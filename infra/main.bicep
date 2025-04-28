@@ -55,7 +55,7 @@ param resourceSize {
     maxReplicas: 1
   }
 }
-param capacity int = 10
+param capacity int = 40
 
 
 var modelVersion = '2024-08-06'
@@ -71,7 +71,7 @@ var backendDockerImageURL = '${resgistryName}.azurecr.io/macaebackend:${appVersi
 var frontendDockerImageURL = '${resgistryName}.azurecr.io/macaefrontend:${appVersion}'
 
 var uniqueNameFormat = '${prefix}-{0}-${uniqueString(resourceGroup().id, prefix)}'
-var aoaiApiVersion = '2024-08-01-preview'
+var aoaiApiVersion = '2025-01-01-preview'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: format(uniqueNameFormat, 'logs')
@@ -332,9 +332,13 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'COSMOSDB_CONTAINER'
               value: cosmos::autogenDb::memoryContainer.name
             }
-            {
-              name: 'AZURE_OPENAI_ENDPOINT'
-              value: aiServices.properties.endpoint
+            {   
+              name: 'AZURE_OPENAI_ENDPOINT'   
+              value: replace(aiServices.properties.endpoint, 'cognitiveservices.azure.com', 'openai.azure.com') 
+            }
+            {   
+              name: 'AUTH_ENABLED'   
+              value: false
             }
             {
               name: 'AZURE_OPENAI_MODEL_NAME'
