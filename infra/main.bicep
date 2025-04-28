@@ -336,10 +336,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'AZURE_OPENAI_ENDPOINT'   
               value: replace(aiServices.properties.endpoint, 'cognitiveservices.azure.com', 'openai.azure.com') 
             }
-            {   
-              name: 'AUTH_ENABLED'   
-              value: false
-            }
             {
               name: 'AZURE_OPENAI_MODEL_NAME'
               value: gptModelVersion
@@ -430,6 +426,10 @@ resource frontendAppService 'Microsoft.Web/sites@2021-02-01' = {
         {
           name: 'BACKEND_API_URL'
           value: 'https://${containerApp.properties.configuration.ingress.fqdn}'
+        }
+        {
+          name: 'AUTH_ENABLED'
+          value: 'false'
         }
       ]
     }
