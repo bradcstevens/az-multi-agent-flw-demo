@@ -119,7 +119,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = 
   properties: {
     customSubDomainName: aiServicesName
     apiProperties: {
-      statisticsEnabled: false
+      //statisticsEnabled: false
     }
   }
 }
