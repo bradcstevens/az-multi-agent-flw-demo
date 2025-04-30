@@ -1,6 +1,6 @@
 targetScope = 'resourceGroup'
 @description('Location for all resources.')
-param location string
+param location string = 'EastUS2'
 
 @allowed([
   'australiaeast'
@@ -28,7 +28,7 @@ param location string
   'westus3'
 ])
 @description('Location for all Ai services resources. This location can be different from the resource group location.')
-param azureOpenAILocation string // The location used for all deployed resources.  This location must be in the same region as the resource group.
+param azureOpenAILocation string = 'eastus2' // The location used for all deployed resources.  This location must be in the same region as the resource group.
 
 @minLength(3)
 @maxLength(20)
