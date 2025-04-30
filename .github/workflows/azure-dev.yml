@@ -7,23 +7,32 @@ on:
       - feature/azd-semantickernel
       - gpickett-patch-6
   workflow_dispatch: 
-
 permissions:
   contents: read
   id-token: write
   pull-requests: write
-
 jobs:
   template_validation_job:
     runs-on: ubuntu-latest
     name: Template validation
-
     steps:
       # Step 1: Checkout the code from your repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Validate the Azure template using microsoft/template-validation-action
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      # Step 3: Install required Python packages
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install azure-mgmt-resource azure-identity azure-core
+
+      # Step 4: Validate the Azure template using microsoft/template-validation-action
       - name: Validate Azure Template
         uses: microsoft/template-validation-action@v0.3.5
         id: validation
@@ -34,8 +43,7 @@ jobs:
           AZURE_ENV_NAME: ${{ secrets.AZURE_ENV_NAME }}
           AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-      # Step 3: Print the result of the validation
+          
+      # Step 5: Print the result of the validation
       - name: Print result
         run: cat ${{ steps.validation.outputs.resultFile }}
