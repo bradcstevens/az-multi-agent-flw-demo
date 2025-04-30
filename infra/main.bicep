@@ -1,6 +1,6 @@
 targetScope = 'resourceGroup'
 @description('Location for all resources.')
-param location string = 'EastUS2'
+param location string = 'EastUS2' //Fixed for model availability, change back to resourceGroup().location
 
 @allowed([
   'australiaeast'
@@ -33,7 +33,7 @@ param azureOpenAILocation string = 'eastus2' // The location used for all deploy
 @minLength(3)
 @maxLength(20)
 @description('Prefix for all resources created by this template.  This prefix will be used to create unique names for all resources.  The prefix must be unique within the resource group.')
-param prefix string
+param prefix string = take('macaeo-${uniqueString(resourceGroup().id)}', 10)
 
 @description('Tags to apply to all deployed resources')
 param tags object = {}
@@ -56,7 +56,7 @@ param resourceSize {
     maxReplicas: 1
   }
 }
-param capacity int = 40
+param capacity int = 10
 
 
 var modelVersion = '2024-08-06'
@@ -72,7 +72,7 @@ var backendDockerImageURL = '${resgistryName}.azurecr.io/macaebackend:${appVersi
 var frontendDockerImageURL = '${resgistryName}.azurecr.io/macaefrontend:${appVersion}'
 
 var uniqueNameFormat = '${prefix}-{0}-${uniqueString(resourceGroup().id, prefix)}'
-var aoaiApiVersion = '2025-01-01-preview'
+var aoaiApiVersion = '2024-08-01-preview'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: format(uniqueNameFormat, 'logs')
@@ -120,7 +120,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = 
   properties: {
     customSubDomainName: aiServicesName
     apiProperties: {
-      //statisticsEnabled: false
+      statisticsEnabled: false
     }
   }
 }
@@ -333,9 +333,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'COSMOSDB_CONTAINER'
               value: cosmos::autogenDb::memoryContainer.name
             }
-            {   
-              name: 'AZURE_OPENAI_ENDPOINT'   
-              value: replace(aiServices.properties.endpoint, 'cognitiveservices.azure.com', 'openai.azure.com') 
+            {
+              name: 'AZURE_OPENAI_ENDPOINT'
+              value: aiServices.properties.endpoint
             }
             {
               name: 'AZURE_OPENAI_MODEL_NAME'
@@ -391,9 +391,9 @@ resource frontendAppServicePlan 'Microsoft.Web/serverfarms@2021-02-01' = {
   location: location
   tags: tags
   sku: {
-    name: 'B2'
+    name: 'P1v2'
     capacity: 1
-    tier: 'Basic'
+    tier: 'PremiumV2'
   }
   properties: {
     reserved: true
@@ -427,10 +427,6 @@ resource frontendAppService 'Microsoft.Web/sites@2021-02-01' = {
         {
           name: 'BACKEND_API_URL'
           value: 'https://${containerApp.properties.configuration.ingress.fqdn}'
-        }
-        {
-          name: 'AUTH_ENABLED'
-          value: 'false'
         }
       ]
     }
