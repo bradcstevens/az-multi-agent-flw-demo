@@ -5,7 +5,6 @@ on:
       - dev
       - main
       - feature/azd-semantickernel
-      - gpickett-patch-6
   workflow_dispatch: 
 permissions:
   contents: read
