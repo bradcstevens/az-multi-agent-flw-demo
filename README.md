@@ -201,7 +201,7 @@ Additional Steps
 
 1. **Add App Authentication**
    
-    Follow steps in [App Authentication](./documentation/azure_app_service_auth_setup.md) to configure authenitcation in app service.
+    Follow steps in [App Authentication](./documentation/azure_app_service_auth_setup.md) to configure authentication in app service.
 
     Note: Authentication changes can take up to 10 minutes 
 
