@@ -31,7 +31,7 @@ This will allow the scripts to run for the current session without permanently c
 Pick from the options below to see step-by-step instructions for GitHub Codespaces, VS Code Dev Containers, Local Environments, and Bicep deployments.
 
 | [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator) | [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator) |
-|---|---|
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 
 <details>
   <summary><b>Deploy in GitHub Codespaces</b></summary>
@@ -42,7 +42,7 @@ You can run this solution using GitHub Codespaces. The button will open a web-ba
 
 1. Open the solution accelerator (this may take several minutes):
 
-    [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator)
+   [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator)
 
 2. Accept the default values on the create Codespaces page.
 3. Open a terminal window if it is not already open.
@@ -60,7 +60,7 @@ You can run this solution in VS Code Dev Containers, which will open the project
 1. Start Docker Desktop (install it if not already installed).
 2. Open the project:
 
-    [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator)
+   [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator)
 
 3. In the VS Code window that opens, once the project files show up (this may take several minutes), open a terminal window.
 4. Continue with the [deploying steps](#deploying-with-azd).
@@ -75,17 +75,18 @@ You can run this solution in VS Code Dev Containers, which will open the project
 If you're not using one of the above options for opening the project, then you'll need to:
 
 1. Make sure the following tools are installed:
-    - [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.5) <small>(v7.0+)</small> - available for Windows, macOS, and Linux.
-    - [Azure Developer CLI (azd)](https://aka.ms/install-azd)
-    - [Python 3.9+](https://www.python.org/downloads/)
-    - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-    - [Git](https://git-scm.com/downloads)
+
+   - [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.5) <small>(v7.0+)</small> - available for Windows, macOS, and Linux.
+   - [Azure Developer CLI (azd)](https://aka.ms/install-azd)
+   - [Python 3.9+](https://www.python.org/downloads/)
+   - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+   - [Git](https://git-scm.com/downloads)
 
 2. Clone the repository or download the project code via command-line:
 
-    ```shell
-    azd init -t microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/
-    ```
+   ```shell
+   azd init -t microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/
+   ```
 
 3. Open the project folder in your terminal or editor.
 4. Continue with the [deploying steps](#deploying-with-azd).
@@ -101,20 +102,21 @@ Consider the following settings during your deployment to modify specific settin
 
 When you start the deployment, most parameters will have **default values**, but you can update the following settings:
 
-| **Setting** | **Description** | **Default value** |
-|-------------|-----------------|-------------------|
-| **Azure Region** | The region where resources will be created. | East US |
-| **Secondary Location** | A **less busy** region for **Azure Cosmos DB**, useful in case of availability constraints. | eastus2 |
-| **Deployment Type** | Select from a drop-down list. | GlobalStandard |
-| **GPT Model** | Choose from **gpt-4, gpt-4o, gpt-4o-mini**. | gpt-4o |
-| **GPT Model Deployment Capacity** | Configure capacity for **GPT models**. | 100k |
+| **Setting**                       | **Description**                                                                             | **Default value** |
+| --------------------------------- | ------------------------------------------------------------------------------------------- | ----------------- |
+| **Azure Region**                  | The region where resources will be created.                                                 | East US           |
+| **Secondary Location**            | A **less busy** region for **Azure Cosmos DB**, useful in case of availability constraints. | eastus2           |
+| **Deployment Type**               | Select from a drop-down list.                                                               | GlobalStandard    |
+| **GPT Model**                     | Choose from **gpt-4, gpt-4o, gpt-4o-mini**.                                                 | gpt-4o            |
+| **GPT Model Deployment Capacity** | Configure capacity for **GPT models**.                                                      | 100k              |
 
 </details>
 
 <details>
   <summary><b>[Optional] Quota Recommendations</b></summary>
 
-By default, the **GPT model capacity** in deployment is set to **30k tokens**.  
+By default, the **GPT model capacity** in deployment is set to **140k tokens**.
+
 > **We recommend increasing the capacity to 100k tokens for optimal performance.**
 
 To adjust quota settings, follow these [steps](./AzureGPTQuotaSettings.md).
@@ -129,26 +131,27 @@ Once you've opened the project in [Codespaces](#github-codespaces), [Dev Contain
 
 1. Login to Azure:
 
-    ```shell
-    azd auth login
-    ```
+   ```shell
+   azd auth login
+   ```
 
-    #### To authenticate with Azure Developer CLI (`azd`), use the following command with your **Tenant ID**:
+   #### To authenticate with Azure Developer CLI (`azd`), use the following command with your **Tenant ID**:
 
-    ```sh
-    azd auth login --tenant-id <tenant-id>
-    ```
+   ```sh
+   azd auth login --tenant-id <tenant-id>
+   ```
 
 2. Provision and deploy all the resources:
 
-    ```shell
-    azd up
-    ```
+   ```shell
+   azd up
+   ```
 
 3. Provide an `azd` environment name (e.g., "macaeapp").
-4. Select a subscription from your Azure account and choose a location that has quota for all the resources. 
-    - This deployment will take *4-6 minutes* to provision the resources in your account and set up the solution with sample data.
-    - If you encounter an error or timeout during deployment, changing the location may help, as there could be availability constraints for the resources.
+4. Select a subscription from your Azure account and choose a location that has quota for all the resources.
+
+   - This deployment will take _4-6 minutes_ to provision the resources in your account and set up the solution with sample data.
+   - If you encounter an error or timeout during deployment, changing the location may help, as there could be availability constraints for the resources.
 
 5. Once the deployment has completed successfully, open the [Azure Portal](https://portal.azure.com/), go to the deployed resource group, find the App Service, and get the app URL from `Default domain`.
 
@@ -161,6 +164,7 @@ If you need to rebuild the source code and push the updated container to the dep
 1. Set the environment variable `USE_LOCAL_BUILD` to `True`:
 
    - **Linux/macOS**:
+
      ```bash
      export USE_LOCAL_BUILD=True
      ```
@@ -169,7 +173,9 @@ If you need to rebuild the source code and push the updated container to the dep
      ```powershell
      $env:USE_LOCAL_BUILD = $true
      ```
+
 2. Run the `az login` command
+
    ```bash
    az login
    ```
@@ -195,7 +201,7 @@ The easiest way to run this accelerator is in a VS Code Dev Containers, which wi
 
 1. Start Docker Desktop (install it if not already installed)
 1. Open the project:
-    [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator)
+   [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator)
 
 1. In the VS Code window that opens, once the project files show up (this may take several minutes), open a terminal window
 
@@ -203,8 +209,8 @@ The easiest way to run this accelerator is in a VS Code Dev Containers, which wi
 
 The solution contains a [development container](https://code.visualstudio.com/docs/remote/containers) with all the required tooling to develop and deploy the accelerator. To deploy the Chat With Your Data accelerator using the provided development container you will also need:
 
-* [Visual Studio Code](https://code.visualstudio.com)
-* [Remote containers extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+- [Visual Studio Code](https://code.visualstudio.com)
+- [Remote containers extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 
 If you are running this on Windows, we recommend you clone this repository in [WSL](https://code.visualstudio.com/docs/remote/wsl)
 
@@ -219,7 +225,7 @@ code .
 ```
 
 !!! tip
-    Visual Studio Code should recognize the available development container and ask you to open the folder using it. For additional details on connecting to remote containers, please see the [Open an existing folder in a container](https://code.visualstudio.com/docs/remote/containers#_quick-start-open-an-existing-folder-in-a-container) quickstart.
+Visual Studio Code should recognize the available development container and ask you to open the folder using it. For additional details on connecting to remote containers, please see the [Open an existing folder in a container](https://code.visualstudio.com/docs/remote/containers#_quick-start-open-an-existing-folder-in-a-container) quickstart.
 
 When you start the development container for the first time, the container will be built. This usually takes a few minutes. **Please use the development container for all further steps.**
 
@@ -258,16 +264,19 @@ The files for the dev container are located in `/.devcontainer/` folder.
      az deployment group create -g <resource-group-name> -f deploy/macae-dev.bicep --query 'properties.outputs'
      ```
    - **Note**: You will be prompted for a `principalId`, which is the ObjectID of your user in Entra ID. To find it, use the Azure Portal or run:
+
      ```bash
      az ad signed-in-user show --query id -o tsv
      ```
-     You will also be prompted for locations for Cosmos and OpenAI services.  This is to allow separate regions where there may be service quota restrictions.
+
+     You will also be prompted for locations for Cosmos and OpenAI services. This is to allow separate regions where there may be service quota restrictions.
 
    - **Additional Notes**:
 
      **Role Assignments in Bicep Deployment:**
-     
-      The **macae-dev.bicep** deployment includes the assignment of the appropriate roles to AOAI and Cosmos services. If you want to modify an existing implementation—for example, to use resources deployed as part of the simple deployment for local debugging—you will need to add your own credentials to access the Cosmos and AOAI services. You can add these permissions using the following commands:
+
+     The **macae-dev.bicep** deployment includes the assignment of the appropriate roles to AOAI and Cosmos services. If you want to modify an existing implementation—for example, to use resources deployed as part of the simple deployment for local debugging—you will need to add your own credentials to access the Cosmos and AOAI services. You can add these permissions using the following commands:
+
      ```bash
      az cosmosdb sql role assignment create --resource-group <solution-accelerator-rg> --account-name <cosmos-db-account-name> --role-definition-name "Cosmos DB Built-in Data Contributor" --principal-id <aad-user-object-id> --scope /subscriptions/<subscription-id>/resourceGroups/<solution-accelerator-rg>/providers/Microsoft.DocumentDB/databaseAccounts/<cosmos-db-account-name>
      ```
@@ -275,25 +284,27 @@ The files for the dev container are located in `/.devcontainer/` folder.
      ```bash
      az role assignment create --assignee <aad-user-upn> --role "Cognitive Services OpenAI User" --scope /subscriptions/<subscription-id>/resourceGroups/<solution-accelerator-rg>/providers/Microsoft.CognitiveServices/accounts/<azure-openai-account-name>
      ```
-      **Using a Different Database in Cosmos:**
 
-      You can set the solution up to use a different database in Cosmos. For example, you can name it something like macae-dev. To do this:
-    1. Change the environment variable **COSMOSDB_DATABASE** to the new database name.
-    2. You will need to create the database in the Cosmos DB account. You can do this from the Data Explorer pane in the portal, click on the drop down labeled "_+ New Container_" and provide all the necessary details.
+     **Using a Different Database in Cosmos:**
 
-6. **Create a `.env` file:**
+     You can set the solution up to use a different database in Cosmos. For example, you can name it something like macae-dev. To do this:
+
+   1. Change the environment variable **COSMOSDB_DATABASE** to the new database name.
+   2. You will need to create the database in the Cosmos DB account. You can do this from the Data Explorer pane in the portal, click on the drop down labeled "_+ New Container_" and provide all the necessary details.
+
+5. **Create a `.env` file:**
 
    - Navigate to the `src` folder and create a `.env` file based on the provided `.env.sample` file.
 
-7. **Fill in the `.env` file:**
+6. **Fill in the `.env` file:**
 
    - Use the output from the deployment or check the Azure Portal under "Deployments" in the resource group.
 
-8. **(Optional) Set up a virtual environment:**
+7. **(Optional) Set up a virtual environment:**
 
    - If you are using `venv`, create and activate your virtual environment for both the frontend and backend folders.
 
-9. **Install requirements - frontend:**
+8. **Install requirements - frontend:**
 
    - In each of the frontend and backend folders -
      Open a terminal in the `src` folder and run:
@@ -301,15 +312,19 @@ The files for the dev container are located in `/.devcontainer/` folder.
      pip install -r requirements.txt
      ```
 
-10. **Run the application:**
-   - From the src/backend directory:
-   ```bash
-   python app.py
-   ```
-   - In a new terminal from the src/frontend directory
-  ```bash
-   python frontend_server.py
-   ```
+9. **Run the application:**
+
+- From the src/backend directory:
+
+```bash
+python app.py
+```
+
+- In a new terminal from the src/frontend directory
+
+```bash
+ python frontend_server.py
+```
 
 10. Open a browser and navigate to `http://localhost:3000`
 11. To see swagger API documentation, you can navigate to `http://localhost:8000/docs`
@@ -329,6 +344,7 @@ You can debug the API backend running locally with VSCode using the following la
       "jinja": true
     }
 ```
+
 To debug the python server in the frontend directory (frontend_server.py) and related, add the following launch.json entry:
 
 ```
@@ -342,4 +358,3 @@ To debug the python server in the frontend directory (frontend_server.py) and re
       "jinja": true
     }
 ```
-

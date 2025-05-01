@@ -56,7 +56,7 @@ param resourceSize {
     maxReplicas: 1
   }
 }
-param capacity int = 40
+param capacity int = 140
 
 var modelVersion = '2024-08-06'
 var aiServicesName = '${prefix}-aiservices'
