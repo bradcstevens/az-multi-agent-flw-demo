@@ -1,22 +1,26 @@
 # Manual Azure Deployment
-Manual Deployment differs from the ‘Quick Deploy’ option in that it will install an Azure Container Registry (ACR) service, and relies on the installer to build and push the necessary containers to this ACR.  This allows you to build and push your own code changes and provides a sample solution you can customize based on your requirements.
+
+Manual Deployment differs from the ‘Quick Deploy’ option in that it will install an Azure Container Registry (ACR) service, and relies on the installer to build and push the necessary containers to this ACR. This allows you to build and push your own code changes and provides a sample solution you can customize based on your requirements.
 
 ## Prerequisites
 
 - Current Azure CLI installed
-  You can update to the latest version using ```az upgrade```
+  You can update to the latest version using `az upgrade`
 - Azure account with appropriate permissions
 - Docker installed
 
 ## Deploy the Azure Services
-All of the necessary Azure services can be deployed using the /deploy/macae.bicep script.  This script will require the following parameters:
+
+All of the necessary Azure services can be deployed using the /deploy/macae.bicep script. This script will require the following parameters:
 
 ```
 az login
 az account set --subscription <SUBSCRIPTION_ID>
 az group create --name <RG_NAME> --location <RG_LOCATION>
 ```
+
 To deploy the script you can use the Azure CLI.
+
 ```
 az deployment group create \
   --resource-group <RG_NAME> \
@@ -26,9 +30,10 @@ az deployment group create \
 
 Note: if you are using windows with PowerShell, the continuation character (currently ‘\’) should change to the tick mark (‘`’).
 
-The template will require you fill in locations for Cosmos and OpenAI services.  This is to avoid the possibility of regional quota errors for either of these resources.
+The template will require you fill in locations for Cosmos and OpenAI services. This is to avoid the possibility of regional quota errors for either of these resources.
 
 ## Create the Containers
+
 - Get admin credentials from ACR
 
 Retrieve the admin credentials for your Azure Container Registry (ACR):
@@ -49,7 +54,7 @@ az acr login --name <e.g. macaeacr2t62qyozi76bs>
 
 ## Build and push the image
 
-Build the frontend and backend Docker images and push them  to your Azure Container Registry. Run the following from the src/backend and the src/frontend directory contexts:
+Build the frontend and backend Docker images and push them to your Azure Container Registry. Run the following from the src/backend and the src/frontend directory contexts:
 
 ```sh
 az acr build \
@@ -60,12 +65,13 @@ az acr build \
 
 ## Add images to the Container APP and Web App services
 
-To add your newly created backend image: 
+To add your newly created backend image:
+
 - Navigate to the Container App Service in the Azure portal
 - Click on Application/Containers in the left pane
 - Click on the "Edit and deploy" button in the upper left of the containers pane
-- In the "Create and deploy new revision" page, click on your container image 'backend'.  This will give you the option of reconfiguring the container image, and also has an Environment variables tab
-- Change the properties page to 
+- In the "Create and deploy new revision" page, click on your container image 'backend'. This will give you the option of reconfiguring the container image, and also has an Environment variables tab
+- Change the properties page to
   - point to your Azure Container registry with a private image type and your image name (e.g. backendmacae:latest)
   - under "Authentication type" select "Managed Identity" and choose the 'mace-containerapp-pull'... identity setup in the bicep template
 - In the environment variables section add the following (each with a 'Manual entry' source):
@@ -75,8 +81,8 @@ To add your newly created backend image:
 
         name: 'COSMOSDB_DATABASE'
         value: 'macae'
-	    Note: To change the default, you will need to create the database in Cosmos
-			  
+      Note: To change the default, you will need to create the database in Cosmos
+
         name: 'COSMOSDB_CONTAINER'
         value: 'memory'
 
@@ -88,7 +94,7 @@ To add your newly created backend image:
 
         name: 'AZURE_OPENAI_API_VERSION'
         value: '2024-08-01-preview'
-		Note: Version should be updated based on latest available
+      Note: Version should be updated based on latest available
 
         name: 'FRONTEND_SITE_NAME'
         value: 'https://<website Name>.azurewebsites.net'
@@ -106,4 +112,3 @@ az webapp config container set --resource-group <resource_group_name> \
 --container-image-name <e.g. macaeacr2t62qyozi76bs.azurecr.io/frontendmacae:latest>  \
 --container-registry-url <e.g. https://macaeacr2t62qyozi76bs.azurecr.io>
 ```
-
