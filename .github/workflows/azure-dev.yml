@@ -5,11 +5,13 @@ on:
       - dev
       - main
       - feature/azd-semantickernel
-  workflow_dispatch: 
+  workflow_dispatch:
+
 permissions:
   contents: read
   id-token: write
   pull-requests: write
+
 jobs:
   template_validation_job:
     runs-on: ubuntu-latest
@@ -23,7 +25,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: "3.9"
 
       # Step 3: Create and populate the virtual environment
       - name: Create virtual environment and install dependencies
@@ -54,7 +56,7 @@ jobs:
           AZURE_ENV_NAME: ${{ secrets.AZURE_ENV_NAME }}
           AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       # Step 6: Debug output in case of failure
       - name: Debug on failure
         if: failure()
