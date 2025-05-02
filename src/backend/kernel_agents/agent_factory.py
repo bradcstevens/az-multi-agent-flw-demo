@@ -158,7 +158,6 @@ class AgentFactory:
 
         # Build the agent definition (functions schema)
         definition = None
-        client = None
 
         try:
             if client is None:
@@ -239,6 +238,7 @@ class AgentFactory:
         user_id: str,
         temperature: float = 0.0,
         memory_store: Optional[CosmosMemoryContext] = None,
+        client: Optional[Any] = None,
     ) -> Dict[AgentType, BaseAgent]:
         """Create all agent types for a session in a specific order.
 
@@ -265,6 +265,13 @@ class AgentFactory:
         planner_agent_type = AgentType.PLANNER
         group_chat_manager_type = AgentType.GROUP_CHAT_MANAGER
 
+        try:
+            if client is None:
+                # Create the AIProjectClient instance using the config
+                # This is a placeholder; replace with actual client creation logic
+                client = config.get_ai_project_client()
+        except Exception as client_exc:
+            logger.error(f"Error creating AIProjectClient: {client_exc}")
         # Initialize cache for this session if it doesn't exist
         if session_id not in cls._agent_cache:
             cls._agent_cache[session_id] = {}
@@ -280,6 +287,7 @@ class AgentFactory:
                 session_id=session_id,
                 user_id=user_id,
                 temperature=temperature,
+                client=client,
                 memory_store=memory_store,
             )
 
@@ -305,6 +313,7 @@ class AgentFactory:
             user_id=user_id,
             temperature=temperature,
             agent_instances=agent_instances,  # Pass agent instances to the planner
+            client=client,
             response_format=ResponseFormatJsonSchemaType(
                 json_schema=ResponseFormatJsonSchema(
                     name=PlannerResponsePlan.__name__,
@@ -324,6 +333,7 @@ class AgentFactory:
             session_id=session_id,
             user_id=user_id,
             temperature=temperature,
+            client=client,
             agent_instances=agent_instances,  # Pass agent instances to the planner
         )
         agents[group_chat_manager_type] = group_chat_manager
