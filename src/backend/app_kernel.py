@@ -129,17 +129,10 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
         kernel, memory_store = await initialize_runtime_and_context(
             input_task.session_id, user_id
         )
-        client = None
-        try:
-            client = config.get_ai_project_client()
-        except Exception as client_exc:
-            logging.error(f"Error creating AIProjectClient: {client_exc}")
-
         agents = await AgentFactory.create_all_agents(
             session_id=input_task.session_id,
             user_id=user_id,
             memory_store=memory_store,
-            client=client,
         )
 
         group_chat_manager = agents[AgentType.GROUP_CHAT_MANAGER.value]
@@ -173,11 +166,7 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
                 "description": input_task.description,
             },
         )
-        if client:
-            try:
-                client.close()
-            except Exception as e:
-                logging.error(f"Error sending to AIProjectClient: {e}")
+
         return {
             "status": f"Plan created with ID: {plan.id}",
             "session_id": input_task.session_id,
@@ -265,31 +254,12 @@ async def human_feedback_endpoint(human_feedback: HumanFeedback, request: Reques
     kernel, memory_store = await initialize_runtime_and_context(
         human_feedback.session_id, user_id
     )
-
-    client = None
-    try:
-        client = config.get_ai_project_client()
-    except Exception as client_exc:
-        logging.error(f"Error creating AIProjectClient: {client_exc}")
-
-    human_agent = await AgentFactory.create_agent(
-        agent_type=AgentType.HUMAN,
-        session_id=human_feedback.session_id,
-        user_id=user_id,
-        memory_store=memory_store,
-        client=client,
+    agents = await AgentFactory.create_all_agents(
+        session_id=human_feedback.session_id, user_id=user_id, memory_store=memory_store
     )
 
-    if human_agent is None:
-        track_event_if_configured(
-            "AgentNotFound",
-            {
-                "status": "Agent not found",
-                "session_id": human_feedback.session_id,
-                "step_id": human_feedback.step_id,
-            },
-        )
-        raise HTTPException(status_code=404, detail="Agent not found")
+    # Send the feedback to the human agent
+    human_agent = agents[AgentType.HUMAN.value]
 
     # Use the human agent to handle the feedback
     await human_agent.handle_human_feedback(human_feedback=human_feedback)
@@ -302,11 +272,7 @@ async def human_feedback_endpoint(human_feedback: HumanFeedback, request: Reques
             "step_id": human_feedback.step_id,
         },
     )
-    if client:
-        try:
-            client.close()
-        except Exception as e:
-            logging.error(f"Error sending to AIProjectClient: {e}")
+
     return {
         "status": "Feedback received",
         "session_id": human_feedback.session_id,
@@ -372,30 +338,14 @@ async def human_clarification_endpoint(
     kernel, memory_store = await initialize_runtime_and_context(
         human_clarification.session_id, user_id
     )
-    client = None
-    try:
-        client = config.get_ai_project_client()
-    except Exception as client_exc:
-        logging.error(f"Error creating AIProjectClient: {client_exc}")
-
-    human_agent = await AgentFactory.create_agent(
-        agent_type=AgentType.HUMAN,
+    agents = await AgentFactory.create_all_agents(
         session_id=human_clarification.session_id,
         user_id=user_id,
         memory_store=memory_store,
-        client=client,
     )
 
-    if human_agent is None:
-        track_event_if_configured(
-            "AgentNotFound",
-            {
-                "status": "Agent not found",
-                "session_id": human_clarification.session_id,
-                "step_id": human_clarification.step_id,
-            },
-        )
-        raise HTTPException(status_code=404, detail="Agent not found")
+    # Send the feedback to the human agent
+    human_agent = agents[AgentType.HUMAN.value]
 
     # Use the human agent to handle the feedback
     await human_agent.handle_human_clarification(
@@ -409,11 +359,7 @@ async def human_clarification_endpoint(
             "session_id": human_clarification.session_id,
         },
     )
-    if client:
-        try:
-            client.close()
-        except Exception as e:
-            logging.error(f"Error sending to AIProjectClient: {e}")
+
     return {
         "status": "Clarification received",
         "session_id": human_clarification.session_id,
@@ -486,16 +432,10 @@ async def approve_step_endpoint(
     kernel, memory_store = await initialize_runtime_and_context(
         human_feedback.session_id, user_id
     )
-    client = None
-    try:
-        client = config.get_ai_project_client()
-    except Exception as client_exc:
-        logging.error(f"Error creating AIProjectClient: {client_exc}")
     agents = await AgentFactory.create_all_agents(
         session_id=human_feedback.session_id,
         user_id=user_id,
         memory_store=memory_store,
-        client=client,
     )
 
     # Send the approval to the group chat manager
@@ -503,11 +443,6 @@ async def approve_step_endpoint(
 
     await group_chat_manager.handle_human_feedback(human_feedback)
 
-    if client:
-        try:
-            client.close()
-        except Exception as e:
-            logging.error(f"Error sending to AIProjectClient: {e}")
     # Return a status message
     if human_feedback.step_id:
         track_event_if_configured(
