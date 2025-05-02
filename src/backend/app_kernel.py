@@ -1,52 +1,52 @@
 # app_kernel.py
 import asyncio
+import json
 import logging
 import os
-import uuid
 import re
-import json
-from typing import List, Dict, Optional, Any
+import uuid
+from typing import Any, Dict, List, Optional
+
+# Semantic Kernel imports
+import semantic_kernel as sk
+from app_config import config
+from auth.auth_utils import get_authenticated_user_details
+
+# Azure monitoring
+from azure.monitor.opentelemetry import configure_azure_monitor
+from config_kernel import Config
+from context.cosmos_memory_kernel import CosmosMemoryContext
+from event_utils import track_event_if_configured
 
 # FastAPI imports
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-
-# Azure monitoring
-from azure.monitor.opentelemetry import configure_azure_monitor
-
-# Semantic Kernel imports
-import semantic_kernel as sk
-
-# Updated import for KernelArguments
-from semantic_kernel.functions.kernel_arguments import KernelArguments
+from kernel_agents.agent_factory import AgentFactory
 
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
-from auth.auth_utils import get_authenticated_user_details
-from config_kernel import Config
-from context.cosmos_memory_kernel import CosmosMemoryContext
 from models.messages_kernel import (
-    HumanFeedback,
-    HumanClarification,
-    InputTask,
-    Plan,
-    Step,
-    AgentMessage,
-    PlanWithSteps,
     ActionRequest,
     ActionResponse,
+    AgentMessage,
+    AgentType,
+    HumanClarification,
+    HumanFeedback,
+    InputTask,
+    Plan,
+    PlanWithSteps,
+    Step,
 )
-from utils_kernel import initialize_runtime_and_context, get_agents, rai_success
-from event_utils import track_event_if_configured
-from models.messages_kernel import AgentType
-from kernel_agents.agent_factory import AgentFactory
-from app_config import config
+
+# Updated import for KernelArguments
+from semantic_kernel.functions.kernel_arguments import KernelArguments
+from utils_kernel import get_agents, initialize_runtime_and_context, rai_success
 
 # # Check if the Application Insights Instrumentation Key is set in the environment variables
-instrumentation_key = os.getenv("APPLICATIONINSIGHTS_INSTRUMENTATION_KEY")
-if instrumentation_key:
+connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+if connection_string:
     # Configure Application Insights if the Instrumentation Key is found
-    configure_azure_monitor(connection_string=instrumentation_key)
+    configure_azure_monitor(connection_string=connection_string)
     logging.info(
         "Application Insights configured with the provided Instrumentation Key"
     )
