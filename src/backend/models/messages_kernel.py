@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime,timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
@@ -93,7 +93,7 @@ class BaseDataModel(KernelBaseModel):
     """Base data model with common fields."""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    timestamp: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # Basic message class for Semantic Kernel compatibility
