@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.34.44.8038",
-      "templateHash": "17842743346739787743"
+      "templateHash": "7719893060553487435"
     }
   },
   "parameters": {
@@ -50,7 +50,7 @@
     },
     "prefix": {
       "type": "string",
-      "defaultValue": "macaeatemplate",
+      "defaultValue": "macae",
       "minLength": 3,
       "maxLength": 20,
       "metadata": {
