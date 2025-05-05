@@ -32,8 +32,11 @@ param azureOpenAILocation string = 'eastus2' // The location used for all deploy
 
 @minLength(3)
 @maxLength(20)
-@description('Prefix for all resources created by this template.  This prefix will be used to create unique names for all resources.  The prefix must be unique within the resource group.')
-param prefix string = toLower(uniqueString(subscription().id, resourceGroup().location))
+@description('A unique prefix for all resources in this deployment. This should be 3-20 characters long:')
+param environmentName string
+ 
+var uniqueId = toLower(uniqueString(subscription().id, environmentName, resourceGroup().location))
+var solutionPrefix = 'km${padLeft(take(uniqueId, 12), 12, '0')}'
 
 @description('Tags to apply to all deployed resources')
 param tags object = {}
