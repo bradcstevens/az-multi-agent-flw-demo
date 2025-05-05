@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.34.44.8038",
-      "templateHash": "17607752669280852658"
+      "templateHash": "17842743346739787743"
     }
   },
   "parameters": {
@@ -719,7 +719,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.34.44.8038",
-              "templateHash": "12841004781727402447"
+              "templateHash": "8087543237770345715"
             }
           },
           "parameters": {
@@ -727,25 +727,25 @@
               "type": "string"
             },
             "solutionLocation": {
-              "type": "securestring"
+              "type": "string"
             },
             "keyVaultName": {
               "type": "string"
             },
             "gptModelName": {
-              "type": "securestring"
+              "type": "string"
             },
             "gptModelVersion": {
-              "type": "securestring"
+              "type": "string"
             },
             "managedIdentityObjectId": {
               "type": "string"
             },
             "aiServicesEndpoint": {
-              "type": "securestring"
+              "type": "string"
             },
             "aiServicesKey": {
-              "type": "securestring"
+              "type": "string"
             },
             "aiServicesId": {
               "type": "string"
