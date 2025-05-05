@@ -36,7 +36,7 @@ param azureOpenAILocation string = 'eastus2' // The location used for all deploy
 param environmentName string
  
 var uniqueId = toLower(uniqueString(subscription().id, environmentName, resourceGroup().location))
-var solutionPrefix = 'km${padLeft(take(uniqueId, 12), 12, '0')}'
+var solutionPrefix = 'macae${padLeft(take(uniqueId, 12), 12, '0')}'
 
 @description('Tags to apply to all deployed resources')
 param tags object = {}
@@ -62,7 +62,7 @@ param resourceSize {
 param capacity int = 140
 
 var modelVersion = '2024-08-06'
-var aiServicesName = '${prefix}-aiservices'
+var aiServicesName = '${solutionPrefix}-aiservices'
 var deploymentType = 'GlobalStandard'
 var gptModelVersion = 'gpt-4o'
 var appVersion = 'fnd01'
@@ -73,7 +73,7 @@ var dockerRegistryUrl = 'https://${resgistryName}.azurecr.io'
 var backendDockerImageURL = '${resgistryName}.azurecr.io/macaebackend:${appVersion}'
 var frontendDockerImageURL = '${resgistryName}.azurecr.io/macaefrontend:${appVersion}'
 
-var uniqueNameFormat = '${prefix}-{0}-${uniqueString(resourceGroup().id, prefix)}'
+var uniqueNameFormat = '${solutionPrefix}-{0}-${uniqueString(resourceGroup().id, solutionPrefix)}'
 var aoaiApiVersion = '2025-01-01-preview'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
@@ -149,7 +149,7 @@ resource aiServicesDeployments 'Microsoft.CognitiveServices/accounts/deployments
 module kvault 'deploy_keyvault.bicep' = {
   name: 'deploy_keyvault'
   params: {
-    solutionName: prefix
+    solutionName: solutionPrefix
     solutionLocation: location
     managedIdentityObjectId: managedIdentityModule.outputs.managedIdentityOutput.objectId
   }
@@ -163,7 +163,7 @@ module kvault 'deploy_keyvault.bicep' = {
 module aifoundry 'deploy_ai_foundry.bicep' = {
   name: 'deploy_ai_foundry'
   params: {
-    solutionName: prefix
+    solutionName: solutionPrefix
     solutionLocation: azureOpenAILocation
     keyVaultName: kvault.outputs.keyvaultName
     gptModelName: gptModelVersion
@@ -279,7 +279,7 @@ resource acaCosomsRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleA
 
 @description('')
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
-  name: '${prefix}-backend'
+  name: '${solutionPrefix}-backend'
   location: location
   tags: tags
   identity: {
@@ -448,7 +448,7 @@ resource frontendAppService 'Microsoft.Web/sites@2021-02-01' = {
 }
 
 resource aiHubProject 'Microsoft.MachineLearningServices/workspaces@2024-01-01-preview' existing = {
-  name: '${prefix}-aiproject' // aiProjectName must be calculated - available at main start.
+  name: '${solutionPrefix}-aiproject' // aiProjectName must be calculated - available at main start.
 }
 
 resource aiDeveloper 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
@@ -469,7 +469,7 @@ var cosmosAssignCli = 'az cosmosdb sql role assignment create --resource-group "
 module managedIdentityModule 'deploy_managed_identity.bicep' = {
   name: 'deploy_managed_identity'
   params: {
-    solutionName: prefix
+    solutionName: solutionPrefix
     //solutionLocation: location
     managedIdentityId: pullIdentity.id
     managedIdentityPropPrin: pullIdentity.properties.principalId
