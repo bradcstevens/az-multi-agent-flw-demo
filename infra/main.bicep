@@ -36,7 +36,7 @@ param azureOpenAILocation string = 'eastus2' // The location used for all deploy
 param environmentName string
  
 var uniqueId = toLower(uniqueString(subscription().id, environmentName, resourceGroup().location))
-var solutionPrefix = 'macae${padLeft(take(uniqueId, 12), 12, '0')}'
+var solutionPrefix = 'ma${padLeft(take(uniqueId, 12), 12, '0')}'
 
 @description('Tags to apply to all deployed resources')
 param tags object = {}
