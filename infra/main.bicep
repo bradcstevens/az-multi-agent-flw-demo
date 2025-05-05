@@ -120,6 +120,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = 
     apiProperties: {
       //statisticsEnabled: false
     }
+    disableLocalAuth: true
   }
 }
 
