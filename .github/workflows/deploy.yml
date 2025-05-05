@@ -24,10 +24,10 @@ jobs:
           export GPT_MIN_CAPACITY="50"
           export AZURE_REGIONS="${{ vars.AZURE_REGIONS }}"
 
-          chmod +x deploy/scripts/checkquota.sh
-          if ! deploy/scripts/checkquota.sh; then
+          chmod +x infra/scripts/checkquota.sh
+          if ! infra/scripts/checkquota.sh; then
             # If quota check fails due to insufficient quota, set the flag
-            if grep -q "No region with sufficient quota found" deploy/scripts/checkquota.sh; then
+            if grep -q "No region with sufficient quota found" infra/scripts/checkquota.sh; then
               echo "QUOTA_FAILED=true" >> $GITHUB_ENV
             fi
             exit 1  # Fail the pipeline if any other failure occurs
@@ -100,7 +100,7 @@ jobs:
           set -e
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --template-file deploy/macae.bicep \
+            --template-file infra/macae.bicep \
             --parameters azureOpenAILocation=${{env.AZURE_LOCATION }} cosmosLocation=${{env.AZURE_LOCATION }}
 
 
