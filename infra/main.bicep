@@ -153,6 +153,15 @@ module kvault 'deploy_keyvault.bicep' = {
   scope: resourceGroup(resourceGroup().name)
 }
 
+// First, add this section to store the AI Services key in Key Vault
+resource aiServicesKeySecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' = {
+  name: '${kvault.outputs.keyvaultName}/aiServicesKey'
+  properties: {
+    value: aiServices.listKeys().key1
+  }
+}
+
+// Then modify the aifoundry module to reference the secret securely
 module aifoundry 'deploy_ai_foundry.bicep' = {
   name: 'deploy_ai_foundry'
   params: {
@@ -163,10 +172,13 @@ module aifoundry 'deploy_ai_foundry.bicep' = {
     gptModelVersion: gptModelVersion
     managedIdentityObjectId: managedIdentityModule.outputs.managedIdentityOutput.objectId
     aiServicesEndpoint: aiServices.properties.endpoint
-    aiServicesKey: aiServices.listKeys().key1
+    aiServicesKey: '@Microsoft.KeyVault(SecretUri=${kvault.outputs.keyVaultUri}secrets/aiServicesKey/)'
     aiServicesId: aiServices.id
   }
   scope: resourceGroup(resourceGroup().name)
+  dependsOn: [
+    aiServicesKeySecret
+  ]
 }
 
 resource aoaiUserRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-05-01-preview' existing = {
