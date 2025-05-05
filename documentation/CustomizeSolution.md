@@ -614,4 +614,4 @@ This application orchestrates a group of AI agents to accomplish user-defined ta
 
 Understanding the flow of data through the endpoints, agents, and persistent storage is key to grasping the logic of the application. Each component plays a specific role in ensuring tasks are planned, executed, and adjusted based on feedback, providing a robust and interactive system.
 
-For instructions to setup a local development environment for the solution, please see [local deployment guide](./LocalDeployment.md).
+For instructions to setup a local development environment for the solution, please see [deployment guide](./DeploymentGuide.md).

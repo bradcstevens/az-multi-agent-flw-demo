@@ -108,7 +108,7 @@ When you start the deployment, most parameters will have **default values**, but
 | **Secondary Location**            | A **less busy** region for **Azure Cosmos DB**, useful in case of availability constraints. | eastus2           |
 | **Deployment Type**               | Select from a drop-down list.                                                               | GlobalStandard    |
 | **GPT Model**                     | Choose from **gpt-4, gpt-4o, gpt-4o-mini**.                                                 | gpt-4o            |
-| **GPT Model Deployment Capacity** | Configure capacity for **GPT models**.                                                      | 100k              |
+| **GPT Model Deployment Capacity** | Configure capacity for **GPT models**.                                                      | 140k              |
 
 </details>
 
@@ -116,8 +116,6 @@ When you start the deployment, most parameters will have **default values**, but
   <summary><b>[Optional] Quota Recommendations</b></summary>
 
 By default, the **GPT model capacity** in deployment is set to **140k tokens**.
-
-> **We recommend increasing the capacity to 100k tokens for optimal performance.**
 
 To adjust quota settings, follow these [steps](./AzureGPTQuotaSettings.md).
 
