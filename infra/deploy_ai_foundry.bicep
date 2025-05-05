@@ -1,11 +1,16 @@
 // Creates Azure dependent resources for Azure AI studio
 param solutionName string
+@secure()
 param solutionLocation string
 param keyVaultName string
+@secure()
 param gptModelName string
+@secure()
 param gptModelVersion string
 param managedIdentityObjectId string
+@secure()
 param aiServicesEndpoint string
+@secure()
 param aiServicesKey string
 param aiServicesId string
 
