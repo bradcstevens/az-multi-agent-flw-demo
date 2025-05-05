@@ -6,29 +6,55 @@
     "_generator": {
       "name": "bicep",
       "version": "0.34.44.8038",
-      "templateHash": "2906892014954666053"
+      "templateHash": "7719893060553487435"
     }
   },
   "parameters": {
     "location": {
       "type": "string",
-      "defaultValue": "EastUS2",
       "metadata": {
         "description": "Location for all resources."
       }
     },
     "azureOpenAILocation": {
       "type": "string",
-      "defaultValue": "japaneast",
+      "defaultValue": "eastus2",
+      "allowedValues": [
+        "australiaeast",
+        "brazilsouth",
+        "canadacentral",
+        "canadaeast",
+        "eastus",
+        "eastus2",
+        "francecentral",
+        "germanywestcentral",
+        "japaneast",
+        "koreacentral",
+        "northcentralus",
+        "norwayeast",
+        "polandcentral",
+        "southafricanorth",
+        "southcentralus",
+        "southindia",
+        "swedencentral",
+        "switzerlandnorth",
+        "uaenorth",
+        "uksouth",
+        "westeurope",
+        "westus",
+        "westus3"
+      ],
       "metadata": {
-        "description": "Location for OpenAI resources."
+        "description": "Location for all Ai services resources. This location can be different from the resource group location."
       }
     },
     "prefix": {
       "type": "string",
-      "defaultValue": "macaeo",
+      "defaultValue": "macae",
+      "minLength": 3,
+      "maxLength": 20,
       "metadata": {
-        "description": "A prefix to add to the start of all resource names. Note: A \"unique\" suffix will also be added"
+        "description": "Prefix for all resources created by this template.  This prefix will be used to create unique names for all resources.  The prefix must be unique within the resource group."
       }
     },
     "tags": {
@@ -77,7 +103,7 @@
     },
     "capacity": {
       "type": "int",
-      "defaultValue": 1
+      "defaultValue": 140
     }
   },
   "variables": {
@@ -85,13 +111,13 @@
     "aiServicesName": "[format('{0}-aiservices', parameters('prefix'))]",
     "deploymentType": "GlobalStandard",
     "gptModelVersion": "gpt-4o",
-    "appVersion": "latest",
+    "appVersion": "fnd01",
     "resgistryName": "biabcontainerreg",
     "dockerRegistryUrl": "[format('https://{0}.azurecr.io', variables('resgistryName'))]",
     "backendDockerImageURL": "[format('{0}.azurecr.io/macaebackend:{1}', variables('resgistryName'), variables('appVersion'))]",
     "frontendDockerImageURL": "[format('{0}.azurecr.io/macaefrontend:{1}', variables('resgistryName'), variables('appVersion'))]",
     "uniqueNameFormat": "[format('{0}-{{0}}-{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix')))]",
-    "aoaiApiVersion": "2024-08-01-preview",
+    "aoaiApiVersion": "2025-01-01-preview",
     "aiModelDeployments": [
       {
         "name": "[variables('gptModelVersion')]",
@@ -198,9 +224,8 @@
       "kind": "AIServices",
       "properties": {
         "customSubDomainName": "[variables('aiServicesName')]",
-        "apiProperties": {
-          "statisticsEnabled": false
-        }
+        "apiProperties": {},
+        "disableLocalAuth": true
       }
     },
     "aiServicesDeployments": {
@@ -268,7 +293,8 @@
           {
             "name": "EnableServerless"
           }
-        ]
+        ],
+        "disableLocalAuth": true
       }
     },
     "pullIdentity": {
@@ -377,7 +403,11 @@
                 },
                 {
                   "name": "AZURE_OPENAI_ENDPOINT",
-                  "value": "[reference('aiServices').endpoint]"
+                  "value": "[replace(reference('aiServices').endpoint, 'cognitiveservices.azure.com', 'openai.azure.com')]"
+                },
+                {
+                  "name": "AZURE_OPENAI_MODEL_NAME",
+                  "value": "[variables('gptModelVersion')]"
                 },
                 {
                   "name": "AZURE_OPENAI_DEPLOYMENT_NAME",
@@ -388,12 +418,32 @@
                   "value": "[variables('aoaiApiVersion')]"
                 },
                 {
-                  "name": "FRONTEND_SITE_NAME",
-                  "value": "[format('https://{0}.azurewebsites.net', format(variables('uniqueNameFormat'), 'frontend'))]"
+                  "name": "APPLICATIONINSIGHTS_INSTRUMENTATION_KEY",
+                  "value": "[reference('appInsights').InstrumentationKey]"
                 },
                 {
                   "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
                   "value": "[reference('appInsights').ConnectionString]"
+                },
+                {
+                  "name": "AZURE_AI_AGENT_PROJECT_CONNECTION_STRING",
+                  "value": "[reference('aifoundry').outputs.projectConnectionString.value]"
+                },
+                {
+                  "name": "AZURE_AI_SUBSCRIPTION_ID",
+                  "value": "[subscription().subscriptionId]"
+                },
+                {
+                  "name": "AZURE_AI_RESOURCE_GROUP",
+                  "value": "[resourceGroup().name]"
+                },
+                {
+                  "name": "AZURE_AI_PROJECT_NAME",
+                  "value": "[reference('aifoundry').outputs.aiProjectName.value]"
+                },
+                {
+                  "name": "FRONTEND_SITE_NAME",
+                  "value": "[format('https://{0}.azurewebsites.net', format(variables('uniqueNameFormat'), 'frontend'))]"
                 }
               ]
             }
@@ -401,6 +451,7 @@
         }
       },
       "dependsOn": [
+        "aifoundry",
         "aiServices",
         "appInsights",
         "containerAppEnv",
@@ -457,6 +508,10 @@
             {
               "name": "BACKEND_API_URL",
               "value": "[format('https://{0}', reference('containerApp').configuration.ingress.fqdn)]"
+            },
+            {
+              "name": "AUTH_ENABLED",
+              "value": "false"
             }
           ]
         }
@@ -471,6 +526,31 @@
         "containerApp",
         "frontendAppServicePlan",
         "pullIdentity"
+      ]
+    },
+    "aiHubProject": {
+      "existing": true,
+      "type": "Microsoft.MachineLearningServices/workspaces",
+      "apiVersion": "2024-01-01-preview",
+      "name": "[format('{0}-aiproject', parameters('prefix'))]"
+    },
+    "aiDeveloper": {
+      "existing": true,
+      "type": "Microsoft.Authorization/roleDefinitions",
+      "apiVersion": "2022-04-01",
+      "name": "64702f94-c441-49e6-a78b-ef80e0188fee"
+    },
+    "aiDeveloperAccessProj": {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', format('{0}-aiproject', parameters('prefix')))]",
+      "name": "[guid(format('{0}-backend', parameters('prefix')), resourceId('Microsoft.MachineLearningServices/workspaces', format('{0}-aiproject', parameters('prefix'))), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
+      "properties": {
+        "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee')]",
+        "principalId": "[reference('containerApp', '2024-03-01', 'full').identity.principalId]"
+      },
+      "dependsOn": [
+        "containerApp"
       ]
     },
     "kvault": {
@@ -639,7 +719,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.34.44.8038",
-              "templateHash": "12550713338937452696"
+              "templateHash": "8087543237770345715"
             }
           },
           "parameters": {
@@ -988,6 +1068,10 @@
             "storageAccountId": {
               "type": "string",
               "value": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+            },
+            "projectConnectionString": {
+              "type": "string",
+              "value": "[format('{0};{1};{2};{3}', split(reference(resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName')), '2024-01-01-preview').discoveryUrl, '/')[2], subscription().subscriptionId, resourceGroup().name, variables('aiProjectName'))]"
             }
           }
         }

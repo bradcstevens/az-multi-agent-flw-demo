@@ -33,7 +33,7 @@ param azureOpenAILocation string = 'eastus2' // The location used for all deploy
 @minLength(3)
 @maxLength(20)
 @description('Prefix for all resources created by this template.  This prefix will be used to create unique names for all resources.  The prefix must be unique within the resource group.')
-param prefix string
+param prefix string = 'macae'
 
 @description('Tags to apply to all deployed resources')
 param tags object = {}
@@ -120,6 +120,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = 
     apiProperties: {
       //statisticsEnabled: false
     }
+    disableLocalAuth: true
   }
 }
 
@@ -152,6 +153,10 @@ module kvault 'deploy_keyvault.bicep' = {
   scope: resourceGroup(resourceGroup().name)
 }
 
+// First, add this section to store the AI Services key in Key Vault
+
+
+// Then modify the aifoundry module to reference the secret securely
 module aifoundry 'deploy_ai_foundry.bicep' = {
   name: 'deploy_ai_foundry'
   params: {
@@ -197,6 +202,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
       }
     ]
     capabilities: [{ name: 'EnableServerless' }]
+    disableLocalAuth: true
   }
 
   resource contributorRoleDefinition 'sqlRoleDefinitions' existing = {
