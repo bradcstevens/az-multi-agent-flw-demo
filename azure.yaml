@@ -8,11 +8,13 @@ services:
         host: containerapp
         language: python
         docker:
+            context: src/backend
             path: Dockerfile
     frontend:
         project: src/frontend
         host: containerapp
         language: python
         docker:
+            context: src/frontend
             path: Dockerfile
 
