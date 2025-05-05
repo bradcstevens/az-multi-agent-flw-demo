@@ -33,7 +33,7 @@ param azureOpenAILocation string = 'eastus2' // The location used for all deploy
 @minLength(3)
 @maxLength(20)
 @description('Prefix for all resources created by this template.  This prefix will be used to create unique names for all resources.  The prefix must be unique within the resource group.')
-param prefix string
+param prefix string = 'macaeatemplate'
 
 @description('Tags to apply to all deployed resources')
 param tags object = {}
@@ -197,6 +197,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
       }
     ]
     capabilities: [{ name: 'EnableServerless' }]
+    disableLocalAuth: true
   }
 
   resource contributorRoleDefinition 'sqlRoleDefinitions' existing = {
