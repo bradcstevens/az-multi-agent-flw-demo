@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.35.1.17967",
-      "templateHash": "11782682784877206872"
+      "templateHash": "18228555099764132241"
     }
   },
   "parameters": {
@@ -111,7 +111,6 @@
     "frontendDockerImageURL": "[format('{0}.azurecr.io/macaefrontend:{1}', variables('resgistryName'), variables('appVersion'))]",
     "uniqueNameFormat": "[format('{0}-{{0}}-{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix')))]",
     "aoaiApiVersion": "2025-01-01-preview",
-    "imageName": "[variables('frontendDockerImageURL')]",
     "aiModelDeployments": [
       {
         "name": "[variables('gptModelVersion')]",
@@ -485,7 +484,7 @@
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format(variables('uniqueNameFormat'), 'frontend-plan'))]",
         "reserved": true,
         "siteConfig": {
-          "linuxFxVersion": "[format('DOCKER|{0}', variables('imageName'))]",
+          "linuxFxVersion": "[format('DOCKER|{0}', variables('frontendDockerImageURL'))]",
           "appSettings": [
             {
               "name": "DOCKER_REGISTRY_SERVER_URL",
