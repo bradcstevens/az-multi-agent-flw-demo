@@ -73,7 +73,7 @@ var frontendDockerImageURL = '${resgistryName}.azurecr.io/macaefrontend:${appVer
 
 var uniqueNameFormat = '${prefix}-{0}-${uniqueString(resourceGroup().id, prefix)}'
 var aoaiApiVersion = '2025-01-01-preview'
-
+var imageName = frontendDockerImageURL
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: format(uniqueNameFormat, 'logs')
   location: location
@@ -411,7 +411,7 @@ resource frontendAppService 'Microsoft.Web/sites@2021-02-01' = {
     serverFarmId: frontendAppServicePlan.id
     reserved: true
     siteConfig: {
-      linuxFxVersion: 'DOCKER|${frontendDockerImageURL}'
+      linuxFxVersion: 'DOCKER|${imageName}'
       appSettings: [
         {
           name: 'DOCKER_REGISTRY_SERVER_URL'
