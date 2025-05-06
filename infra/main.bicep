@@ -1,6 +1,4 @@
 targetScope = 'resourceGroup'
-@description('Location for all resources.')
-param location string
 
 @allowed([
   'australiaeast'
@@ -34,9 +32,16 @@ param azureOpenAILocation string = 'eastus2' // The location used for all deploy
 @maxLength(20)
 @description('A unique prefix for all resources in this deployment. This should be 3-20 characters long:')
 param environmentName string
- 
-var uniqueId = toLower(uniqueString(subscription().id, environmentName, resourceGroup().location))
+
+@description('Set this if you want to deploy to a different region than the resource group. Otherwise, it will use the resource group location by default.')
+param AZURE_LOCATION string=''
+var solutionLocation = empty(AZURE_LOCATION) ? resourceGroup().location : AZURE_LOCATION
+
+var uniqueId = toLower(uniqueString(subscription().id, environmentName, solutionLocation))
 var solutionPrefix = 'ma${padLeft(take(uniqueId, 12), 12, '0')}'
+
+// Load the abbrevations file required to name the azure resources.
+var abbrs = loadJsonContent('./abbreviations.json')
 
 @description('Tags to apply to all deployed resources')
 param tags object = {}
@@ -62,7 +67,7 @@ param resourceSize {
 param capacity int = 140
 
 var modelVersion = '2024-08-06'
-var aiServicesName = '${solutionPrefix}-aiservices'
+var aiServicesName = '${abbrs.ai.aiServices}${solutionPrefix}'
 var deploymentType = 'GlobalStandard'
 var gptModelVersion = 'gpt-4o'
 var appVersion = 'fnd01'
@@ -73,12 +78,12 @@ var dockerRegistryUrl = 'https://${resgistryName}.azurecr.io'
 var backendDockerImageURL = '${resgistryName}.azurecr.io/macaebackend:${appVersion}'
 var frontendDockerImageURL = '${resgistryName}.azurecr.io/macaefrontend:${appVersion}'
 
-var uniqueNameFormat = '${solutionPrefix}-{0}-${uniqueString(resourceGroup().id, solutionPrefix)}'
+//var uniqueNameFormat = '${solutionPrefix}-{0}-${uniqueString(resourceGroup().id, solutionPrefix)}'
 var aoaiApiVersion = '2025-01-01-preview'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: format(uniqueNameFormat, 'logs')
-  location: location
+  name: '${abbrs.managementGovernance.logAnalyticsWorkspace}${solutionPrefix}'
+  location: solutionLocation
   tags: tags
   properties: {
     retentionInDays: 30
@@ -89,8 +94,8 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
 }
 
 resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
-  name: format(uniqueNameFormat, 'appins')
-  location: location
+  name: '${abbrs.managementGovernance.applicationInsights}${solutionPrefix}'
+  location: solutionLocation
   kind: 'web'
   properties: {
     Application_Type: 'web'
@@ -113,7 +118,7 @@ var aiModelDeployments = [
 
 resource aiServices 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = {
   name: aiServicesName
-  location: location
+  location: azureOpenAILocation
   sku: {
     name: 'S0'
   }
@@ -149,9 +154,9 @@ resource aiServicesDeployments 'Microsoft.CognitiveServices/accounts/deployments
 module kvault 'deploy_keyvault.bicep' = {
   name: 'deploy_keyvault'
   params: {
-    solutionName: solutionPrefix
-    solutionLocation: location
+    solutionLocation: solutionLocation
     managedIdentityObjectId: managedIdentityModule.outputs.managedIdentityOutput.objectId
+    keyvaultName: '${abbrs.security.keyVault}${solutionPrefix}'
   }
   scope: resourceGroup(resourceGroup().name)
 }
@@ -191,8 +196,8 @@ resource acaAoaiRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
 }
 
 resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
-  name: format(uniqueNameFormat, 'cosmos')
-  location: location
+  name: '${abbrs.databases.cosmosDBDatabase}${solutionPrefix}'
+  location: solutionLocation
   tags: tags
   kind: 'GlobalDocumentDB'
   properties: {
@@ -201,7 +206,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
     locations: [
       {
         failoverPriority: 0
-        locationName: location
+        locationName: solutionLocation
       }
     ]
     capabilities: [{ name: 'EnableServerless' }]
@@ -241,13 +246,13 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
 // Define existing ACR resource
 
 resource pullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-07-31-preview' = {
-  name: format(uniqueNameFormat, 'containerapp-pull')
-  location: location
+  name: '${abbrs.security.managedIdentity}${solutionPrefix}-containerapp-pull'
+  location: solutionLocation
 }
 
 resource containerAppEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
-  name: format(uniqueNameFormat, 'containerapp')
-  location: location
+  name: '${abbrs.containers.containerAppsEnvironment}${solutionPrefix}'
+  location: solutionLocation
   tags: tags
   properties: {
     daprAIConnectionString: appInsights.properties.ConnectionString
@@ -279,8 +284,8 @@ resource acaCosomsRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleA
 
 @description('')
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
-  name: '${solutionPrefix}-backend'
-  location: location
+  name: '${abbrs.containers.containerApp}${solutionPrefix}-backend'
+  location: solutionLocation
   tags: tags
   identity: {
     type: 'SystemAssigned, UserAssigned'
@@ -296,8 +301,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         external: true
         corsPolicy: {
           allowedOrigins: [
-            'https://${format(uniqueNameFormat, 'frontend')}.azurewebsites.net'
-            'http://${format(uniqueNameFormat, 'frontend')}.azurewebsites.net'
+            'https://${abbrs.compute.webApp}${solutionPrefix}-frontend.azurewebsites.net'
+            'http://${abbrs.compute.webApp}${solutionPrefix}-frontend.azurewebsites.net'
           ]
         }
       }
@@ -381,7 +386,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'FRONTEND_SITE_NAME'
-              value: 'https://${format(uniqueNameFormat, 'frontend')}.azurewebsites.net'
+              value: 'https://${abbrs.compute.webApp}${solutionPrefix}-frontend.azurewebsites.net'
             }
           ]
         }
@@ -390,8 +395,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 resource frontendAppServicePlan 'Microsoft.Web/serverfarms@2021-02-01' = {
-  name: format(uniqueNameFormat, 'frontend-plan')
-  location: location
+  name: '${abbrs.compute.appServicePlan}${solutionPrefix}-frontend'
+  location: solutionLocation
   tags: tags
   sku: {
     name: 'P1v2'
@@ -405,8 +410,8 @@ resource frontendAppServicePlan 'Microsoft.Web/serverfarms@2021-02-01' = {
 }
 
 resource frontendAppService 'Microsoft.Web/sites@2021-02-01' = {
-  name: format(uniqueNameFormat, 'frontend')
-  location: location
+  name: '${abbrs.compute.webApp}${solutionPrefix}-frontend'
+  location: solutionLocation
   tags: tags
   kind: 'app,linux,container'
   properties: {
@@ -440,7 +445,7 @@ resource frontendAppService 'Microsoft.Web/sites@2021-02-01' = {
   }
   dependsOn: [containerApp]
   identity: {
-    type: 'SystemAssigned,UserAssigned'
+    type: 'SystemAssigned, UserAssigned'
     userAssignedIdentities: {
       '${pullIdentity.id}': {}
     }
@@ -448,7 +453,7 @@ resource frontendAppService 'Microsoft.Web/sites@2021-02-01' = {
 }
 
 resource aiHubProject 'Microsoft.MachineLearningServices/workspaces@2024-01-01-preview' existing = {
-  name: '${solutionPrefix}-aiproject' // aiProjectName must be calculated - available at main start.
+  name: '${abbrs.ai.aiHubProject}${solutionPrefix}' // aiProjectName must be calculated - available at main start.
 }
 
 resource aiDeveloper 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
@@ -469,11 +474,11 @@ var cosmosAssignCli = 'az cosmosdb sql role assignment create --resource-group "
 module managedIdentityModule 'deploy_managed_identity.bicep' = {
   name: 'deploy_managed_identity'
   params: {
-    solutionName: solutionPrefix
     //solutionLocation: location
     managedIdentityId: pullIdentity.id
     managedIdentityPropPrin: pullIdentity.properties.principalId
     managedIdentityLocation: pullIdentity.location
+    miName: '${abbrs.security.managedIdentity}${solutionPrefix}'
   }
   scope: resourceGroup(resourceGroup().name)
 }
@@ -486,7 +491,7 @@ module deploymentScriptCLI 'br/public:avm/res/resources/deployment-script:0.5.1'
     name: 'rdsmin001'
     // Non-required parameters
     azCliVersion: '2.69.0'
-    location: location
+    location: solutionLocation
     managedIdentities: {
       userAssignedResourceIds: [
         managedIdentityModule.outputs.managedIdentityId

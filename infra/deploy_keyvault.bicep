@@ -1,11 +1,8 @@
-@minLength(3)
-@maxLength(15)
-@description('Solution Name')
-param solutionName string
 param solutionLocation string
 param managedIdentityObjectId string
 
-var keyvaultName = '${solutionName}-kv'
+@description('KeyVault Name')
+param keyvaultName string
 
 resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' = {
   name: keyvaultName
@@ -37,7 +34,6 @@ resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' = {
     enabledForTemplateDeployment: true
     enableSoftDelete: false
     enableRbacAuthorization: true
-    enablePurgeProtection: true
     publicNetworkAccess: 'enabled'
     sku: {
       family: 'A'
