@@ -1,24 +1,2 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
-environment:
-  name: multi-agent-custom-automation-engine-solution-accelerator
-  location: eastus
 name: multi-agent-custom-automation-engine-solution-accelerator
-metadata:
-    template: multi-agent-custom-automation-engine-solution-accelerator@1.0
-parameters:
-  azureOpenAILocation:
-    type: string
-    default: eastus2
-  prefix:
-    type: string
-    default: ma-azdtest
-  baseUrl:
-    type: string
-    default: 'https://raw.githubusercontent.com/microsoft/multi-agent-custom-automation-engine-solution-accelerator'
-deployment:
-  mode: Incremental
-  template: ./infra/main.bicep  # Path to the main.bicep file inside the 'deployment' folder
-  prameters:
-    azureOpenAILocation: ${{ parameters.AiLocation }}
-    prefix: ${{ parameters.ResourcePrefix }}
-    baseUrl: ${{ parameters.baseUrl }}
