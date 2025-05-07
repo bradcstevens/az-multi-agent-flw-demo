@@ -205,7 +205,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
       }
     ]
     capabilities: [{ name: 'EnableServerless' }]
-    //disableLocalAuth: true
+    disableLocalAuth: true
   }
 
   resource contributorRoleDefinition 'sqlRoleDefinitions' existing = {
