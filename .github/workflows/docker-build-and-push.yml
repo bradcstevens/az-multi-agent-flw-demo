@@ -7,7 +7,6 @@ on:
       - dev
       - demo
       - hotfix
-      - feature/psl-conregchanges
   pull_request:
     types:
       - opened
@@ -33,7 +32,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Log in to Azure Container Registry
-        if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo' || github.ref_name == 'hotfix' || github.ref_name == 'feature/psl-conregchanges' }}
+        if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo' || github.ref_name == 'hotfix' }}
         uses: azure/docker-login@v2
         with:
           login-server: ${{ secrets.ACR_LOGIN_SERVER }}
@@ -55,8 +54,6 @@ jobs:
             echo "TAG=demo" >> $GITHUB_ENV
           elif [[ "${{ github.ref }}" == "refs/heads/hotfix" ]]; then
             echo "TAG=hotfix" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/feature/psl-conregchanges" ]]; then
-            echo "TAG=psl-conregchanges" >> $GITHUB_ENV
           else
             echo "TAG=pullrequest-ignore" >> $GITHUB_ENV
           fi
