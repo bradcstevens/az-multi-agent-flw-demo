@@ -68,30 +68,22 @@ jobs:
           # Create historical tag using TAG, DATE_TAG, and RUN_ID
           echo "HISTORICAL_TAG=${{ env.TAG }}_${DATE_TAG}_${RUN_ID}" >> $GITHUB_ENV
 
-      - name: Build and push Docker images optionally
-        run: |
-          # Backend Image Build and Push
-          cd src/backend
-          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }} -f Dockerfile . && \
-          docker tag ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }} ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.HISTORICAL_TAG }} && \
+      - name: Build and optionally push Backend Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/backend
+          file: ./src/backend/Dockerfile
+          push: ${{ env.TAG != 'pullrequest-ignore' }}
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.HISTORICAL_TAG }}
   
-          if [[ "${{ env.TAG }}" == "latest" || "${{ env.TAG }}" == "dev" || "${{ env.TAG }}" == "demo" || "${{ env.TAG }}" == "hotfix" || "${{ env.TAG }}" == "psl-conregchanges" ]]; then
-            docker push ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }} && \
-            docker push ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.HISTORICAL_TAG }} && \
-            echo "Backend image built and pushed successfully."
-          else
-            echo "Skipping Docker push for backend with tag: ${{ env.TAG }}"
-          fi
-
-          # Frontend Image Build and Push
-          cd ../frontend
-          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }} -f Dockerfile . && \
-          docker tag ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }} ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.HISTORICAL_TAG }} && \
-  
-          if [[ "${{ env.TAG }}" == "latest" || "${{ env.TAG }}" == "dev" || "${{ env.TAG }}" == "demo" || "${{ env.TAG }}" == "hotfix" || "${{ env.TAG }}" == "psl-conregchanges" ]]; then
-            docker push ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }} && \
-            docker push ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.HISTORICAL_TAG }} && \
-            echo "Frontend image built and pushed successfully."
-          else
-            echo "Skipping Docker push for frontend with tag: ${{ env.TAG }}"
-          fi
+      - name: Build and optionally push Frontend Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/frontend
+          file: ./src/frontend/Dockerfile
+          push: ${{ env.TAG != 'pullrequest-ignore' }}
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.HISTORICAL_TAG }}
