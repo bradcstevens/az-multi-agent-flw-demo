@@ -18,6 +18,7 @@ on:
       - dev
       - demo
       - hotfix
+      - feature/psl-conregchanges
   workflow_dispatch: 
 
 jobs:
@@ -32,7 +33,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Log in to Azure Container Registry
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo' || github.ref_name == 'hotfix' || github.ref_name == 'feature/conregchanges') }}
+        if: ${{ (github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo' || github.ref_name == 'hotfix' || github.ref_name == 'feature/psl-conregchanges') }}
         uses: azure/docker-login@v2
         with:
           login-server: ${{ secrets.ACR_LOGIN_SERVER }}
@@ -52,8 +53,8 @@ jobs:
             echo "TAG=demo" >> $GITHUB_ENV
           elif [[ "${{ github.ref }}" == "refs/heads/hotfix" ]]; then
             echo "TAG=hotfix" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/feature/conregchanges" ]]; then
-            echo "TAG=conregchanges" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == "refs/heads/feature/psl-conregchanges" ]]; then
+            echo "TAG=psl-conregchanges" >> $GITHUB_ENV
           else
             echo "TAG=pullrequest-ignore" >> $GITHUB_ENV
           fi
@@ -67,7 +68,7 @@ jobs:
           docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }} -f Dockerfile . && \
           docker tag ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }} ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.HISTORICAL_TAG }} && \
   
-          if [[ "${{ env.TAG }}" == "latest" || "${{ env.TAG }}" == "dev" || "${{ env.TAG }}" == "demo" || "${{ env.TAG }}" == "hotfix" || "${{ env.TAG }}" == "conregchanges" ]]; then
+          if [[ "${{ env.TAG }}" == "latest" || "${{ env.TAG }}" == "dev" || "${{ env.TAG }}" == "demo" || "${{ env.TAG }}" == "hotfix" || "${{ env.TAG }}" == "psl-conregchanges" ]]; then
             docker push ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }} && \
             docker push ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.HISTORICAL_TAG }} && \
             echo "Backend image built and pushed successfully."
@@ -78,7 +79,7 @@ jobs:
           docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }} -f Dockerfile . && \
           docker tag ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }} ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.HISTORICAL_TAG }} && \
   
-          if [[ "${{ env.TAG }}" == "latest" || "${{ env.TAG }}" == "dev" || "${{ env.TAG }}" == "demo" || "${{ env.TAG }}" == "hotfix" || "${{ env.TAG }}" == "conregchanges" ]]; then
+          if [[ "${{ env.TAG }}" == "latest" || "${{ env.TAG }}" == "dev" || "${{ env.TAG }}" == "demo" || "${{ env.TAG }}" == "hotfix" || "${{ env.TAG }}" == "psl-conregchanges" ]]; then
             docker push ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }} && \
             docker push ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.HISTORICAL_TAG }} && \
             echo "Frontend image built and pushed successfully."
