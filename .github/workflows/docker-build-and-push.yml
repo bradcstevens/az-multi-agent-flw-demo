@@ -7,6 +7,7 @@ on:
       - dev
       - demo
       - hotfix
+      - feature/psl-conregchanges
   pull_request:
     types:
       - opened
@@ -18,8 +19,7 @@ on:
       - dev
       - demo
       - hotfix
-      - feature/psl-conregchanges
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -33,18 +33,20 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Log in to Azure Container Registry
-        if: ${{ (github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo' || github.ref_name == 'hotfix' || github.ref_name == 'feature/psl-conregchanges') }}
+        if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo' || github.ref_name == 'hotfix' || github.ref_name == 'feature/psl-conregchanges' }}
         uses: azure/docker-login@v2
         with:
           login-server: ${{ secrets.ACR_LOGIN_SERVER }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Set Docker image tag
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Determine Tag Name Based on Branch
+        id: determine_tag
         run: |
-          DATE_TAG=$(date +'%Y-%m-%d')
-          RUN_ID=${{ github.run_number }}
-  
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "TAG=latest" >> $GITHUB_ENV
           elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
@@ -58,12 +60,17 @@ jobs:
           else
             echo "TAG=pullrequest-ignore" >> $GITHUB_ENV
           fi
-  
-          echo "HISTORICAL_TAG=${TAG}_${DATE_TAG}_${RUN_ID}" >> $GITHUB_ENV
-  
-          
+
+      - name: Set Historical Tag
+        run: |
+          DATE_TAG=$(date +'%Y-%m-%d')
+          RUN_ID=${{ github.run_number }}
+          # Create historical tag using TAG, DATE_TAG, and RUN_ID
+          echo "HISTORICAL_TAG=${{ env.TAG }}_${DATE_TAG}_${RUN_ID}" >> $GITHUB_ENV
+
       - name: Build and push Docker images optionally
         run: |
+          # Backend Image Build and Push
           cd src/backend
           docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }} -f Dockerfile . && \
           docker tag ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.TAG }} ${{ secrets.ACR_LOGIN_SERVER }}/macaebackend:${{ env.HISTORICAL_TAG }} && \
@@ -75,6 +82,8 @@ jobs:
           else
             echo "Skipping Docker push for backend with tag: ${{ env.TAG }}"
           fi
+
+          # Frontend Image Build and Push
           cd ../frontend
           docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }} -f Dockerfile . && \
           docker tag ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.TAG }} ${{ secrets.ACR_LOGIN_SERVER }}/macaefrontend:${{ env.HISTORICAL_TAG }} && \
@@ -86,5 +95,3 @@ jobs:
           else
             echo "Skipping Docker push for frontend with tag: ${{ env.TAG }}"
           fi
-
-          
