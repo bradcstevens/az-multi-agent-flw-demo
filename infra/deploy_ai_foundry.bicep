@@ -6,7 +6,7 @@ param gptModelName string
 param gptModelVersion string
 param managedIdentityObjectId string
 param aiServicesEndpoint string
-param aiServices object
+param aiServicesKey string
 param aiServicesId string
 
 var storageName = '${solutionName}hubstorage'
@@ -133,11 +133,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2023-08-01-preview'
     properties: {
       category: 'AIServices'
       target: aiServicesEndpoint
-      authType: 'ApiKey'
+      authType: 'AAD'
       isSharedToAll: true
-      credentials: {
-        key: aiServices.Key.key1
-      }
       metadata: {
         ApiType: 'Azure'
         ResourceId: aiServicesId
@@ -187,7 +184,7 @@ resource azureOpenAIApiKeyEntry 'Microsoft.KeyVault/vaults/secrets@2021-11-01-pr
   parent: keyVault
   name: 'AZURE-OPENAI-KEY'
   properties: {
-    value: aiServices.Key.key1 //aiServices_m.listKeys().key1
+    value: aiServicesKey //aiServices_m.listKeys().key1
   }
 }
 
@@ -251,7 +248,7 @@ resource cogServiceKeyEntry 'Microsoft.KeyVault/vaults/secrets@2021-11-01-previe
   parent: keyVault
   name: 'COG-SERVICES-KEY'
   properties: {
-    value: aiServices.Key.key1
+    value: aiServicesKey
   }
 }
 

@@ -168,7 +168,7 @@ module aifoundry 'deploy_ai_foundry.bicep' = {
     gptModelVersion: gptModelVersion
     managedIdentityObjectId: managedIdentityModule.outputs.managedIdentityOutput.objectId
     aiServicesEndpoint: aiServices.properties.endpoint
-    aiServices: aiServices
+    aiServicesKey: aiServices.listKeys().key1
     aiServicesId: aiServices.id
   }
   scope: resourceGroup(resourceGroup().name)
@@ -459,6 +459,15 @@ resource aiDeveloperAccessProj 'Microsoft.Authorization/roleAssignments@2022-04-
   properties: {
     roleDefinitionId: aiDeveloper.id
     principalId: containerApp.identity.principalId
+  }
+}
+
+resource aiDevelopertoAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiServices.name, aiHubProject.id, aiDeveloper.id)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: aiDeveloper.id
+    principalId: aiHubProject.identity.principalId
   }
 }
 
