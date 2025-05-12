@@ -8,7 +8,7 @@
   const taskPauseButton = document.getElementById("taskPauseButton");
   const taskAgentsButton = document.getElementById("taskAgentsButton");
   const taskWokFlowButton = document.getElementById("taskWokFlowButton");
-  const taskMessageTextarea=document.getElementById("taskMessageTextarea");
+  const taskMessageTextarea = document.getElementById("taskMessageTextarea");
   const taskMessageAddButton = document.getElementById("taskMessageAddButton");
   const taskMessages = document.getElementById("taskMessages");
   const taskDetailsAgents = document.getElementById("taskDetailsAgents");
@@ -65,34 +65,34 @@
     let agentIcon = "";
 
     switch (agentName) {
-      case "MarketingAgent":
+      case "Marketing_Agent":
         agentIcon = "unknown";
         break;
-      case "HrAgent":
+      case "Hr_Agent":
         agentIcon = "hr_agent";
         break;
-      case "ExpenseBillingAgent":
+      case "Expense_Billing_Agent":
         agentIcon = "expense_billing_agent";
         break;
-      case "InvoiceReconciliationAgent":
+      case "Invoice_Reconciliation_Agent":
         agentIcon = "invoice_reconciliation_agent";
         break;
-      case "TechSupportAgent":
+      case "Tech_Support_Agent":
         agentIcon = "tech_agent";
         break;
-      case "ProcurementAgent":
+      case "Procurement_Agent":
         agentIcon = "procurement_agent";
         break;
-      case "ProductAgent":
+      case "Product_Agent":
         agentIcon = "product_agent";
         break;
-      case "GroupChatManager":
+      case "Group_Chat_Manager":
         agentIcon = "manager";
         break;
-      case "GenericAgent":
+      case "Generic_Agent":
         agentIcon = "manager";
         break;
-      case "HumanAgent":
+      case "Human_Agent":
         let userNumber = getStoredData("userNumber");
         if (userNumber == null) {
           // Generate a random number between 0 and 6
@@ -114,7 +114,16 @@
   };
 
   const toDateTime = (timestamp) => {
-    const date = new Date(timestamp * 1000);
+    // Handle ISO date string format (e.g., 2025-04-25T03:01:13.093260)
+    // instead of Unix timestamp
+    const date = new Date(timestamp);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn("Invalid date format:", timestamp);
+      return "Invalid date";
+    }
+
     const options = { month: "short", day: "numeric" };
     const timeOptions = { hour: "numeric", minute: "numeric", hour12: true };
     return `${date.toLocaleDateString(
@@ -139,8 +148,8 @@
       textInputContainer[0].style.backgroundColor = '#efefef';
       textInputContainer[0].style.cursor = 'not-allowed';
     } else {
-      taskPauseButton.disabled=false;
-      taskCancelButton.disabled=false;
+      taskPauseButton.disabled = false;
+      taskCancelButton.disabled = false;
     }
   }
 
@@ -172,20 +181,20 @@
         const apiTaskStore = JSON.parse(getStoredData("apiTask"));
         handleDisableOfActions("completed")
 
-         // Explicitly disable chatbox and message button
-         taskMessageTextarea.disabled = true;
-         taskMessageTextarea.style.backgroundColor = "#efefef";
-         taskMessageTextarea.style.cursor = 'not-allowed';
- 
-         taskMessageAddButton.disabled = true;
-         taskMessageAddButton.style.cursor = 'not-allowed';
- 
-         const textInputContainer = document.getElementsByClassName("text-input-container");
-         if (textInputContainer[0]) {
-             textInputContainer[0].style.backgroundColor = '#efefef';
-             textInputContainer[0].style.cursor = 'not-allowed';
-         }
- 
+        // Explicitly disable chatbox and message button
+        taskMessageTextarea.disabled = true;
+        taskMessageTextarea.style.backgroundColor = "#efefef";
+        taskMessageTextarea.style.cursor = 'not-allowed';
+
+        taskMessageAddButton.disabled = true;
+        taskMessageAddButton.style.cursor = 'not-allowed';
+
+        const textInputContainer = document.getElementsByClassName("text-input-container");
+        if (textInputContainer[0]) {
+          textInputContainer[0].style.backgroundColor = '#efefef';
+          textInputContainer[0].style.cursor = 'not-allowed';
+        }
+
         actionStages(apiTaskStore, false);
       });
     }
@@ -196,7 +205,7 @@
     taskAgentsVsHumans = [];
 
     agents.forEach((agent) => {
-      const isAvatar = agent === "HumanAgent" ? "is-human" : "is-avatar";
+      const isAvatar = agent === "Human_Agent" ? "is-human" : "is-avatar";
 
       taskDetailsAgents.innerHTML += `
             <figure class="image is-agent ${isAvatar} is-rounded is-32x32 m-1 has-status has-status-active">
@@ -204,7 +213,7 @@
             </figure>
             `;
 
-      agent === "HumanAgent"
+      agent === "Human_Agent"
         ? taskAgentsVsHumans.push("Human")
         : taskAgentsVsHumans.push("Agent");
     });
@@ -223,7 +232,7 @@
 
     taskStatusDetails.innerHTML = `
             <p class="mb-3"><strong>Summary:</strong> ${task.summary}</p>
-            <p><strong>Created:</strong> ${toDateTime(task.ts)}</p>
+            <p><strong>Created:</strong> ${toDateTime(task.timestamp)}</p>
         `;
   };
 
@@ -243,10 +252,10 @@
         setStoredData("apiTask", JSON.stringify(data[0]));
         //const isHumanClarificationRequestNull = data?.[0]?.human_clarification_request === null
         const isHumanClarificationResponseNotNull = data?.[0]?.human_clarification_response !== null;
-        const taskMessageTextareaElement =document.getElementById("taskMessageTextarea");
+        const taskMessageTextareaElement = document.getElementById("taskMessageTextarea");
         const taskMessageAddButton = document.getElementById("taskMessageAddButton");
         const textInputContainer = document.getElementsByClassName("text-input-container");
-        
+
         if (isHumanClarificationResponseNotNull) {
           // Update the local state to set human_clarification_request to null
           data[0].human_clarification_request = null;
@@ -254,23 +263,23 @@
         }
 
         const isHumanClarificationRequestNull = data?.[0]?.human_clarification_request === null
-        
-        if(isHumanClarificationRequestNull && taskMessageTextareaElement){
+
+        if (isHumanClarificationRequestNull && taskMessageTextareaElement) {
           taskMessageTextareaElement.setAttribute('disabled', true)
           taskMessageTextareaElement.style.backgroundColor = "#efefef";
           taskMessageTextareaElement.style.cursor = 'not-allowed';
-        } 
-        
-        if(isHumanClarificationRequestNull && taskMessageAddButton){
+        }
+
+        if (isHumanClarificationRequestNull && taskMessageAddButton) {
           taskMessageAddButton.setAttribute('disabled', true)
           taskMessageAddButton.style.cursor = 'not-allowed';
-        } 
-        
-        if(isHumanClarificationRequestNull && textInputContainer[0]){ 
+        }
+
+        if (isHumanClarificationRequestNull && textInputContainer[0]) {
           textInputContainer[0].style.backgroundColor = '#efefef';
           textInputContainer[0].style.cursor = 'not-allowed';
-        } 
-       
+        }
+
       })
       .catch((error) => {
         console.error("Error:", error);
@@ -342,15 +351,12 @@
                                 `;
 
               stageItem.innerHTML = `
-                                <a class="menu-stage ${
-                                  stage.status
-                                } ${stageRejected}" data-id="${
-                stage.id
-              }" title="Status: ${stage.status}, Id: ${stage.id}">
+                                <a class="menu-stage ${stage.status
+                } ${stageRejected}" data-id="${stage.id
+                }" title="Status: ${stage.status}, Id: ${stage.id}">
                                     ${stageStatusIcon}
-                                    <span>${taskStageCount + 1}. ${
-                stage.action
-              }</span>
+                                    <span>${taskStageCount + 1}. ${stage.action
+                }</span>
                                     ${stageActions}
                                 </a>
                                 `;
@@ -421,7 +427,10 @@
         .then((response) => response.json())
         .then((data) => {
           const toAgentName = (str) => {
-            return str.replace(/([a-z])([A-Z])/g, "$1 $2");
+            console.log("toAgentName", str);
+            let new_name = str.replace(/_/g, " ");
+            console.log("toAgentName", new_name);
+            return new_name;
           };
 
           const groupByStepId = (messages) => {
@@ -443,8 +452,8 @@
 
             messages.forEach((message) => {
               if (
-                message.source !== "PlannerAgent" &&
-                message.source !== "GroupChatManager"
+                message.source !== "Planner_Agent" &&
+                message.source !== "Group_Chat_Manager"
               ) {
                 filteredMessages.push(message);
               }
@@ -492,9 +501,9 @@
 
                 messageItem.classList.add("media");
                 const isAvatar =
-                  message.source === "HumanAgent" ? "is-human" : "is-avatar";
+                  message.source === "Human_Agent" ? "is-human" : "is-avatar";
                 const isActive =
-                  message.source === "PlannerAgent"
+                  message.source === "Planner_Agent"
                     ? "has-status-busy"
                     : "has-status-active";
 
@@ -518,15 +527,15 @@
                                         <div class="content">
                                             <div class="is-size-7 has-text-weight-medium has-text-grey is-flex">
                                                 ${toAgentName(
-                                                  message.source
-                                                )} • ${toDateTime(
-                  message.ts
+                  message.source
+                )} • ${toDateTime(
+                  message.timestamp
                 )} AI-generated content may be incorrect
                                             </div>
                                             <div class="notification is-light mt-1">
                                                 ${markdownConverter.makeHtml(
-                                                  message.content
-                                                )} ${approveAllStagesButton}
+                  message.content
+                )} ${approveAllStagesButton}
                                             </div>
                                         </div>
                                     </div>
@@ -535,12 +544,12 @@
                                     <div class="media-content">
                                         <div class="content">
                                             <div class="is-size-7 has-text-weight-medium has-text-grey is-flex is-justify-content-end">
-                                                You • ${toDateTime(message.ts)}
+                                                You • ${toDateTime(message.timestamp)}
                                             </div>
                                             <div class="notification is-info is-light mt-1 is-pulled-right">
                                                 ${markdownConverter.makeHtml(
-                                                  message.content
-                                                )}
+                  message.content
+                )}
                                             </div>
                                         </div>
                                     </div>
@@ -553,7 +562,7 @@
                                     `;
 
                 const messageTemplate =
-                  message.source === "HumanAgent" ? messageRight : messageLeft;
+                  message.source === "Human_Agent" ? messageRight : messageLeft;
                 messageItem.innerHTML = messageTemplate;
                 taskMessages.appendChild(messageItem);
 
@@ -642,10 +651,10 @@
       removeClassesExcept(taskStatusTag, "tag");
       taskStatusTag.classList.add("is-info");
       const iconElement = taskPauseButton.querySelector("i");
-         if (iconElement.classList.contains("fa-circle-play")) {
-           iconElement.classList.remove("fa-circle-play");
-           iconElement.classList.add("fa-circle-pause");
-         }
+      if (iconElement.classList.contains("fa-circle-play")) {
+        iconElement.classList.remove("fa-circle-play");
+        iconElement.classList.add("fa-circle-pause");
+      }
 
     }
     handleDisableOfActions(task.overall_status)
@@ -796,7 +805,7 @@
           // Update the lastDataHash to the new hash
           lastDataHash = newDataHash;
 
-       
+
         } catch (error) {
           console.error("Error in fetchLoop:", error);
         }
@@ -853,7 +862,7 @@
                 charCount.textContent = "0";
               }
               updateButtonImage();
-              
+
               notyf.success("Additional details registered in plan.");
             })
             .catch((error) => {

@@ -19,6 +19,14 @@ window.GetAuthDetails = async () => {
 
             // Check if the request is successful
             if (!authResponse.ok) {
+                if(getStoredData('authEnabled') === 'false') {
+                    //Authentication is disabled. Will use mock user
+                    console.log("Authentication Disabled. Using mock user details.");
+
+                    const headers = getMockUserHeaders();
+
+                    return  headers;
+                }
                 console.log("Failed to fetch authentication details. Access to chat will be blocked.");
                 return null;
             }
@@ -47,25 +55,30 @@ window.GetAuthDetails = async () => {
         // This code runs locally so setup mock headers
         console.log("Running locally. Skipping authentication details fetch.");
 
+        const headers = getMockUserHeaders();
+
+        return  headers;
+    }
+
+    function getMockUserHeaders() {
         const mockUserDetails = {
             client_principal: 'mock-client-principal-id',
             user_claims: [
-              { typ: 'http://schemas.microsoft.com/identity/claims/objectidentifier', val: '12345678-abcd-efgh-ijkl-9876543210ab' }, // Mock Object ID
-              { typ: 'name', val: 'Local User' }, // Mock Name
-              { typ: 'email', val: 'localuser@example.com' }, // Mock Email (optional claim)
+                { typ: 'http://schemas.microsoft.com/identity/claims/objectidentifier', val: '12345678-abcd-efgh-ijkl-9876543210ab' }, // Mock Object ID
+                { typ: 'name', val: 'Local User' }, // Mock Name
+                { typ: 'email', val: 'localuser@example.com' }, // Mock Email (optional claim)
             ],
             identity_provider: 'mock-identity-provider', // Mock Identity Provider
-          };
-          
-          const headers = {
+        };
+
+        const headers = {
             'Content-Type': 'application/json',
             'X-Ms-Client-Principal': mockUserDetails.client_principal || '',
             'X-Ms-Client-Principal-Id': mockUserDetails.user_claims?.find(claim => claim.typ === 'http://schemas.microsoft.com/identity/claims/objectidentifier')?.val || '',
             'X-Ms-Client-Principal-Name': mockUserDetails.user_claims?.find(claim => claim.typ === 'name')?.val || '',
             'X-Ms-Client-Principal-Idp': mockUserDetails.identity_provider || '',
-          };
-
-        return  headers;
+        };
+        return headers;
     }
 };
 

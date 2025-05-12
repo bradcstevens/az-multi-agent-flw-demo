@@ -6,6 +6,10 @@
     const closeModalButtons = document.querySelectorAll(".modal-close-button");
     const myTasksMenu = document.getElementById("myTasksMenu");
     const tasksStats = document.getElementById("tasksStats");
+    
+    if(AUTH_ENABLED !== undefined) {
+        setStoredData('authEnabled', AUTH_ENABLED.toString().toLowerCase());
+    }
 
     //if (!getStoredData('apiEndpoint'))setStoredData('apiEndpoint', apiEndpoint);
     // Force rewrite of apiEndpoint
@@ -51,8 +55,17 @@
           try {
               const response = await fetch('/.auth/me');
               if (!response.ok) {
-                  console.log("No identity provider found. Access to chat will be blocked.");
-                  return null;
+                  if(getStoredData('authEnabled') === 'false'){
+                        //Authentication is disabled. Will use mock user
+                        return {
+                            name: 'Local User',
+                            authenticated: true
+                        }
+                  }
+                  else{
+                    console.log("No identity provider found. Access to chat will be blocked.");
+                    return null;
+                  }
               }
               const payload = await response.json();
 
