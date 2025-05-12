@@ -1,14 +1,8 @@
-import json
 import logging
-import os
-from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Union
+from typing import Any, List, Mapping, Optional
 
-import semantic_kernel as sk
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 from semantic_kernel.functions import KernelFunction
-from semantic_kernel.functions.kernel_arguments import KernelArguments
-from semantic_kernel.functions.kernel_function_decorator import kernel_function
-from semantic_kernel.agents import AzureAIAgentThread
 
 
 # Import the new AppConfig instance

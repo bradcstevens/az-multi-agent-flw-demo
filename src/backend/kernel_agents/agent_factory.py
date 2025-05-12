@@ -1,10 +1,7 @@
 """Factory for creating agents in the Multi-Agent Custom Automation Engine."""
 
 import logging
-from typing import Dict, List, Callable, Any, Optional, Type
-from types import SimpleNamespace
-from semantic_kernel import Kernel
-from semantic_kernel.functions import KernelFunction
+from typing import Dict, Any, Optional, Type
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 import inspect
 
@@ -23,7 +20,6 @@ from kernel_agents.procurement_agent import ProcurementAgent
 from kernel_agents.product_agent import ProductAgent
 from kernel_agents.planner_agent import PlannerAgent  # Add PlannerAgent import
 from kernel_agents.group_chat_manager import GroupChatManager
-from semantic_kernel.prompt_template.prompt_template_config import PromptTemplateConfig
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from models.messages_kernel import PlannerResponsePlan, AgentType
 
@@ -216,7 +212,7 @@ class AgentFactory:
             if hasattr(agent, "async_init") and inspect.iscoroutinefunction(
                 agent.async_init
             ):
-                init_result = await agent.async_init()
+                await agent.async_init()
 
         except Exception as e:
             logger.error(
