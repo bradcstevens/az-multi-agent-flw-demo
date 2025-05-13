@@ -168,7 +168,7 @@ module aifoundry 'deploy_ai_foundry.bicep' = {
     gptModelVersion: gptModelVersion
     managedIdentityObjectId: managedIdentityModule.outputs.managedIdentityOutput.objectId
     aiServicesEndpoint: aiServices.properties.endpoint
-    aiServices: aiServices
+    aiServicesKey: aiServices.listKeys().key1
     aiServicesId: aiServices.id
   }
   scope: resourceGroup(resourceGroup().name)

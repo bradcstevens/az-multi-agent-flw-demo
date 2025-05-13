@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.35.1.17967",
-      "templateHash": "18228555099764132241"
+      "templateHash": "4778084734742710121"
     }
   },
   "parameters": {
@@ -712,7 +712,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.35.1.17967",
-              "templateHash": "9490638595753234802"
+              "templateHash": "14561153070486462167"
             }
           },
           "parameters": {
@@ -767,11 +767,8 @@
               "properties": {
                 "category": "AIServices",
                 "target": "[parameters('aiServicesEndpoint')]",
-                "authType": "ApiKey",
+                "authType": "AAD",
                 "isSharedToAll": true,
-                "credentials": {
-                  "key": "[parameters('aiServicesKey')]"
-                },
                 "metadata": {
                   "ApiType": "Azure",
                   "ResourceId": "[parameters('aiServicesId')]"
@@ -895,6 +892,18 @@
               },
               "dependsOn": [
                 "[resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiHubName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName')), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
+              "properties": {
+                "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee')]",
+                "principalId": "[reference(resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName')), '2024-01-01-preview', 'full').identity.principalId]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName'))]"
               ]
             },
             {
