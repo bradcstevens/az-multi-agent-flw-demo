@@ -1,13 +1,12 @@
 # app_config.py
 import os
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from dotenv import load_dotenv
-from azure.identity import DefaultAzureCredential, ClientSecretCredential
+from azure.identity import DefaultAzureCredential
 from azure.cosmos.aio import CosmosClient
 from azure.ai.projects.aio import AIProjectClient
 from semantic_kernel.kernel import Kernel
-from semantic_kernel.contents import ChatHistory
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 from semantic_kernel.functions import KernelFunction
 

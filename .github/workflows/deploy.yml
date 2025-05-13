@@ -168,34 +168,6 @@ jobs:
             echo "Azure Container Registry name: ${acr_name}"
           fi
 
-      
-      - name: Build the image and update the container app
-        id: build-and-update
-        run: |
-
-          set -e
-          # Define variables for acr and container app names
-          acr_name="${{ env.ACR_NAME }}"
-          echo "ACR name: {$acr_name}"
-          backend_container_app_name="macae-backend"
-          backend_build_image_tag="backend:latest"
-
-          echo "Building the container image..."
-          # Build the image
-          az acr build -r ${acr_name} -t ${backend_build_image_tag} ./src/backend
-          echo "Backend image build completed successfully."
-
-          frontend_container_app_name="${{ env.APP_SERVICE_NAME }}"
-          frontend_build_image_tag="frontend:latest"
-
-          echo "Building the container image..."
-          # Build the image
-          az acr build -r ${acr_name} -t ${frontend_build_image_tag} ./src/frontend
-          echo "Frontend image build completed successfully."
-
-          # Add the new container to the website
-          az webapp config container set --resource-group ${{ env.RESOURCE_GROUP_NAME }} --name ${frontend_container_app_name} --container-image-name ${acr_name}.azurecr.io/frontend:latest --container-registry-url https://${acr_name}.azurecr.io
-                  
           
       - name: Delete Bicep Deployment
         if: success()

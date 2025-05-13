@@ -1,22 +1,17 @@
-import logging
 from typing import List, Optional
 
-import semantic_kernel as sk
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from event_utils import track_event_if_configured
 from kernel_agents.agent_base import BaseAgent
 from models.messages_kernel import (
-    ActionRequest,
     AgentMessage,
     AgentType,
     ApprovalRequest,
     HumanClarification,
     HumanFeedback,
-    Step,
     StepStatus,
 )
 from semantic_kernel.functions import KernelFunction
-from semantic_kernel.functions.kernel_arguments import KernelArguments
 
 
 class HumanAgent(BaseAgent):
@@ -119,7 +114,7 @@ class HumanAgent(BaseAgent):
 
         # Track the event
         track_event_if_configured(
-            f"Human Agent - Received feedback for step and added into the cosmos",
+            "Human Agent - Received feedback for step and added into the cosmos",
             {
                 "session_id": human_feedback.session_id,
                 "user_id": self._user_id,
@@ -143,7 +138,7 @@ class HumanAgent(BaseAgent):
 
         # Track the approval request event
         track_event_if_configured(
-            f"Human Agent - Approval request sent for step and added into the cosmos",
+            "Human Agent - Approval request sent for step and added into the cosmos",
             {
                 "session_id": human_feedback.session_id,
                 "user_id": self._user_id,

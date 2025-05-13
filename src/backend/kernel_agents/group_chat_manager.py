@@ -1,28 +1,17 @@
 import logging
-import json
 from datetime import datetime
-import re
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional
 
-import semantic_kernel as sk
 from semantic_kernel.functions.kernel_function import KernelFunction
-from semantic_kernel.agents import AgentGroupChat  # pylint: disable=E0611
-
-from semantic_kernel.agents.strategies import (
-    SequentialSelectionStrategy,
-    TerminationStrategy,
-)
 
 from kernel_agents.agent_base import BaseAgent
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from models.messages_kernel import (
     ActionRequest,
-    ActionResponse,
     AgentMessage,
     HumanFeedback,
     Step,
     StepStatus,
-    PlanStatus,
     HumanFeedbackStatus,
     InputTask,
     Plan,
