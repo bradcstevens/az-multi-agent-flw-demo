@@ -156,6 +156,19 @@ resource aiHubProject 'Microsoft.MachineLearningServices/workspaces@2024-01-01-p
   }
 }
 
+resource aiDeveloper 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '64702f94-c441-49e6-a78b-ef80e0188fee'
+}
+
+resource aiDevelopertoAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiHubProject.id, aiDeveloper.id)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: aiDeveloper.id
+    principalId: aiHubProject.identity.principalId
+  }
+}
+
 resource tenantIdEntry 'Microsoft.KeyVault/vaults/secrets@2021-11-01-preview' = {
   parent: keyVault
   name: 'TENANT-ID'

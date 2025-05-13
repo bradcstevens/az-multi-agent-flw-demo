@@ -462,15 +462,6 @@ resource aiDeveloperAccessProj 'Microsoft.Authorization/roleAssignments@2022-04-
   }
 }
 
-resource aiDevelopertoAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aiServices.name, aiHubProject.id, aiDeveloper.id)
-  scope: aiServices
-  properties: {
-    roleDefinitionId: aiDeveloper.id
-    principalId: aiHubProject.identity.principalId
-  }
-}
-
 var cosmosAssignCli = 'az cosmosdb sql role assignment create --resource-group "${resourceGroup().name}" --account-name "${cosmos.name}" --role-definition-id "${cosmos::contributorRoleDefinition.id}" --scope "${cosmos.id}" --principal-id "${containerApp.identity.principalId}"'
 
 module managedIdentityModule 'deploy_managed_identity.bicep' = {
