@@ -1,22 +1,13 @@
 import logging
 import uuid
-import json
-import re
-import datetime
-from typing import Dict, List, Optional, Any, Tuple
-from pydantic import BaseModel, Field
+from typing import Dict, List, Optional, Tuple
 from azure.ai.projects.models import (
     ResponseFormatJsonSchema,
     ResponseFormatJsonSchemaType,
 )
-import semantic_kernel as sk
 from semantic_kernel.functions import KernelFunction
 from semantic_kernel.functions.kernel_arguments import KernelArguments
-from semantic_kernel.agents import (
-    AzureAIAgent,
-    AzureAIAgentSettings,
-    AzureAIAgentThread,
-)
+
 from kernel_agents.agent_base import BaseAgent
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from models.messages_kernel import (
