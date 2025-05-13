@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.35.1.17967",
-      "templateHash": "8798142813454376636"
+      "templateHash": "4778084734742710121"
     }
   },
   "parameters": {
@@ -546,20 +546,6 @@
         "containerApp"
       ]
     },
-    "aiDevelopertoAIProject": {
-      "type": "Microsoft.Authorization/roleAssignments",
-      "apiVersion": "2022-04-01",
-      "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', variables('aiServicesName'))]",
-      "name": "[guid(variables('aiServicesName'), resourceId('Microsoft.MachineLearningServices/workspaces', format('{0}-aiproject', parameters('prefix'))), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
-      "properties": {
-        "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee')]",
-        "principalId": "[reference('aiHubProject', '2024-01-01-preview', 'full').identity.principalId]"
-      },
-      "dependsOn": [
-        "aiHubProject",
-        "aiServices"
-      ]
-    },
     "kvault": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -726,7 +712,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.35.1.17967",
-              "templateHash": "12578060348489775267"
+              "templateHash": "14561153070486462167"
             }
           },
           "parameters": {
@@ -906,6 +892,18 @@
               },
               "dependsOn": [
                 "[resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiHubName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName')), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
+              "properties": {
+                "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee')]",
+                "principalId": "[reference(resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName')), '2024-01-01-preview', 'full').identity.principalId]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName'))]"
               ]
             },
             {
