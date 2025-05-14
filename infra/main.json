@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.34.44.8038",
-      "templateHash": "7719893060553487435"
+      "version": "0.35.1.17967",
+      "templateHash": "6559422175999367984"
     }
   },
   "parameters": {
@@ -48,13 +48,12 @@
         "description": "Location for all Ai services resources. This location can be different from the resource group location."
       }
     },
-    "prefix": {
+    "environmentName": {
       "type": "string",
-      "defaultValue": "macae",
       "minLength": 3,
       "maxLength": 20,
       "metadata": {
-        "description": "Prefix for all resources created by this template.  This prefix will be used to create unique names for all resources.  The prefix must be unique within the resource group."
+        "description": "A unique prefix for all resources in this deployment. This should be 3-20 characters long:"
       }
     },
     "tags": {
@@ -107,16 +106,18 @@
     }
   },
   "variables": {
+    "uniqueId": "[toLower(uniqueString(subscription().id, parameters('environmentName'), resourceGroup().location))]",
+    "solutionPrefix": "[format('ma{0}', padLeft(take(variables('uniqueId'), 12), 12, '0'))]",
     "modelVersion": "2024-08-06",
-    "aiServicesName": "[format('{0}-aiservices', parameters('prefix'))]",
+    "aiServicesName": "[format('{0}-aiservices', variables('solutionPrefix'))]",
     "deploymentType": "GlobalStandard",
     "gptModelVersion": "gpt-4o",
-    "appVersion": "fnd01",
+    "appVersion": "latest",
     "resgistryName": "biabcontainerreg",
     "dockerRegistryUrl": "[format('https://{0}.azurecr.io', variables('resgistryName'))]",
     "backendDockerImageURL": "[format('{0}.azurecr.io/macaebackend:{1}', variables('resgistryName'), variables('appVersion'))]",
     "frontendDockerImageURL": "[format('{0}.azurecr.io/macaefrontend:{1}', variables('resgistryName'), variables('appVersion'))]",
-    "uniqueNameFormat": "[format('{0}-{{0}}-{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix')))]",
+    "uniqueNameFormat": "[format('{0}-{{0}}-{1}', variables('solutionPrefix'), uniqueString(resourceGroup().id, variables('solutionPrefix')))]",
     "aoaiApiVersion": "2025-01-01-preview",
     "aiModelDeployments": [
       {
@@ -224,8 +225,7 @@
       "kind": "AIServices",
       "properties": {
         "customSubDomainName": "[variables('aiServicesName')]",
-        "apiProperties": {},
-        "disableLocalAuth": true
+        "apiProperties": {}
       }
     },
     "aiServicesDeployments": {
@@ -262,7 +262,7 @@
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
       "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', variables('aiServicesName'))]",
-      "name": "[guid(resourceId('Microsoft.App/containerApps', format('{0}-backend', parameters('prefix'))), resourceId('Microsoft.CognitiveServices/accounts', variables('aiServicesName')), resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'))]",
+      "name": "[guid(resourceId('Microsoft.App/containerApps', format('{0}-backend', variables('solutionPrefix'))), resourceId('Microsoft.CognitiveServices/accounts', variables('aiServicesName')), resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'))]",
       "properties": {
         "principalId": "[reference('containerApp', '2024-03-01', 'full').identity.principalId]",
         "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')]",
@@ -315,7 +315,7 @@
           "destination": "log-analytics",
           "logAnalyticsConfiguration": {
             "customerId": "[reference('logAnalytics').customerId]",
-            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'logs')), '2023-09-01').primarySharedKey]"
+            "sharedKey": "[listKeys('logAnalytics', '2023-09-01').primarySharedKey]"
           }
         }
       },
@@ -327,7 +327,7 @@
     "acaCosomsRoleAssignment": {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'cosmos'), guid(resourceId('Microsoft.App/containerApps', format('{0}-backend', parameters('prefix'))), resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format(variables('uniqueNameFormat'), 'cosmos'), '00000000-0000-0000-0000-000000000002')))]",
+      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'cosmos'), guid(resourceId('Microsoft.App/containerApps', format('{0}-backend', variables('solutionPrefix'))), resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format(variables('uniqueNameFormat'), 'cosmos'), '00000000-0000-0000-0000-000000000002')))]",
       "properties": {
         "principalId": "[reference('containerApp', '2024-03-01', 'full').identity.principalId]",
         "roleDefinitionId": "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format(variables('uniqueNameFormat'), 'cosmos'), '00000000-0000-0000-0000-000000000002')]",
@@ -341,7 +341,7 @@
     "containerApp": {
       "type": "Microsoft.App/containerApps",
       "apiVersion": "2024-03-01",
-      "name": "[format('{0}-backend', parameters('prefix'))]",
+      "name": "[format('{0}-backend', variables('solutionPrefix'))]",
       "location": "[parameters('location')]",
       "tags": "[parameters('tags')]",
       "identity": {
@@ -532,7 +532,7 @@
       "existing": true,
       "type": "Microsoft.MachineLearningServices/workspaces",
       "apiVersion": "2024-01-01-preview",
-      "name": "[format('{0}-aiproject', parameters('prefix'))]"
+      "name": "[format('{0}-aiproject', variables('solutionPrefix'))]"
     },
     "aiDeveloper": {
       "existing": true,
@@ -543,8 +543,8 @@
     "aiDeveloperAccessProj": {
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', format('{0}-aiproject', parameters('prefix')))]",
-      "name": "[guid(format('{0}-backend', parameters('prefix')), resourceId('Microsoft.MachineLearningServices/workspaces', format('{0}-aiproject', parameters('prefix'))), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', format('{0}-aiproject', variables('solutionPrefix')))]",
+      "name": "[guid(format('{0}-backend', variables('solutionPrefix')), resourceId('Microsoft.MachineLearningServices/workspaces', format('{0}-aiproject', variables('solutionPrefix'))), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
       "properties": {
         "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee')]",
         "principalId": "[reference('containerApp', '2024-03-01', 'full').identity.principalId]"
@@ -565,7 +565,7 @@
         "mode": "Incremental",
         "parameters": {
           "solutionName": {
-            "value": "[parameters('prefix')]"
+            "value": "[variables('solutionPrefix')]"
           },
           "solutionLocation": {
             "value": "[parameters('location')]"
@@ -580,8 +580,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.34.44.8038",
-              "templateHash": "10664495342911727649"
+              "version": "0.35.1.17967",
+              "templateHash": "5761607453167859573"
             }
           },
           "parameters": {
@@ -685,7 +685,7 @@
         "mode": "Incremental",
         "parameters": {
           "solutionName": {
-            "value": "[parameters('prefix')]"
+            "value": "[variables('solutionPrefix')]"
           },
           "solutionLocation": {
             "value": "[parameters('azureOpenAILocation')]"
@@ -706,7 +706,7 @@
             "value": "[reference('aiServices').endpoint]"
           },
           "aiServicesKey": {
-            "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('aiServicesName')), '2024-04-01-preview').key1]"
+            "value": "[listKeys('aiServices', '2024-04-01-preview').key1]"
           },
           "aiServicesId": {
             "value": "[resourceId('Microsoft.CognitiveServices/accounts', variables('aiServicesName'))]"
@@ -718,8 +718,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.34.44.8038",
-              "templateHash": "8087543237770345715"
+              "version": "0.35.1.17967",
+              "templateHash": "9490638595753234802"
             }
           },
           "parameters": {
@@ -1094,7 +1094,7 @@
         "mode": "Incremental",
         "parameters": {
           "solutionName": {
-            "value": "[parameters('prefix')]"
+            "value": "[variables('solutionPrefix')]"
           },
           "managedIdentityId": {
             "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'containerapp-pull'))]"
@@ -1112,8 +1112,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.34.44.8038",
-              "templateHash": "11364190519186458619"
+              "version": "0.35.1.17967",
+              "templateHash": "12327197428621494853"
             }
           },
           "parameters": {

@@ -65,7 +65,7 @@ var modelVersion = '2024-08-06'
 var aiServicesName = '${solutionPrefix}-aiservices'
 var deploymentType = 'GlobalStandard'
 var gptModelVersion = 'gpt-4o'
-var appVersion = 'fnd01'
+var appVersion = 'latest'
 var resgistryName = 'biabcontainerreg'
 var dockerRegistryUrl = 'https://${resgistryName}.azurecr.io'
 
