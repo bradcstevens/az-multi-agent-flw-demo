@@ -6,12 +6,13 @@
     "_generator": {
       "name": "bicep",
       "version": "0.35.1.17967",
-      "templateHash": "4208201882676728802"
+      "templateHash": "2907054203534234249"
     }
   },
   "parameters": {
     "azureOpenAILocation": {
       "type": "string",
+      "defaultValue": "eastus2",
       "allowedValues": [
         "australiaeast",
         "brazilsouth",
@@ -454,7 +455,8 @@
       "properties": {
         "customSubDomainName": "[variables('aiServicesName')]",
         "apiProperties": {},
-        "disableLocalAuth": true
+        "disableLocalAuth": true,
+        "publicNetworkAccess": "Enabled"
       }
     },
     "aiServicesDeployments": {
@@ -810,7 +812,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.35.1.17967",
-              "templateHash": "4587248441449388111"
+              "templateHash": "7119862929918770475"
             }
           },
           "parameters": {
@@ -858,7 +860,6 @@
                 "enabledForDeployment": true,
                 "enabledForDiskEncryption": true,
                 "enabledForTemplateDeployment": true,
-                "enableSoftDelete": false,
                 "enableRbacAuthorization": true,
                 "publicNetworkAccess": "enabled",
                 "sku": {

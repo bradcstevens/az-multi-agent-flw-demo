@@ -26,7 +26,7 @@ targetScope = 'resourceGroup'
   'westus3'
 ])
 @description('Location for all Ai services resources. This location can be different from the resource group location.')
-param azureOpenAILocation string = 'eastus2' // The location used for all deployed resources.  This location must be in the same region as the resource group.
+param azureOpenAILocation string = 'eastus2'
 
 @minLength(3)
 @maxLength(20)
@@ -129,6 +129,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = 
       //statisticsEnabled: false
     }
     disableLocalAuth: true
+    publicNetworkAccess: 'Enabled'
   }
 }
 
