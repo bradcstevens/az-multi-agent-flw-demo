@@ -136,11 +136,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2023-08-01-preview'
     properties: {
       category: 'AIServices'
       target: aiServicesEndpoint
-      authType: 'ApiKey'
+      authType: 'AAD'
       isSharedToAll: true
-      credentials: {
-        key: aiServicesKey
-      }
       metadata: {
         ApiType: 'Azure'
         ResourceId: aiServicesId
@@ -159,6 +156,19 @@ resource aiHubProject 'Microsoft.MachineLearningServices/workspaces@2024-01-01-p
   properties: {
     friendlyName: aiProjectFriendlyName
     hubResourceId: aiHub.id
+  }
+}
+
+resource aiDeveloper 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '64702f94-c441-49e6-a78b-ef80e0188fee'
+}
+
+resource aiDevelopertoAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiHubProject.id, aiDeveloper.id)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: aiDeveloper.id
+    principalId: aiHubProject.identity.principalId
   }
 }
 

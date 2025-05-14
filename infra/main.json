@@ -5,14 +5,13 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.34.44.8038",
-      "templateHash": "17550717161725705246"
+      "version": "0.35.1.17967",
+      "templateHash": "4208201882676728802"
     }
   },
   "parameters": {
     "azureOpenAILocation": {
       "type": "string",
-      "defaultValue": "eastus2",
       "allowedValues": [
         "australiaeast",
         "brazilsouth",
@@ -454,7 +453,8 @@
       "kind": "AIServices",
       "properties": {
         "customSubDomainName": "[variables('aiServicesName')]",
-        "apiProperties": {}
+        "apiProperties": {},
+        "disableLocalAuth": true
       }
     },
     "aiServicesDeployments": {
@@ -522,7 +522,8 @@
           {
             "name": "EnableServerless"
           }
-        ]
+        ],
+        "disableLocalAuth": true
       }
     },
     "pullIdentity": {
@@ -543,7 +544,7 @@
           "destination": "log-analytics",
           "logAnalyticsConfiguration": {
             "customerId": "[reference('logAnalytics').customerId]",
-            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}{1}', variables('abbrs').managementGovernance.logAnalyticsWorkspace, variables('solutionPrefix'))), '2023-09-01').primarySharedKey]"
+            "sharedKey": "[listKeys('logAnalytics', '2023-09-01').primarySharedKey]"
           }
         }
       },
@@ -808,8 +809,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.34.44.8038",
-              "templateHash": "6018596764344872545"
+              "version": "0.35.1.17967",
+              "templateHash": "4587248441449388111"
             }
           },
           "parameters": {
@@ -928,7 +929,7 @@
             "value": "[reference('aiServices').endpoint]"
           },
           "aiServicesKey": {
-            "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('aiServicesName')), '2024-04-01-preview').key1]"
+            "value": "[listKeys('aiServices', '2024-04-01-preview').key1]"
           },
           "aiServicesId": {
             "value": "[resourceId('Microsoft.CognitiveServices/accounts', variables('aiServicesName'))]"
@@ -940,8 +941,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.34.44.8038",
-              "templateHash": "4169059378107378993"
+              "version": "0.35.1.17967",
+              "templateHash": "13047093698365252995"
             }
           },
           "parameters": {
@@ -1223,11 +1224,8 @@
               "properties": {
                 "category": "AIServices",
                 "target": "[parameters('aiServicesEndpoint')]",
-                "authType": "ApiKey",
+                "authType": "AAD",
                 "isSharedToAll": true,
-                "credentials": {
-                  "key": "[parameters('aiServicesKey')]"
-                },
                 "metadata": {
                   "ApiType": "Azure",
                   "ResourceId": "[parameters('aiServicesId')]"
@@ -1351,6 +1349,18 @@
               },
               "dependsOn": [
                 "[resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiHubName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName')), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
+              "properties": {
+                "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee')]",
+                "principalId": "[reference(resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName')), '2024-01-01-preview', 'full').identity.principalId]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.MachineLearningServices/workspaces', variables('aiProjectName'))]"
               ]
             },
             {
@@ -1561,8 +1571,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.34.44.8038",
-              "templateHash": "225360114294826340"
+              "version": "0.35.1.17967",
+              "templateHash": "14769217536017297821"
             }
           },
           "parameters": {
