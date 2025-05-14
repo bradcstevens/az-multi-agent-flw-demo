@@ -6,5 +6,6 @@ module testDeployment '../../main.bicep' = {
     virtualNetworkConfiguration: {
       enabled: false
     }
+    enableTelemetry:false
   }
 }

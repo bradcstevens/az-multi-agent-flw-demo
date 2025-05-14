@@ -12,7 +12,7 @@ param solutionPrefix string
 param solutionLocation string = resourceGroup().location
 
 @description('Optional. Enable/Disable usage telemetry for module.')
-param enableTelemetry bool = true
+param enableTelemetry bool
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags object = {
@@ -75,7 +75,7 @@ param networkSecurityGroupBackendConfiguration networkSecurityGroupConfiguration
 
 @description('Optional. The configuration to apply for the Multi-Agent Custom Automation Engine Network Security Group resource for the containers subnet.')
 param networkSecurityGroupContainersConfiguration networkSecurityGroupConfigurationType = {
-  enabled: true
+  enabled: false
   name: '${solutionPrefix}nsgr-containers'
   location: solutionLocation
   tags: tags
@@ -101,7 +101,7 @@ param networkSecurityGroupContainersConfiguration networkSecurityGroupConfigurat
 
 @description('Optional. The configuration to apply for the Multi-Agent Custom Automation Engine Network Security Group resource for the Bastion subnet.')
 param networkSecurityGroupBastionConfiguration networkSecurityGroupConfigurationType = {
-  enabled: true
+  enabled: false
   name: '${solutionPrefix}nsgr-bastion'
   location: solutionLocation
   tags: tags
@@ -127,7 +127,7 @@ param networkSecurityGroupBastionConfiguration networkSecurityGroupConfiguration
 
 @description('Optional. The configuration to apply for the Multi-Agent Custom Automation Engine Network Security Group resource for the administration subnet.')
 param networkSecurityGroupAdministrationConfiguration networkSecurityGroupConfigurationType = {
-  enabled: true
+  enabled: false
   name: '${solutionPrefix}nsgr-administration'
   location: solutionLocation
   tags: tags
@@ -138,7 +138,7 @@ param networkSecurityGroupAdministrationConfiguration networkSecurityGroupConfig
     //     priority: 200
     //     access: 'Deny'
     //     protocol: '*'
-    //     direction: 'Outbound'
+    //     direction: 'Outbound
     //     sourceAddressPrefix: 'VirtualNetwork'
     //     sourcePortRange: '*'
     //     destinationAddressPrefix: '*'
@@ -153,7 +153,7 @@ param networkSecurityGroupAdministrationConfiguration networkSecurityGroupConfig
 
 @description('Optional. Configuration for the virtual machine.')
 param virtualMachineConfiguration virtualMachineConfigurationType = {
-  enabled: true
+  enabled: false
   adminUsername: 'adminuser'
   adminPassword: guid(solutionPrefix, subscription().subscriptionId)
 }
@@ -161,7 +161,7 @@ var virtualMachineEnabled = virtualMachineConfiguration.?enabled ?? true
 
 @description('Optional. Configuration for the virtual machine.')
 param virtualNetworkConfiguration virtualNetworkConfigurationType = {
-  enabled: true
+  enabled: false
 }
 var virtualNetworkEnabled = virtualNetworkConfiguration.?enabled ?? true
 
