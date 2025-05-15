@@ -1,6 +1,5 @@
 using './main.bicep'
 
-
-
 param enableTelemetry = true
-param solutionPrefix = 'thtst'
+param solutionPrefix = 'thdev'
+param enableNetworkSecurity = false
