@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.35.1.17967",
-      "templateHash": "2907054203534234249"
+      "templateHash": "12016977205829849477"
     }
   },
   "parameters": {
@@ -702,9 +702,9 @@
       "location": "[variables('solutionLocation')]",
       "tags": "[parameters('tags')]",
       "sku": {
-        "name": "P1v2",
+        "name": "B2",
         "capacity": 1,
-        "tier": "PremiumV2"
+        "tier": "Basic"
       },
       "properties": {
         "reserved": true
