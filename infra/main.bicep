@@ -400,9 +400,9 @@ resource frontendAppServicePlan 'Microsoft.Web/serverfarms@2021-02-01' = {
   location: solutionLocation
   tags: tags
   sku: {
-    name: 'P1v2'
+    name: 'B2'
     capacity: 1
-    tier: 'PremiumV2'
+    tier: 'Basic'
   }
   properties: {
     reserved: true
