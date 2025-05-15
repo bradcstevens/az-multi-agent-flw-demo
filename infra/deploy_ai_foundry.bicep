@@ -9,18 +9,21 @@ param aiServicesEndpoint string
 param aiServicesKey string
 param aiServicesId string
 
-var storageName = '${solutionName}hubstorage'
+// Load the abbrevations file required to name the azure resources.
+var abbrs = loadJsonContent('./abbreviations.json')
+
+var storageName = '${abbrs.storage.storageAccount}${solutionName}hub'
 var storageSkuName = 'Standard_LRS'
-var aiServicesName = '${solutionName}-aiservices'
-var workspaceName = '${solutionName}-workspace'
-var keyvaultName = '${solutionName}-kv'
+var aiServicesName = '${abbrs.ai.aiServices}${solutionName}'
+var workspaceName = '${abbrs.managementGovernance.logAnalyticsWorkspace}${solutionName}hub'
+//var keyvaultName = '${abbrs.security.keyVault}${solutionName}'
 var location = solutionLocation 
-var aiHubName = '${solutionName}-aihub'
+var aiHubName = '${abbrs.ai.aiHub}${solutionName}'
 var aiHubFriendlyName = aiHubName
-var aiHubDescription = 'AI Hub for KM template'
-var aiProjectName = '${solutionName}-aiproject'
+var aiHubDescription = 'AI Hub for MACAE template'
+var aiProjectName = '${abbrs.ai.aiHubProject}${solutionName}'
 var aiProjectFriendlyName = aiProjectName
-var aiSearchName = '${solutionName}-search'
+var aiSearchName = '${abbrs.ai.aiSearch}${solutionName}'
 
 
 resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' existing = {
@@ -297,7 +300,7 @@ resource azureLocatioEntry 'Microsoft.KeyVault/vaults/secrets@2021-11-01-preview
   }
 }
 
-output keyvaultName string = keyvaultName
+output keyvaultName string = keyVaultName
 output keyvaultId string = keyVault.id
 
 output aiServicesName string = aiServicesName 

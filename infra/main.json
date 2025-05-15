@@ -6,12 +6,13 @@
     "_generator": {
       "name": "bicep",
       "version": "0.35.1.17967",
-      "templateHash": "4778084734742710121"
+      "templateHash": "2907054203534234249"
     }
   },
   "parameters": {
     "azureOpenAILocation": {
       "type": "string",
+      "defaultValue": "eastus2",
       "allowedValues": [
         "australiaeast",
         "brazilsouth",
@@ -41,12 +42,19 @@
         "description": "Location for all Ai services resources. This location can be different from the resource group location."
       }
     },
-    "prefix": {
+    "environmentName": {
       "type": "string",
       "minLength": 3,
       "maxLength": 20,
       "metadata": {
-        "description": "Prefix for all resources created by this template.  This prefix will be used to create unique names for all resources.  The prefix must be unique within the resource group."
+        "description": "A unique prefix for all resources in this deployment. This should be 3-20 characters long:"
+      }
+    },
+    "AZURE_LOCATION": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Set this if you want to deploy to a different region than the resource group. Otherwise, it will use the resource group location by default."
       }
     },
     "tags": {
@@ -99,9 +107,239 @@
     }
   },
   "variables": {
-    "location": "[resourceGroup().location]",
+    "$fxv#0": {
+      "ai": {
+        "aiSearch": "srch-",
+        "aiServices": "aisa-",
+        "aiVideoIndexer": "avi-",
+        "machineLearningWorkspace": "mlw-",
+        "openAIService": "oai-",
+        "botService": "bot-",
+        "computerVision": "cv-",
+        "contentModerator": "cm-",
+        "contentSafety": "cs-",
+        "customVisionPrediction": "cstv-",
+        "customVisionTraining": "cstvt-",
+        "documentIntelligence": "di-",
+        "faceApi": "face-",
+        "healthInsights": "hi-",
+        "immersiveReader": "ir-",
+        "languageService": "lang-",
+        "speechService": "spch-",
+        "translator": "trsl-",
+        "aiHub": "aih-",
+        "aiHubProject": "aihp-"
+      },
+      "analytics": {
+        "analysisServicesServer": "as",
+        "databricksWorkspace": "dbw-",
+        "dataExplorerCluster": "dec",
+        "dataExplorerClusterDatabase": "dedb",
+        "dataFactory": "adf-",
+        "digitalTwin": "dt-",
+        "streamAnalytics": "asa-",
+        "synapseAnalyticsPrivateLinkHub": "synplh-",
+        "synapseAnalyticsSQLDedicatedPool": "syndp",
+        "synapseAnalyticsSparkPool": "synsp",
+        "synapseAnalyticsWorkspaces": "synw",
+        "dataLakeStoreAccount": "dls",
+        "dataLakeAnalyticsAccount": "dla",
+        "eventHubsNamespace": "evhns-",
+        "eventHub": "evh-",
+        "eventGridDomain": "evgd-",
+        "eventGridSubscriptions": "evgs-",
+        "eventGridTopic": "evgt-",
+        "eventGridSystemTopic": "egst-",
+        "hdInsightHadoopCluster": "hadoop-",
+        "hdInsightHBaseCluster": "hbase-",
+        "hdInsightKafkaCluster": "kafka-",
+        "hdInsightSparkCluster": "spark-",
+        "hdInsightStormCluster": "storm-",
+        "hdInsightMLServicesCluster": "mls-",
+        "iotHub": "iot-",
+        "provisioningServices": "provs-",
+        "provisioningServicesCertificate": "pcert-",
+        "powerBIEmbedded": "pbi-",
+        "timeSeriesInsightsEnvironment": "tsi-"
+      },
+      "compute": {
+        "appServiceEnvironment": "ase-",
+        "appServicePlan": "asp-",
+        "loadTesting": "lt-",
+        "availabilitySet": "avail-",
+        "arcEnabledServer": "arcs-",
+        "arcEnabledKubernetesCluster": "arck",
+        "batchAccounts": "ba-",
+        "cloudService": "cld-",
+        "communicationServices": "acs-",
+        "diskEncryptionSet": "des",
+        "functionApp": "func-",
+        "gallery": "gal",
+        "hostingEnvironment": "host-",
+        "imageTemplate": "it-",
+        "managedDiskOS": "osdisk",
+        "managedDiskData": "disk",
+        "notificationHubs": "ntf-",
+        "notificationHubsNamespace": "ntfns-",
+        "proximityPlacementGroup": "ppg-",
+        "restorePointCollection": "rpc-",
+        "snapshot": "snap-",
+        "staticWebApp": "stapp-",
+        "virtualMachine": "vm",
+        "virtualMachineScaleSet": "vmss-",
+        "virtualMachineMaintenanceConfiguration": "mc-",
+        "virtualMachineStorageAccount": "stvm",
+        "webApp": "app-"
+      },
+      "containers": {
+        "aksCluster": "aks-",
+        "aksSystemNodePool": "npsystem-",
+        "aksUserNodePool": "np-",
+        "containerApp": "ca-",
+        "containerAppsEnvironment": "cae-",
+        "containerRegistry": "cr",
+        "containerInstance": "ci",
+        "serviceFabricCluster": "sf-",
+        "serviceFabricManagedCluster": "sfmc-"
+      },
+      "databases": {
+        "cosmosDBDatabase": "cosmos-",
+        "cosmosDBApacheCassandra": "coscas-",
+        "cosmosDBMongoDB": "cosmon-",
+        "cosmosDBNoSQL": "cosno-",
+        "cosmosDBTable": "costab-",
+        "cosmosDBGremlin": "cosgrm-",
+        "cosmosDBPostgreSQL": "cospos-",
+        "cacheForRedis": "redis-",
+        "sqlDatabaseServer": "sql-",
+        "sqlDatabase": "sqldb-",
+        "sqlElasticJobAgent": "sqlja-",
+        "sqlElasticPool": "sqlep-",
+        "mariaDBServer": "maria-",
+        "mariaDBDatabase": "mariadb-",
+        "mySQLDatabase": "mysql-",
+        "postgreSQLDatabase": "psql-",
+        "sqlServerStretchDatabase": "sqlstrdb-",
+        "sqlManagedInstance": "sqlmi-"
+      },
+      "developerTools": {
+        "appConfigurationStore": "appcs-",
+        "mapsAccount": "map-",
+        "signalR": "sigr",
+        "webPubSub": "wps-"
+      },
+      "devOps": {
+        "managedGrafana": "amg-"
+      },
+      "integration": {
+        "apiManagementService": "apim-",
+        "integrationAccount": "ia-",
+        "logicApp": "logic-",
+        "serviceBusNamespace": "sbns-",
+        "serviceBusQueue": "sbq-",
+        "serviceBusTopic": "sbt-",
+        "serviceBusTopicSubscription": "sbts-"
+      },
+      "managementGovernance": {
+        "automationAccount": "aa-",
+        "applicationInsights": "appi-",
+        "monitorActionGroup": "ag-",
+        "monitorDataCollectionRules": "dcr-",
+        "monitorAlertProcessingRule": "apr-",
+        "blueprint": "bp-",
+        "blueprintAssignment": "bpa-",
+        "dataCollectionEndpoint": "dce-",
+        "logAnalyticsWorkspace": "log-",
+        "logAnalyticsQueryPacks": "pack-",
+        "managementGroup": "mg-",
+        "purviewInstance": "pview-",
+        "resourceGroup": "rg-",
+        "templateSpecsName": "ts-"
+      },
+      "migration": {
+        "migrateProject": "migr-",
+        "databaseMigrationService": "dms-",
+        "recoveryServicesVault": "rsv-"
+      },
+      "networking": {
+        "applicationGateway": "agw-",
+        "applicationSecurityGroup": "asg-",
+        "cdnProfile": "cdnp-",
+        "cdnEndpoint": "cdne-",
+        "connections": "con-",
+        "dnsForwardingRuleset": "dnsfrs-",
+        "dnsPrivateResolver": "dnspr-",
+        "dnsPrivateResolverInboundEndpoint": "in-",
+        "dnsPrivateResolverOutboundEndpoint": "out-",
+        "firewall": "afw-",
+        "firewallPolicy": "afwp-",
+        "expressRouteCircuit": "erc-",
+        "expressRouteGateway": "ergw-",
+        "frontDoorProfile": "afd-",
+        "frontDoorEndpoint": "fde-",
+        "frontDoorFirewallPolicy": "fdfp-",
+        "ipGroups": "ipg-",
+        "loadBalancerInternal": "lbi-",
+        "loadBalancerExternal": "lbe-",
+        "loadBalancerRule": "rule-",
+        "localNetworkGateway": "lgw-",
+        "natGateway": "ng-",
+        "networkInterface": "nic-",
+        "networkSecurityGroup": "nsg-",
+        "networkSecurityGroupSecurityRules": "nsgsr-",
+        "networkWatcher": "nw-",
+        "privateLink": "pl-",
+        "privateEndpoint": "pep-",
+        "publicIPAddress": "pip-",
+        "publicIPAddressPrefix": "ippre-",
+        "routeFilter": "rf-",
+        "routeServer": "rtserv-",
+        "routeTable": "rt-",
+        "serviceEndpointPolicy": "se-",
+        "trafficManagerProfile": "traf-",
+        "userDefinedRoute": "udr-",
+        "virtualNetwork": "vnet-",
+        "virtualNetworkGateway": "vgw-",
+        "virtualNetworkManager": "vnm-",
+        "virtualNetworkPeering": "peer-",
+        "virtualNetworkSubnet": "snet-",
+        "virtualWAN": "vwan-",
+        "virtualWANHub": "vhub-"
+      },
+      "security": {
+        "bastion": "bas-",
+        "keyVault": "kv-",
+        "keyVaultManagedHSM": "kvmhsm-",
+        "managedIdentity": "id-",
+        "sshKey": "sshkey-",
+        "vpnGateway": "vpng-",
+        "vpnConnection": "vcn-",
+        "vpnSite": "vst-",
+        "webApplicationFirewallPolicy": "waf",
+        "webApplicationFirewallPolicyRuleGroup": "wafrg"
+      },
+      "storage": {
+        "storSimple": "ssimp",
+        "backupVault": "bvault-",
+        "backupVaultPolicy": "bkpol-",
+        "fileShare": "share-",
+        "storageAccount": "st",
+        "storageSyncService": "sss-"
+      },
+      "virtualDesktop": {
+        "labServicesPlan": "lp-",
+        "virtualDesktopHostPool": "vdpool-",
+        "virtualDesktopApplicationGroup": "vdag-",
+        "virtualDesktopWorkspace": "vdws-",
+        "virtualDesktopScalingPlan": "vdscaling-"
+      }
+    },
+    "solutionLocation": "[if(empty(parameters('AZURE_LOCATION')), resourceGroup().location, parameters('AZURE_LOCATION'))]",
+    "uniqueId": "[toLower(uniqueString(subscription().id, parameters('environmentName'), variables('solutionLocation')))]",
+    "solutionPrefix": "[format('ma{0}', padLeft(take(variables('uniqueId'), 12), 12, '0'))]",
+    "abbrs": "[variables('$fxv#0')]",
     "modelVersion": "2024-08-06",
-    "aiServicesName": "[format('{0}-aiservices', parameters('prefix'))]",
+    "aiServicesName": "[format('{0}{1}', variables('abbrs').ai.aiServices, variables('solutionPrefix'))]",
     "deploymentType": "GlobalStandard",
     "gptModelVersion": "gpt-4o",
     "appVersion": "fnd01",
@@ -109,7 +347,6 @@
     "dockerRegistryUrl": "[format('https://{0}.azurecr.io', variables('resgistryName'))]",
     "backendDockerImageURL": "[format('{0}.azurecr.io/macaebackend:{1}', variables('resgistryName'), variables('appVersion'))]",
     "frontendDockerImageURL": "[format('{0}.azurecr.io/macaefrontend:{1}', variables('resgistryName'), variables('appVersion'))]",
-    "uniqueNameFormat": "[format('{0}-{{0}}-{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix')))]",
     "aoaiApiVersion": "2025-01-01-preview",
     "aiModelDeployments": [
       {
@@ -128,7 +365,7 @@
     "cosmos::autogenDb::memoryContainer": {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}/{2}', format(variables('uniqueNameFormat'), 'cosmos'), 'autogen', 'memory')]",
+      "name": "[format('{0}/{1}/{2}', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), 'autogen', 'memory')]",
       "properties": {
         "resource": {
           "id": "memory",
@@ -149,7 +386,7 @@
       "existing": true,
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'cosmos'), '00000000-0000-0000-0000-000000000002')]",
+      "name": "[format('{0}/{1}', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), '00000000-0000-0000-0000-000000000002')]",
       "dependsOn": [
         "cosmos"
       ]
@@ -157,7 +394,7 @@
     "cosmos::autogenDb": {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'cosmos'), 'autogen')]",
+      "name": "[format('{0}/{1}', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), 'autogen')]",
       "properties": {
         "resource": {
           "id": "autogen",
@@ -171,7 +408,7 @@
     "containerAppEnv::aspireDashboard": {
       "type": "Microsoft.App/managedEnvironments/dotNetComponents",
       "apiVersion": "2024-02-02-preview",
-      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'containerapp'), 'aspire-dashboard')]",
+      "name": "[format('{0}/{1}', format('{0}{1}', variables('abbrs').containers.containerAppsEnvironment, variables('solutionPrefix')), 'aspire-dashboard')]",
       "properties": {
         "componentType": "AspireDashboard"
       },
@@ -182,8 +419,8 @@
     "logAnalytics": {
       "type": "Microsoft.OperationalInsights/workspaces",
       "apiVersion": "2023-09-01",
-      "name": "[format(variables('uniqueNameFormat'), 'logs')]",
-      "location": "[variables('location')]",
+      "name": "[format('{0}{1}', variables('abbrs').managementGovernance.logAnalyticsWorkspace, variables('solutionPrefix'))]",
+      "location": "[variables('solutionLocation')]",
       "tags": "[parameters('tags')]",
       "properties": {
         "retentionInDays": 30,
@@ -195,12 +432,12 @@
     "appInsights": {
       "type": "Microsoft.Insights/components",
       "apiVersion": "2020-02-02-preview",
-      "name": "[format(variables('uniqueNameFormat'), 'appins')]",
-      "location": "[variables('location')]",
+      "name": "[format('{0}{1}', variables('abbrs').managementGovernance.applicationInsights, variables('solutionPrefix'))]",
+      "location": "[variables('solutionLocation')]",
       "kind": "web",
       "properties": {
         "Application_Type": "web",
-        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'logs'))]"
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}{1}', variables('abbrs').managementGovernance.logAnalyticsWorkspace, variables('solutionPrefix')))]"
       },
       "dependsOn": [
         "logAnalytics"
@@ -210,7 +447,7 @@
       "type": "Microsoft.CognitiveServices/accounts",
       "apiVersion": "2024-04-01-preview",
       "name": "[variables('aiServicesName')]",
-      "location": "[variables('location')]",
+      "location": "[parameters('azureOpenAILocation')]",
       "sku": {
         "name": "S0"
       },
@@ -218,7 +455,8 @@
       "properties": {
         "customSubDomainName": "[variables('aiServicesName')]",
         "apiProperties": {},
-        "disableLocalAuth": true
+        "disableLocalAuth": true,
+        "publicNetworkAccess": "Enabled"
       }
     },
     "aiServicesDeployments": {
@@ -255,7 +493,7 @@
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
       "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', variables('aiServicesName'))]",
-      "name": "[guid(resourceId('Microsoft.App/containerApps', format('{0}-backend', parameters('prefix'))), resourceId('Microsoft.CognitiveServices/accounts', variables('aiServicesName')), resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'))]",
+      "name": "[guid(resourceId('Microsoft.App/containerApps', format('{0}{1}-backend', variables('abbrs').containers.containerApp, variables('solutionPrefix'))), resourceId('Microsoft.CognitiveServices/accounts', variables('aiServicesName')), resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'))]",
       "properties": {
         "principalId": "[reference('containerApp', '2024-03-01', 'full').identity.principalId]",
         "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')]",
@@ -269,8 +507,8 @@
     "cosmos": {
       "type": "Microsoft.DocumentDB/databaseAccounts",
       "apiVersion": "2024-05-15",
-      "name": "[format(variables('uniqueNameFormat'), 'cosmos')]",
-      "location": "[variables('location')]",
+      "name": "[format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix'))]",
+      "location": "[variables('solutionLocation')]",
       "tags": "[parameters('tags')]",
       "kind": "GlobalDocumentDB",
       "properties": {
@@ -279,7 +517,7 @@
         "locations": [
           {
             "failoverPriority": 0,
-            "locationName": "[variables('location')]"
+            "locationName": "[variables('solutionLocation')]"
           }
         ],
         "capabilities": [
@@ -293,14 +531,14 @@
     "pullIdentity": {
       "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
       "apiVersion": "2023-07-31-preview",
-      "name": "[format(variables('uniqueNameFormat'), 'containerapp-pull')]",
-      "location": "[variables('location')]"
+      "name": "[format('{0}{1}-containerapp-pull', variables('abbrs').security.managedIdentity, variables('solutionPrefix'))]",
+      "location": "[variables('solutionLocation')]"
     },
     "containerAppEnv": {
       "type": "Microsoft.App/managedEnvironments",
       "apiVersion": "2024-03-01",
-      "name": "[format(variables('uniqueNameFormat'), 'containerapp')]",
-      "location": "[variables('location')]",
+      "name": "[format('{0}{1}', variables('abbrs').containers.containerAppsEnvironment, variables('solutionPrefix'))]",
+      "location": "[variables('solutionLocation')]",
       "tags": "[parameters('tags')]",
       "properties": {
         "daprAIConnectionString": "[reference('appInsights').ConnectionString]",
@@ -320,11 +558,11 @@
     "acaCosomsRoleAssignment": {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'cosmos'), guid(resourceId('Microsoft.App/containerApps', format('{0}-backend', parameters('prefix'))), resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format(variables('uniqueNameFormat'), 'cosmos'), '00000000-0000-0000-0000-000000000002')))]",
+      "name": "[format('{0}/{1}', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), guid(resourceId('Microsoft.App/containerApps', format('{0}{1}-backend', variables('abbrs').containers.containerApp, variables('solutionPrefix'))), resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), '00000000-0000-0000-0000-000000000002')))]",
       "properties": {
         "principalId": "[reference('containerApp', '2024-03-01', 'full').identity.principalId]",
-        "roleDefinitionId": "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format(variables('uniqueNameFormat'), 'cosmos'), '00000000-0000-0000-0000-000000000002')]",
-        "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', format(variables('uniqueNameFormat'), 'cosmos'))]"
+        "roleDefinitionId": "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), '00000000-0000-0000-0000-000000000002')]",
+        "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')))]"
       },
       "dependsOn": [
         "containerApp",
@@ -334,25 +572,25 @@
     "containerApp": {
       "type": "Microsoft.App/containerApps",
       "apiVersion": "2024-03-01",
-      "name": "[format('{0}-backend', parameters('prefix'))]",
-      "location": "[variables('location')]",
+      "name": "[format('{0}{1}-backend', variables('abbrs').containers.containerApp, variables('solutionPrefix'))]",
+      "location": "[variables('solutionLocation')]",
       "tags": "[parameters('tags')]",
       "identity": {
         "type": "SystemAssigned, UserAssigned",
         "userAssignedIdentities": {
-          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'containerapp-pull')))]": {}
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}{1}-containerapp-pull', variables('abbrs').security.managedIdentity, variables('solutionPrefix'))))]": {}
         }
       },
       "properties": {
-        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format(variables('uniqueNameFormat'), 'containerapp'))]",
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}{1}', variables('abbrs').containers.containerAppsEnvironment, variables('solutionPrefix')))]",
         "configuration": {
           "ingress": {
             "targetPort": 8000,
             "external": true,
             "corsPolicy": {
               "allowedOrigins": [
-                "[format('https://{0}.azurewebsites.net', format(variables('uniqueNameFormat'), 'frontend'))]",
-                "[format('http://{0}.azurewebsites.net', format(variables('uniqueNameFormat'), 'frontend'))]"
+                "[format('https://{0}{1}-frontend.azurewebsites.net', variables('abbrs').compute.webApp, variables('solutionPrefix'))]",
+                "[format('http://{0}{1}-frontend.azurewebsites.net', variables('abbrs').compute.webApp, variables('solutionPrefix'))]"
               ]
             }
           },
@@ -436,7 +674,7 @@
                 },
                 {
                   "name": "FRONTEND_SITE_NAME",
-                  "value": "[format('https://{0}.azurewebsites.net', format(variables('uniqueNameFormat'), 'frontend'))]"
+                  "value": "[format('https://{0}{1}-frontend.azurewebsites.net', variables('abbrs').compute.webApp, variables('solutionPrefix'))]"
                 }
               ]
             }
@@ -460,8 +698,8 @@
     "frontendAppServicePlan": {
       "type": "Microsoft.Web/serverfarms",
       "apiVersion": "2021-02-01",
-      "name": "[format(variables('uniqueNameFormat'), 'frontend-plan')]",
-      "location": "[variables('location')]",
+      "name": "[format('{0}{1}-frontend', variables('abbrs').compute.appServicePlan, variables('solutionPrefix'))]",
+      "location": "[variables('solutionLocation')]",
       "tags": "[parameters('tags')]",
       "sku": {
         "name": "P1v2",
@@ -476,12 +714,12 @@
     "frontendAppService": {
       "type": "Microsoft.Web/sites",
       "apiVersion": "2021-02-01",
-      "name": "[format(variables('uniqueNameFormat'), 'frontend')]",
-      "location": "[variables('location')]",
+      "name": "[format('{0}{1}-frontend', variables('abbrs').compute.webApp, variables('solutionPrefix'))]",
+      "location": "[variables('solutionLocation')]",
       "tags": "[parameters('tags')]",
       "kind": "app,linux,container",
       "properties": {
-        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format(variables('uniqueNameFormat'), 'frontend-plan'))]",
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}{1}-frontend', variables('abbrs').compute.appServicePlan, variables('solutionPrefix')))]",
         "reserved": true,
         "siteConfig": {
           "linuxFxVersion": "[format('DOCKER|{0}', variables('frontendDockerImageURL'))]",
@@ -510,9 +748,9 @@
         }
       },
       "identity": {
-        "type": "SystemAssigned,UserAssigned",
+        "type": "SystemAssigned, UserAssigned",
         "userAssignedIdentities": {
-          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'containerapp-pull')))]": {}
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}{1}-containerapp-pull', variables('abbrs').security.managedIdentity, variables('solutionPrefix'))))]": {}
         }
       },
       "dependsOn": [
@@ -525,7 +763,7 @@
       "existing": true,
       "type": "Microsoft.MachineLearningServices/workspaces",
       "apiVersion": "2024-01-01-preview",
-      "name": "[format('{0}-aiproject', parameters('prefix'))]"
+      "name": "[format('{0}{1}', variables('abbrs').ai.aiHubProject, variables('solutionPrefix'))]"
     },
     "aiDeveloper": {
       "existing": true,
@@ -536,8 +774,8 @@
     "aiDeveloperAccessProj": {
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', format('{0}-aiproject', parameters('prefix')))]",
-      "name": "[guid(format('{0}-backend', parameters('prefix')), resourceId('Microsoft.MachineLearningServices/workspaces', format('{0}-aiproject', parameters('prefix'))), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', format('{0}{1}', variables('abbrs').ai.aiHubProject, variables('solutionPrefix')))]",
+      "name": "[guid(format('{0}{1}-backend', variables('abbrs').containers.containerApp, variables('solutionPrefix')), resourceId('Microsoft.MachineLearningServices/workspaces', format('{0}{1}', variables('abbrs').ai.aiHubProject, variables('solutionPrefix'))), resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee'))]",
       "properties": {
         "roleDefinitionId": "[resourceId('Microsoft.Authorization/roleDefinitions', '64702f94-c441-49e6-a78b-ef80e0188fee')]",
         "principalId": "[reference('containerApp', '2024-03-01', 'full').identity.principalId]"
@@ -557,14 +795,14 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "solutionName": {
-            "value": "[parameters('prefix')]"
-          },
           "solutionLocation": {
-            "value": "[variables('location')]"
+            "value": "[variables('solutionLocation')]"
           },
           "managedIdentityObjectId": {
             "value": "[reference('managedIdentityModule').outputs.managedIdentityOutput.value.objectId]"
+          },
+          "keyvaultName": {
+            "value": "[format('{0}{1}', variables('abbrs').security.keyVault, variables('solutionPrefix'))]"
           }
         },
         "template": {
@@ -574,33 +812,28 @@
             "_generator": {
               "name": "bicep",
               "version": "0.35.1.17967",
-              "templateHash": "5761607453167859573"
+              "templateHash": "7119862929918770475"
             }
           },
           "parameters": {
-            "solutionName": {
-              "type": "string",
-              "minLength": 3,
-              "maxLength": 15,
-              "metadata": {
-                "description": "Solution Name"
-              }
-            },
             "solutionLocation": {
               "type": "string"
             },
             "managedIdentityObjectId": {
               "type": "string"
+            },
+            "keyvaultName": {
+              "type": "string",
+              "metadata": {
+                "description": "KeyVault Name"
+              }
             }
-          },
-          "variables": {
-            "keyvaultName": "[format('{0}-kv', parameters('solutionName'))]"
           },
           "resources": [
             {
               "type": "Microsoft.KeyVault/vaults",
               "apiVersion": "2022-07-01",
-              "name": "[variables('keyvaultName')]",
+              "name": "[parameters('keyvaultName')]",
               "location": "[parameters('solutionLocation')]",
               "properties": {
                 "createMode": "default",
@@ -627,9 +860,7 @@
                 "enabledForDeployment": true,
                 "enabledForDiskEncryption": true,
                 "enabledForTemplateDeployment": true,
-                "enableSoftDelete": false,
                 "enableRbacAuthorization": true,
-                "enablePurgeProtection": true,
                 "publicNetworkAccess": "enabled",
                 "sku": {
                   "family": "A",
@@ -653,11 +884,11 @@
           "outputs": {
             "keyvaultName": {
               "type": "string",
-              "value": "[variables('keyvaultName')]"
+              "value": "[parameters('keyvaultName')]"
             },
             "keyvaultId": {
               "type": "string",
-              "value": "[resourceId('Microsoft.KeyVault/vaults', variables('keyvaultName'))]"
+              "value": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvaultName'))]"
             }
           }
         }
@@ -678,7 +909,7 @@
         "mode": "Incremental",
         "parameters": {
           "solutionName": {
-            "value": "[parameters('prefix')]"
+            "value": "[variables('solutionPrefix')]"
           },
           "solutionLocation": {
             "value": "[parameters('azureOpenAILocation')]"
@@ -712,7 +943,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.35.1.17967",
-              "templateHash": "14561153070486462167"
+              "templateHash": "13047093698365252995"
             }
           },
           "parameters": {
@@ -745,18 +976,245 @@
             }
           },
           "variables": {
-            "storageName": "[format('{0}hubstorage', parameters('solutionName'))]",
+            "$fxv#0": {
+              "ai": {
+                "aiSearch": "srch-",
+                "aiServices": "aisa-",
+                "aiVideoIndexer": "avi-",
+                "machineLearningWorkspace": "mlw-",
+                "openAIService": "oai-",
+                "botService": "bot-",
+                "computerVision": "cv-",
+                "contentModerator": "cm-",
+                "contentSafety": "cs-",
+                "customVisionPrediction": "cstv-",
+                "customVisionTraining": "cstvt-",
+                "documentIntelligence": "di-",
+                "faceApi": "face-",
+                "healthInsights": "hi-",
+                "immersiveReader": "ir-",
+                "languageService": "lang-",
+                "speechService": "spch-",
+                "translator": "trsl-",
+                "aiHub": "aih-",
+                "aiHubProject": "aihp-"
+              },
+              "analytics": {
+                "analysisServicesServer": "as",
+                "databricksWorkspace": "dbw-",
+                "dataExplorerCluster": "dec",
+                "dataExplorerClusterDatabase": "dedb",
+                "dataFactory": "adf-",
+                "digitalTwin": "dt-",
+                "streamAnalytics": "asa-",
+                "synapseAnalyticsPrivateLinkHub": "synplh-",
+                "synapseAnalyticsSQLDedicatedPool": "syndp",
+                "synapseAnalyticsSparkPool": "synsp",
+                "synapseAnalyticsWorkspaces": "synw",
+                "dataLakeStoreAccount": "dls",
+                "dataLakeAnalyticsAccount": "dla",
+                "eventHubsNamespace": "evhns-",
+                "eventHub": "evh-",
+                "eventGridDomain": "evgd-",
+                "eventGridSubscriptions": "evgs-",
+                "eventGridTopic": "evgt-",
+                "eventGridSystemTopic": "egst-",
+                "hdInsightHadoopCluster": "hadoop-",
+                "hdInsightHBaseCluster": "hbase-",
+                "hdInsightKafkaCluster": "kafka-",
+                "hdInsightSparkCluster": "spark-",
+                "hdInsightStormCluster": "storm-",
+                "hdInsightMLServicesCluster": "mls-",
+                "iotHub": "iot-",
+                "provisioningServices": "provs-",
+                "provisioningServicesCertificate": "pcert-",
+                "powerBIEmbedded": "pbi-",
+                "timeSeriesInsightsEnvironment": "tsi-"
+              },
+              "compute": {
+                "appServiceEnvironment": "ase-",
+                "appServicePlan": "asp-",
+                "loadTesting": "lt-",
+                "availabilitySet": "avail-",
+                "arcEnabledServer": "arcs-",
+                "arcEnabledKubernetesCluster": "arck",
+                "batchAccounts": "ba-",
+                "cloudService": "cld-",
+                "communicationServices": "acs-",
+                "diskEncryptionSet": "des",
+                "functionApp": "func-",
+                "gallery": "gal",
+                "hostingEnvironment": "host-",
+                "imageTemplate": "it-",
+                "managedDiskOS": "osdisk",
+                "managedDiskData": "disk",
+                "notificationHubs": "ntf-",
+                "notificationHubsNamespace": "ntfns-",
+                "proximityPlacementGroup": "ppg-",
+                "restorePointCollection": "rpc-",
+                "snapshot": "snap-",
+                "staticWebApp": "stapp-",
+                "virtualMachine": "vm",
+                "virtualMachineScaleSet": "vmss-",
+                "virtualMachineMaintenanceConfiguration": "mc-",
+                "virtualMachineStorageAccount": "stvm",
+                "webApp": "app-"
+              },
+              "containers": {
+                "aksCluster": "aks-",
+                "aksSystemNodePool": "npsystem-",
+                "aksUserNodePool": "np-",
+                "containerApp": "ca-",
+                "containerAppsEnvironment": "cae-",
+                "containerRegistry": "cr",
+                "containerInstance": "ci",
+                "serviceFabricCluster": "sf-",
+                "serviceFabricManagedCluster": "sfmc-"
+              },
+              "databases": {
+                "cosmosDBDatabase": "cosmos-",
+                "cosmosDBApacheCassandra": "coscas-",
+                "cosmosDBMongoDB": "cosmon-",
+                "cosmosDBNoSQL": "cosno-",
+                "cosmosDBTable": "costab-",
+                "cosmosDBGremlin": "cosgrm-",
+                "cosmosDBPostgreSQL": "cospos-",
+                "cacheForRedis": "redis-",
+                "sqlDatabaseServer": "sql-",
+                "sqlDatabase": "sqldb-",
+                "sqlElasticJobAgent": "sqlja-",
+                "sqlElasticPool": "sqlep-",
+                "mariaDBServer": "maria-",
+                "mariaDBDatabase": "mariadb-",
+                "mySQLDatabase": "mysql-",
+                "postgreSQLDatabase": "psql-",
+                "sqlServerStretchDatabase": "sqlstrdb-",
+                "sqlManagedInstance": "sqlmi-"
+              },
+              "developerTools": {
+                "appConfigurationStore": "appcs-",
+                "mapsAccount": "map-",
+                "signalR": "sigr",
+                "webPubSub": "wps-"
+              },
+              "devOps": {
+                "managedGrafana": "amg-"
+              },
+              "integration": {
+                "apiManagementService": "apim-",
+                "integrationAccount": "ia-",
+                "logicApp": "logic-",
+                "serviceBusNamespace": "sbns-",
+                "serviceBusQueue": "sbq-",
+                "serviceBusTopic": "sbt-",
+                "serviceBusTopicSubscription": "sbts-"
+              },
+              "managementGovernance": {
+                "automationAccount": "aa-",
+                "applicationInsights": "appi-",
+                "monitorActionGroup": "ag-",
+                "monitorDataCollectionRules": "dcr-",
+                "monitorAlertProcessingRule": "apr-",
+                "blueprint": "bp-",
+                "blueprintAssignment": "bpa-",
+                "dataCollectionEndpoint": "dce-",
+                "logAnalyticsWorkspace": "log-",
+                "logAnalyticsQueryPacks": "pack-",
+                "managementGroup": "mg-",
+                "purviewInstance": "pview-",
+                "resourceGroup": "rg-",
+                "templateSpecsName": "ts-"
+              },
+              "migration": {
+                "migrateProject": "migr-",
+                "databaseMigrationService": "dms-",
+                "recoveryServicesVault": "rsv-"
+              },
+              "networking": {
+                "applicationGateway": "agw-",
+                "applicationSecurityGroup": "asg-",
+                "cdnProfile": "cdnp-",
+                "cdnEndpoint": "cdne-",
+                "connections": "con-",
+                "dnsForwardingRuleset": "dnsfrs-",
+                "dnsPrivateResolver": "dnspr-",
+                "dnsPrivateResolverInboundEndpoint": "in-",
+                "dnsPrivateResolverOutboundEndpoint": "out-",
+                "firewall": "afw-",
+                "firewallPolicy": "afwp-",
+                "expressRouteCircuit": "erc-",
+                "expressRouteGateway": "ergw-",
+                "frontDoorProfile": "afd-",
+                "frontDoorEndpoint": "fde-",
+                "frontDoorFirewallPolicy": "fdfp-",
+                "ipGroups": "ipg-",
+                "loadBalancerInternal": "lbi-",
+                "loadBalancerExternal": "lbe-",
+                "loadBalancerRule": "rule-",
+                "localNetworkGateway": "lgw-",
+                "natGateway": "ng-",
+                "networkInterface": "nic-",
+                "networkSecurityGroup": "nsg-",
+                "networkSecurityGroupSecurityRules": "nsgsr-",
+                "networkWatcher": "nw-",
+                "privateLink": "pl-",
+                "privateEndpoint": "pep-",
+                "publicIPAddress": "pip-",
+                "publicIPAddressPrefix": "ippre-",
+                "routeFilter": "rf-",
+                "routeServer": "rtserv-",
+                "routeTable": "rt-",
+                "serviceEndpointPolicy": "se-",
+                "trafficManagerProfile": "traf-",
+                "userDefinedRoute": "udr-",
+                "virtualNetwork": "vnet-",
+                "virtualNetworkGateway": "vgw-",
+                "virtualNetworkManager": "vnm-",
+                "virtualNetworkPeering": "peer-",
+                "virtualNetworkSubnet": "snet-",
+                "virtualWAN": "vwan-",
+                "virtualWANHub": "vhub-"
+              },
+              "security": {
+                "bastion": "bas-",
+                "keyVault": "kv-",
+                "keyVaultManagedHSM": "kvmhsm-",
+                "managedIdentity": "id-",
+                "sshKey": "sshkey-",
+                "vpnGateway": "vpng-",
+                "vpnConnection": "vcn-",
+                "vpnSite": "vst-",
+                "webApplicationFirewallPolicy": "waf",
+                "webApplicationFirewallPolicyRuleGroup": "wafrg"
+              },
+              "storage": {
+                "storSimple": "ssimp",
+                "backupVault": "bvault-",
+                "backupVaultPolicy": "bkpol-",
+                "fileShare": "share-",
+                "storageAccount": "st",
+                "storageSyncService": "sss-"
+              },
+              "virtualDesktop": {
+                "labServicesPlan": "lp-",
+                "virtualDesktopHostPool": "vdpool-",
+                "virtualDesktopApplicationGroup": "vdag-",
+                "virtualDesktopWorkspace": "vdws-",
+                "virtualDesktopScalingPlan": "vdscaling-"
+              }
+            },
+            "abbrs": "[variables('$fxv#0')]",
+            "storageName": "[format('{0}{1}hub', variables('abbrs').storage.storageAccount, parameters('solutionName'))]",
             "storageSkuName": "Standard_LRS",
-            "aiServicesName": "[format('{0}-aiservices', parameters('solutionName'))]",
-            "workspaceName": "[format('{0}-workspace', parameters('solutionName'))]",
-            "keyvaultName": "[format('{0}-kv', parameters('solutionName'))]",
+            "aiServicesName": "[format('{0}{1}', variables('abbrs').ai.aiServices, parameters('solutionName'))]",
+            "workspaceName": "[format('{0}{1}hub', variables('abbrs').managementGovernance.logAnalyticsWorkspace, parameters('solutionName'))]",
             "location": "[parameters('solutionLocation')]",
-            "aiHubName": "[format('{0}-aihub', parameters('solutionName'))]",
+            "aiHubName": "[format('{0}{1}', variables('abbrs').ai.aiHub, parameters('solutionName'))]",
             "aiHubFriendlyName": "[variables('aiHubName')]",
-            "aiHubDescription": "AI Hub for KM template",
-            "aiProjectName": "[format('{0}-aiproject', parameters('solutionName'))]",
+            "aiHubDescription": "AI Hub for MACAE template",
+            "aiProjectName": "[format('{0}{1}', variables('abbrs').ai.aiHubProject, parameters('solutionName'))]",
             "aiProjectFriendlyName": "[variables('aiProjectName')]",
-            "aiSearchName": "[format('{0}-search', parameters('solutionName'))]",
+            "aiSearchName": "[format('{0}{1}', variables('abbrs').ai.aiSearch, parameters('solutionName'))]",
             "storageNameCleaned": "[replace(variables('storageName'), '-', '')]"
           },
           "resources": [
@@ -1041,7 +1499,7 @@
           "outputs": {
             "keyvaultName": {
               "type": "string",
-              "value": "[variables('keyvaultName')]"
+              "value": "[parameters('keyVaultName')]"
             },
             "keyvaultId": {
               "type": "string",
@@ -1095,17 +1553,17 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "solutionName": {
-            "value": "[parameters('prefix')]"
-          },
           "managedIdentityId": {
-            "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'containerapp-pull'))]"
+            "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}{1}-containerapp-pull', variables('abbrs').security.managedIdentity, variables('solutionPrefix')))]"
           },
           "managedIdentityPropPrin": {
             "value": "[reference('pullIdentity').principalId]"
           },
           "managedIdentityLocation": {
             "value": "[reference('pullIdentity', '2023-07-31-preview', 'full').location]"
+          },
+          "miName": {
+            "value": "[format('{0}{1}', variables('abbrs').security.managedIdentity, variables('solutionPrefix'))]"
           }
         },
         "template": {
@@ -1115,18 +1573,10 @@
             "_generator": {
               "name": "bicep",
               "version": "0.35.1.17967",
-              "templateHash": "12327197428621494853"
+              "templateHash": "14769217536017297821"
             }
           },
           "parameters": {
-            "solutionName": {
-              "type": "string",
-              "minLength": 3,
-              "maxLength": 15,
-              "metadata": {
-                "description": "Solution Name"
-              }
-            },
             "managedIdentityId": {
               "type": "string",
               "metadata": {
@@ -1141,9 +1591,8 @@
             },
             "miName": {
               "type": "string",
-              "defaultValue": "[format('{0}-managed-identity', parameters('solutionName'))]",
               "metadata": {
-                "description": "Name"
+                "description": "Managed Identity Name"
               }
             }
           },
@@ -1201,7 +1650,7 @@
             "value": "2.69.0"
           },
           "location": {
-            "value": "[variables('location')]"
+            "value": "[variables('solutionLocation')]"
           },
           "managedIdentities": {
             "value": {
@@ -1211,7 +1660,7 @@
             }
           },
           "scriptContent": {
-            "value": "[format('az cosmosdb sql role assignment create --resource-group \"{0}\" --account-name \"{1}\" --role-definition-id \"{2}\" --scope \"{3}\" --principal-id \"{4}\"', resourceGroup().name, format(variables('uniqueNameFormat'), 'cosmos'), resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format(variables('uniqueNameFormat'), 'cosmos'), '00000000-0000-0000-0000-000000000002'), resourceId('Microsoft.DocumentDB/databaseAccounts', format(variables('uniqueNameFormat'), 'cosmos')), reference('containerApp', '2024-03-01', 'full').identity.principalId)]"
+            "value": "[format('az cosmosdb sql role assignment create --resource-group \"{0}\" --account-name \"{1}\" --role-definition-id \"{2}\" --scope \"{3}\" --principal-id \"{4}\"', resourceGroup().name, format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), '00000000-0000-0000-0000-000000000002'), resourceId('Microsoft.DocumentDB/databaseAccounts', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix'))), reference('containerApp', '2024-03-01', 'full').identity.principalId)]"
           }
         },
         "template": {
