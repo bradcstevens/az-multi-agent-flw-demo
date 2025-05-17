@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@fluentui/merge-styles": "^8.6.14",
+    "@fluentui/react-components": "^9.64.0",
+    "@fluentui/react-icons": "^2.0.300",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -11,9 +14,11 @@
     "@types/node": "^16.18.126",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
+    "axios": "^1.9.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-scripts": "5.0.1",
+    "react-router-dom": "^7.6.0",
+    "react-scripts": "^3.0.1",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },

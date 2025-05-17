@@ -11,3 +11,26 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+/* Adjust focus styles for accessibility */
+*:focus {
+  outline: 2px solid rgba(100, 58, 97, 0.5);
+  outline-offset: 2px;
+}
+
+/* Better button styling */
+button {
+  cursor: pointer;
+}
+
+button:active {
+  transform: translateY(1px);
+}

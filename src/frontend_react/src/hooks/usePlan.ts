@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { PlanWithSteps, Step, HumanFeedbackStatus, StepStatus } from '../models';
 import PlanService from '../api/planService';
 
+
+
 /**
  * Custom hook for working with a plan and its steps
  * 
@@ -20,13 +22,14 @@ export const usePlan = (sessionId: string, planId: string) => {
     const fetchPlan = async () => {
         try {
             setLoading(true);
+
+
             const data = await PlanService.getPlanWithSteps(sessionId, planId);
             setPlanWithSteps(data);
             setError(null);
         } catch (err) {
             setError(err instanceof Error ? err : new Error('Failed to fetch plan'));
         } finally {
-            setLoading(false);
         }
     };
 
@@ -47,6 +50,8 @@ export const usePlan = (sessionId: string, planId: string) => {
     ) => {
         try {
             const status = approved ? StepStatus.APPROVED : StepStatus.REJECTED;
+
+
             const update = {
                 status,
                 human_feedback: feedback,

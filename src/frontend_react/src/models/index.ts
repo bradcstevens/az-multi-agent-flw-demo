@@ -8,5 +8,7 @@ export * from './enums';
 // Export models
 export * from './plan';
 export * from './messages';
+export * from './inputTask';
+export * from './agentMessage';
 
 // Add other model exports as needed
