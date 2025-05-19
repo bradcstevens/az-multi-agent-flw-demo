@@ -2,22 +2,14 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from semantic_kernel.functions.kernel_function import KernelFunction
-
-from kernel_agents.agent_base import BaseAgent
 from context.cosmos_memory_kernel import CosmosMemoryContext
-from models.messages_kernel import (
-    ActionRequest,
-    AgentMessage,
-    HumanFeedback,
-    Step,
-    StepStatus,
-    HumanFeedbackStatus,
-    InputTask,
-    Plan,
-)
-from models.messages_kernel import AgentType
 from event_utils import track_event_if_configured
+from kernel_agents.agent_base import BaseAgent
+from models.messages_kernel import (ActionRequest, AgentMessage, AgentType,
+                                    HumanFeedback, HumanFeedbackStatus, InputTask,
+                                    Plan, Step, StepStatus)
+# pylint: disable=E0611
+from semantic_kernel.functions.kernel_function import KernelFunction
 
 
 class GroupChatManager(BaseAgent):
@@ -87,6 +79,57 @@ class GroupChatManager(BaseAgent):
         # Create the Azure AI Agent for group chat operations
         # This will be initialized in async_init
         self._azure_ai_agent = None
+
+    @classmethod
+    async def create(
+        cls,
+        **kwargs: Dict[str, str],
+    ) -> None:
+        """Asynchronously create the PlannerAgent.
+
+        Creates the Azure AI Agent for planning operations.
+
+        Returns:
+            None
+        """
+
+        session_id = kwargs.get("session_id")
+        user_id = kwargs.get("user_id")
+        memory_store = kwargs.get("memory_store")
+        tools = kwargs.get("tools", None)
+        system_message = kwargs.get("system_message", None)
+        agent_name = kwargs.get("agent_name")
+        agent_tools_list = kwargs.get("agent_tools_list", None)
+        agent_instances = kwargs.get("agent_instances", None)
+        client = kwargs.get("client")
+
+        try:
+            logging.info("Initializing GroupChatAgent from async init azure AI Agent")
+
+            # Create the Azure AI Agent using AppConfig with string instructions
+            agent_definition = await cls._create_azure_ai_agent_definition(
+                agent_name=agent_name,
+                instructions=system_message,  # Pass the formatted string, not an object
+                temperature=0.0,
+                response_format=None,
+            )
+
+            return cls(
+                session_id=session_id,
+                user_id=user_id,
+                memory_store=memory_store,
+                tools=tools,
+                system_message=system_message,
+                agent_name=agent_name,
+                agent_tools_list=agent_tools_list,
+                agent_instances=agent_instances,
+                client=client,
+                definition=agent_definition,
+            )
+
+        except Exception as e:
+            logging.error(f"Failed to create Azure AI Agent for PlannerAgent: {e}")
+            raise
 
     @staticmethod
     def default_system_message(agent_name=None) -> str:

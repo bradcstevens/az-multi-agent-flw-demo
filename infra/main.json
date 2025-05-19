@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.35.1.17967",
-      "templateHash": "5028939591915540887"
+      "templateHash": "6559422175999367984"
     }
   },
   "parameters": {
@@ -341,7 +341,7 @@
     "aiServicesName": "[format('{0}{1}', variables('abbrs').ai.aiServices, variables('solutionPrefix'))]",
     "deploymentType": "GlobalStandard",
     "gptModelVersion": "gpt-4o",
-    "appVersion": "fnd01",
+    "appVersion": "latest",
     "resgistryName": "biabcontainerreg",
     "dockerRegistryUrl": "[format('https://{0}.azurecr.io', variables('resgistryName'))]",
     "backendDockerImageURL": "[format('{0}.azurecr.io/macaebackend:{1}', variables('resgistryName'), variables('appVersion'))]",
