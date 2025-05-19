@@ -6,13 +6,12 @@
     "_generator": {
       "name": "bicep",
       "version": "0.35.1.17967",
-      "templateHash": "12016977205829849477"
+      "templateHash": "5028939591915540887"
     }
   },
   "parameters": {
     "azureOpenAILocation": {
       "type": "string",
-      "defaultValue": "eastus2",
       "allowedValues": [
         "australiaeast",
         "brazilsouth",
@@ -362,10 +361,10 @@
     ]
   },
   "resources": {
-    "cosmos::autogenDb::memoryContainer": {
+    "cosmos::macaeDb::memoryContainer": {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}/{2}', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), 'autogen', 'memory')]",
+      "name": "[format('{0}/{1}/{2}', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), 'macae', 'memory')]",
       "properties": {
         "resource": {
           "id": "memory",
@@ -379,7 +378,7 @@
         }
       },
       "dependsOn": [
-        "cosmos::autogenDb"
+        "cosmos::macaeDb"
       ]
     },
     "cosmos::contributorRoleDefinition": {
@@ -391,13 +390,13 @@
         "cosmos"
       ]
     },
-    "cosmos::autogenDb": {
+    "cosmos::macaeDb": {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), 'autogen')]",
+      "name": "[format('{0}/{1}', format('{0}{1}', variables('abbrs').databases.cosmosDBDatabase, variables('solutionPrefix')), 'macae')]",
       "properties": {
         "resource": {
-          "id": "autogen",
+          "id": "macae",
           "createMode": "Default"
         }
       },
@@ -626,7 +625,7 @@
                 },
                 {
                   "name": "COSMOSDB_DATABASE",
-                  "value": "autogen"
+                  "value": "macae"
                 },
                 {
                   "name": "COSMOSDB_CONTAINER",
@@ -687,8 +686,8 @@
         "appInsights",
         "containerAppEnv",
         "cosmos",
-        "cosmos::autogenDb",
-        "cosmos::autogenDb::memoryContainer",
+        "cosmos::macaeDb",
+        "cosmos::macaeDb::memoryContainer",
         "pullIdentity"
       ],
       "metadata": {
