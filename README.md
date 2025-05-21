@@ -51,7 +51,7 @@ If you'd like to customize the solution accelerator, here are some common areas 
   <summary>Click to learn more about the key features this solution enables</summary>
 
   - **Allows people to focus on what matters** <br/>
-  By doing the heavy lifting involved with coordinating activities across an organization, peoples' time is freed up to focus on their specializations.
+  By doing the heavy lifting involved with coordinating activities across an organization, people's time is freed up to focus on their specializations.
   
   - **Enabling GenAI to scale** <br/>
   By not needing to build one application after another, organizations are able to reduce the friction of adopting GenAI across their entire organization. One capability can unlock almost unlimited use cases.
@@ -95,7 +95,7 @@ Here are some example regions where the services are available: East US, East US
 
 Pricing varies per region and usage, so it isn't possible to predict exact costs for your usage. The majority of the Azure resources used in this infrastructure are on usage-based pricing tiers. However, Azure Container Registry has a fixed cost per registry per day.
 
-Use the [Azure pricing calculator](https://azure.microsoft.com/en-us/pricing/calculator) to calculate the cost of this solution in your subscription. [Review a sample pricing sheet for the achitecture](https://azure.com/e/86d0eefbe4dd4a23981c1d3d4f6fe7ed).
+Use the [Azure pricing calculator](https://azure.microsoft.com/en-us/pricing/calculator) to calculate the cost of this solution in your subscription. [Review a sample pricing sheet for the architecture](https://azure.com/e/86d0eefbe4dd4a23981c1d3d4f6fe7ed).
 | Product | Description | Cost |
 |---|---|---|
 | [Azure OpenAI Service](https://learn.microsoft.com/azure/ai-services/openai/) | Powers the AI agents for task automation | [Pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/) |
