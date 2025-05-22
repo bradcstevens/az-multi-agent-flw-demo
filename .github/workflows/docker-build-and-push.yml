@@ -69,8 +69,6 @@ jobs:
           RUN_ID=${{ github.run_number }}
           # Create historical tag using TAG, DATE_TAG, and RUN_ID
           echo "HISTORICAL_TAG=${{ env.TAG }}_${DATE_TAG}_${RUN_ID}" >> $GITHUB_ENV
-      
-      
 
       - name: Build and optionally push Backend Docker image
         uses: docker/build-push-action@v6
