@@ -5,17 +5,20 @@ metadata description = 'This module contains the resources required to deploy th
 @maxLength(19)
 param solutionPrefix string = 'macae${uniqueString(deployer().objectId, deployer().tenantId, subscription().subscriptionId, resourceGroup().id)}'
 
+@description('Required. Location for all Resources except AI Foundry.')
+param solutionLocation string = resourceGroup().location
+
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
 // Restricting deployment to only supported Azure OpenAI regions validated with GPT-4o model
 @allowed(['australiaeast','eastus2','francecentral','japaneast','norwayeast','swedencentral','uksouth', 'westus'])
 @description('Azure OpenAI Location')
-param AzureOpenAILocation string
+param azureOpenAILocation string
 
-@description('Set this if you want to deploy to a different region than the resource group. Otherwise, it will use the resource group location by default.')
-param AZURE_LOCATION string=''
-param solutionLocation string = empty(AZURE_LOCATION) ? resourceGroup().location : AZURE_LOCATION
+// @description('Set this if you want to deploy to a different region than the resource group. Otherwise, it will use the resource group location by default.')
+// param AZURE_LOCATION string=''
+// param solutionLocation string = empty(AZURE_LOCATION) ? resourceGroup().location
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags object = {
@@ -123,7 +126,7 @@ param virtualMachineConfiguration virtualMachineConfigurationType = {
 param aiFoundryAiServicesConfiguration aiServicesConfigurationType = {
   enabled: true
   name: 'aisa-${solutionPrefix}'
-  location: AzureOpenAILocation
+  location: azureOpenAILocation
   sku: 'S0'
   deployments: null //Default value set on module configuration
   subnetResourceId: null //Default value set on module configuration
@@ -133,7 +136,7 @@ param aiFoundryAiServicesConfiguration aiServicesConfigurationType = {
 param aiFoundryStorageAccountConfiguration storageAccountType = {
   enabled: true
   name: replace('sthub${solutionPrefix}', '-', '')
-  location: AzureOpenAILocation
+  location: azureOpenAILocation
   tags: tags
   sku: 'Standard_ZRS'
   subnetResourceId: null //Default value set on module configuration
@@ -143,7 +146,7 @@ param aiFoundryStorageAccountConfiguration storageAccountType = {
 param aiFoundryAiHubConfiguration aiHubType = {
   enabled: true
   name: 'aih-${solutionPrefix}'
-  location: AzureOpenAILocation
+  location: azureOpenAILocation
   sku: 'Basic'
   tags: tags
   subnetResourceId: null //Default value set on module configuration
@@ -153,7 +156,7 @@ param aiFoundryAiHubConfiguration aiHubType = {
 param aiFoundryAiProjectConfiguration aiProjectConfigurationType = {
   enabled: true
   name: 'aihb-${solutionPrefix}'
-  location: AzureOpenAILocation
+  location: azureOpenAILocation
   sku: 'Basic'
   tags: tags
 }
@@ -735,7 +738,7 @@ module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.10.2'
   params: {
     name: aiFoundryAiServicesResourceName
     tags: aiFoundryAiServicesConfiguration.?tags ?? tags
-    location: aiFoundryAiServicesConfiguration.?location ?? solutionLocation
+    location: aiFoundryAiServicesConfiguration.?location ?? azureOpenAILocation
     enableTelemetry: enableTelemetry
     diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId }]
     sku: aiFoundryAiServicesConfiguration.?sku ?? 'S0'
@@ -833,7 +836,7 @@ module aiFoundryStorageAccount 'br/public:avm/res/storage/storage-account:0.18.2
   ]
   params: {
     name: aiFoundryStorageAccountResourceName
-    location: aiFoundryStorageAccountConfiguration.?location ?? solutionLocation
+    location: aiFoundryStorageAccountConfiguration.?location ?? azureOpenAILocation
     tags: aiFoundryStorageAccountConfiguration.?tags ?? tags
     enableTelemetry: enableTelemetry
     diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId }]
@@ -901,7 +904,7 @@ module aiFoundryAiHub 'modules/ai-hub.bicep' = if (aiFoundryAiHubEnabled) {
   ]
   params: {
     name: aiFoundryAiHubName
-    location: aiFoundryAiHubConfiguration.?location ?? solutionLocation
+    location: aiFoundryAiHubConfiguration.?location ?? azureOpenAILocation
     tags: aiFoundryAiHubConfiguration.?tags ?? tags
     sku: aiFoundryAiHubConfiguration.?sku ?? 'Basic'
     aiFoundryAiServicesName: aiFoundryAiServices.outputs.name
@@ -940,7 +943,7 @@ module aiFoundryAiProject 'br/public:avm/res/machine-learning-services/workspace
   name: take('avm.res.machine-learning-services.workspace.${aiFoundryAiProjectName}', 64)
   params: {
     name: aiFoundryAiProjectName
-    location: aiFoundryAiProjectConfiguration.?location ?? solutionLocation
+    location: aiFoundryAiProjectConfiguration.?location ?? azureOpenAILocation
     tags: aiFoundryAiProjectConfiguration.?tags ?? tags
     enableTelemetry: enableTelemetry
     diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId }]
@@ -1166,7 +1169,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
           }
           {
             name: 'AZURE_AI_AGENT_PROJECT_CONNECTION_STRING'
-            value: '${toLower(replace(AzureOpenAILocation,' ',''))}.api.azureml.ms;${subscription().subscriptionId};${resourceGroup().name};${aiFoundryAiProjectName}'
+            value: '${toLower(replace(azureOpenAILocation,' ',''))}.api.azureml.ms;${subscription().subscriptionId};${resourceGroup().name};${aiFoundryAiProjectName}'
             //Location should be the AI Foundry AI Project location
           }
           {

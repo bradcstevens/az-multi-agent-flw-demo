@@ -19,5 +19,4 @@ param webServerFarmConfiguration = {
   skuCapacity: 1
   skuName: 'B2'
 }
-param AzureOpenAILocation = readEnvironmentVariable('AZURE_ENV_OPENAI_LOCATION', 'swedencentral')
-param AZURE_LOCATION = readEnvironmentVariable('AZURE_LOCATION', '')
+param azureOpenAILocation = readEnvironmentVariable('AZURE_ENV_OPENAI_LOCATION', 'swedencentral')
