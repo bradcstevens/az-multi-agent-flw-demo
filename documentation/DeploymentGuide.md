@@ -40,7 +40,7 @@ param virtualNetworkConfiguration = {
 
 
 This will enable the use of the main.waf-aligned.bicepparam file during deployment. This param file is where all the WAF settings for a production type of deployment will be set. 
->**Note**: WAF deployment is still in active development and all params needed are being added.  
+>**Note**: WAF deployment is still in active development and all params needed for a complete WAF aligned deployment are still being added. Changing the virtualNetworkConfiguration value will still deploy a demo enviroment for devlopment work with virtual Machines, Private Dns Zones, and Private Endpoints.   
 
 ### Deployment Steps 
 Pick from the options below to see step-by-step instructions for GitHub Codespaces, VS Code Dev Containers, Local Environments, and Bicep deployments.
