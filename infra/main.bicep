@@ -126,6 +126,7 @@ param aiFoundryAiServicesConfiguration aiServicesConfigurationType = {
   sku: 'S0'
   deployments: null //Default value set on module configuration
   subnetResourceId: null //Default value set on module configuration
+  modelCapcity: 140
 }
 
 @description('Optional. The configuration to apply for the AI Foundry Storage Account resource.')
@@ -717,7 +718,8 @@ var aiFoundryAiServicesModelDeployment = {
   version: '2024-08-06'
   sku: {
     name: 'GlobalStandard'
-    capacity: 50
+    //Curently the capacity is set to 140 for opinanal performance. 
+    capacity: aiFoundryAiServicesConfiguration.?modelCapcity ?? 140
   }
   raiPolicyName: 'Microsoft.Default'
 }
@@ -1670,6 +1672,10 @@ type aiServicesConfigurationType = {
 
   @description('Optional. The model deployments to set for the AI Services resource.')
   deployments: deploymentType[]?
+
+  @description('Optional. The capacity to set for AI Services GTP model.')
+  modelCapacity: int?
+
 }
 
 @export()
