@@ -25,9 +25,7 @@ The solution leverages Azure OpenAI Service, Azure Container Apps, Azure Cosmos 
 |![image](./documentation/images/readme/macae-architecture.png)|
 |---|
 
-### Application interface
-|![image](./documentation/images/readme/macae-application.png)|
-|---|
+
 
 ### How to customize
 If you'd like to customize the solution accelerator, here are some common areas to start:
