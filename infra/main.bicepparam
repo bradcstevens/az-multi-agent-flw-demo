@@ -2,7 +2,7 @@ using './main.bicep'
 
 param enableTelemetry = true
 param solutionPrefix = null //Type a string value to customize the prefix for your resource names
-param solutionLocation = 'australiaeast'
+param solutionLocation = null
 param logAnalyticsWorkspaceConfiguration = {
   dataRetentionInDays: 30
 }
@@ -19,3 +19,5 @@ param webServerFarmConfiguration = {
   skuCapacity: 1
   skuName: 'B2'
 }
+param AzureOpenAILocation = readEnvironmentVariable('AZURE_ENV_OPENAI_LOCATION', 'australiaeast')
+param AZURE_LOCATION = readEnvironmentVariable('AZURE_LOCATION', '')
