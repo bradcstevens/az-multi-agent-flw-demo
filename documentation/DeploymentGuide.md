@@ -6,7 +6,7 @@ To deploy this solution accelerator, ensure you have access to an [Azure subscri
 
 Check the [Azure Products by Region](https://azure.microsoft.com/en-us/explore/global-infrastructure/products-by-region/?products=all&regions=all) page and select a **region** where the following services are available:
 
-- [Azure OpenAI Service](https://learn.microsoft.com/en-us/azure/ai-services/openai/)
+- [Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-foundry/)
 - [Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/)
 - [Azure Container Registry](https://learn.microsoft.com/en-us/azure/container-registry/)
 - [Azure Cosmos DB](https://learn.microsoft.com/en-us/azure/cosmos-db/)
@@ -28,21 +28,31 @@ This will allow the scripts to run for the current session without permanently c
 
 ## Deployment Options & Steps
 
-### WAF Deployment Option ###
+### Sandbox or WAF Aligned Deployment Options
 
-The Multi Agent Solution Accelerator has an option for a [WAF aligned](https://learn.microsoft.com/en-us/azure/well-architected/) deployment. In order to enable a WAF aligned deployment, go to the main.bicepparam file and change the  virtualNetworkConfiguration param to 'true'. 
+The [`infra`](../infra) folder of the Multi Agent Solution Accelerator contains the [`main.bicep`](../infra/main.bicep) Bicep script, which defines all Azure infrastructure components for this solution.
 
-```bicep
-param virtualNetworkConfiguration = {
-  enabled: true
-}
-```
+By default, the `azd up` command uses the [`main.bicepparam`](../infra/main.bicepparam) file to deploy the solution. This file is pre-configured for a **sandbox environment** — ideal for development and proof-of-concept scenarios, with minimal security and cost controls for rapid iteration.
 
+For **production deployments**, the repository also provides [`main.waf-aligned.bicepparam`](../infra/main.waf-aligned.bicepparam), which applies a [Well-Architected Framework (WAF) aligned](https://learn.microsoft.com/en-us/azure/well-architected/) configuration. This option enables additional Azure best practices for reliability, security, cost optimization, operational excellence, and performance efficiency, such as:
 
-This will enable the use of the main.waf-aligned.bicepparam file during deployment. This param file is where all the WAF settings for a production type of deployment will be set. 
->**Note**: WAF deployment is still in active development and all params needed for a complete WAF aligned deployment are still being added. Changing the virtualNetworkConfiguration value will still deploy a demo enviroment for devlopment work with virtual Machines, Private Dns Zones, and Private Endpoints.   
+- Enhanced network security (e.g., Network protection with private endpoints)
+- Stricter access controls and managed identities
+- Logging, monitoring, and diagnostics enabled by default
+- Resource tagging and cost management recommendations
+
+**How to choose your deployment configuration:**
+- Use the default [`main.bicepparam`](../infra/main.bicepparam) for a sandbox/dev environment.
+- For a WAF-aligned, production-ready deployment, copy the contents of [`main.waf-aligned.bicepparam`](../infra/main.waf-aligned.bicepparam) into `main.bicepparam` before running `azd up`.
+
+> [!TIP]
+> Always review and adjust parameter values (such as region, capacity, and security settings) to match your organization’s requirements before deploying. For production, ensure you have sufficient quota and follow the principle of least privilege for all identities and role assignments.
+
+> [!IMPORTANT]
+> The WAF-aligned configuration is under active development. More Azure Well-Architected recommendations will be added in future updates.
 
 ### Deployment Steps 
+
 Pick from the options below to see step-by-step instructions for GitHub Codespaces, VS Code Dev Containers, Local Environments, and Bicep deployments.
 
 | [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator) | [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator) |
