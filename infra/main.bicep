@@ -12,7 +12,7 @@ param solutionLocation string = resourceGroup().location
 param enableTelemetry bool = true
 
 // Restricting deployment to only supported Azure OpenAI regions validated with GPT-4o model
-@allowed(['australiaeast','eastus2','francecentral','japaneast','norwayeast','swedencentral','uksouth', 'westus'])
+@allowed(['australiaeast', 'eastus2', 'francecentral', 'japaneast', 'norwayeast', 'swedencentral', 'uksouth', 'westus'])
 @description('Azure OpenAI Location')
 param azureOpenAILocation string
 
@@ -712,8 +712,8 @@ module privateDnsZonesAiServices 'br/public:avm/res/network/private-dns-zone:0.7
       enableTelemetry: enableTelemetry
       virtualNetworkLinks: [
         {
-          name : 'vnetlink-${split(zone, '.')[1]}'
-          virtualNetworkResourceId: virtualNetwork.outputs.resourceId 
+          name: 'vnetlink-${split(zone, '.')[1]}'
+          virtualNetworkResourceId: virtualNetwork.outputs.resourceId
         }
       ]
     }
@@ -756,7 +756,7 @@ module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.10.2'
     privateEndpoints: virtualNetworkEnabled
       ? ([
           {
-            name : 'pep-${aiFoundryAiServicesResourceName}'
+            name: 'pep-${aiFoundryAiServicesResourceName}'
             customNetworkInterfaceName: 'nic-${aiFoundryAiServicesResourceName}'
             subnetResourceId: aiFoundryAiServicesConfiguration.?subnetResourceId ?? virtualNetwork.outputs.subnetResourceIds[0]
             privateDnsZoneGroup: {
@@ -970,9 +970,9 @@ module privateDnsZonesCosmosDb 'br/public:avm/res/network/private-dns-zone:0.7.0
     name: 'privatelink.documents.azure.com'
     enableTelemetry: enableTelemetry
     virtualNetworkLinks: [
-      { 
+      {
         name: 'vnetlink-cosmosdb'
-        virtualNetworkResourceId: virtualNetwork.outputs.resourceId 
+        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
       }
     ]
     tags: tags
@@ -1697,7 +1697,6 @@ type aiServicesConfigurationType = {
 
   @description('Optional. The capacity to set for AI Services GTP model.')
   modelCapacity: int?
-
 }
 
 @export()
