@@ -137,7 +137,7 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
         # Convert input task to JSON for the kernel function, add user_id here
 
         # Use the planner to handle the task
-        result = await group_chat_manager.handle_input_task(input_task)
+        await group_chat_manager.handle_input_task(input_task)
 
         # Get plan from memory store
         plan = await memory_store.get_plan_by_session(input_task.session_id)

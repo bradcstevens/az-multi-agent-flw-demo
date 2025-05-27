@@ -123,7 +123,7 @@ class ProductTools:
     async def update_product_price(product_name: str, price: float) -> str:
         """Update the price of a specific product."""
         message = f"## Price Update\nPrice for **'{product_name}'** updated to **${price:.2f}**."
-        
+
         return message
 
     @staticmethod
@@ -197,7 +197,7 @@ class ProductTools:
     async def handle_product_recall(product_name: str, recall_reason: str) -> str:
         """Handle a product recall for a specific product."""
         message = f"## Product Recall\nProduct recall for **'{product_name}'** initiated due to:\n\n{recall_reason}"
-        
+
         return message
 
     @staticmethod
@@ -461,7 +461,7 @@ class ProductTools:
     ) -> str:
         """Develop training material for a specific product."""
         message = f"## Training Material Developed\nTraining material for **'{product_name}'** developed:\n\n{training_material}"
-        
+
         return message
 
     @staticmethod
@@ -471,7 +471,7 @@ class ProductTools:
     async def update_product_labels(product_name: str, label_details: str) -> str:
         """Update labels for a specific product."""
         message = f"## Product Labels Updated\nLabels for **'{product_name}'** updated with details:\n\n{label_details}"
-        
+
         return message
 
     @staticmethod
@@ -481,7 +481,7 @@ class ProductTools:
     async def manage_product_warranty(product_name: str, warranty_details: str) -> str:
         """Manage the warranty for a specific product."""
         message = f"## Product Warranty Managed\nWarranty for **'{product_name}'** managed with details:\n\n{warranty_details}"
-        
+
         return message
 
     @staticmethod
@@ -491,7 +491,7 @@ class ProductTools:
     async def forecast_product_demand(product_name: str, forecast_period: str) -> str:
         """Forecast demand for a specific product."""
         message = f"## Demand Forecast\nDemand for **'{product_name}'** forecasted for **{forecast_period}**."
-        
+
         return message
 
     @staticmethod
@@ -503,7 +503,7 @@ class ProductTools:
     ) -> str:
         """Handle licensing for a specific product."""
         message = f"## Product Licensing Handled\nLicensing for **'{product_name}'** handled with details:\n\n{licensing_details}"
-        
+
         return message
 
     @staticmethod
@@ -515,7 +515,7 @@ class ProductTools:
     ) -> str:
         """Manage packaging for a specific product."""
         message = f"## Product Packaging Managed\nPackaging for **'{product_name}'** managed with details:\n\n{packaging_details}"
-        
+
         return message
 
     @staticmethod
@@ -527,7 +527,7 @@ class ProductTools:
     ) -> str:
         """Set safety standards for a specific product."""
         message = f"## Safety Standards Set\nSafety standards for **'{product_name}'** set to:\n\n{safety_standards}"
-        
+
         return message
 
     @staticmethod
@@ -537,7 +537,7 @@ class ProductTools:
     async def develop_product_features(product_name: str, features_details: str) -> str:
         """Develop new features for a specific product."""
         message = f"## New Features Developed\nNew features for **'{product_name}'** developed with details:\n\n{features_details}"
-        
+
         return message
 
     @staticmethod
@@ -549,7 +549,7 @@ class ProductTools:
     ) -> str:
         """Evaluate the performance of a specific product."""
         message = f"## Product Performance Evaluated\nPerformance of **'{product_name}'** evaluated based on:\n\n{evaluation_criteria}"
-        
+
         return message
 
     @staticmethod
@@ -559,7 +559,7 @@ class ProductTools:
     async def manage_custom_product_orders(order_details: str) -> str:
         """Manage custom orders for a specific product."""
         message = f"## Custom Product Order Managed\nCustom product order managed with details:\n\n{order_details}"
-        
+
         return message
 
     @staticmethod
@@ -570,7 +570,7 @@ class ProductTools:
         """Update images for a specific product."""
         images = ", ".join(image_urls)
         message = f"## Product Images Updated\nImages for **'{product_name}'** updated:\n\n{images}"
-        
+
         return message
 
     @staticmethod
@@ -580,7 +580,7 @@ class ProductTools:
     async def handle_product_obsolescence(product_name: str) -> str:
         """Handle the obsolescence of a specific product."""
         message = f"## Product Obsolescence Handled\nObsolescence for **'{product_name}'** handled."
-        
+
         return message
 
     @staticmethod
@@ -590,7 +590,7 @@ class ProductTools:
     async def manage_product_sku(product_name: str, sku: str) -> str:
         """Manage SKU for a specific product."""
         message = f"## SKU Managed\nSKU for **'{product_name}'** managed:\n\n{sku}"
-        
+
         return message
 
     @staticmethod
@@ -602,7 +602,7 @@ class ProductTools:
     ) -> str:
         """Provide training for a specific product."""
         message = f"## Product Training Provided\nTraining for **'{product_name}'** provided with details:\n\n{training_session_details}"
-        
+
         return message
 
     # This function does NOT have the kernel_function annotation
