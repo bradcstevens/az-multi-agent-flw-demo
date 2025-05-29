@@ -1,5 +1,21 @@
 using './main.bicep'
 
-param environmentName = readEnvironmentVariable('AZURE_ENV_NAME', 'macaetemplate')
-param AZURE_LOCATION = readEnvironmentVariable('AZURE_LOCATION', '')
-param azureOpenAILocation = readEnvironmentVariable('AZURE_OPENAI_LOCATION', 'eastus2')
+param solutionPrefix = null //Type a string value to customize the prefix for your resource names
+param solutionLocation = readEnvironmentVariable('AZURE_LOCATION', 'swedencentral')
+param azureOpenAILocation = readEnvironmentVariable('AZURE_ENV_OPENAI_LOCATION', 'swedencentral')
+param logAnalyticsWorkspaceConfiguration = {
+  dataRetentionInDays: 30
+}
+param applicationInsightsConfiguration = {
+  retentionInDays: 30
+}
+param virtualNetworkConfiguration = {
+  enabled: false
+}
+param aiFoundryStorageAccountConfiguration = {
+  sku: 'Standard_LRS'
+}
+param webServerFarmConfiguration = {
+  skuCapacity: 1
+  skuName: 'B2'
+}
