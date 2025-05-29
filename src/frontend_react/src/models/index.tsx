@@ -10,5 +10,6 @@ export * from './plan';
 export * from './messages';
 export * from './inputTask';
 export * from './agentMessage';
+export * from './taskDetails';
 
 // Add other model exports as needed

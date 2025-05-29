@@ -20,7 +20,7 @@ import Content from '../coral/components/Content/Content';
  * Page component for displaying a specific plan
  * Accessible via the route /plan/{plan_id}
  */
-const PlanPage: React.FC = () => {
+const HomePage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
 
@@ -44,4 +44,4 @@ const PlanPage: React.FC = () => {
     );
 };
 
-export default PlanPage;
+export default HomePage;
