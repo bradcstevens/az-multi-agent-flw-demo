@@ -13,6 +13,7 @@ import {
 import { MoreHorizontal20Regular } from "@fluentui/react-icons";
 import React from "react";
 import "../../styles/TaskList.css";
+import { TaskListProps, Task } from "../../models/taskList";
 
 
 

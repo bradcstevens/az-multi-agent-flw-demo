@@ -33,7 +33,7 @@ const PlanPage: React.FC = () => {
         navigate(-1);
     };
     const handleTaskSelect = (taskId: string) => {
-        setActiveTaskId(taskId);
+        console.log(`Selected task ID: ${taskId}`);
     };
     // Show error if no planId is provided
 
