@@ -47,7 +47,15 @@ For **production deployments**, the repository also provides [`main.waf-aligned.
 
 > [!TIP]
 > Always review and adjust parameter values (such as region, capacity, security settings and log analytics workspace configuration) to match your organization’s requirements before deploying. For production, ensure you have sufficient quota and follow the principle of least privilege for all identities and role assignments.
-> If you want to reuse the existing log analytics workspace update the existingWorkspaceResourceId under the logAnalyticsWorkspaceConfiguration in the bicepparm file with the Log analytics workspace id.
+
+> To reuse an existing Log Analytics workspace, update the existingWorkspaceResourceId field under the logAnalyticsWorkspaceConfiguration parameter in the bicepparam file with the resource ID of your existing workspace.
+For example: 
+```
+param logAnalyticsWorkspaceConfiguration = {
+  dataRetentionInDays: 30
+  existingWorkspaceResourceId: '/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>'
+}
+```
 
 > [!IMPORTANT]
 > The WAF-aligned configuration is under active development. More Azure Well-Architected recommendations will be added in future updates.
