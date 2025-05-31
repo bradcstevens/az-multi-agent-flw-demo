@@ -46,7 +46,8 @@ For **production deployments**, the repository also provides [`main.waf-aligned.
 - For a WAF-aligned, production-ready deployment, copy the contents of [`main.waf-aligned.bicepparam`](../infra/main.waf-aligned.bicepparam) into `main.bicepparam` before running `azd up`.
 
 > [!TIP]
-> Always review and adjust parameter values (such as region, capacity, and security settings) to match your organization’s requirements before deploying. For production, ensure you have sufficient quota and follow the principle of least privilege for all identities and role assignments.
+> Always review and adjust parameter values (such as region, capacity, security settings and log analytics workspace configuration) to match your organization’s requirements before deploying. For production, ensure you have sufficient quota and follow the principle of least privilege for all identities and role assignments.
+> If you want to reuse the existing log analytics workspace update the existingWorkspaceResourceId under the logAnalyticsWorkspaceConfiguration in the bicepparm file with the Log analytics workspace id.
 
 > [!IMPORTANT]
 > The WAF-aligned configuration is under active development. More Azure Well-Architected recommendations will be added in future updates.
