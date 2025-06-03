@@ -42,8 +42,7 @@ const PlanList: React.FC<PlanListProps> = ({
 
     /**
      * Get badge color based on plan status
-     */
-    const getPlanStatusColor = (status: PlanStatus): string => {
+     */    const getPlanStatusColor = (status: PlanStatus): "success" | "brand" | "danger" | "informative" => {
         switch (status) {
             case PlanStatus.COMPLETED:
                 return 'success';

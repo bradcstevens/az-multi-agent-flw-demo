@@ -84,10 +84,8 @@ export class ApiClient {
 
                 if (!response) {
                     return Promise.reject(new ServerError('Network error or server is not responding'));
-                }
-
-                const { status, data } = response;
-                const message = data?.detail || data?.message || 'An error occurred';
+                } const { status, data } = response;
+                const message = (data as any)?.detail || (data as any)?.message || 'An error occurred';
 
                 switch (status) {
                     case 400:

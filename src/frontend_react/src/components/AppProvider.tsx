@@ -1,24 +1,18 @@
 import React from 'react';
-import { ThemeProvider, createTheme, ITheme, initializeIcons } from '@fluentui/react';
-
-// Initialize icons for FluentUI
-initializeIcons();
+import { FluentProvider, teamsLightTheme } from '@fluentui/react-components';
 
 interface AppProviderProps {
     children: React.ReactNode;
 }
-
-// Create a custom theme with brand colors for your application
-
 
 /**
  * Provider component to initialize the Fluent UI theme provider
  */
 const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     return (
-        <ThemeProvider>
+        <FluentProvider theme={teamsLightTheme}>
             {children}
-        </ThemeProvider>
+        </FluentProvider>
     );
 };
 

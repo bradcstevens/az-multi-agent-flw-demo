@@ -11,7 +11,6 @@ import {
     ArrowLeft24Regular,
     ErrorCircle24Regular
 } from '@fluentui/react-icons';
-import PlanView from '../components/PlanView';
 import '../styles/PlanPage.css';
 import CoralShellColumn from '../coral/components/Layout/CoralShellColumn';
 import CoralShellRow from '../coral/components/Layout/CoralShellRow';
@@ -28,14 +27,31 @@ const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
 
+    // Temporary placeholder data - will be replaced with API calls
+    const inProgressTasks: any[] = [];
+    const completedTasks: any[] = [];
+
     // Handle back navigation
     const handleBackClick = () => {
         navigate(-1);
     };
+
     const handleTaskSelect = (taskId: string) => {
         console.log(`Selected task ID: ${taskId}`);
     };
+
+    const handleNewTask = (taskName: string) => {
+        console.log(`Creating new task: ${taskName}`);
+    };
+
     // Show error if no planId is provided
+    if (!planId) {
+        return (
+            <div style={{ padding: '20px' }}>
+                <Text>Error: No plan ID provided</Text>
+            </div>
+        );
+    }
 
 
     return (
