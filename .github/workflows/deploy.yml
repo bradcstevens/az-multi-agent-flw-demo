@@ -100,7 +100,7 @@ jobs:
           set -e
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --template-file infra/macae.bicep \
+            --template-file infra/main.bicep \
             --parameters azureOpenAILocation=${{env.AZURE_LOCATION }} cosmosLocation=${{env.AZURE_LOCATION }}
 
 
