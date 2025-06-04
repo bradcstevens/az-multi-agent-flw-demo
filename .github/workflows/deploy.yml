@@ -171,7 +171,7 @@ jobs:
 
           
       - name: Delete Bicep Deployment
-        
+        if: always()
         run: |
           set -e  
           echo "Checking if resource group exists..."
@@ -241,7 +241,7 @@ jobs:
 
           
       - name: Purging the Resources
-        
+        if: always()
         run: |
 
           set -e 
