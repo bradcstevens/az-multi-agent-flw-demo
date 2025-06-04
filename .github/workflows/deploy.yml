@@ -100,8 +100,8 @@ jobs:
           set -e
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --template-file infra/macae.bicep \
-            --parameters azureOpenAILocation=${{env.AZURE_LOCATION }} cosmosLocation=${{env.AZURE_LOCATION }}
+            --template-file infra/main.bicep \
+            --parameters azureOpenAILocation=${{ env.AZURE_LOCATION }}
 
 
       - name: Send Notification on Failure
@@ -123,7 +123,7 @@ jobs:
             -d "$EMAIL_BODY" || echo "Failed to send notification"
   
     
-      - name: Get OpenAI, App Service and Container Registry Resource from Resource Group
+      - name: Get OpenAI Resource from Resource Group
         id: get_openai_resource
         run: |
 
@@ -142,35 +142,11 @@ jobs:
             echo "OpenAI resource name: ${openai_resource_name}" 
           fi
 
-          echo "Fetching Azure App Service resource from resource group ${{ env.RESOURCE_GROUP_NAME }}..."
           
-          # Run the az resource list command to get the App Service resource name
-          app_service_name=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.Web/sites" --query "[0].name" -o tsv)
-
-          if [ -z "$app_service_name" ]; then
-            echo "No Azure App Service resource found in resource group ${{ env.RESOURCE_GROUP_NAME }}."
-            exit 1
-          else
-            echo "APP_SERVICE_NAME=${app_service_name}" >> $GITHUB_ENV
-            echo "Azure App Service resource name: ${app_service_name}" 
-          fi
-
-          echo "Fetching container registry resource from resource group ${{ env.RESOURCE_GROUP_NAME }}..."
-
-          # Fetch Azure Container Registry name
-          acr_name=$(az acr list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query "[0].name" -o tsv)
-
-          if [ -z "$acr_name" ]; then
-            echo "No Azure Container Registry found in resource group ${{ env.RESOURCE_GROUP_NAME }}."
-            exit 1
-          else
-            echo "ACR_NAME=${acr_name}" >> $GITHUB_ENV
-            echo "Azure Container Registry name: ${acr_name}"
-          fi
 
           
       - name: Delete Bicep Deployment
-        if: success()
+        if: always()
         run: |
           set -e  
           echo "Checking if resource group exists..."
@@ -240,7 +216,7 @@ jobs:
 
           
       - name: Purging the Resources
-        if: success()
+        if: always()
         run: |
 
           set -e 
