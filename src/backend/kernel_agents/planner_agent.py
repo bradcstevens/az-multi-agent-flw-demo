@@ -440,7 +440,6 @@ class PlannerAgent(BaseAgent):
                 raise
             else:
                 logging.exception(f"Error creating structured plan: {e}")
-        
 
             # Create a fallback dummy plan when parsing fails
             logging.info("Creating fallback dummy plan due to parsing error")
