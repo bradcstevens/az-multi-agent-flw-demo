@@ -13,9 +13,11 @@ import {
     DocumentEdit20Regular,
 } from "@fluentui/react-icons";
 import React, { useRef, useEffect } from "react";
+import { useNavigate } from 'react-router-dom';
 import "./../../styles/Chat.css"; // Assuming you have a CSS file for additional styles
 import "./../../styles/HomeInput.css";
-import { HomeInputProps, quickTasks } from "../../models/homeInput";
+import { HomeInputProps, quickTasks, QuickTask } from "../../models/homeInput";
+import { TaskService } from "../../services/TaskService";
 
 
 const HomeInput: React.FC<HomeInputProps> = ({
@@ -24,15 +26,40 @@ const HomeInput: React.FC<HomeInputProps> = ({
 }) => {
     const [inputValue, setInputValue] = React.useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const navigate = useNavigate();
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (inputValue.trim()) {
-            onInputSubmit(inputValue.trim());
-            setInputValue("");
-            if (textareaRef.current) {
-                textareaRef.current.style.height = "auto";
+            try {
+                // Submit the input task using TaskService
+                const response = await TaskService.submitInputTask(inputValue.trim());
+
+                // Clear the input field
+                setInputValue("");
+                if (textareaRef.current) {
+                    textareaRef.current.style.height = "auto";
+                }
+
+                // Navigate to the plan page using the plan_id from the response
+                navigate(`/plan/${response.plan_id}`);
+
+            } catch (error) {
+                console.error('Failed to create task:', error);
+                // You can add error handling here if needed
             }
         }
+    };
+    const handleQuickTaskClick = (task: QuickTask) => {
+        // Copy task description to textarea
+        setInputValue(task.description);
+
+        // Focus on textarea
+        if (textareaRef.current) {
+            textareaRef.current.focus();
+        }
+
+        // Call the onQuickTaskSelect with the task description
+        onQuickTaskSelect(task.description);
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -66,7 +93,6 @@ const HomeInput: React.FC<HomeInputProps> = ({
                                 className="home-input-input-field"
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
-                                onKeyPress={handleKeyPress}
                                 placeholder="Describe what you'd like to do or use / to reference files, people, and more"
                                 rows={1}
                             />
@@ -86,22 +112,21 @@ const HomeInput: React.FC<HomeInputProps> = ({
                         <div className="home-input-quick-tasks-header">
                             <Text className="home-input-quick-tasks-title">Quick tasks</Text>
                         </div>
-                        <div className="home-input-quick-tasks">
-                            {quickTasks.map((task) => (
-                                <Card
-                                    key={task.id}
-                                    className="home-input-quick-task-card"
-                                    onClick={() => onQuickTaskSelect(task.id)}
-                                >
-                                    <div className="home-input-card-content">
-                                        <div className="home-input-card-icon">{task.icon}</div>
-                                        <div className="home-input-card-text-content">
-                                            <Text className="home-input-card-title">{task.title}</Text>
-                                            <Text className="home-input-card-description">{task.description}</Text>
-                                        </div>
+                        <div className="home-input-quick-tasks">                            {quickTasks.map((task) => (
+                            <Card
+                                key={task.id}
+                                className="home-input-quick-task-card"
+                                onClick={() => handleQuickTaskClick(task)}
+                            >
+                                <div className="home-input-card-content">
+                                    <div className="home-input-card-icon">{task.icon}</div>
+                                    <div className="home-input-card-text-content">
+                                        <Text className="home-input-card-title">{task.title}</Text>
+                                        <Text className="home-input-card-description">{task.description}</Text>
                                     </div>
-                                </Card>
-                            ))}
+                                </div>
+                            </Card>
+                        ))}
                         </div>
                     </div>
                 </div>

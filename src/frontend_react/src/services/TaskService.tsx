@@ -1,6 +1,7 @@
 import { PlanWithSteps, PlanStatus } from '../models';
 import { Task } from '../models/taskList';
 import { apiService } from '../api/apiService';
+import { InputTask, InputTaskResponse } from '../models/inputTask';
 
 /**
  * TaskService - Service for handling task-related operations and transformations
@@ -76,6 +77,32 @@ export class TaskService {
      */
     static filterTasksByStatus(tasks: Task[], status: 'inprogress' | 'completed'): Task[] {
         return tasks.filter(task => task.status === status);
+    }
+
+    /**
+     * Generate a session ID using the specified algorithm
+     * @returns Generated session ID in format "sid_" + timestamp + "_" + random
+     */
+    static generateSessionId(): string {
+        const timestamp = new Date().getTime();
+        const random = Math.floor(Math.random() * 10000);
+        return `sid_${timestamp}_${random}`;
+    }
+
+    /**
+     * Submit an input task to create a new plan
+     * @param description Task description
+     * @returns Promise with the response containing session and plan IDs
+     */
+    static async submitInputTask(description: string): Promise<InputTaskResponse> {
+        const sessionId = this.generateSessionId();
+
+        const inputTask: InputTask = {
+            session_id: sessionId,
+            description: description
+        };
+
+        return await apiService.submitInputTask(inputTask);
     }
 }
 

@@ -36,5 +36,5 @@ export const quickTasks: QuickTask[] = [
 
 export interface HomeInputProps {
     onInputSubmit: (input: string) => void;
-    onQuickTaskSelect: (taskId: string) => void;
+    onQuickTaskSelect: (taskDescription: string) => void;
 }
