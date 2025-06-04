@@ -1,135 +1,104 @@
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { headerBuilder } from '../auth';
 
-export interface ApiError {
-    status: number;
-    message: string;
-    data?: any;
-}
+// Get base API URL
+const api = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
-// Define classes for different error types
-export class BadRequestError extends Error {
-    public readonly status = 400;
-    public readonly data?: any;
+// Helper function to build URL with query parameters
+const buildUrl = (url: string, params?: Record<string, any>): string => {
+    if (!params) return url;
 
-    constructor(message: string, data?: any) {
-        super(message);
-        this.name = 'BadRequestError';
-        this.data = data;
-    }
-}
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+            searchParams.append(key, String(value));
+        }
+    });
 
-export class UnauthorizedError extends Error {
-    public readonly status = 401;
-    public readonly data?: any;
+    const queryString = searchParams.toString();
+    return queryString ? `${url}?${queryString}` : url;
+};
 
-    constructor(message: string, data?: any) {
-        super(message);
-        this.name = 'UnauthorizedError';
-        this.data = data;
-    }
-}
+// Fetch with Authentication Headers
+const fetchWithAuth = async (url: string, method: string = "GET", body: BodyInit | null = null) => {
+    const token = localStorage.getItem('token'); // Get the token from localStorage
+    const authHeaders = headerBuilder(); // Get authentication headers
 
-export class NotFoundError extends Error {
-    public readonly status = 404;
-    public readonly data?: any;
+    const headers: Record<string, string> = {
+        ...authHeaders, // Include auth headers from headerBuilder
+    };
 
-    constructor(message: string, data?: any) {
-        super(message);
-        this.name = 'NotFoundError';
-        this.data = data;
-    }
-}
-
-export class ServerError extends Error {
-    public readonly status = 500;
-    public readonly data?: any;
-
-    constructor(message: string, data?: any) {
-        super(message);
-        this.name = 'ServerError';
-        this.data = data;
-    }
-}
-
-export class ApiClient {
-    private client: AxiosInstance;
-
-    constructor(baseURL: string) {
-        this.client = axios.create({
-            baseURL,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            withCredentials: true, // Include credentials for cross-origin requests if needed
-        });
-
-        // Add request interceptor to handle authentication
-        this.client.interceptors.request.use(
-            (config) => {
-                // Get token from localStorage or other storage mechanism
-                const token = localStorage.getItem('authToken');
-                if (token) {
-                    config.headers.Authorization = `Bearer ${token}`;
-                }
-                return config;
-            },
-            (error) => Promise.reject(error)
-        );
-
-        // Add response interceptor to handle errors
-        this.client.interceptors.response.use(
-            (response) => response,
-            (error: AxiosError) => {
-                const { response } = error;
-
-                if (!response) {
-                    return Promise.reject(new ServerError('Network error or server is not responding'));
-                } const { status, data } = response;
-                const message = (data as any)?.detail || (data as any)?.message || 'An error occurred';
-
-                switch (status) {
-                    case 400:
-                        return Promise.reject(new BadRequestError(message, data));
-                    case 401:
-                        // Optionally clear auth state here
-                        return Promise.reject(new UnauthorizedError(message, data));
-                    case 404:
-                        return Promise.reject(new NotFoundError(message, data));
-                    case 500:
-                        return Promise.reject(new ServerError(message, data));
-                    default:
-                        return Promise.reject(new Error(`Unexpected error: ${message}`));
-                }
-            }
-        );
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`; // Add the token to the Authorization header
     }
 
-    async get<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
-        const response: AxiosResponse<T> = await this.client.get(path, config);
-        return response.data;
+    // If body is FormData, do not set Content-Type header
+    if (body && body instanceof FormData) {
+        delete headers['Content-Type'];
+    } else {
+        headers['Content-Type'] = 'application/json';
+        body = body ? JSON.stringify(body) : null;
     }
 
-    async post<T>(path: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-        const response: AxiosResponse<T> = await this.client.post(path, data, config);
-        return response.data;
-    }
+    const options: RequestInit = {
+        method,
+        headers,
+        body: body || undefined,
+    };
 
-    async put<T>(path: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-        const response: AxiosResponse<T> = await this.client.put(path, data, config);
-        return response.data;
-    }
+    try {
+        const response = await fetch(`${api}${url}`, options);
+        console.log('response', response);
 
-    async delete<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
-        const response: AxiosResponse<T> = await this.client.delete(path, config);
-        return response.data;
-    }
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Something went wrong');
+        }
 
-    async patch<T>(path: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-        const response: AxiosResponse<T> = await this.client.patch(path, data, config);
-        return response.data;
+        const isJson = response.headers.get('content-type')?.includes('application/json');
+        return isJson ? await response.json() : null;
+    } catch (error) {
+        console.error('API Error:', (error as Error).message);
+        throw error;
     }
-}
+};
 
-// Create and export a default API client instance
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
-export const apiClient = new ApiClient(API_BASE_URL);
+// Vanilla Fetch without Auth for Login
+const fetchWithoutAuth = async (url: string, method: string = "POST", body: BodyInit | null = null) => {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+
+    const options: RequestInit = {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+    };
+
+    try {
+        const response = await fetch(`${api}${url}`, options);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Login failed');
+        }
+
+        const isJson = response.headers.get('content-type')?.includes('application/json');
+        return isJson ? await response.json() : null;
+    } catch (error) {
+        console.error('Login Error:', (error as Error).message);
+        throw error;
+    }
+};
+
+// Authenticated requests (with token) and login (without token)
+export const apiClient = {
+    get: (url: string, config?: { params?: Record<string, any> }) => {
+        const finalUrl = buildUrl(url, config?.params);
+        return fetchWithAuth(finalUrl, 'GET');
+    },
+    post: (url: string, body?: any) => fetchWithAuth(url, 'POST', body),
+    put: (url: string, body?: any) => fetchWithAuth(url, 'PUT', body),
+    delete: (url: string) => fetchWithAuth(url, 'DELETE'),
+    upload: (url: string, formData: FormData) => fetchWithAuth(url, 'POST', formData),
+    login: (url: string, body?: any) => fetchWithoutAuth(url, 'POST', body), // For login without auth
+};

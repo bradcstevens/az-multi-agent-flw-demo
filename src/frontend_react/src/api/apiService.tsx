@@ -51,84 +51,73 @@ class APICache {
             return null;
         }
 
-        return entry.data as T;
-    } invalidate(keyPattern: RegExp | string): void {
-        if (typeof keyPattern === 'string') {
-            this.cache.delete(keyPattern);
-            return;
-        }
-
-        // If RegExp, delete all matching keys
-        // Use Array.from to avoid iterator compatibility issues
-        Array.from(this.cache.keys()).forEach(key => {
-            if (keyPattern.test(key)) {
-                this.cache.delete(key);
-            }
-        });
+        return entry.data;
     }
 
     clear(): void {
         this.cache.clear();
     }
+
+    invalidate(pattern: RegExp): void {
+        for (const key of this.cache.keys()) {
+            if (pattern.test(key)) {
+                this.cache.delete(key);
+            }
+        }
+    }
 }
 
-/**
- * Unified API service for interacting with the backend app_kernel.py
- */
-export const apiService = {
-    // Cache instance
-    _cache: new APICache(),
+// Request tracking to prevent duplicate requests
+class RequestTracker {
+    private pendingRequests: Map<string, Promise<any>> = new Map();
 
-    // API request tracking
-    _requestsInProgress: new Map<string, Promise<any>>(),
-
-    /**
-     * Track API calls to prevent duplicate requests for the same resource
-     * @param key Unique identifier for this request
-     * @param request Promise function that makes the actual API call
-     */
-    async _trackRequest<T>(key: string, request: () => Promise<T>): Promise<T> {
-        // Check if request is already in progress
-        if (this._requestsInProgress.has(key)) {
-            return this._requestsInProgress.get(key);
+    async trackRequest<T>(key: string, requestFn: () => Promise<T>): Promise<T> {
+        // If request is already pending, return the existing promise
+        if (this.pendingRequests.has(key)) {
+            return this.pendingRequests.get(key)!;
         }
 
-        // Check cache first
-        const cachedData = this._cache.get<T>(key);
-        if (cachedData) return cachedData;
+        // Create new request
+        const requestPromise = requestFn();
 
-        // Make the request and track it
-        const promise = request().finally(() => {
-            this._requestsInProgress.delete(key);
-        });
+        // Track the request
+        this.pendingRequests.set(key, requestPromise);
 
-        this._requestsInProgress.set(key, promise);
-        return promise;
-    },
+        try {
+            const result = await requestPromise;
+            return result;
+        } finally {
+            // Remove from tracking when done (success or failure)
+            this.pendingRequests.delete(key);
+        }
+    }
+}
 
-    // Task-related methods
+export class APIService {
+    private _cache = new APICache();
+    private _requestTracker = new RequestTracker();
+
     /**
      * Submit a new input task to generate a plan
      * @param inputTask The task description and optional session ID
      * @returns Promise with the response containing session and plan IDs
      */
     async submitInputTask(inputTask: InputTask): Promise<InputTaskResponse> {
-        return apiClient.post<InputTaskResponse>(API_ENDPOINTS.INPUT_TASK, inputTask);
-    },
+        return apiClient.post(API_ENDPOINTS.INPUT_TASK, inputTask);
+    }
 
-    // Plan-related methods
     /**
-     * Get all plans
+     * Get all plans, optionally filtered by session ID
      * @param sessionId Optional session ID to filter plans
-     * @param useCache Whether to use cached data if available
-     * @returns Promise with an array of plans with their steps
+     * @param useCache Whether to use cached data or force fresh fetch
+     * @returns Promise with array of plans with their steps
      */
     async getPlans(sessionId?: string, useCache = true): Promise<PlanWithSteps[]> {
         const cacheKey = `plans_${sessionId || 'all'}`;
         const params = sessionId ? { session_id: sessionId } : {};
 
         const fetcher = async () => {
-            const data = await apiClient.get<PlanWithSteps[]>(API_ENDPOINTS.PLANS, { params });
+            const data = await apiClient.get(API_ENDPOINTS.PLANS, { params });
             if (useCache) {
                 this._cache.set(cacheKey, data, 30000); // Cache for 30 seconds
             }
@@ -136,23 +125,22 @@ export const apiService = {
         };
 
         if (useCache) {
-            return this._trackRequest<PlanWithSteps[]>(cacheKey, fetcher);
+            return this._requestTracker.trackRequest(cacheKey, fetcher);
         }
 
         return fetcher();
-    },
+    }
 
     /**
-     * Get plan with steps by session ID and plan ID
-     * @param sessionId The session ID
-     * @param planId The plan ID
-     * @param useCache Whether to use cached data if available
+     * Get a specific plan with its steps
+     * @param sessionId Session ID
+     * @param planId Plan ID
+     * @param useCache Whether to use cached data or force fresh fetch
      * @returns Promise with the plan and its steps
      */
     async getPlanWithSteps(sessionId: string, planId: string, useCache = true): Promise<PlanWithSteps> {
         const cacheKey = `plan_${sessionId}_${planId}`;
 
-        // Check cache first if enabled
         if (useCache) {
             const cachedPlan = this._cache.get<PlanWithSteps>(cacheKey);
             if (cachedPlan) return cachedPlan;
@@ -161,6 +149,7 @@ export const apiService = {
         const fetcher = async () => {
             const plans = await this.getPlans(sessionId, useCache);
             const plan = plans.find(p => p.id === planId);
+
             if (!plan) {
                 throw new Error(`Plan with ID ${planId} not found`);
             }
@@ -173,23 +162,23 @@ export const apiService = {
         };
 
         if (useCache) {
-            return this._trackRequest<PlanWithSteps>(cacheKey, fetcher);
+            return this._requestTracker.trackRequest(cacheKey, fetcher);
         }
 
         return fetcher();
-    },
+    }
 
     /**
      * Get steps for a specific plan
-     * @param planId The ID of the plan
-     * @param useCache Whether to use cached data if available
-     * @returns Promise with an array of steps
+     * @param planId Plan ID
+     * @param useCache Whether to use cached data or force fresh fetch
+     * @returns Promise with array of steps
      */
     async getSteps(planId: string, useCache = true): Promise<Step[]> {
         const cacheKey = `steps_${planId}`;
 
         const fetcher = async () => {
-            const data = await apiClient.get<Step[]>(`${API_ENDPOINTS.STEPS}/${planId}`);
+            const data = await apiClient.get(`${API_ENDPOINTS.STEPS}/${planId}`);
             if (useCache) {
                 this._cache.set(cacheKey, data, 30000); // Cache for 30 seconds
             }
@@ -197,18 +186,18 @@ export const apiService = {
         };
 
         if (useCache) {
-            return this._trackRequest<Step[]>(cacheKey, fetcher);
+            return this._requestTracker.trackRequest(cacheKey, fetcher);
         }
 
         return fetcher();
-    },
+    }
 
     /**
-     * Update a step
-     * @param sessionId Session identifier
-     * @param planId Plan identifier
-     * @param stepId Step identifier
-     * @param update The update to apply to the step
+     * Update a step with new status and optional feedback
+     * @param sessionId Session ID
+     * @param planId Plan ID
+     * @param stepId Step ID
+     * @param update Update object with status and optional feedback
      * @returns Promise with the updated step
      */
     async updateStep(
@@ -230,29 +219,30 @@ export const apiService = {
             update.updated_action
         );
 
-        // Invalidate caches for this plan and its steps
+        // Invalidate cached data
         this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
         this._cache.invalidate(new RegExp(`^plans_`));
 
-        // Get the updated step after providing feedback
+        // Get fresh step data
         const steps = await this.getSteps(planId, false); // Force fresh data
         const updatedStep = steps.find(step => step.id === stepId);
+
         if (!updatedStep) {
             throw new Error(`Step with ID ${stepId} not found after update`);
         }
-        return updatedStep;
-    },
 
-    // Feedback-related methods
+        return updatedStep;
+    }
+
     /**
-     * Update step status and provide feedback
-     * @param stepId Step identifier
-     * @param planId Plan identifier
-     * @param sessionId Session identifier
+     * Provide feedback for a specific step
+     * @param stepId Step ID
+     * @param planId Plan ID
+     * @param sessionId Session ID
      * @param approved Whether the step is approved
-     * @param humanFeedback Optional feedback from human
+     * @param humanFeedback Optional human feedback
      * @param updatedAction Optional updated action
-     * @returns Promise with status response
+     * @returns Promise with response object
      */
     async provideStepFeedback(
         stepId: string,
@@ -262,7 +252,7 @@ export const apiService = {
         humanFeedback?: string,
         updatedAction?: string
     ): Promise<{ status: string; session_id: string; step_id: string }> {
-        const response = await apiClient.post<{ status: string; session_id: string; step_id: string }>(
+        const response = await apiClient.post(
             API_ENDPOINTS.HUMAN_FEEDBACK,
             {
                 step_id: stepId,
@@ -274,22 +264,22 @@ export const apiService = {
             }
         );
 
-        // Invalidate related caches
+        // Invalidate cached data
         this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
         this._cache.invalidate(new RegExp(`^plans_`));
 
         return response;
-    },
+    }
 
     /**
-     * Approve a step or multiple steps in a plan
-     * @param planId Plan identifier
-     * @param sessionId Session identifier
+     * Approve one or more steps
+     * @param planId Plan ID
+     * @param sessionId Session ID
      * @param approved Whether the step(s) are approved
-     * @param stepId Optional step ID (if not provided, approves all steps)
-     * @param humanFeedback Optional feedback from human
+     * @param stepId Optional specific step ID
+     * @param humanFeedback Optional human feedback
      * @param updatedAction Optional updated action
-     * @returns Promise with status response
+     * @returns Promise with response object
      */
     async approveSteps(
         planId: string,
@@ -299,7 +289,7 @@ export const apiService = {
         humanFeedback?: string,
         updatedAction?: string
     ): Promise<{ status: string }> {
-        const response = await apiClient.post<{ status: string }>(
+        const response = await apiClient.post(
             API_ENDPOINTS.APPROVE_STEPS,
             {
                 step_id: stepId,
@@ -311,19 +301,19 @@ export const apiService = {
             }
         );
 
-        // Invalidate related caches
+        // Invalidate cached data
         this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
         this._cache.invalidate(new RegExp(`^plans_`));
 
         return response;
-    },
+    }
 
     /**
-     * Submit human clarification on a plan
-     * @param planId The ID of the plan
-     * @param sessionId The session ID
-     * @param clarification The clarification text
-     * @returns Promise with status response
+     * Submit clarification for a plan
+     * @param planId Plan ID
+     * @param sessionId Session ID
+     * @param clarification Clarification text
+     * @returns Promise with response object
      */
     async submitClarification(
         planId: string,
@@ -336,30 +326,29 @@ export const apiService = {
             human_clarification: clarification
         };
 
-        const response = await apiClient.post<{ status: string; session_id: string }>(
+        const response = await apiClient.post(
             API_ENDPOINTS.HUMAN_CLARIFICATION,
             clarificationData
         );
 
-        // Invalidate related caches
+        // Invalidate cached data
         this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
         this._cache.invalidate(new RegExp(`^plans_`));
 
         return response;
-    },
+    }
 
-    // Message-related methods
     /**
-     * Get all agent messages for a specific session
-     * @param sessionId The session ID
-     * @param useCache Whether to use cached data if available
-     * @returns Promise with an array of agent messages
+     * Get agent messages for a session
+     * @param sessionId Session ID
+     * @param useCache Whether to use cached data or force fresh fetch
+     * @returns Promise with array of agent messages
      */
     async getAgentMessages(sessionId: string, useCache = true): Promise<AgentMessage[]> {
         const cacheKey = `agent_messages_${sessionId}`;
 
         const fetcher = async () => {
-            const data = await apiClient.get<AgentMessage[]>(`${API_ENDPOINTS.AGENT_MESSAGES}/${sessionId}`);
+            const data = await apiClient.get(`${API_ENDPOINTS.AGENT_MESSAGES}/${sessionId}`);
             if (useCache) {
                 this._cache.set(cacheKey, data, 30000); // Cache for 30 seconds
             }
@@ -367,35 +356,35 @@ export const apiService = {
         };
 
         if (useCache) {
-            return this._trackRequest<AgentMessage[]>(cacheKey, fetcher);
+            return this._requestTracker.trackRequest(cacheKey, fetcher);
         }
 
         return fetcher();
-    },
+    }
 
     /**
-     * Delete all messages and plans across sessions
-     * @returns Promise with status response
+     * Delete all messages
+     * @returns Promise with response object
      */
     async deleteAllMessages(): Promise<{ status: string }> {
-        const response = await apiClient.delete<{ status: string }>(API_ENDPOINTS.MESSAGES);
+        const response = await apiClient.delete(API_ENDPOINTS.MESSAGES);
 
-        // Clear the entire cache since everything is deleted
+        // Clear all cached data
         this._cache.clear();
 
         return response;
-    },
+    }
 
     /**
-     * Get all messages across sessions
-     * @param useCache Whether to use cached data if available
-     * @returns Promise with all messages
+     * Get all messages
+     * @param useCache Whether to use cached data or force fresh fetch
+     * @returns Promise with array of messages
      */
     async getAllMessages(useCache = true): Promise<any[]> {
         const cacheKey = 'all_messages';
 
         const fetcher = async () => {
-            const data = await apiClient.get<any[]>(API_ENDPOINTS.MESSAGES);
+            const data = await apiClient.get(API_ENDPOINTS.MESSAGES);
             if (useCache) {
                 this._cache.set(cacheKey, data, 30000); // Cache for 30 seconds
             }
@@ -403,56 +392,53 @@ export const apiService = {
         };
 
         if (useCache) {
-            return this._trackRequest<any[]>(cacheKey, fetcher);
+            return this._requestTracker.trackRequest(cacheKey, fetcher);
         }
 
         return fetcher();
-    },
+    }
 
     // Utility methods
-    /**
-     * Check if a plan has completed all steps
-     * @param plan The plan to check
-     * @returns true if all steps are completed or failed
-     */
-    isPlanComplete(plan: PlanWithSteps): boolean {
-        return plan.steps.every(
-            step => step.status === StepStatus.COMPLETED || step.status === StepStatus.FAILED
-        );
-    },
 
     /**
-     * Get steps that are awaiting feedback for a plan
-     * @param plan The plan to check
+     * Check if a plan is complete (all steps are completed or failed)
+     * @param plan Plan with steps
+     * @returns Boolean indicating if plan is complete
+     */
+    isPlanComplete(plan: PlanWithSteps): boolean {
+        return plan.steps.every(step =>
+            [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
+        );
+    }
+
+    /**
+     * Get steps that are awaiting human feedback
+     * @param plan Plan with steps
      * @returns Array of steps awaiting feedback
      */
     getStepsAwaitingFeedback(plan: PlanWithSteps): Step[] {
-        return plan.steps.filter(
-            step => step.status === StepStatus.AWAITING_FEEDBACK
-        );
-    },
-
-    /**
-     * Get steps assigned to a specific agent
-     * @param plan The plan containing steps
-     * @param agentType The type of agent to filter by
-     * @returns Array of steps assigned to the specified agent
+        return plan.steps.filter(step => step.status === StepStatus.AWAITING_FEEDBACK);
+    }    /**
+     * Get steps assigned to a specific agent type
+     * @param plan Plan with steps
+     * @param agentType Agent type to filter by
+     * @returns Array of steps for the specified agent
      */
     getStepsForAgent(plan: PlanWithSteps, agentType: AgentType): Step[] {
         return plan.steps.filter(step => step.agent === agentType);
-    },
+    }
 
     /**
-     * Force refresh all cached data
+     * Clear all cached data
      */
     clearCache(): void {
         this._cache.clear();
-    },
+    }
 
     /**
-     * Get detailed progress status for a plan
-     * @param plan The plan to analyze
-     * @returns Object with counts of steps in each status
+     * Get progress status counts for a plan
+     * @param plan Plan with steps
+     * @returns Object with counts for each step status
      */
     getPlanProgressStatus(plan: PlanWithSteps): Record<StepStatus, number> {
         const result = Object.values(StepStatus).reduce((acc, status) => {
@@ -465,12 +451,12 @@ export const apiService = {
         });
 
         return result;
-    },
+    }
 
     /**
-     * Calculate the overall completion percentage of a plan
-     * @param plan The plan to calculate completion for
-     * @returns Percentage of completion from 0 to 100
+     * Get completion percentage for a plan
+     * @param plan Plan with steps
+     * @returns Completion percentage (0-100)
      */
     getPlanCompletionPercentage(plan: PlanWithSteps): number {
         if (!plan.steps.length) return 0;
@@ -481,6 +467,7 @@ export const apiService = {
 
         return Math.round((completedSteps / plan.steps.length) * 100);
     }
-};
+}
 
-export default apiService;
+// Export a singleton instance
+export const apiService = new APIService();
