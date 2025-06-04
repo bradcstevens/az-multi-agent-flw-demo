@@ -50,64 +50,63 @@ const HomeInput: React.FC<HomeInputProps> = ({
         }
     }, [inputValue]);
 
-    return (<div className="home-input-container">
-        <div className="home-input-content">
-            <div className="home-input-center-content">
-                <div className="home-input-title-wrapper">
-                    <Text className="home-input-title">How can I help?</Text>
-                </div>
+    return (
 
-                <div className="home-input-input-section">
-                    <div className="home-input-input-wrapper">
-                        <textarea
-                            ref={textareaRef}
-                            className="home-input-input-field"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                            placeholder="Describe what you'd like to do or use / to reference files, people, and more"
-                            rows={1}
-                        />
-                        <Button
-                            className="home-input-send-button"
-                            onClick={handleSubmit}
-                            disabled={!inputValue.trim()}
-                            icon={<Send20Regular />}
-                        />
+        <div className="home-input-container">
+            <div className="home-input-content">
+                <div className="home-input-center-content">
+                    <div className="home-input-title-wrapper">
+                        <Text className="home-input-title">How can I help?</Text>
                     </div>
-                    <div className="home-input-ai-footer">
-                        AI-generated content may be incorrect
-                    </div>
-                </div>
 
-                <div className="home-input-quick-tasks-section">
-                    <div className="home-input-quick-tasks-header">
-                        <Text className="home-input-quick-tasks-title">Quick tasks</Text>
-                        <Button appearance="transparent" className="home-input-refresh-button">
-                            Refresh
-                        </Button>
+                    <div className="home-input-input-section">
+                        <div className="home-input-input-wrapper">
+                            <textarea
+                                ref={textareaRef}
+                                className="home-input-input-field"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onKeyPress={handleKeyPress}
+                                placeholder="Describe what you'd like to do or use / to reference files, people, and more"
+                                rows={1}
+                            />
+                            <Button
+                                className="home-input-send-button"
+                                onClick={handleSubmit}
+                                disabled={!inputValue.trim()}
+                                icon={<Send20Regular />}
+                            />
+                        </div>
+                        <div className="home-input-ai-footer">
+                            AI-generated content may be incorrect
+                        </div>
                     </div>
-                    <div className="home-input-quick-tasks">
-                        {quickTasks.map((task) => (
-                            <Card
-                                key={task.id}
-                                className="home-input-quick-task-card"
-                                onClick={() => onQuickTaskSelect(task.id)}
-                            >
-                                <div className="home-input-card-content">
-                                    <div className="home-input-card-icon">{task.icon}</div>
-                                    <div className="home-input-card-text-content">
-                                        <Text className="home-input-card-title">{task.title}</Text>
-                                        <Text className="home-input-card-description">{task.description}</Text>
+
+                    <div className="home-input-quick-tasks-section">
+                        <div className="home-input-quick-tasks-header">
+                            <Text className="home-input-quick-tasks-title">Quick tasks</Text>
+                        </div>
+                        <div className="home-input-quick-tasks">
+                            {quickTasks.map((task) => (
+                                <Card
+                                    key={task.id}
+                                    className="home-input-quick-task-card"
+                                    onClick={() => onQuickTaskSelect(task.id)}
+                                >
+                                    <div className="home-input-card-content">
+                                        <div className="home-input-card-icon">{task.icon}</div>
+                                        <div className="home-input-card-text-content">
+                                            <Text className="home-input-card-title">{task.title}</Text>
+                                            <Text className="home-input-card-description">{task.description}</Text>
+                                        </div>
                                     </div>
-                                </div>
-                            </Card>
-                        ))}
+                                </Card>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
     );
 }
 

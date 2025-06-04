@@ -138,13 +138,14 @@ const HomePage: React.FC = () => {
                                 />
                             )}
                         </PanelLeft>
-                        <Content>
-                            <HomeInput
-                                onInputSubmit={handleNewTask}
-                                onQuickTaskSelect={handleNewTask}
-                            />
-                        </Content>
                     </div>
+                    <Content>
+                        <HomeInput
+                            onInputSubmit={handleNewTask}
+                            onQuickTaskSelect={handleNewTask}
+                        />
+                    </Content>
+
                 </CoralShellRow>
             </CoralShellColumn>
         </>

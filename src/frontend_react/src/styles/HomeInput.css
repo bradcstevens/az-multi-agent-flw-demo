@@ -131,7 +131,6 @@
     width: 32px;
     height: 32px;
     border-radius: 4px;
-    background-color: #f5f5f5; /* tokens.colorNeutralBackground2 */
     color: #0f6cbd; /* tokens.colorBrandForeground1 */
 }
 
