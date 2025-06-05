@@ -24,7 +24,8 @@ import { NewTaskService } from "../../services/NewTaskService";
 const HomeInput: React.FC<HomeInputProps> = ({
     onInputSubmit,
     onQuickTaskSelect,
-}) => {    const [inputValue, setInputValue] = React.useState("");
+}) => {
+    const [inputValue, setInputValue] = React.useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const navigate = useNavigate();
 

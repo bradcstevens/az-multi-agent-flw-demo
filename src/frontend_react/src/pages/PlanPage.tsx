@@ -39,7 +39,7 @@ const PlanPage: React.FC = () => {
 
     const handleTaskSelect = (taskId: string) => {
         console.log(`Selected task ID: ${taskId}`);
-    };    const handleNewTask = () => {
+    }; const handleNewTask = () => {
         // Use NewTaskService to handle navigation to homepage and reset textarea
         NewTaskService.handleNewTaskFromPlan(navigate);
     };

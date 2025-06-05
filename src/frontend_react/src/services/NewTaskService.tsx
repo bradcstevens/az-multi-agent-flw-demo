@@ -17,7 +17,7 @@ export class NewTaskService {
     static handleNewTaskFromPlan(navigate: (to: string) => void): void {
         // Navigate to homepage
         navigate('/');
-        
+
         // Emit event to reset textarea after navigation
         // Use setTimeout to ensure navigation completes first
         setTimeout(() => {
