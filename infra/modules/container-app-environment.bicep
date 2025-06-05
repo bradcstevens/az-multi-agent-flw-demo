@@ -1,6 +1,6 @@
 param name string
 param location string
-param logAnalyticsResourceName string
+param logAnalyticsResourceId string
 param tags object
 param publicNetworkAccess string
 //param vnetConfiguration object
@@ -10,8 +10,13 @@ param enableTelemetry bool
 param subnetResourceId string
 param applicationInsightsConnectionString string
 
-resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
-  name: logAnalyticsResourceName
+var logAnalyticsSubscription = split(logAnalyticsResourceId, '/')[2]
+var logAnalyticsResourceGroup = split(logAnalyticsResourceId, '/')[4]
+var logAnalyticsName = split(logAnalyticsResourceId, '/')[8]
+
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2020-08-01' existing = {
+  name: logAnalyticsName
+  scope: resourceGroup(logAnalyticsSubscription, logAnalyticsResourceGroup)
 }
 
 // resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-08-02-preview' = {
