@@ -54,7 +54,13 @@ foreach ($deployment in $aiModelDeployments) {
     & .\infra\scripts\validate_model_quota.ps1 -Location $Location -Model $model -Capacity $capacity -DeploymentType $type
 
     # Check if the script failed
-    if ($LASTEXITCODE -ne 0) {
+    $exitCode = $LASTEXITCODE
+    
+    if ($exitCode -ne 0) {
+        if ($exitCode -eq 2) {
+            # Quota error already printed inside the script, exit gracefully without reprinting
+            exit 1
+        }
         Write-Error "❌ ERROR: Quota validation failed for model deployment: $name"
         $QuotaAvailable = $false
     }
