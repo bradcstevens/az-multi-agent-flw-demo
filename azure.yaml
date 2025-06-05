@@ -7,7 +7,7 @@ hooks:
     posix:
       shell: sh
       run: >
-        ./infra/scripts/validate_model_deployment_quota.sh --subscription "$AZURE_SUBSCRIPTION_ID" --location "${AZURE_ENV_OPENAI_LOCATION:-swedencentral}" --models-parameter "aiModelDeployments"
+        chmod u+r+x ./infra/scripts/validate_model_deployment_quota.sh; chmod u+r+x ./infra/scripts/validate_model_quota.sh; ./infra/scripts/validate_model_deployment_quota.sh --subscription "$AZURE_SUBSCRIPTION_ID" --location "${AZURE_ENV_OPENAI_LOCATION:-swedencentral}" --models-parameter "aiModelDeployments"
       interactive: false
       continueOnError: false
 
