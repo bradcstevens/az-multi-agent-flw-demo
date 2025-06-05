@@ -10,12 +10,13 @@ param enableTelemetry bool
 param subnetResourceId string
 param applicationInsightsConnectionString string
 
+var logAnalyticsSubscription = split(logAnalyticsResourceId, '/')[2]
 var logAnalyticsResourceGroup = split(logAnalyticsResourceId, '/')[4]
 var logAnalyticsName = split(logAnalyticsResourceId, '/')[8]
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2020-08-01' existing = {
   name: logAnalyticsName
-  scope: resourceGroup(logAnalyticsResourceGroup)
+  scope: resourceGroup(logAnalyticsSubscription, logAnalyticsResourceGroup)
 }
 
 // resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-08-02-preview' = {
