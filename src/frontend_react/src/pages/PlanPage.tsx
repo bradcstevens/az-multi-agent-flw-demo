@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Button,
     Text,
     Card,
-    CardHeader
+    CardHeader,
+    useToastController,
+    Spinner
 } from '@fluentui/react-components';
 import {
     Add20Regular,
@@ -19,6 +21,9 @@ import PanelLeft from '../coral/components/Panels/PanelLeft';
 import PanelLeftToolbar from '../coral/components/Panels/PanelLeftToolbar';
 import TaskList from '../components/content/TaskList';
 import { NewTaskService } from '../services/NewTaskService';
+import { PlanWithSteps, Task } from '@/models';
+import { apiService } from '@/api';
+import PlanPanelLeft from '@/components/content/PlanPanelLeft';
 
 /**
  * Page component for displaying a specific plan
@@ -28,18 +33,10 @@ const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
 
-    // Temporary placeholder data - will be replaced with API calls
-    const inProgressTasks: any[] = [];
-    const completedTasks: any[] = [];
 
-    // Handle back navigation
-    const handleBackClick = () => {
-        navigate(-1);
-    };
 
-    const handleTaskSelect = (taskId: string) => {
-        console.log(`Selected task ID: ${taskId}`);
-    }; const handleNewTask = () => {
+
+    const handleNewTaskButton = () => {
         // Use NewTaskService to handle navigation to homepage and reset textarea
         NewTaskService.handleNewTaskFromPlan(navigate);
     };
@@ -57,27 +54,13 @@ const PlanPage: React.FC = () => {
     return (
         <CoralShellColumn>
             <CoralShellRow>
-                <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
-                    <PanelLeft
-                        panelWidth={280}
-                        panelResize={true}>                        <PanelLeftToolbar panelTitle="" panelIcon={null}>
-                            <Button
-                                icon={<Add20Regular />}
-                                onClick={handleNewTask}
-                            >
-                                New task
-                            </Button>
-                        </PanelLeftToolbar>
-                        <TaskList
-                            inProgressTasks={inProgressTasks}
-                            completedTasks={completedTasks}
-                            onTaskSelect={handleTaskSelect}
-                        />
-                    </PanelLeft>
-                    <Content>
+                <PlanPanelLeft
+                    onNewTaskButton={handleNewTaskButton}
+                />
+                <Content>
 
-                    </Content>
-                </div>
+                </Content>
+
             </CoralShellRow>
         </CoralShellColumn>
     );

@@ -12,5 +12,7 @@ export * from './inputTask';
 export * from './agentMessage';
 export * from './taskDetails';
 export * from './taskList';
+export * from './planPanelLeft';
+export * from './homeInput';
 
 // Add other model exports as needed
