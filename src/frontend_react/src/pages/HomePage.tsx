@@ -25,6 +25,7 @@ import { TaskService } from '../services/TaskService';
 import { apiService } from '../api/apiService';
 import { PlanWithSteps } from '../models';
 import HomeInput from '@/components/content/HomeInput';
+import { NewTaskService } from '../services/NewTaskService';
 
 /**
  * HomePage component - displays task lists and provides navigation
@@ -63,9 +64,16 @@ const HomePage: React.FC = () => {
     // Load data on component mount
     useEffect(() => {
         loadPlansData();
-    }, [loadPlansData]);
+    }, [loadPlansData]);    /**
+     * Handle new task creation from the "New task" button
+     * Resets textarea to empty state on HomePage
+     */
+    const handleNewTaskButton = useCallback(() => {
+        NewTaskService.handleNewTaskFromHome();
+    }, []);
+
     /**
-     * Handle new task creation - placeholder for future implementation
+     * Handle new task creation from input submission - placeholder for future implementation
      */
     const handleNewTask = useCallback((taskName: string) => {
         console.log('Creating new task:', taskName);
@@ -116,11 +124,10 @@ const HomePage: React.FC = () => {
                     <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
                         <PanelLeft
                             panelWidth={280}
-                            panelResize={true}>
-                            <PanelLeftToolbar panelTitle="Tasks" panelIcon={null}>
+                            panelResize={true}>                            <PanelLeftToolbar panelTitle="Tasks" panelIcon={null}>
                                 <Button
                                     icon={<Add20Regular />}
-                                    onClick={() => handleNewTask("New task")}
+                                    onClick={handleNewTaskButton}
                                     disabled={plansLoading}
                                 >
                                     New task

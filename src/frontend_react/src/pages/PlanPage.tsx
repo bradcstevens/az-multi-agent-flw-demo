@@ -18,6 +18,7 @@ import Content from '../coral/components/Content/Content';
 import PanelLeft from '../coral/components/Panels/PanelLeft';
 import PanelLeftToolbar from '../coral/components/Panels/PanelLeftToolbar';
 import TaskList from '../components/content/TaskList';
+import { NewTaskService } from '../services/NewTaskService';
 
 /**
  * Page component for displaying a specific plan
@@ -38,10 +39,9 @@ const PlanPage: React.FC = () => {
 
     const handleTaskSelect = (taskId: string) => {
         console.log(`Selected task ID: ${taskId}`);
-    };
-
-    const handleNewTask = (taskName: string) => {
-        console.log(`Creating new task: ${taskName}`);
+    };    const handleNewTask = () => {
+        // Use NewTaskService to handle navigation to homepage and reset textarea
+        NewTaskService.handleNewTaskFromPlan(navigate);
     };
 
     // Show error if no planId is provided
@@ -60,11 +60,10 @@ const PlanPage: React.FC = () => {
                 <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
                     <PanelLeft
                         panelWidth={280}
-                        panelResize={true}>
-                        <PanelLeftToolbar panelTitle="" panelIcon={null}>
+                        panelResize={true}>                        <PanelLeftToolbar panelTitle="" panelIcon={null}>
                             <Button
                                 icon={<Add20Regular />}
-                                onClick={() => handleNewTask("New task")}
+                                onClick={handleNewTask}
                             >
                                 New task
                             </Button>

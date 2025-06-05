@@ -18,15 +18,32 @@ import "./../../styles/Chat.css"; // Assuming you have a CSS file for additional
 import "./../../styles/HomeInput.css";
 import { HomeInputProps, quickTasks, QuickTask } from "../../models/homeInput";
 import { TaskService } from "../../services/TaskService";
+import { NewTaskService } from "../../services/NewTaskService";
 
 
 const HomeInput: React.FC<HomeInputProps> = ({
     onInputSubmit,
     onQuickTaskSelect,
-}) => {
-    const [inputValue, setInputValue] = React.useState("");
+}) => {    const [inputValue, setInputValue] = React.useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const navigate = useNavigate();
+
+    /**
+     * Reset textarea to empty state
+     */
+    const resetTextarea = () => {
+        setInputValue("");
+        if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+            textareaRef.current.focus();
+        }
+    };
+
+    // Listen for new task reset events
+    useEffect(() => {
+        const cleanup = NewTaskService.addResetListener(resetTextarea);
+        return cleanup;
+    }, []);
 
     const handleSubmit = async () => {
         if (inputValue.trim()) {
