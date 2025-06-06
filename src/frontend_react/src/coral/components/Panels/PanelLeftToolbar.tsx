@@ -1,5 +1,5 @@
 import React, { ReactNode } from "react";
-import { Body1Strong } from "@fluentui/react-components";
+import { Body1Strong, Subtitle2 } from "@fluentui/react-components";
 
 interface PanelLeftToolbarProps {
   panelIcon?: ReactNode;
@@ -48,7 +48,7 @@ const PanelLeftToolbar: React.FC<PanelLeftToolbarProps> = ({
             </div>
           )}
           {panelTitle && (
-            <Body1Strong
+            <Subtitle2
               style={{
                 whiteSpace: "nowrap",
                 overflow: "hidden",
@@ -56,7 +56,7 @@ const PanelLeftToolbar: React.FC<PanelLeftToolbarProps> = ({
               }}
             >
               {panelTitle}
-            </Body1Strong>
+            </Subtitle2>
           )}
         </div>
       )}

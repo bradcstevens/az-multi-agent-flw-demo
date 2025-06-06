@@ -99,14 +99,14 @@ const PanelRight: React.FC<PanelRightProps> = ({
         width: `${width}px`,
         display: "flex",
         flexDirection: "column",
-        backgroundColor: "var(--colorNeutralBackground4)",
+        backgroundColor: "var(--colorNeutralBackground3)",
         height: "100%",
         boxSizing: "border-box",
         position: "relative",
         borderLeft: panelResize
           ? isHandleHovered
             ? "2px solid var(--colorNeutralStroke2)"
-            : "2px solid transparent"
+            : "1px solid var(--colorNeutralStroke2)"
           : "none",
       }}
     >

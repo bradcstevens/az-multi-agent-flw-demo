@@ -1,5 +1,12 @@
 import React, { useState, useEffect, ReactNode, ReactElement } from "react";
 import PanelToolbar from "./PanelLeftToolbar.js"; // Import to identify toolbar
+import {
+  Avatar,
+  Body1,
+  Body1Strong,
+  Caption1,
+} from "@fluentui/react-components";
+import Human from "../../imports/human.png";
 
 interface PanelLeftProps {
   panelWidth?: number;
@@ -81,7 +88,9 @@ const PanelLeft: React.FC<PanelLeftProps> = ({
         style={{
           flex: 1,
           overflowY: "auto",
-        //   padding: "16px",
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          // padding: "16px",
         }}
       >
         {content}
@@ -102,11 +111,33 @@ const PanelLeft: React.FC<PanelLeftProps> = ({
             cursor: "ew-resize",
             zIndex: 1,
             backgroundColor: isHandleHovered
-            ? "var(--colorNeutralStroke2)"
-            : "transparent",
+              ? "var(--colorNeutralStroke2)"
+              : "transparent",
           }}
         />
       )}
+
+      <div
+        style={{
+          display: "flex",
+          padding: "24px 16px",
+          gap: "12px",
+          alignItems: "center",
+        }}
+      >
+        <Avatar
+          name="Pepper Hayuki"
+          image={{
+            src: Human,
+          }}
+        />
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <Body1Strong>Pepper Hayuki</Body1Strong>
+          <Caption1 style={{ color: "var(--colorNeutralForeground3)" }}>
+            pepperhayuki@microsoft.com
+          </Caption1>
+        </div>
+      </div>
     </div>
   );
 };

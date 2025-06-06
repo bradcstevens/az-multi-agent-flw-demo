@@ -69,9 +69,13 @@ import {
     CopyFilled,
     CopyRegular,
     HistoryFilled,
-    HistoryRegular
+    HistoryRegular,
+    TaskListSquareLtrFilled,
+    TaskListSquareLtrRegular,
+
   } from "@fluentui/react-icons";
   
+    export const TaskListSquareLtr = bundleIcon(TaskListSquareLtrFilled, TaskListSquareLtrRegular);
   export const History = bundleIcon(HistoryFilled, HistoryRegular);
   export const Copy = bundleIcon(CopyFilled, CopyRegular);
   export const Send = bundleIcon(SendFilled, SendRegular);

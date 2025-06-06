@@ -1,6 +1,6 @@
 import React from "react";
 import { Avatar, Subtitle2 } from "@fluentui/react-components";
-import MsftColor from "../../imports/MsftColor.tsx"; // Default icon component
+import MsftColor from "../../imports/MsftColor"; // Default icon component
 
 /**
  * @component
@@ -45,7 +45,11 @@ const Header: React.FC<HeaderProps> = ({ logo, title = "Microsoft", subtitle, ch
         }}
       >
         {/* Render custom logo or default MsftColor logo */}
-        <Avatar shape="square" color={null} icon={logo || <MsftColor />} />
+        <Avatar 
+          shape="square" 
+          color="neutral" 
+          icon={{ children: logo || <MsftColor /> }} 
+        />
 
         {/* Render title and optional subtitle */}
         <Subtitle2 style={{ whiteSpace: "nowrap", marginTop: "-2px" }}>

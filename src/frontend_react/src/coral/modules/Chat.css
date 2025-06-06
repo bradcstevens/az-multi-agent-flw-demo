@@ -4,7 +4,7 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  max-width: 728px;
+
   margin: 0 auto; /* ✅ centers it */
 }
 
@@ -17,6 +17,8 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    margin-left: 0;
+    margin-right: 0;
   
     p {
       margin: 8px 0;
@@ -99,6 +101,9 @@
     word-break: break-word;
   
     box-sizing: border-box;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+
   }
   
   .user {
@@ -107,7 +112,8 @@
     align-self: flex-end;
     padding: 2px 16px;
     border-radius: 6px;
-    max-width: 80%;
+
+    
   }
   
   .assistant {
@@ -122,8 +128,8 @@
   
   .input-container {
     display: flex;
-    padding: 16px;
-    border-top: 1px solid #ccc;
+    /* padding: 16px; */
+    /* border-top: 1px solid #ccc; */
   
   }
   
@@ -171,13 +177,13 @@
   
   /* Input Container */
   .input-wrapper {
-    margin: 0 16px 16px 16px;
+    /* margin: 0 16px 16px 16px; */
     display: inline-flex;
     /* Allows height to expand dynamically */
     flex-direction: column;
     gap: 8px;
     align-items: stretch;
-    width: calc(100% - 32px);
+    width: 100%;
     padding: 8px;
     border-radius: var(--borderRadiusLarge);
     background-color: var(--colorNeutralBackground1);
@@ -276,7 +282,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 12px;
+    margin-top: 6px;
+    margin-left: -10px;
   }
   
   .assistant-actions {
@@ -284,17 +291,24 @@
     /* gap: 8px; */
   }
   
-  .messages {
-    position: relative;
-    /* So that absolute children are positioned relative to this container */
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 16px 16px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-height: 0; /* ✅ this is crucial to allow .messages to flex properly */
-  }
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+
+  align-items: center;
+  padding: 0 16px 16px 16px;
+}
+
+.message-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 768px;
+}
+
   
   .scroll-to-bottom {
     position: absolute;
@@ -305,6 +319,6 @@
     border-radius: 50%;
     padding: 8px;
     cursor: pointer;
-    /* box-shadow: var(--shadow8); */
-    margin-bottom: 40px;
+    box-shadow: var(--shadow8);
+    margin-bottom: 16px;
   }
