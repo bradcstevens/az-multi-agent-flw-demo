@@ -68,7 +68,7 @@ frontend_url = Config.FRONTEND_SITE_NAME
 # Add this near the top of your app.py, after initializing the app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url],  # Add your frontend server URL
+    allow_origins=["*"],  # Add your frontend server URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -521,7 +521,9 @@ async def approve_step_endpoint(
 
 @app.get("/api/plans", response_model=List[PlanWithSteps])
 async def get_plans(
-    request: Request, session_id: Optional[str] = Query(None)
+    request: Request,
+    session_id: Optional[str] = Query(None),
+    plan_id: Optional[str] = Query(None),
 ) -> List[PlanWithSteps]:
     """
     Retrieve plans for the current user.
@@ -595,6 +597,20 @@ async def get_plans(
 
     if session_id:
         plan = await memory_store.get_plan_by_session(session_id=session_id)
+        if not plan:
+            track_event_if_configured(
+                "GetPlanBySessionNotFound",
+                {"status_code": 400, "detail": "Plan not found"},
+            )
+            raise HTTPException(status_code=404, detail="Plan not found")
+
+        # Use get_steps_by_plan to match the original implementation
+        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
+        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+        plan_with_steps.update_step_counts()
+        return [plan_with_steps]
+    if plan_id:
+        plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
         if not plan:
             track_event_if_configured(
                 "GetPlanBySessionNotFound",

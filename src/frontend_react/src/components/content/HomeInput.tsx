@@ -1,9 +1,12 @@
 
 import {
     Body1,
+    Body1Strong,
     Button,
+    Caption1,
     Card,
     Text,
+    Title2,
 } from "@fluentui/react-components";
 import {
     Send20Regular,
@@ -80,12 +83,6 @@ const HomeInput: React.FC<HomeInputProps> = ({
         onQuickTaskSelect(task.description);
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit();
-        }
-    };
 
     // Auto-resize textarea
     useEffect(() => {
@@ -101,7 +98,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
             <div className="home-input-content">
                 <div className="home-input-center-content">
                     <div className="home-input-title-wrapper">
-                        <Text className="home-input-title">How can I help?</Text>
+                        <Title2>How can I help?</Title2>
                     </div>
 
                     <div className="home-input-input-section">
@@ -122,29 +119,34 @@ const HomeInput: React.FC<HomeInputProps> = ({
                             />
                         </div>
                         <div className="home-input-ai-footer">
-                            AI-generated content may be incorrect
+                            <Caption1>
+                                AI-Generated content may be incorrect
+                            </Caption1>
                         </div>
                     </div>
 
                     <div className="home-input-quick-tasks-section">
                         <div className="home-input-quick-tasks-header">
-                            <Text className="home-input-quick-tasks-title">Quick tasks</Text>
+                            <Body1Strong>Quick tasks</Body1Strong>
                         </div>
-                        <div className="home-input-quick-tasks">                            {quickTasks.map((task) => (
-                            <Card
-                                key={task.id}
-                                className="home-input-quick-task-card"
-                                onClick={() => handleQuickTaskClick(task)}
-                            >
-                                <div className="home-input-card-content">
-                                    <div className="home-input-card-icon">{task.icon}</div>
-                                    <div className="home-input-card-text-content">
-                                        <Text className="home-input-card-title">{task.title}</Text>
-                                        <Text className="home-input-card-description">{task.description}</Text>
+                        <div className="home-input-quick-tasks">
+                            {quickTasks.map((task) => (
+                                <Card
+                                    key={task.id}
+                                    className="home-input-quick-task-card"
+                                    onClick={() => handleQuickTaskClick(task)}
+                                >
+                                    <div className="home-input-quick-task-content">
+                                        <div className="home-input-quick-task-icon">
+                                            {task.icon}
+                                        </div>
+                                        <div className="home-input-quick-task-text-content">
+                                            <Body1Strong>{task.title}</Body1Strong>
+                                            <Body1 className="home-input-quick-task-description">{task.description}</Body1>
+                                        </div>
                                     </div>
-                                </div>
-                            </Card>
-                        ))}
+                                </Card>
+                            ))}
                         </div>
                     </div>
                 </div>

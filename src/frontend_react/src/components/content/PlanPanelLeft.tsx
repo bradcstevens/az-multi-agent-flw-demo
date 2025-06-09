@@ -1,6 +1,6 @@
 import PanelLeft from "@/coral/components/Panels/PanelLeft";
 import PanelLeftToolbar from "@/coral/components/Panels/PanelLeftToolbar";
-import { Button, Spinner, Toast, ToastBody, ToastTitle, useToastController } from "@fluentui/react-components";
+import { Button, Spinner, Toast, ToastBody, ToastTitle, Tooltip, useToastController } from "@fluentui/react-components";
 import { Add20Regular, ErrorCircle20Regular } from "@fluentui/react-icons";
 import TaskList from "./TaskList";
 import { useCallback, useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { PlanPanelLefProps, PlanWithSteps, Task } from "@/models";
 import { apiService } from "@/api";
 import { TaskService } from "@/services";
+import MsftColor from "@/coral/imports/MsftColor";
 
 const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
     onNewTaskButton,
@@ -89,14 +90,15 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
             <PanelLeft
                 panelWidth={280}
                 panelResize={true}>
-                <PanelLeftToolbar panelTitle="Tasks" panelIcon={null}>
-                    <Button
-                        icon={<Add20Regular />}
-                        onClick={onNewTaskButton}
-                        disabled={plansLoading}
-                    >
-                        New task
-                    </Button>
+                <PanelLeftToolbar panelTitle="Microsoft" panelIcon={<MsftColor />}>
+                    <Tooltip content='New task'>
+                        <Button
+                            icon={<Add20Regular />}
+                            onClick={onNewTaskButton}
+                            disabled={plansLoading}
+                            appearance="transparent"
+                        />
+                    </Tooltip>
                 </PanelLeftToolbar>
                 {plansLoading && (!inProgressTasks.length && !completedTasks.length) ? (
                     <div style={{ padding: '20px', textAlign: 'center' }}>

@@ -11,7 +11,8 @@ import {
 } from '@fluentui/react-components';
 import {
     Add20Regular,
-    ErrorCircle20Regular
+    ErrorCircle20Regular,
+    Sparkle20Filled
 } from '@fluentui/react-icons';
 import '../styles/PlanPage.css';
 import CoralShellColumn from '../coral/components/Layout/CoralShellColumn';
@@ -27,6 +28,7 @@ import { PlanWithSteps } from '../models';
 import HomeInput from '@/components/content/HomeInput';
 import { NewTaskService } from '../services/NewTaskService';
 import PlanPanelLeft from '@/components/content/PlanPanelLeft';
+import ContentToolbar from '@/coral/components/Content/ContentToolbar';
 
 /**
  * HomePage component - displays task lists and provides navigation
@@ -57,6 +59,10 @@ const HomePage: React.FC = () => {
                         onNewTaskButton={handleNewTaskButton}
                     />
                     <Content>
+                        <ContentToolbar
+                            panelTitle={"Multi-Agent Planner"}
+                            panelIcon={<Sparkle20Filled />}
+                        ></ContentToolbar>
                         <HomeInput
                             onInputSubmit={handleNewTask}
                             onQuickTaskSelect={handleNewTask}

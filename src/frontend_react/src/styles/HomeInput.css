@@ -4,7 +4,6 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background-color: #fafafa; /* tokens.colorNeutralBackground1 */
 }
 
 .home-input-content {
@@ -13,7 +12,7 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 40px 24px;
+    padding: 24px;
 }
 
 .home-input-center-content {
@@ -27,12 +26,6 @@
 .home-input-title-wrapper {
     text-align: center;
     margin-bottom: 24px;
-}
-
-.home-input-title {
-    font-size: 28px;
-    font-weight: 600;
-    color: #242424; /* tokens.colorNeutralForeground1 */
 }
 
 .home-input-input-section {
@@ -83,82 +76,66 @@
 
 .home-input-quick-tasks-section {
     width: 100%;
-    margin-top: 16px;
+    margin-top: 8px;
 }
 
 .home-input-quick-tasks-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
-.home-input-quick-tasks-title {
-    font-size: 1rem; /* tokens.fontSizeBase400 */
-    font-weight: 600; /* tokens.fontWeightSemibold */
-    color: #242424; /* tokens.colorNeutralForeground1 */
-}
 
 .home-input-quick-tasks {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 16px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: space-between;
 }
 
 .home-input-quick-task-card {
-    cursor: pointer;
+    flex: 1;
     display: flex;
     flex-direction: column;
-    background-color: #fafafa; /* tokens.colorNeutralBackground1 */
     padding: 16px;
-    border: 1px solid #d1d1d1; /* tokens.colorNeutralStroke1 */
+    background-color: var(--colorNeutralBackground3);
+    border: 1px solid var(--colorNeutralStroke2);
     border-radius: 8px;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+.home-input-quick-task-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.home-input-quick-task-icon {
+    font-size: 20px;
+    color: var(--colorBrandForeground1);
+    margin-top: 2px;
+}
+
+.home-input-quick-task-text-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.home-input-quick-task-description {
+    color: var(--colorNeutralForeground3);
 }
 
 .home-input-quick-task-card:hover {
     background-color: #f5f5f5; /* tokens.colorNeutralBackground2 */
 }
 
-.home-input-card-content {
-    display: flex;
-    gap: 12px;
-}
-
-.home-input-card-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
-    color: #0f6cbd; /* tokens.colorBrandForeground1 */
-}
-
-.home-input-card-text-content {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex: 1;
-}
-
-.home-input-card-title {
-    font-size: 0.875rem; /* tokens.fontSizeBase300 */
-    font-weight: 600; /* tokens.fontWeightSemibold */
-    color: #242424; /* tokens.colorNeutralForeground1 */
-}
-
-.home-input-card-description {
-    font-size: 0.75rem; /* tokens.fontSizeBase200 */
-    color: #616161; /* tokens.colorNeutralForeground2 */
-    line-height: 1rem; /* tokens.lineHeightBase200 */
-}
-
 .home-input-ai-footer {
-    display: flex;
-    justify-content: flex-end;
-    width: 100%;
+    padding-bottom: 8px;
     margin-top: 8px;
-    font-size: 0.625rem; /* tokens.fontSizeBase100 */
+    text-align: center;
     color: #707070; /* tokens.colorNeutralForeground3 */
 }
 
