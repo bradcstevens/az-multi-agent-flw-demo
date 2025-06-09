@@ -1,3 +1,5 @@
+import { ProcessedPlanData, Step } from "./plan";
+
 export interface SubTask {
     id: string;
     name: string;
@@ -19,10 +21,7 @@ export interface Human {
 }
 
 export interface TaskDetailsProps {
-    taskName: string;
-    subTasks: SubTask[];
-    agents: Agent[];
-    humans: Human[];
-    onAddAgent: () => void;
-    onAddHuman: () => void;
+    PlanData: ProcessedPlanData;
+    OnApproveStep: (step: Step) => void;
+    OnRejectStep: (step: Step) => void;
 }

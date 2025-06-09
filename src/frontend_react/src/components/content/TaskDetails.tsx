@@ -14,10 +14,9 @@ import { TaskDetailsProps } from "../../models";
 import "../../styles/TaskDetails.css";
 
 const TaskDetails: React.FC<TaskDetailsProps> = ({
-    taskName,
-    subTasks,
-    agents,
-    humans,
+    PlanData,
+    OnApproveStep,
+    OnRejectStep
 
 }) => {
     const completedCount = subTasks.filter(t => t.status === 'completed').length;
@@ -26,7 +25,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
         <div className="task-details-container">
             <div className="task-details-section">
                 <div className="task-details-progress-header">
-                    <Subtitle1>{taskName}</Subtitle1>
+                    <Subtitle1>{PlanData.plan.initial_goal}</Subtitle1>
                     <Text size={200}>
                         {completedCount} of {subTasks.length} completed
                     </Text>

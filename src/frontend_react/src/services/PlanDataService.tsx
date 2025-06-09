@@ -1,15 +1,6 @@
-import { PlanWithSteps, Step, AgentType } from '@/models';
+import { PlanWithSteps, Step, AgentType, ProcessedPlanData } from '@/models';
 import { apiService } from '@/api';
 
-/**
- * Interface for processed plan data
- */
-export interface ProcessedPlanData {
-    plan: PlanWithSteps;
-    agents: AgentType[];
-    steps: Step[];
-    hasHumanClarificationRequest: boolean;
-}
 
 /**
  * Service for processing and managing plan data operations

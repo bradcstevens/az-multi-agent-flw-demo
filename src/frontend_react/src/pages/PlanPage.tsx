@@ -15,7 +15,8 @@ import {
     ErrorCircle24Regular,
     Person24Regular,
     CheckmarkCircle24Regular,
-    AlertUrgent24Regular
+    AlertUrgent24Regular,
+    Sparkle20Filled
 } from '@fluentui/react-icons';
 import '../styles/PlanPage.css';
 import CoralShellColumn from '../coral/components/Layout/CoralShellColumn';
@@ -29,6 +30,10 @@ import { PlanDataService, ProcessedPlanData } from '../services/PlanDataService'
 import { PlanWithSteps, Task, AgentType, Step } from '@/models';
 import { apiService } from '@/api';
 import PlanPanelLeft from '@/components/content/PlanPanelLeft';
+import ContentToolbar from '@/coral/components/Content/ContentToolbar';
+import Chat from '@/coral/modules/Chat';
+import TaskDetails from '@/components/content/TaskDetails';
+import PlanChat from '@/components/content/PlanChat';
 
 /**
  * Page component for displaying a specific plan
@@ -42,7 +47,17 @@ const PlanPage: React.FC = () => {
     const [planData, setPlanData] = useState<ProcessedPlanData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<Error | null>(null);
+    const handleOnchatSubmit = useCallback(() => {
+        NewTaskService.handleNewTaskFromHome();
+    }, []);
 
+    const handleApproveStep = useCallback((step: Step) => {
+        NewTaskService.handleNewTaskFromHome();
+    }, []);
+
+    const handleRejectStep = useCallback((step: Step) => {
+        NewTaskService.handleNewTaskFromHome();
+    }, []);
     /**
      * Fetch plan data when component mounts or planId changes
      */
@@ -54,6 +69,7 @@ const PlanPage: React.FC = () => {
             setError(null);
 
             const data = await PlanDataService.fetchPlanData(planId);
+            console.log('Fetched plan data:', data);
             setPlanData(data);
         } catch (err) {
             console.error('Failed to load plan data:', err);
@@ -85,6 +101,19 @@ const PlanPage: React.FC = () => {
             <CoralShellRow>
                 <PlanPanelLeft onNewTaskButton={handleNewTaskButton} />
                 <Content>
+                    <ContentToolbar
+                        panelTitle={planData?.plan?.initial_goal || 'Plan Details'}
+                        panelIcon={<Sparkle20Filled />}
+                    ></ContentToolbar>
+                    <PlanChat
+                        PlanData={planData}
+                        OnChatSubmit={handleOnchatSubmit}
+                    />
+                    <TaskDetails
+                        PlanData={planData}
+                        OnApproveStep={handleApproveStep}
+                        OnRejectStep={handleRejectStep}
+                    />
 
                 </Content>
             </CoralShellRow>

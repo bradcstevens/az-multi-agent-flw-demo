@@ -85,3 +85,19 @@ export interface PlanWithSteps extends Plan {
     /** Count of steps failed */
     failed: number;
 }
+
+
+/**
+ * Interface for processed plan data
+ */
+export interface ProcessedPlanData {
+    plan: PlanWithSteps;
+    agents: AgentType[];
+    steps: Step[];
+    hasHumanClarificationRequest: boolean;
+}
+
+export interface PlanChatProps {
+    PlanData: ProcessedPlanData;
+    OnChatSubmit: (message: string) => void;
+}
