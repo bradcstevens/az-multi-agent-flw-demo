@@ -98,6 +98,6 @@ export interface ProcessedPlanData {
 }
 
 export interface PlanChatProps {
-    PlanData: ProcessedPlanData;
+    planData: ProcessedPlanData;
     OnChatSubmit: (message: string) => void;
 }

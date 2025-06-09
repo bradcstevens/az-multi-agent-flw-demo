@@ -21,7 +21,7 @@ export interface Human {
 }
 
 export interface TaskDetailsProps {
-    PlanData: ProcessedPlanData;
+    planData: ProcessedPlanData;
     OnApproveStep: (step: Step) => void;
     OnRejectStep: (step: Step) => void;
 }

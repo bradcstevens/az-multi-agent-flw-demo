@@ -1,7 +1,7 @@
 import { PlanChatProps } from "@/models";
 
 const PlanChat: React.FC<PlanChatProps> = ({
-    PlanData,
+    planData,
     OnChatSubmit
 }) => {
 
