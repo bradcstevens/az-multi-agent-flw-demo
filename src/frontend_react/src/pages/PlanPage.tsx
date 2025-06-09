@@ -101,21 +101,24 @@ const PlanPage: React.FC = () => {
             <CoralShellRow>
                 <PlanPanelLeft onNewTaskButton={handleNewTaskButton} />
                 <Content>
-
-                    <ContentToolbar
-                        panelTitle={planData?.plan?.initial_goal || 'Plan Details'}
-                        panelIcon={<Sparkle20Filled />}
-                    ></ContentToolbar>
-                    <PlanChat
-                        planData={planData}
-                        OnChatSubmit={handleOnchatSubmit}
-                    />
-                    <TaskDetails
-                        planData={planData}
-                        OnApproveStep={handleApproveStep}
-                        OnRejectStep={handleRejectStep}
-                    />
-
+                    {loading && <Spinner />}
+                    {!loading && (
+                        <>
+                            <ContentToolbar
+                                panelTitle={planData?.plan?.initial_goal || 'Plan Details'}
+                                panelIcon={<Sparkle20Filled />}
+                            ></ContentToolbar>
+                            <PlanChat
+                                planData={planData}
+                                OnChatSubmit={handleOnchatSubmit}
+                            />
+                            <TaskDetails
+                                planData={planData}
+                                OnApproveStep={handleApproveStep}
+                                OnRejectStep={handleRejectStep}
+                            />
+                        </>
+                    )}
                 </Content>
             </CoralShellRow>
         </CoralShellColumn>
