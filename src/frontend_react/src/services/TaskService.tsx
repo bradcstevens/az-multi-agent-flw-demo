@@ -88,6 +88,46 @@ export class TaskService {
         const random = Math.floor(Math.random() * 10000);
         return `sid_${timestamp}_${random}`;
     }
+    /**
+      * Split subtask action into description and function/details parts
+      * @param action The full action string to split
+      * @returns Object containing description and functionOrDetails
+      */
+    static splitSubtaskAction(action: string): { description: string; functionOrDetails: string | null } {
+        // Check for "Function:" pattern
+        // Check for "Function:" pattern
+        const functionMatch = action.match(/^(.+?)\.\s*Function:\s*(.+)$/);
+        if (functionMatch) {
+            return {
+                description: functionMatch[1].trim(),
+                functionOrDetails: functionMatch[2].trim()
+            };
+        }
+
+        // Check for "Provide more details about:" pattern
+        const detailsMatch = action.match(/^Provide more details about:\s*(.+)$/);
+        if (detailsMatch) {
+            return {
+                description: "Provide more details about",
+                functionOrDetails: detailsMatch[1].trim()
+            };
+        }
+
+        // Check for "Analyze the task:" pattern
+        const analyzeMatch = action.match(/^Analyze the task:\s*(.+)$/);
+        if (analyzeMatch) {
+            return {
+                description: "Analyze the task",
+                functionOrDetails: analyzeMatch[1].trim()
+            };
+        }
+
+        // If no pattern matches, return the full action as description
+        return {
+            description: action,
+            functionOrDetails: null
+        };
+    }
 
     /**
      * Submit an input task to create a new plan

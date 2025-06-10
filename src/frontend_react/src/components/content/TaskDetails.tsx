@@ -13,6 +13,7 @@ import {
 import { Add20Regular, CheckmarkCircle20Regular, Dismiss20Regular, CircleHalfFill20Regular, CheckboxChecked20Regular, DismissSquare20Regular } from "@fluentui/react-icons";
 import React from "react";
 import "../../styles/TaskDetails.css";
+import { TaskService } from "@/services";
 
 const TaskDetails: React.FC<TaskDetailsProps> = ({
     planData,
@@ -69,20 +70,34 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                         </div>
                     </div>
                 </div>
-
+                <Divider />
                 <div className="task-details-subtask-list">
-                    {subTasks.map((subtask) => (
-                        <div key={subtask.id} className="task-details-subtask-item">
-                            <div className="task-details-status-icon">
-                                {renderStatusIcon(subtask.status)}
+                    {subTasks.map((subtask) => {
+                        const { description, functionOrDetails } = TaskService.splitSubtaskAction(subtask.action);
+
+
+                        return (
+
+                            <div key={subtask.id} className="task-details-subtask-item">
+                                <div className="task-details-status-icon">
+                                    {renderStatusIcon(subtask.status)}
+                                </div>
+                                <div className="task-details-subtask-content">
+                                    <span className="task-details-subtask-name">{description}</span>
+                                    <div className="task-details-subtask-actions">
+                                        <CheckboxChecked20Regular
+                                            onClick={() => OnApproveStep(subtask)}
+                                            className="task-details-checkbox-icon"
+                                        />
+                                        <DismissSquare20Regular
+                                            onClick={() => OnRejectStep(subtask)}
+                                            className="task-details-dismiss-icon"
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                            <div className="task-details-subtask-content">
-                                <span className="task-details-subtask-name">{subtask.action}</span>
-                                <CheckboxChecked20Regular onClick={() => OnApproveStep(subtask)} className="task-details-checkbox-icon" />
-                                <DismissSquare20Regular onClick={() => OnRejectStep(subtask)} className="task-details-dismiss-icon" />
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
