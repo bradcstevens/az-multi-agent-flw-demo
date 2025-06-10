@@ -53,11 +53,11 @@ const PlanPage: React.FC = () => {
     }, []);
 
     const handleApproveStep = useCallback((step: Step) => {
-        NewTaskService.handleNewTaskFromHome();
+        console.log('Approving step:', step);
     }, []);
 
     const handleRejectStep = useCallback((step: Step) => {
-        NewTaskService.handleNewTaskFromHome();
+        console.log('Rejecting step:', step);
     }, []);
     /**
      * Fetch plan data when component mounts or planId changes

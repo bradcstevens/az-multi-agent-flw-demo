@@ -10,7 +10,7 @@ import {
     Subtitle1,
     Avatar,
 } from "@fluentui/react-components";
-import { Add20Regular, CheckmarkCircle20Regular, Dismiss20Regular, CircleHalfFill20Regular } from "@fluentui/react-icons";
+import { Add20Regular, CheckmarkCircle20Regular, Dismiss20Regular, CircleHalfFill20Regular, CheckboxChecked20Regular, DismissSquare20Regular } from "@fluentui/react-icons";
 import React from "react";
 import "../../styles/TaskDetails.css";
 
@@ -26,10 +26,11 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
     const agents = planData.agents || [];
     // Helper function to render the appropriate status icon
     const renderStatusIcon = (status: string) => {
+
         switch (status) {
             case 'completed':
                 return <CheckmarkCircle20Regular className="task-details-status-completed" />;
-            case 'working':
+            case 'planned':
                 return <CircleHalfFill20Regular className="task-details-status-working" />;
             case 'removed':
                 return <Dismiss20Regular className="task-details-status-removed" />;
@@ -77,6 +78,8 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                             </div>
                             <div className="task-details-subtask-content">
                                 <span className="task-details-subtask-name">{subtask.action}</span>
+                                <CheckboxChecked20Regular onClick={() => OnApproveStep(subtask)} className="task-details-checkbox-icon" />
+                                <DismissSquare20Regular onClick={() => OnRejectStep(subtask)} className="task-details-dismiss-icon" />
                             </div>
                         </div>
                     ))}
