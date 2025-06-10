@@ -1,7 +1,7 @@
 import PanelLeft from "@/coral/components/Panels/PanelLeft";
 import PanelLeftToolbar from "@/coral/components/Panels/PanelLeftToolbar";
 import { Button, Spinner, Toast, ToastBody, ToastTitle, Tooltip, useToastController } from "@fluentui/react-components";
-import { Add20Regular, ErrorCircle20Regular } from "@fluentui/react-icons";
+import { Add20Regular, ChatAdd20Regular, ErrorCircle20Regular } from "@fluentui/react-icons";
 import TaskList from "./TaskList";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -100,6 +100,16 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
                         />
                     </Tooltip>
                 </PanelLeftToolbar>
+                <br />
+                <div
+                    className="tab"
+                    style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px", cursor: "pointer", margin: '0 8px' }}
+                    onClick={onNewTaskButton}
+                >
+                    <ChatAdd20Regular />
+                    New task
+                </div>
+                <br />
                 {plansLoading && (!inProgressTasks.length && !completedTasks.length) ? (
                     <div style={{ padding: '20px', textAlign: 'center' }}>
                         <Spinner size="medium" label="Loading tasks..." />
