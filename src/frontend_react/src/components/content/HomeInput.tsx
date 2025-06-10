@@ -10,15 +10,12 @@ import {
 } from "@fluentui/react-components";
 import {
     Send20Regular,
-    Person20Regular,
-    Phone20Regular,
-    ShoppingBag20Regular,
-    DocumentEdit20Regular,
 } from "@fluentui/react-icons";
 import React, { useRef, useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
-import "./../../styles/Chat.css"; // Assuming you have a CSS file for additional styles
 import "./../../styles/HomeInput.css";
+import "./../../styles/Chat.css";
+import "../../styles/prism-material-oceanic.css"
 import { HomeInputProps, quickTasks, QuickTask } from "../../models/homeInput";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";

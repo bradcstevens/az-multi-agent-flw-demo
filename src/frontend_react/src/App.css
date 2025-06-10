@@ -1,55 +1,76 @@
-.App {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* APP */
+
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--colorNeutralForeground2);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
 }
 
-/* Global styles */
-body {
-  margin: 0;
-  padding: 0;
-  background-color: #f9f9f9;
+.tab:hover {
+  background-color: var(--colorSubtleBackgroundHover);
 }
 
-/* Utility classes */
-.text-center {
-  text-align: center;
+.tab:active {
+  background-color: var(--colorSubtleBackgroundPressed);
 }
 
-.pre-wrap {
-  white-space: pre-wrap;
+
+/* TASKLIST */
+
+.task-tab {
+  display: flex;
+  align-items: center;
+  padding: 8px 8px 8px 0;
+  color: var(--colorNeutralForeground2);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  font-size: var(--fontSizeBase00);
+  gap: 14px;
+
 }
 
-/* Animation */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.task-tab:hover {
+  background-color: var(--colorSubtleBackgroundHover);
 }
 
-.fade-in {
-  animation: fade-in 0.3s ease-in-out;
+.task-tab.active {
+  background-color: var(--colorNeutralBackground1Pressed);
+  color: var(--colorNeutralForeground1);
+  font-weight: 500;
+  
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+.task-tab .sideNavTick {
+  width: 2px;
+  height: 100%;
+  min-height: 32px;
+  background-color: var(--colorCompoundBrandStroke);
+  opacity: 0;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease-in-out;
+  margin-left: -8px;
+  
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+.task-tab.active .sideNavTick {
+  opacity: 1;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #d4d4d4;
-  border-radius: 4px;
+.task-tab .task-menu-button {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #b8b8b8;
+.task-tab:hover .task-menu-button {
+  opacity: 1;
 }
+

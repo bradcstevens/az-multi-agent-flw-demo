@@ -8,9 +8,9 @@ import { Body1, Button, Tag, ToolbarDivider } from "@fluentui/react-components";
 import { ChatDismiss20Regular, HeartRegular } from "@fluentui/react-icons";
 import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import "../../styles/Chat.css"; // Assuming you have a CSS file for additional styles
 import "../../styles/PlanChat.css"; // Assuming you have a CSS file for additional styles
-
+import "../../styles/Chat.css"; // Assuming you have a CSS file for additional styles
+import "../../styles/prism-material-oceanic.css"
 const PlanChat: React.FC<PlanChatProps> = ({
     planData,
     OnChatSubmit
@@ -74,7 +74,8 @@ const PlanChat: React.FC<PlanChatProps> = ({
                         <span>Thinking...</span>
                     </div>
                 )}
-            </div>            {showScrollButton && (
+            </div>
+            {showScrollButton && (
                 <Tag
                     onClick={scrollToBottom}
                     className="scroll-to-bottom plan-chat-scroll-button"
@@ -83,7 +84,9 @@ const PlanChat: React.FC<PlanChatProps> = ({
                 >
                     Back to bottom
                 </Tag>
-            )}            <div ref={inputContainerRef} className="plan-chat-input-container">
+            )}
+
+            <div ref={inputContainerRef} className="plan-chat-input-container">
                 <div className="plan-chat-input-wrapper">
                     <ChatInput
                         value={input}
