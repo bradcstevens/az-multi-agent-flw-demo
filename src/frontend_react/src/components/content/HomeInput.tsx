@@ -15,20 +15,21 @@ import {
     ShoppingBag20Regular,
     DocumentEdit20Regular,
 } from "@fluentui/react-icons";
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import "./../../styles/Chat.css"; // Assuming you have a CSS file for additional styles
 import "./../../styles/HomeInput.css";
 import { HomeInputProps, quickTasks, QuickTask } from "../../models/homeInput";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
+import ChatInput from "@/coral/modules/ChatInput";
 
 
 const HomeInput: React.FC<HomeInputProps> = ({
     onInputSubmit,
     onQuickTaskSelect,
 }) => {
-    const [inputValue, setInputValue] = React.useState("");
+    const [input, setInput] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const navigate = useNavigate();
 
@@ -36,7 +37,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
      * Reset textarea to empty state
      */
     const resetTextarea = () => {
-        setInputValue("");
+        setInput("");
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
             textareaRef.current.focus();
@@ -50,13 +51,13 @@ const HomeInput: React.FC<HomeInputProps> = ({
     }, []);
 
     const handleSubmit = async () => {
-        if (inputValue.trim()) {
+        if (input.trim()) {
             try {
                 // Submit the input task using TaskService
-                const response = await TaskService.submitInputTask(inputValue.trim());
+                const response = await TaskService.submitInputTask(input.trim());
 
                 // Clear the input field
-                setInputValue("");
+                setInput("");
                 if (textareaRef.current) {
                     textareaRef.current.style.height = "auto";
                 }
@@ -72,7 +73,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
     };
     const handleQuickTaskClick = (task: QuickTask) => {
         // Copy task description to textarea
-        setInputValue(task.description);
+        setInput(task.description);
 
         // Focus on textarea
         if (textareaRef.current) {
@@ -90,10 +91,9 @@ const HomeInput: React.FC<HomeInputProps> = ({
             textareaRef.current.style.height = "auto";
             textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
         }
-    }, [inputValue]);
+    }, [input]);
 
     return (
-
         <div className="home-input-container">
             <div className="home-input-content">
                 <div className="home-input-center-content">
@@ -101,29 +101,17 @@ const HomeInput: React.FC<HomeInputProps> = ({
                         <Title2>How can I help?</Title2>
                     </div>
 
-                    <div className="home-input-input-section">
-                        <div className="home-input-input-wrapper">
-                            <textarea
-                                ref={textareaRef}
-                                className="home-input-input-field"
-                                value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
-                                placeholder="Describe what you'd like to do or use / to reference files, people, and more"
-                                rows={1}
-                            />
-                            <Button
-                                className="home-input-send-button"
-                                onClick={handleSubmit}
-                                disabled={!inputValue.trim()}
-                                icon={<Send20Regular />}
-                            />
-                        </div>
-                        <div className="home-input-ai-footer">
-                            <Caption1>
-                                AI-Generated content may be incorrect
-                            </Caption1>
-                        </div>
-                    </div>
+                    <ChatInput
+                        value={input}
+                        placeholder="Describe what you'd like to do or use / to reference files, people, and more" onChange={setInput} >
+                        <Button
+                            appearance="subtle"
+                            className="home-input-send-button"
+                            onClick={handleSubmit}
+                            disabled={!input.trim()}
+                            icon={<Send20Regular />}
+                        />
+                    </ChatInput>
 
                     <div className="home-input-quick-tasks-section">
                         <div className="home-input-quick-tasks-header">
@@ -142,7 +130,9 @@ const HomeInput: React.FC<HomeInputProps> = ({
                                         </div>
                                         <div className="home-input-quick-task-text-content">
                                             <Body1Strong>{task.title}</Body1Strong>
-                                            <Body1 className="home-input-quick-task-description">{task.description}</Body1>
+                                            <Body1 className="home-input-quick-task-description">
+                                                {task.description}
+                                            </Body1>
                                         </div>
                                     </div>
                                 </Card>

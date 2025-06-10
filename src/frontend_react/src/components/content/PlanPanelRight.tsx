@@ -17,7 +17,7 @@ const PlanPanelRight: React.FC<TaskDetailsProps> = ({
 
     return (
         <PanelRight
-            panelWidth={450}
+            panelWidth={400}
             defaultClosed={false}
             panelResize={true}
             panelType="first"

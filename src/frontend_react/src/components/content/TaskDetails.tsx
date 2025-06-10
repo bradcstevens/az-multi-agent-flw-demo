@@ -101,7 +101,6 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                             />
                             <div className="task-details-agent-details">
                                 <span className="task-details-agent-name">{agent}</span>
-                                <span className="task-details-agent-description">agent description</span>
                             </div>
                         </div>
                     ))}
