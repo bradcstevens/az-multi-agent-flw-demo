@@ -34,6 +34,7 @@ import ContentToolbar from '@/coral/components/Content/ContentToolbar';
 import Chat from '@/coral/modules/Chat';
 import TaskDetails from '@/components/content/TaskDetails';
 import PlanChat from '@/components/content/PlanChat';
+import PlanPanelRight from '@/components/content/PlanPanelRight';
 
 /**
  * Page component for displaying a specific plan
@@ -112,14 +113,15 @@ const PlanPage: React.FC = () => {
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}
                             />
-                            <TaskDetails
-                                planData={planData}
-                                OnApproveStep={handleApproveStep}
-                                OnRejectStep={handleRejectStep}
-                            />
                         </>
                     )}
                 </Content>
+
+                <PlanPanelRight
+                    planData={planData}
+                    OnApproveStep={handleApproveStep}
+                    OnRejectStep={handleRejectStep}
+                />
             </CoralShellRow>
         </CoralShellColumn>
     );

@@ -5,21 +5,15 @@ import { History20Filled, MoreHorizontalRegular, TaskListSquareLtr20Regular, Tas
 import PanelRight from "@/coral/components/Panels/PanelRight";
 import PanelRightToolbar from "@/coral/components/Panels/PanelRightToolbar";
 import TaskDetails from "./TaskDetails";
+import { TaskDetailsProps } from "@/models";
 
 
-
-interface PlanPanelRightProps {
-    activeTask: any | null;
-    onAddAgent: () => void;
-    onAddHuman: () => void;
-}
-
-const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
-    activeTask,
-    onAddAgent,
-    onAddHuman,
+const PlanPanelRight: React.FC<TaskDetailsProps> = ({
+    planData,
+    OnApproveStep,
+    OnRejectStep,
 }) => {
-    if (!activeTask) return null;
+    if (!planData) return null;
 
     return (
         <PanelRight
@@ -28,16 +22,12 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
             panelResize={true}
             panelType="first"
         >
-            <PanelRightToolbar panelTitle="Task Details" panelIcon={<TaskListSquareLtr20Regular />}>
-
-            </PanelRightToolbar>
 
             <div >
                 <TaskDetails
-                    taskName={activeTask.name}
-                    subTasks={activeTask.subTasks}
-                    agents={activeTask.agents}
-                    humans={activeTask.humans}
+                    planData={planData}
+                    OnApproveStep={OnApproveStep}
+                    OnRejectStep={OnRejectStep}
                 />
             </div>
         </PanelRight>
