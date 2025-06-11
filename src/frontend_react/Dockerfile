@@ -6,13 +6,13 @@ FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # Copy package files first for better caching
-COPY src/frontend_react/package*.json ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm ci --silent
 
 # Copy source files
-COPY src/frontend_react/ ./
+COPY . ./
 
 # Build the React app
 RUN npm run build
@@ -29,11 +29,15 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 WORKDIR /app
 
 # Copy Python project definition files
-COPY src/frontend_react/pyproject.toml src/frontend_react/uv.lock* ./
+COPY pyproject.toml uv.lock* ./
 
 # Install Python dependencies using UV
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system -r <(uv pip freeze --requirement pyproject.toml)
+    if [ -f "requirements.txt" ]; then \
+      uv pip install --system -r requirements.txt && uv pip install --system "uvicorn[standard]";  \
+    else \
+      uv pip install --system pyproject.toml && uv pip install --system "uvicorn[standard]"; \
+    fi
 
 # Stage 3: Final production image
 FROM python:3.11-slim-bullseye
@@ -41,8 +45,13 @@ FROM python:3.11-slim-bullseye
 # Set production environment
 ENV NODE_ENV=production \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/app/venv/bin:$PATH"
+    PYTHONUNBUFFERED=1
+
+# Install curl for healthcheck
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* 
 
 WORKDIR /app
 
@@ -59,7 +68,7 @@ COPY --from=python-builder /usr/local/bin /usr/local/bin
 COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/build /app/static
 
 # Copy Python application code
-COPY --chown=appuser:appuser src/frontend_react/*.py /app/
+COPY --chown=appuser:appuser ./*.py /app/
 
 # Create log directory with correct permissions
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
@@ -74,5 +83,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
+RUN touch "log_config.json"
+
 # Run the application with uvicorn
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "3000", "--log-config", "log_config.json"]
+CMD ["/usr/local/bin/uvicorn", "frontend_server:app", "--host", "0.0.0.0", "--port", "3000", "--log-config", "log_config.json"]
