@@ -323,8 +323,6 @@ export class APIService {
         sessionId: string,
         approved: boolean,
         stepId?: string,
-        humanFeedback?: string,
-        updatedAction?: string
     ): Promise<{ status: string }> {
         const response = await apiClient.post(
             API_ENDPOINTS.APPROVE_STEPS,
@@ -332,9 +330,7 @@ export class APIService {
                 step_id: stepId,
                 plan_id: planId,
                 session_id: sessionId,
-                approved,
-                human_feedback: humanFeedback,
-                updated_action: updatedAction
+                approved
             }
         );
 

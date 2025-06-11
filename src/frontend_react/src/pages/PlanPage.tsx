@@ -22,17 +22,11 @@ import '../styles/PlanPage.css';
 import CoralShellColumn from '../coral/components/Layout/CoralShellColumn';
 import CoralShellRow from '../coral/components/Layout/CoralShellRow';
 import Content from '../coral/components/Content/Content';
-import PanelLeft from '../coral/components/Panels/PanelLeft';
-import PanelLeftToolbar from '../coral/components/Panels/PanelLeftToolbar';
-import TaskList from '../components/content/TaskList';
 import { NewTaskService } from '../services/NewTaskService';
 import { PlanDataService } from '../services/PlanDataService';
-import { PlanWithSteps, Task, AgentType, Step, ProcessedPlanData } from '@/models';
-import { apiService } from '@/api';
+import { Step, ProcessedPlanData } from '@/models';
 import PlanPanelLeft from '@/components/content/PlanPanelLeft';
 import ContentToolbar from '@/coral/components/Content/ContentToolbar';
-import Chat from '@/coral/modules/Chat';
-import TaskDetails from '@/components/content/TaskDetails';
 import PlanChat from '@/components/content/PlanChat';
 import PlanPanelRight from '@/components/content/PlanPanelRight';
 
@@ -48,17 +42,7 @@ const PlanPage: React.FC = () => {
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<Error | null>(null);
-    const handleOnchatSubmit = useCallback(() => {
-        NewTaskService.handleNewTaskFromHome();
-    }, []);
 
-    const handleApproveStep = useCallback((step: Step) => {
-        console.log('Approving step:', step);
-    }, []);
-
-    const handleRejectStep = useCallback((step: Step) => {
-        console.log('Rejecting step:', step);
-    }, []);
     /**
      * Fetch plan data when component mounts or planId changes
      */
@@ -79,6 +63,43 @@ const PlanPage: React.FC = () => {
             setLoading(false);
         }
     }, [planId]);
+
+    // Accept chat input and submit clarification
+    const handleOnchatSubmit = useCallback(
+        async (chatInput: string) => {
+            if (!planData?.plan) return;
+            try {
+                await PlanDataService.submitClarification(
+                    planData.plan.id, // plan_id
+                    planData.plan.session_id, // session_id
+                    chatInput // human_clarification
+                );
+                await loadPlanData();
+            } catch (error) {
+                console.error('Failed to submit clarification:', error);
+            }
+        },
+        [planData, loadPlanData]
+    );
+
+    // Move handlers here to fix dependency order
+    const handleApproveStep = useCallback(async (step: Step) => {
+        try {
+            await PlanDataService.approveStep(step);
+            await loadPlanData();
+        } catch (error) {
+            console.error('Failed to approve step:', error);
+        }
+    }, [loadPlanData]);
+
+    const handleRejectStep = useCallback(async (step: Step) => {
+        try {
+            await PlanDataService.rejectStep(step);
+            await loadPlanData();
+        } catch (error) {
+            console.error('Failed to reject step:', error);
+        }
+    }, [loadPlanData]);
 
     // Load plan data on mount and when planId changes
     useEffect(() => {

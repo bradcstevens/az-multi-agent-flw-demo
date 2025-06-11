@@ -24,8 +24,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputContainerRef = useRef<HTMLDivElement>(null);
-    const sendMessage = async () => {
-    };
+
     const scrollToBottom = () => {
     };
     const clearChat = async () => {
@@ -91,12 +90,12 @@ const PlanChat: React.FC<PlanChatProps> = ({
                     <ChatInput
                         value={input}
                         onChange={setInput}
-                        onEnter={sendMessage}
+                        onEnter={OnChatSubmit}
 
                     >
                         <Button
                             appearance="transparent"
-                            onClick={sendMessage}
+                            onClick={OnChatSubmit}
                             icon={<Send />}
                             disabled={planData.hasHumanClarificationRequest && (isTyping || !input.trim())}
                         />

@@ -90,4 +90,43 @@ export class PlanDataService {    /**
     static getPlanCompletionPercentage(plan: PlanWithSteps): number {
         return apiService.getPlanCompletionPercentage(plan);
     }
+
+    /**
+     * Approve a plan step
+     * @param step Step to approve
+     * @returns Promise with API response
+     */
+    static async approveStep(step: Step): Promise<{ status: string }> {
+        return apiService.approveSteps(
+            step.plan_id,
+            step.session_id,
+            true, // approved
+            step.id
+        );
+    }
+
+    /**
+     * Reject a plan step
+     * @param step Step to reject
+     * @returns Promise with API response
+     */
+    static async rejectStep(step: Step): Promise<{ status: string }> {
+        return apiService.approveSteps(
+            step.plan_id,
+            step.session_id,
+            false, // not approved
+            step.id
+        );
+    }
+
+    /**
+     * Submit human clarification for a plan
+     * @param planId Plan ID
+     * @param sessionId Session ID
+     * @param clarification Clarification text
+     * @returns Promise with API response
+     */
+    static async submitClarification(planId: string, sessionId: string, clarification: string) {
+        return apiService.submitClarification(planId, sessionId, clarification);
+    }
 }
