@@ -89,13 +89,12 @@ export class TaskService {
         return `sid_${timestamp}_${random}`;
     }
     /**
-      * Split subtask action into description and function/details parts
-      * @param action The full action string to split
-      * @returns Object containing description and functionOrDetails
-      */
+     * Split subtask action into description and function/details parts
+     * @param action The full action string to split
+     * @returns Object containing description and functionOrDetails
+     */
     static splitSubtaskAction(action: string): { description: string; functionOrDetails: string | null } {
-        // Check for "Function:" pattern
-        // Check for "Function:" pattern
+        // Check for "Function:" pattern (with period before Function)
         const functionMatch = action.match(/^(.+?)\.\s*Function:\s*(.+)$/);
         if (functionMatch) {
             return {
@@ -104,31 +103,37 @@ export class TaskService {
             };
         }
 
-        // Check for "Provide more details about:" pattern
-        const detailsMatch = action.match(/^Provide more details about:\s*(.+)$/);
-        if (detailsMatch) {
+        // Check for any colon pattern - split on first colon
+        const colonIndex = action.indexOf(':');
+        if (colonIndex !== -1) {
             return {
-                description: "Provide more details about",
-                functionOrDetails: detailsMatch[1].trim()
+                description: action.substring(0, colonIndex).trim(),
+                functionOrDetails: action.substring(colonIndex + 1).trim()
             };
         }
 
-        // Check for "Analyze the task:" pattern
-        const analyzeMatch = action.match(/^Analyze the task:\s*(.+)$/);
-        if (analyzeMatch) {
-            return {
-                description: "Analyze the task",
-                functionOrDetails: analyzeMatch[1].trim()
-            };
-        }
-
-        // If no pattern matches, return the full action as description
+        // If no colon found, return the full action as description
         return {
             description: action,
             functionOrDetails: null
         };
     }
+    /**
+     * Clean text by converting any non-alphanumeric character to spaces
+     * @param text The text string to clean
+     * @returns Cleaned text string with only letters, numbers, and spaces
+     */
+    static cleanTextToSpaces(text: string): string {
+        if (!text) return '';
 
+        // Replace any non-alphanumeric character with a space
+        let cleanedText = text.replace(/[^a-zA-Z0-9]/g, ' ');
+
+        // Clean up multiple spaces and trim
+        cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+
+        return cleanedText;
+    }
     /**
      * Submit an input task to create a new plan
      * @param description Task description
