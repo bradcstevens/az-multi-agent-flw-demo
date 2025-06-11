@@ -184,3 +184,7 @@
     border-radius: var(--borderRadiusSmall);
     transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+.strikethrough {
+    text-decoration: line-through;
+}

@@ -84,7 +84,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                                     {renderStatusIcon(subtask.human_approval_status || subtask.status)}
                                 </div>
                                 <div className="task-details-subtask-content">
-                                    <span className="task-details-subtask-name">{description}</span>
+                                    <span className={`task-details-subtask-name ${subtask.human_approval_status === "rejected" ? "strikethrough" : ""}`}>{description}</span>
                                     <div className="task-details-subtask-actions">
                                         {(subtask.human_approval_status !== "accepted" && subtask.human_approval_status !== "rejected") && (
                                             <>
