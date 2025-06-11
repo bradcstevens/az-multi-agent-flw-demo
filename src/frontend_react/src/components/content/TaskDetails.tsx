@@ -115,7 +115,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                             // image={{ src: agent.avatarUrl }}
                             />
                             <div className="task-details-agent-details">
-                                <span className="task-details-agent-name">{agent}</span>
+                                <span className="task-details-agent-name">{TaskService.cleanTextToSpaces(agent)}</span>
                             </div>
                         </div>
                     ))}

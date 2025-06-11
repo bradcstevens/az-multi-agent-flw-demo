@@ -12,6 +12,7 @@ interface ChatInputProps {
     onEnter?: () => void;
     placeholder?: string;
     children?: React.ReactNode;
+    disabledChat?: boolean;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -20,6 +21,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     onEnter,
     placeholder = "Type a message...",
     children,
+    disabledChat
 }) => {
     const [isFocused, setIsFocused] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -59,10 +61,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     transition: "border-color 0.2s ease-in-out",
                     position: "relative",
                     boxSizing: "border-box",
-                    overflow:'hidden'
+                    overflow: 'hidden'
                 }}
             >
                 <textarea
+                    disabled={disabledChat}
                     ref={textareaRef}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
@@ -130,17 +133,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </div>
             <br />
             <div
-                            style={{
+                style={{
                     color: "var(--colorNeutralForeground3)",
                     marginTop: "8px",
                     paddingBottom: "8px",
                     textAlign: "center",
                 }}>
-            <Caption1
+                <Caption1
 
-            >
-                AI-Generated content may be incorrect
-            </Caption1>
+                >
+                    AI-Generated content may be incorrect
+                </Caption1>
             </div>
 
         </div>
