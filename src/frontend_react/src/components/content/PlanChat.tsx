@@ -15,7 +15,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
     planData,
     OnChatSubmit
 }) => {
-    const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+    // const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
     const [input, setInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const [showScrollButton, setShowScrollButton] = useState(false);
@@ -24,11 +24,10 @@ const PlanChat: React.FC<PlanChatProps> = ({
 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputContainerRef = useRef<HTMLDivElement>(null);
-
+    const messages = planData.messages || [];
     const scrollToBottom = () => {
     };
     const clearChat = async () => {
-        setMessages([]);
         setInput("");
         setCurrentConversationId(undefined);
     };
@@ -36,7 +35,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
         <div className="chat-container">
             <div className="messages" ref={messagesContainerRef}>
                 <div className="message-wrapper">
-                    {messages.map((msg, index) => (<div key={index} className={`message ${msg.role}`}>
+                    {messages.map((msg, index) => (<div key={index} className={`message ${msg.source !== "human" ? "assistant" : "user"}`}>
                         <Body1>
                             <div className="plan-chat-message-content">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]}>

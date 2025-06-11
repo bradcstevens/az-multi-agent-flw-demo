@@ -30,10 +30,11 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
 
         switch (status) {
             case 'completed':
+            case 'accepted':
                 return <CheckmarkCircle20Regular className="task-details-status-completed" />;
             case 'planned':
                 return <CircleHalfFill20Regular className="task-details-status-working" />;
-            case 'removed':
+            case 'rejected':
                 return <Dismiss20Regular className="task-details-status-removed" />;
             default:
                 return null;
@@ -80,19 +81,23 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
 
                             <div key={subtask.id} className="task-details-subtask-item">
                                 <div className="task-details-status-icon">
-                                    {renderStatusIcon(subtask.status)}
+                                    {renderStatusIcon(subtask.human_approval_status || subtask.status)}
                                 </div>
                                 <div className="task-details-subtask-content">
-                                    <span className="task-details-subtask-name">{description}</span>
+                                    <span className={`task-details-subtask-name ${subtask.human_approval_status === "rejected" ? "strikethrough" : ""}`}>{description}</span>
                                     <div className="task-details-subtask-actions">
-                                        <CheckboxChecked20Regular
-                                            onClick={planData.hasHumanClarificationRequest ? () => OnApproveStep(subtask) : undefined}
-                                            className={`${!planData.hasHumanClarificationRequest ? 'task-details-checkbox-icon-disabled' : 'task-details-checkbox-icon'}`}
-                                        />
-                                        <DismissSquare20Regular
-                                            onClick={planData.hasHumanClarificationRequest ? () => OnRejectStep(subtask) : undefined}
-                                            className={`${!planData.hasHumanClarificationRequest ? 'task-details-dismiss-icon-disabled' : 'task-details-dismiss-icon'}`}
-                                        />
+                                        {(subtask.human_approval_status !== "accepted" && subtask.human_approval_status !== "rejected") && (
+                                            <>
+                                                <CheckboxChecked20Regular
+                                                    onClick={planData.hasHumanClarificationRequest ? () => OnApproveStep(subtask) : undefined}
+                                                    className={`${!planData.hasHumanClarificationRequest ? 'task-details-checkbox-icon-disabled' : 'task-details-checkbox-icon'}`}
+                                                />
+                                                <DismissSquare20Regular
+                                                    onClick={planData.hasHumanClarificationRequest ? () => OnRejectStep(subtask) : undefined}
+                                                    className={`${!planData.hasHumanClarificationRequest ? 'task-details-dismiss-icon-disabled' : 'task-details-dismiss-icon'}`}
+                                                />
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
