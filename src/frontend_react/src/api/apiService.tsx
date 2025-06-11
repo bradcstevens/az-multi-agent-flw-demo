@@ -8,7 +8,8 @@ import {
     Plan,
     Step,
     StepStatus,
-    AgentType
+    AgentType,
+    PlanMessage
 } from '../models';
 
 // Constants for endpoints
@@ -137,7 +138,7 @@ export class APIService {
      * @param useCache Whether to use cached data or force fresh fetch
      * @returns Promise with the plan and its steps
      */
-    async getPlanById(planId: string, useCache = true): Promise<PlanWithSteps> {
+    async getPlanById(planId: string, useCache = true): Promise<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }> {
         const cacheKey = `plan_by_id_${planId}`;
         const params = { plan_id: planId };
 
@@ -145,19 +146,20 @@ export class APIService {
             const data = await apiClient.get(API_ENDPOINTS.PLANS, { params });
 
             // The API returns an array, but with plan_id filter it should have only one item
-            if (!data || data.length === 0) {
+            if (!data) {
                 throw new Error(`Plan with ID ${planId} not found`);
             }
 
-            const plan = data[0];
+            const plan = data[0] as PlanWithSteps;
+            const messages = data[1] || [];
             if (useCache) {
-                this._cache.set(cacheKey, plan, 30000); // Cache for 30 seconds
+                this._cache.set(cacheKey, { plan_with_steps: plan, messages }, 30000); // Cache for 30 seconds
             }
-            return plan;
+            return { plan_with_steps: plan, messages };
         };
 
         if (useCache) {
-            const cachedPlan = this._cache.get<PlanWithSteps>(cacheKey);
+            const cachedPlan = this._cache.get<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }>(cacheKey);
             if (cachedPlan) return cachedPlan;
 
             return this._requestTracker.trackRequest(cacheKey, fetcher);

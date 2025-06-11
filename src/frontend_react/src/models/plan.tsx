@@ -61,7 +61,22 @@ export interface Step extends BaseModel {
     /** Optional updated action */
     updated_action?: string;
 }
-
+export interface PlanMessage extends BaseModel {
+    /** The type of data model */
+    data_type: "agent_message";
+    /** Session identifier */
+    session_id: string;
+    /** User identifier */
+    user_id: string;
+    /** Plan identifier */
+    plan_id: string;
+    /** Message content */
+    content: string;
+    /** Source of the message */
+    source: string;
+    /** Step identifier */
+    step_id: string;
+}
 /**
  * Represents a plan that includes its associated steps.
  */
@@ -95,6 +110,7 @@ export interface ProcessedPlanData {
     agents: AgentType[];
     steps: Step[];
     hasHumanClarificationRequest: boolean;
+    messages: PlanMessage[];
 }
 
 export interface PlanChatProps {
