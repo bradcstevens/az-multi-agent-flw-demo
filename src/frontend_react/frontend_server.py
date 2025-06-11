@@ -20,7 +20,7 @@ app.add_middleware(
 )
 
 # Build paths
-BUILD_DIR = os.path.join(os.path.dirname(__file__), "dist")
+BUILD_DIR = os.path.join(os.path.dirname(__file__), "build")
 INDEX_HTML = os.path.join(BUILD_DIR, "index.html")
 
 # Serve static files from build directory
