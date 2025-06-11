@@ -98,7 +98,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
                             appearance="transparent"
                             onClick={sendMessage}
                             icon={<Send />}
-                            disabled={isTyping || !input.trim()}
+                            disabled={planData.hasHumanClarificationRequest && (isTyping || !input.trim())}
                         />
 
                         {messages.length > 0 && (

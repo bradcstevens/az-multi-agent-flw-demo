@@ -176,3 +176,11 @@
     background-color: var(--colorNeutralBackground2);
     color: var(--colorPaletteRedForeground1);
 }
+
+.task-details-checkbox-icon-disabled,
+.task-details-dismiss-icon-disabled {
+    cursor: not-allowed;
+    padding: 4px;
+    border-radius: var(--borderRadiusSmall);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}

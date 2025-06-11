@@ -26,8 +26,8 @@ import PanelLeft from '../coral/components/Panels/PanelLeft';
 import PanelLeftToolbar from '../coral/components/Panels/PanelLeftToolbar';
 import TaskList from '../components/content/TaskList';
 import { NewTaskService } from '../services/NewTaskService';
-import { PlanDataService, ProcessedPlanData } from '../services/PlanDataService';
-import { PlanWithSteps, Task, AgentType, Step } from '@/models';
+import { PlanDataService } from '../services/PlanDataService';
+import { PlanWithSteps, Task, AgentType, Step, ProcessedPlanData } from '@/models';
 import { apiService } from '@/api';
 import PlanPanelLeft from '@/components/content/PlanPanelLeft';
 import ContentToolbar from '@/coral/components/Content/ContentToolbar';
@@ -45,7 +45,7 @@ const PlanPage: React.FC = () => {
     const navigate = useNavigate();
 
     // State for plan data
-    const [planData, setPlanData] = useState<ProcessedPlanData | null>(null);
+    const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<Error | null>(null);
     const handleOnchatSubmit = useCallback(() => {

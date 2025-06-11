@@ -86,12 +86,12 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                                     <span className="task-details-subtask-name">{description}</span>
                                     <div className="task-details-subtask-actions">
                                         <CheckboxChecked20Regular
-                                            onClick={() => OnApproveStep(subtask)}
-                                            className="task-details-checkbox-icon"
+                                            onClick={planData.hasHumanClarificationRequest ? () => OnApproveStep(subtask) : undefined}
+                                            className={`${!planData.hasHumanClarificationRequest ? 'task-details-checkbox-icon-disabled' : 'task-details-checkbox-icon'}`}
                                         />
                                         <DismissSquare20Regular
-                                            onClick={() => OnRejectStep(subtask)}
-                                            className="task-details-dismiss-icon"
+                                            onClick={planData.hasHumanClarificationRequest ? () => OnRejectStep(subtask) : undefined}
+                                            className={`${!planData.hasHumanClarificationRequest ? 'task-details-dismiss-icon-disabled' : 'task-details-dismiss-icon'}`}
                                         />
                                     </div>
                                 </div>
