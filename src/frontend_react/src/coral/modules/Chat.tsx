@@ -14,7 +14,7 @@ import { ChatDismiss20Regular, HeartRegular } from "@fluentui/react-icons";
 import ChatInput from "./ChatInput";
 import "./Chat.css";
 import "./prism-material-oceanic.css";
-import { chatService } from "../services/chatService";
+// import { chatService } from "../services/chatService";
 import HeaderTools from "../components/Header/HeaderTools";
 
 interface ChatProps {
@@ -62,8 +62,8 @@ const Chat: React.FC<ChatProps> = ({
             return;
           }
         }
-        const chatMessages = await chatService.getUserHistory(userId);
-        setMessages(chatMessages);
+        // const chatMessages = await chatService.getUserHistory(userId);
+        // setMessages(chatMessages);
       } catch (err) {
         console.error("Failed to load chat history.", err);
       }
@@ -147,10 +147,10 @@ const Chat: React.FC<ChatProps> = ({
           onSaveMessage?.(userId, newHistory);
         }
       } else {
-        const response = await chatService.sendMessage(userId, input, currentConversationId);
-        setCurrentConversationId(response.conversation_id);
-        const assistantMessage = { role: "assistant", content: response.assistant_response };
-        setMessages([...updatedMessages, assistantMessage]);
+        // const response = await chatService.sendMessage(userId, input, currentConversationId);
+        // setCurrentConversationId(response.conversation_id);
+        // const assistantMessage = { role: "assistant", content: response.assistant_response };
+        // setMessages([...updatedMessages, assistantMessage]);
       }
     } catch (err) {
       console.error("Send Message Error:", err);
@@ -168,7 +168,7 @@ const Chat: React.FC<ChatProps> = ({
       if (onClearHistory) {
         onClearHistory(userId);
       } else {
-        await chatService.clearChatHistory(userId);
+        // await chatService.clearChatHistory(userId);
       }
       setMessages([]);
       setCurrentConversationId(undefined);
@@ -228,7 +228,7 @@ const Chat: React.FC<ChatProps> = ({
           style={{
             bottom: inputHeight,
             backgroundColor: "transparent",
-            border:'1px solid var(--colorNeutralStroke3)',
+            border: '1px solid var(--colorNeutralStroke3)',
             backdropFilter: "saturate(180%) blur(16px)",
           }}
         >
@@ -236,36 +236,36 @@ const Chat: React.FC<ChatProps> = ({
         </Tag>
       )}
 
-      <div ref={inputContainerRef} style={{ display:'flex', width:'100%', alignItems:'center', justifyContent:'center' }}>
-        <div style={{ display:'flex', width:'100%', maxWidth:'768px', margin:'0px 16px' }}>
-                  <ChatInput
-          value={input}
-          onChange={setInput}
-          onEnter={sendMessage}
+      <div ref={inputContainerRef} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', width: '100%', maxWidth: '768px', margin: '0px 16px' }}>
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onEnter={sendMessage}
 
-        >
-          <Button
-            appearance="transparent"
-            onClick={sendMessage}
-            icon={<Send />}
-            disabled={isTyping || !input.trim()}
-          />
+          >
+            <Button
+              appearance="transparent"
+              onClick={sendMessage}
+              icon={<Send />}
+              disabled={isTyping || !input.trim()}
+            />
 
-          {messages.length > 0 && (
-            <HeaderTools>
-              <ToolbarDivider />
-              <Button
+            {messages.length > 0 && (
+              <HeaderTools>
+                <ToolbarDivider />
+                <Button
 
-                onClick={clearChat}
-                appearance="transparent"
-                icon={<ChatDismiss20Regular />}
-                disabled={isTyping || messages.length === 0} />
+                  onClick={clearChat}
+                  appearance="transparent"
+                  icon={<ChatDismiss20Regular />}
+                  disabled={isTyping || messages.length === 0} />
 
-            </HeaderTools>
+              </HeaderTools>
 
-          )}
+            )}
 
-        </ChatInput>
+          </ChatInput>
         </div>
 
       </div>
