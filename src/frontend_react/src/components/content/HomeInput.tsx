@@ -7,6 +7,9 @@ import {
     Card,
     Text,
     Title2,
+    Toast,
+    ToastBody,
+    ToastTitle,
 } from "@fluentui/react-components";
 import {
     Send20Regular,
@@ -27,6 +30,9 @@ const HomeInput: React.FC<HomeInputProps> = ({
     onQuickTaskSelect,
 }) => {
     const [input, setInput] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [showToast, setShowToast] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const navigate = useNavigate();
 
@@ -49,22 +55,35 @@ const HomeInput: React.FC<HomeInputProps> = ({
 
     const handleSubmit = async () => {
         if (input.trim()) {
+            setSubmitting(true);
+            setShowToast(true);
+            setError(null);
             try {
                 // Submit the input task using TaskService
                 const response = await TaskService.submitInputTask(input.trim());
 
                 // Clear the input field
-                setInput("");
+                //setInput("");
                 if (textareaRef.current) {
                     textareaRef.current.style.height = "auto";
                 }
 
-                // Navigate to the plan page using the plan_id from the response
-                navigate(`/plan/${response.plan_id}`);
+                console.log('Task response', response);
+                if (response.plan_id != null) {
+                    // plan_id is valid (not null or undefined)
+                    navigate(`/plan/${response.plan_id}`);
+                } else {
+                    // plan_id is not valid, handle accordingly
+                    console.log('Invalid plan:', response.status);
+                    setShowToast(false);
+                    setError("Failed to create task. Please try again.");
+                }
 
-            } catch (error) {
-                console.error('Failed to create task:', error);
-                // You can add error handling here if needed
+            } catch (error: any) {
+                console.log('Failed to create task:', error);
+                setError(error.message || "Failed to create task.");
+            } finally {
+                setSubmitting(false);
             }
         }
     };
@@ -101,12 +120,13 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     <ChatInput
                         value={input}
                         placeholder="Describe what you'd like to do or use / to reference files, people, and more" onChange={setInput}
+                        disabledChat={submitting}
                     >
                         <Button
                             appearance="subtle"
                             className="home-input-send-button"
                             onClick={handleSubmit}
-                            disabled={!input.trim()}
+                            disabled={submitting}
                             icon={<Send20Regular />}
                         />
                     </ChatInput>
@@ -137,6 +157,23 @@ const HomeInput: React.FC<HomeInputProps> = ({
                             ))}
                         </div>
                     </div>
+                    {/* Toast appears after quick tasks */}
+                    {showToast && (
+                        <div style={{ marginTop: 16 }}>
+                            <Toast>
+                                <ToastTitle>Task submitted!</ToastTitle>
+                                <ToastBody>Your task is processing.</ToastBody>
+                            </Toast>
+                        </div>
+                    )}
+                    {error && (
+                        <div style={{ marginTop: 16 }}>
+                            <Toast>
+                                <ToastTitle>Task failed!</ToastTitle>
+                                <ToastBody>{error}</ToastBody>
+                            </Toast>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
