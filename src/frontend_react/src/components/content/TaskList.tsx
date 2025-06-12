@@ -14,21 +14,11 @@ import {
 import { MoreHorizontal20Regular } from "@fluentui/react-icons";
 import React from "react";
 import "../../styles/TaskList.css";
+import { Task, TaskListProps } from "@/models";
 
-interface Task {
-  id: string;
-  name: string;
-  status: "inprogress" | "completed";
-  date?: string;
-}
 
-interface TaskListProps {
-  inProgressTasks: Task[];
-  completedTasks: Task[];
-  onTaskSelect: (taskId: string) => void;
-  loading?: boolean;
-  selectedTaskId?: string;
-}
+
+
 
 const TaskList: React.FC<TaskListProps> = ({
   inProgressTasks,
@@ -66,30 +56,19 @@ const TaskList: React.FC<TaskListProps> = ({
       </div>
     );
   };
-
   const renderSkeleton = (key: string) => (
     <div
       key={key}
-      style={{
-        padding: "8px",
-        borderRadius: 6,
-        pointerEvents: "none",
-        cursor: "default",
-        backgroundColor: "transparent",
-      }}
+      className="task-skeleton-container"
     >
       <Skeleton aria-label="Loading task">
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-          }}
+          className="task-skeleton-content"
         >
           <SkeletonItem
             shape="rectangle"
             animation="wave"
-            style={{ width: "100%", height: 24, borderRadius: 4 }}
+            className="task-skeleton-item"
           />
         </div>
       </Skeleton>
@@ -97,51 +76,34 @@ const TaskList: React.FC<TaskListProps> = ({
   );
 
   return (
-    <Accordion defaultOpenItems={["inprogress"]} collapsible>
-      <AccordionItem value="inprogress">
+    <Accordion defaultOpenItems={["inprogress"]} collapsible>      <AccordionItem value="inprogress">
+      <AccordionHeader
+        expandIconPosition="end"
+        className="task-accordion-header-in-progress"
+      >
+        <Body1>In progress</Body1>
+      </AccordionHeader>
+
+      <AccordionPanel className="task-accordion-panel">
+        {loading && inProgressTasks.length === 0
+          ? [...Array(3)].map((_, i) =>
+            renderSkeleton(`inprogress-skel-${i}`)
+          )
+          : inProgressTasks.map(renderTaskItem)}
+      </AccordionPanel>
+    </AccordionItem>      <AccordionItem value="completed">
         <AccordionHeader
           expandIconPosition="end"
-          style={{
-            color: "var(--colorNeutralForeground3)",
-            padding: "0px 16px 0px 0",
-            backgroundColor: "transparent",
-            cursor: "pointer",
-            justifyContent: "space-between",
-            height: "40px",
-          }}
-        >
-          <Body1>In progress</Body1>
-        </AccordionHeader>
-
-        <AccordionPanel style={{ margin: "8px" }}>
-          {loading && inProgressTasks.length === 0
-            ? [...Array(3)].map((_, i) =>
-                renderSkeleton(`inprogress-skel-${i}`)
-              )
-            : inProgressTasks.map(renderTaskItem)}
-        </AccordionPanel>
-      </AccordionItem>
-
-      <AccordionItem value="completed">
-        <AccordionHeader
-          expandIconPosition="end"
-          style={{
-            color: "var(--colorNeutralForeground3)",
-            padding: "0px 16px 0px 0",
-            backgroundColor: "transparent",
-            cursor: "pointer",
-            justifyContent: "space-between",
-            height: "32px",
-          }}
+          className="task-accordion-header-completed"
         >
           <Body1>Completed</Body1>
         </AccordionHeader>
 
-        <AccordionPanel style={{ margin: "8px" }}>
+        <AccordionPanel className="task-accordion-panel">
           {loading && completedTasks.length === 0
             ? [...Array(2)].map((_, i) =>
-                renderSkeleton(`completed-skel-${i}`)
-              )
+              renderSkeleton(`completed-skel-${i}`)
+            )
             : completedTasks.map(renderTaskItem)}
         </AccordionPanel>
       </AccordionItem>

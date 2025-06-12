@@ -103,3 +103,46 @@
   opacity: 1;
 }
 
+/* New styles for migrated inline styles */
+.task-skeleton-container {
+  padding: 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  cursor: default;
+  background-color: transparent;
+}
+
+.task-skeleton-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.task-skeleton-item {
+  width: 100%;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.task-accordion-header-in-progress {
+  color: var(--colorNeutralForeground3);
+  padding: 0px 16px 0px 0;
+  background-color: transparent;
+  cursor: pointer;
+  justify-content: space-between;
+  height: 40px;
+}
+
+.task-accordion-header-completed {
+  color: var(--colorNeutralForeground3);
+  padding: 0px 16px 0px 0;
+  background-color: transparent;
+  cursor: pointer;
+  justify-content: space-between;
+  height: 32px;
+}
+
+.task-accordion-panel {
+  margin: 8px;
+}
+
