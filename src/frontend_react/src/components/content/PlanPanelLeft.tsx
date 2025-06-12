@@ -110,15 +110,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
 
         <br />
         <div
-          className="tab"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "8px 8px",
-            cursor: "pointer",
-            margin: "0 8px",
-          }}
+          className="tab tab-new-task"
           onClick={onNewTaskButton}
         >
           <ChatAdd20Regular />
