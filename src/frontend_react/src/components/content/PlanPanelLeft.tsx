@@ -98,14 +98,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
     <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
       <PanelLeft panelWidth={280} panelResize={true}>
         <PanelLeftToolbar panelTitle="Microsoft" panelIcon={<MsftColor />}>
-          <Tooltip content="New task">
-            <Button
-              icon={<Add20Regular />}
-              onClick={onNewTaskButton}
-              disabled={plansLoading}
-              appearance="transparent"
-            />
-          </Tooltip>
+          <Tooltip content="New task" relationship={"label"} />
         </PanelLeftToolbar>
 
         <br />

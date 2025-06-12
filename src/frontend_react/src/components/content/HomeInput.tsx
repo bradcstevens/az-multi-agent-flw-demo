@@ -45,7 +45,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
     const handleSubmit = async () => {
         if (input.trim()) {
             setSubmitting(true);
-            showToast("Creating a task...", "info", { dismissible: false });
+            showToast("Creating a task...", "progress", { dismissible: false });
             try {
                 const response = await TaskService.submitInputTask(input.trim());
 
@@ -89,9 +89,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
         }
     }, [input]);
 
-    const handleClick = () => {
-        showToast("Creating a task plan...", "error", { dismissible: true });
-    };
+
 
     return (
         <div className="home-input-container">
@@ -103,7 +101,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
 
                     <ChatInput
                         value={input}
-                        placeholder="Describe what you'd like to do or use / to reference files, people, and more"
+                        placeholder="Tell us what needs planning, building, or connecting—we'll handle the rest."
                         onChange={setInput}
                         disabledChat={submitting}
                     >
@@ -114,11 +112,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                             disabled={submitting}
                             icon={<Send20Regular />}
                         />
-                        <Button
-                            appearance="subtle"
-                            icon={<FoodToast20Regular />}
-                            onClick={handleClick}
-                        ></Button>
+
                     </ChatInput>
 
                     {/* Inline Toaster lives right under chat input */}

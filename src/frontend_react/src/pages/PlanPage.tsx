@@ -87,7 +87,7 @@ const PlanPage: React.FC = () => {
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
             if (!planData?.plan) return;
-            showToast("Submitting clarification...", "info", { dismissible: false });
+            showToast("Submitting clarification...", "progress", { dismissible: false });
             try {
                 await PlanDataService.submitClarification(
                     planData.plan.id, // plan_id
@@ -105,7 +105,7 @@ const PlanPage: React.FC = () => {
     // Move handlers here to fix dependency order
     const handleApproveStep = useCallback(async (step: Step) => {
         setProcessingSubtaskId(step.id);
-        showToast("Submitting approval...", "info", { dismissible: false });
+        showToast("Submitting approval...", "progress", { dismissible: false });
         try {
             await PlanDataService.approveStep(step);
             await loadPlanData2();
@@ -118,7 +118,7 @@ const PlanPage: React.FC = () => {
 
     const handleRejectStep = useCallback(async (step: Step) => {
         setProcessingSubtaskId(step.id);
-        showToast("Submitting rejection...", "info", { dismissible: false });
+        showToast("Submitting rejection...", "progress", { dismissible: false });
         try {
             await PlanDataService.rejectStep(step);
             await loadPlanData2();
