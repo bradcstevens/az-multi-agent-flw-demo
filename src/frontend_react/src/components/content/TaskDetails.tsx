@@ -111,26 +111,31 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
 
                         return (<div key={subtask.id} className="task-details-subtask-item">
                             <div className="task-details-status-icon">
-                                {renderStatusIcon(subtask.status)}
+                                {renderStatusIcon(subtask.human_approval_status || subtask.status)}
                             </div>
                             <div className="task-details-subtask-content">
-                                <span className="task-details-subtask-description">
+                                <span className={`task-details-subtask-description ${subtask.human_approval_status === "rejected" ? "strikethrough" : ""}`}>
                                     {description}
                                 </span>
                                 <div className="task-details-action-buttons">
-                                    <CheckboxChecked20Regular
-                                        onClick={
-                                            canInteract ? () => OnApproveStep(subtask) : undefined
-                                        }
-                                        className={canInteract ? "task-details-action-button" : "task-details-action-button-disabled"}
-                                    />
-                                    <DismissSquare20Regular
-                                        onClick={
-                                            canInteract ? () => OnRejectStep(subtask) : undefined
-                                        }
-                                        className={canInteract ? "task-details-action-button" : "task-details-action-button-disabled"}
-                                    />
+                                    {(subtask.human_approval_status !== "accepted" && subtask.human_approval_status !== "rejected") && (
+                                        <>
+                                            <CheckboxChecked20Regular
+                                                onClick={
+                                                    canInteract ? () => OnApproveStep(subtask) : undefined
+                                                }
+                                                className={canInteract ? "task-details-action-button" : "task-details-action-button-disabled"}
+                                            />
+                                            <DismissSquare20Regular
+                                                onClick={
+                                                    canInteract ? () => OnRejectStep(subtask) : undefined
+                                                }
+                                                className={canInteract ? "task-details-action-button" : "task-details-action-button-disabled"}
+                                            />
+                                        </>
+                                    )}
                                 </div>
+
                             </div>
                         </div>
                         );
