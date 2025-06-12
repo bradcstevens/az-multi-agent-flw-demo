@@ -30,6 +30,7 @@ interface TaskListProps {
   onTaskRename: (taskId: string, newName: string) => void;
   onTaskDelete: (taskId: string) => void;
   activeTaskId: string | null;
+      loading?: boolean;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
