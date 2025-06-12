@@ -65,13 +65,6 @@ const PlanChat: React.FC<PlanChatProps> = ({
                         </Body1>
                     </div>
                     ))}</div>
-
-
-                {isTyping && (
-                    <div className="typing-indicator">
-                        <span>Thinking...</span>
-                    </div>
-                )}
             </div>
             {showScrollButton && (
                 <Tag
@@ -97,20 +90,6 @@ const PlanChat: React.FC<PlanChatProps> = ({
                             icon={<Send />}
                             disabled={planData.hasHumanClarificationRequest && (isTyping || !input.trim())}
                         />
-
-                        {messages.length > 0 && (
-                            <HeaderTools>
-                                <ToolbarDivider />
-                                <Button
-
-                                    onClick={clearChat}
-                                    appearance="transparent"
-                                    icon={<ChatDismiss20Regular />}
-                                    disabled={isTyping || messages.length === 0} />
-
-                            </HeaderTools>
-
-                        )}
 
                     </ChatInput>
                 </div>
