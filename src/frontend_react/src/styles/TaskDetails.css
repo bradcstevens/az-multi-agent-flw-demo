@@ -97,9 +97,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px;
-    border-radius: var(--borderRadiusMedium);
-    background-color: var(--colorNeutralBackground2);
+
+
 }
 
 .task-details-agent-details {
