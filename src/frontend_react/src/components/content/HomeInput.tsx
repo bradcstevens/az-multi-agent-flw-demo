@@ -9,9 +9,10 @@ import {
 import { FoodToast20Regular, Send20Regular } from "@fluentui/react-icons";
 import React, { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./../../styles/HomeInput.css";
+
 import "./../../styles/Chat.css";
 import "../../styles/prism-material-oceanic.css";
+import "./../../styles/HomeInput.css";
 import { HomeInputProps, quickTasks, QuickTask } from "../../models/homeInput";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
