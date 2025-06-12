@@ -100,7 +100,8 @@ const HomeInput: React.FC<HomeInputProps> = ({
 
                     <ChatInput
                         value={input}
-                        placeholder="Describe what you'd like to do or use / to reference files, people, and more" onChange={setInput} >
+                        placeholder="Describe what you'd like to do or use / to reference files, people, and more" onChange={setInput}
+                    >
                         <Button
                             appearance="subtle"
                             className="home-input-send-button"
