@@ -861,7 +861,7 @@ module aiFoundryStorageAccount 'br/public:avm/res/storage/storage-account:0.18.2
       diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspaceId }]
     }
     publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
-    allowBlobPublicAccess: virtualNetworkEnabled ? false : true
+    allowBlobPublicAccess: false
     privateEndpoints: virtualNetworkEnabled
       ? map(items(storageAccountPrivateDnsZones), zone => {
           name: 'pep-${zone.value}-${aiFoundryStorageAccountResourceName}'
@@ -1036,6 +1036,7 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.12.0' = if (co
       {
         locationName: cosmosDbAccountConfiguration.?location ?? solutionLocation
         failoverPriority: 0
+        isZoneRedundant: false
       }
     ]
     capabilitiesToAdd: [
@@ -1073,7 +1074,7 @@ module containerAppEnvironment 'modules/container-app-environment.bicep' = if (c
     location: containerAppEnvironmentConfiguration.?location ?? solutionLocation
     logAnalyticsResourceId: logAnalyticsWorkspaceId
     publicNetworkAccess: 'Enabled'
-    zoneRedundant: virtualNetworkEnabled ? true : false
+    zoneRedundant: false
     applicationInsightsConnectionString: applicationInsights.outputs.connectionString
     enableTelemetry: enableTelemetry
     subnetResourceId: virtualNetworkEnabled
