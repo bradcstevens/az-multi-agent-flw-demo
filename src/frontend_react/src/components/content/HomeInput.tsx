@@ -45,7 +45,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
     const handleSubmit = async () => {
         if (input.trim()) {
             setSubmitting(true);
-            showToast("Creating a task...", "info");
+            showToast("Creating a task...", "info", { dismissible: false });
             try {
                 const response = await TaskService.submitInputTask(input.trim());
 
@@ -141,7 +141,9 @@ const HomeInput: React.FC<HomeInputProps> = ({
                                     (e.currentTarget.style.backgroundColor =
                                         "var(--colorNeutralBackground3)")
                                     }
-                                    onClick={() => handleQuickTaskClick(task)}
+                                    onClick={
+                                        !submitting ? () => handleQuickTaskClick(task) : undefined
+                                    }
                                 >
                                     <div className="home-input-quick-task-content">
                                         <div className="home-input-quick-task-icon">

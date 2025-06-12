@@ -20,9 +20,8 @@ import {
 } from "@fluentui/react-icons";
 import React from "react";
 import { TaskService } from "@/services";
-import PanelLeftToolbar from "@/coral/components/Panels/PanelLeftToolbar";
 import PanelRightToolbar from "@/coral/components/Panels/PanelRightToolbar";
-import "@/styles/TaskDetails.css";
+import "../../styles/TaskDetails.css";
 
 const TaskDetails: React.FC<TaskDetailsProps> = ({
     planData,
@@ -60,15 +59,11 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
         <div
             className="task-details-container"
         >
-            <PanelRightToolbar panelTitle="Progress"></PanelRightToolbar>            <div
-                className="task-details-section"
-            >                <div
-                className="task-details-progress-header"
-            >                    <div
-                className="task-details-progress-card"
-            >                        <div
-                className="task-details-progress-icon"
-            >
+            <PanelRightToolbar panelTitle="Progress"></PanelRightToolbar>
+            <div className="task-details-section">
+                <div className="task-details-progress-header">
+                    <div className="task-details-progress-card">
+                        <div className="task-details-progress-icon">
                             <svg width="56" height="56" viewBox="0 0 56 56">
                                 <circle
                                     cx="28"
