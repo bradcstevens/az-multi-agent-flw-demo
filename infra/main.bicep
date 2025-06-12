@@ -16,6 +16,19 @@ param enableTelemetry bool = true
 @description('Azure OpenAI Location')
 param azureOpenAILocation string
 
+@minLength(1)
+@description('Name of the GPT model to deploy:')
+param gptModelName string = 'gpt-4o'
+
+param gptModelVersion string = '2024-08-06'
+
+@minLength(1)
+@description('GPT model deployment type:')
+param modelDeploymentType string = 'GlobalStandard'
+
+@description('Set the image tag for the container images used in the solution. Default is "latest".')
+param imageTag string = 'latest'
+
 // @description('Set this if you want to deploy to a different region than the resource group. Otherwise, it will use the resource group location by default.')
 // param AZURE_LOCATION string=''
 // param solutionLocation string = empty(AZURE_LOCATION) ? resourceGroup().location
@@ -194,7 +207,7 @@ param containerAppConfiguration containerAppConfigurationType = {
   containerMemory: '4.0Gi'
   containerImageRegistryDomain: 'biabcontainerreg.azurecr.io'
   containerImageName: 'macaebackend'
-  containerImageTag: 'latest'
+  containerImageTag: imageTag
   containerName: 'backend'
   ingressTargetPort: 8000
   maxReplicas: 1
@@ -218,7 +231,7 @@ param webSiteConfiguration webSiteConfigurationType = {
   location: solutionLocation
   containerImageRegistryDomain: 'biabcontainerreg.azurecr.io'
   containerImageName: 'macaefrontend'
-  containerImageTag: 'latest'
+  containerImageTag: imageTag
   containerName: 'backend'
   tags: tags
   environmentResourceId: null //Default value set on module configuration
@@ -731,10 +744,10 @@ var aiFoundryAiServicesResourceName = aiFoundryAiServicesConfiguration.?name ?? 
 var aiFoundryAIservicesEnabled = aiFoundryAiServicesConfiguration.?enabled ?? true
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
-  name: 'gpt-4o'
-  version: '2024-08-06'
+  name: gptModelName
+  version: gptModelVersion
   sku: {
-    name: 'GlobalStandard'
+    name: modelDeploymentType
     //Curently the capacity is set to 140 for opinanal performance. 
     capacity: aiFoundryAiServicesConfiguration.?modelCapacity ?? 140
   }
