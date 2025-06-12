@@ -29,7 +29,7 @@ import PlanPanelLeft from '@/components/content/PlanPanelLeft';
 import ContentToolbar from '@/coral/components/Content/ContentToolbar';
 import PlanChat from '@/components/content/PlanChat';
 import PlanPanelRight from '@/components/content/PlanPanelRight';
-
+import InlineToaster, { useInlineToaster } from "../components/toast/InlineToaster";
 /**
  * Page component for displaying a specific plan
  * Accessible via the route /plan/{plan_id}
@@ -37,6 +37,7 @@ import PlanPanelRight from '@/components/content/PlanPanelRight';
 const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
+    const { showToast } = useInlineToaster();
 
     // State for plan data
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
@@ -64,45 +65,69 @@ const PlanPage: React.FC = () => {
         }
     }, [planId]);
 
+    const loadPlanData2 = useCallback(async () => {
+        if (!planId) return;
+
+        try {
+
+            setError(null);
+
+            const data = await PlanDataService.fetchPlanData(planId);
+            console.log('Fetched plan data:', data);
+            setPlanData(data);
+        } catch (err) {
+            console.error('Failed to load plan data:', err);
+            setError(err instanceof Error ? err : new Error('Failed to load plan data'));
+        } finally {
+
+        }
+    }, [planId]);
+
     // Accept chat input and submit clarification
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
             if (!planData?.plan) return;
+            showToast("Submitting clarification...", "info", { dismissible: false });
             try {
                 await PlanDataService.submitClarification(
                     planData.plan.id, // plan_id
                     planData.plan.session_id, // session_id
                     chatInput // human_clarification
                 );
-                await loadPlanData();
+                await loadPlanData2();
             } catch (error) {
                 console.error('Failed to submit clarification:', error);
             }
         },
-        [planData, loadPlanData]
+        [planData, loadPlanData2]
     );
 
     // Move handlers here to fix dependency order
     const handleApproveStep = useCallback(async (step: Step) => {
         setProcessingSubtaskId(step.id);
+        showToast("Submitting approval...", "info", { dismissible: false });
         try {
             await PlanDataService.approveStep(step);
-            await loadPlanData();
+            await loadPlanData2();
         } catch (error) {
             console.error('Failed to reject step:', error);
         } finally {
             setProcessingSubtaskId(null);
         }
-    }, [loadPlanData]);
+    }, [loadPlanData2]);
 
     const handleRejectStep = useCallback(async (step: Step) => {
+        setProcessingSubtaskId(step.id);
+        showToast("Submitting rejection...", "info", { dismissible: false });
         try {
             await PlanDataService.rejectStep(step);
-            await loadPlanData();
+            await loadPlanData2();
         } catch (error) {
             console.error('Failed to reject step:', error);
+        } finally {
+            setProcessingSubtaskId(null);
         }
-    }, [loadPlanData]);
+    }, [loadPlanData2]);
 
     // Load plan data on mount and when planId changes
     useEffect(() => {

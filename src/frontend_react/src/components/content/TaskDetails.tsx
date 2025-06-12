@@ -38,19 +38,13 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
         switch (status) {
             case "completed":
             case 'accepted':
-                return (<CheckmarkCircle20Regular
-                    className="status-icon-completed"
-                />
+                return (<CheckmarkCircle20Regular className="status-icon-completed" />
                 );
             case "planned":
-                return (<CircleHalfFill20Regular
-                    className="status-icon-planned"
-                />
+                return (<CircleHalfFill20Regular className="status-icon-planned" />
                 );
             case "rejected":
-                return (<Dismiss20Regular
-                    className="status-icon-rejected"
-                />
+                return (<Dismiss20Regular className="status-icon-rejected" />
                 );
             default:
                 return null;

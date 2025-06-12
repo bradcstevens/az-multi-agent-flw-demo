@@ -11,6 +11,7 @@ import ReactMarkdown from "react-markdown";
 import "../../styles/PlanChat.css"; // Assuming you have a CSS file for additional styles
 import "../../styles/Chat.css"; // Assuming you have a CSS file for additional styles
 import "../../styles/prism-material-oceanic.css"
+import InlineToaster from "../toast/InlineToaster";
 const PlanChat: React.FC<PlanChatProps> = ({
     planData,
     OnChatSubmit
@@ -77,6 +78,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
                 </Tag>
             )}
 
+            <InlineToaster />
             <div ref={inputContainerRef} className="plan-chat-input-container">
                 <div className="plan-chat-input-wrapper">
                     <ChatInput
