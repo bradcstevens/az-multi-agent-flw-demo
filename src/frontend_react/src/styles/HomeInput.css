@@ -138,3 +138,14 @@
     border: none;
     padding: 0;
 }
+.home-input-quick-task-card{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background-color: var(--colorNeutralBackground3);
+    border: 1px solid var(--colorNeutralStroke2);
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: none;
+}
