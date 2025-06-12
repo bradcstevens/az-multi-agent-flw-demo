@@ -18,13 +18,15 @@ import { TaskService } from "@/services";
 const TaskDetails: React.FC<TaskDetailsProps> = ({
     planData,
     OnApproveStep,
-    OnRejectStep
+    OnRejectStep,
+    processingSubtaskId
 }) => {
     const completedCount = planData.plan.completed || 0;
     const total = planData.plan.total_steps || 1; // Avoid division by zero
     const subTasks = planData.steps || [];
     const progress = completedCount / total;
     const agents = planData.agents || [];
+
     // Helper function to render the appropriate status icon
     const renderStatusIcon = (status: string) => {
 
@@ -90,11 +92,12 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                                             <>
                                                 <CheckboxChecked20Regular
                                                     onClick={planData.hasHumanClarificationRequest ? () => OnApproveStep(subtask) : undefined}
-                                                    className={`${!planData.hasHumanClarificationRequest ? 'task-details-checkbox-icon-disabled' : 'task-details-checkbox-icon'}`}
+                                                    className={`${!planData.hasHumanClarificationRequest && processingSubtaskId === subtask.id ? 'task-details-checkbox-icon-disabled' : 'task-details-checkbox-icon'}`}
+
                                                 />
                                                 <DismissSquare20Regular
                                                     onClick={planData.hasHumanClarificationRequest ? () => OnRejectStep(subtask) : undefined}
-                                                    className={`${!planData.hasHumanClarificationRequest ? 'task-details-dismiss-icon-disabled' : 'task-details-dismiss-icon'}`}
+                                                    className={`${!planData.hasHumanClarificationRequest && processingSubtaskId === subtask.id ? 'task-details-dismiss-icon-disabled' : 'task-details-dismiss-icon'}`}
                                                 />
                                             </>
                                         )}

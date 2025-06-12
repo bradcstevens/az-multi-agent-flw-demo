@@ -83,12 +83,13 @@ const PlanChat: React.FC<PlanChatProps> = ({
                         value={input}
                         onChange={setInput}
                         onEnter={() => OnChatSubmit(input)}
+                        disabledChat={!planData.hasHumanClarificationRequest}
                     >
                         <Button
                             appearance="transparent"
                             onClick={() => OnChatSubmit(input)}
                             icon={<Send />}
-                            disabled={planData.hasHumanClarificationRequest && (isTyping || !input.trim())}
+                            disabled={!planData.hasHumanClarificationRequest && (!input.trim())}
                         />
 
                     </ChatInput>

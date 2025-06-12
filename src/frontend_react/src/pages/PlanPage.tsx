@@ -42,7 +42,7 @@ const PlanPage: React.FC = () => {
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<Error | null>(null);
-
+    const [processingSubtaskId, setProcessingSubtaskId] = useState<string | null>(null);
     /**
      * Fetch plan data when component mounts or planId changes
      */
@@ -84,11 +84,14 @@ const PlanPage: React.FC = () => {
 
     // Move handlers here to fix dependency order
     const handleApproveStep = useCallback(async (step: Step) => {
+        setProcessingSubtaskId(step.id);
         try {
             await PlanDataService.approveStep(step);
             await loadPlanData();
         } catch (error) {
-            console.error('Failed to approve step:', error);
+            console.error('Failed to reject step:', error);
+        } finally {
+            setProcessingSubtaskId(null);
         }
     }, [loadPlanData]);
 
@@ -142,6 +145,7 @@ const PlanPage: React.FC = () => {
                     planData={planData}
                     OnApproveStep={handleApproveStep}
                     OnRejectStep={handleRejectStep}
+                    processingSubtaskId={processingSubtaskId}
                 />
             </CoralShellRow>
         </CoralShellColumn>
