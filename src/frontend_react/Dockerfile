@@ -29,7 +29,7 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 WORKDIR /app
 
 # Copy Python project definition files
-COPY pyproject.toml uv.lock* ./
+COPY pyproject.toml requirements.txt* uv.lock* ./
 
 # Install Python dependencies using UV
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -65,7 +65,7 @@ COPY --from=python-builder /usr/local/lib/python3.11/site-packages /usr/local/li
 COPY --from=python-builder /usr/local/bin /usr/local/bin
 
 # Copy React build artifacts
-COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/build /app/static
+COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/build /app/build
 
 # Copy Python application code
 COPY --chown=appuser:appuser ./*.py /app/
@@ -83,7 +83,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-RUN touch "log_config.json"
-
 # Run the application with uvicorn
-CMD ["/usr/local/bin/uvicorn", "frontend_server:app", "--host", "0.0.0.0", "--port", "3000", "--log-config", "log_config.json"]
+CMD ["/usr/local/bin/uvicorn", "frontend_server:app", "--host", "0.0.0.0", "--port", "3000"]
