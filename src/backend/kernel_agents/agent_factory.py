@@ -265,6 +265,14 @@ class AgentFactory:
             temperature=temperature,
             agent_instances=agent_instances,  # Pass agent instances to the planner
             client=client,
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": PlannerResponsePlan.__name__,
+                    "description": f"respond with {PlannerResponsePlan.__name__.lower()}",
+                    "schema": PlannerResponsePlan.model_json_schema()
+                }
+            },
         )
         agent_instances[AgentType.PLANNER.value] = (
             planner_agent  # to pass it to group chat manager
