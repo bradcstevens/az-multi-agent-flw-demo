@@ -14,6 +14,7 @@ import "../../styles/prism-material-oceanic.css"
 import InlineToaster from "../toast/InlineToaster";
 const PlanChat: React.FC<PlanChatProps> = ({
     planData,
+    loading,
     OnChatSubmit
 }) => {
     // const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
@@ -25,7 +26,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputContainerRef = useRef<HTMLDivElement>(null);
-    const messages = planData.messages || [];
+    const messages = planData?.messages || [];
     const scrollToBottom = () => {
     };
     const clearChat = async () => {
@@ -34,15 +35,18 @@ const PlanChat: React.FC<PlanChatProps> = ({
     };
     return (
         <div className="chat-container">
-            <div className="messages" ref={messagesContainerRef}>
-                <div className="message-wrapper">
-                    {messages.map((msg, index) => (<div key={index} className={`message ${msg.source !== "human" ? "assistant" : "user"}`}>
-                        <Body1>
-                            <div className="plan-chat-message-content">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]}>
-                                    {msg.content}
-                                </ReactMarkdown>
-                                {/* {msg.role === "assistant" && (
+            {planData && (
+                <>
+                    <div className="messages" ref={messagesContainerRef}>
+                        <div className="message-wrapper">
+
+                            {messages.map((msg, index) => (<div key={index} className={`message ${msg.source !== "human" ? "assistant" : "user"}`}>
+                                <Body1>
+                                    <div className="plan-chat-message-content">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]}>
+                                            {msg.content}
+                                        </ReactMarkdown>
+                                        {/* {msg.role === "assistant" && (
                                     <div className="assistant-footer">
                                         <div className="assistant-actions">
                                             <Button
@@ -62,44 +66,43 @@ const PlanChat: React.FC<PlanChatProps> = ({
                                         </div>
                                     </div>
                                 )} */}
+                                    </div>
+                                </Body1>
                             </div>
-                        </Body1>
+                            ))}</div>
                     </div>
-                    ))}</div>
-            </div>
-            {showScrollButton && (
-                <Tag
-                    onClick={scrollToBottom}
-                    className="scroll-to-bottom plan-chat-scroll-button"
-                    shape="circular"
-                    style={{ bottom: inputHeight }}
-                >
-                    Back to bottom
-                </Tag>
-            )}
+                    {showScrollButton && (
+                        <Tag
+                            onClick={scrollToBottom}
+                            className="scroll-to-bottom plan-chat-scroll-button"
+                            shape="circular"
+                            style={{ bottom: inputHeight }}
+                        >
+                            Back to bottom
+                        </Tag>
+                    )}
 
-            <InlineToaster />
-            <div ref={inputContainerRef} className="plan-chat-input-container">
-                <div className="plan-chat-input-wrapper">
-                    <ChatInput
-                        value={input}
-                        onChange={setInput}
-                        onEnter={() => OnChatSubmit(input)}
-                        disabledChat={!planData.hasHumanClarificationRequest}
-                    >
-                        <Button
-                            appearance="transparent"
-                            onClick={() => OnChatSubmit(input)}
-                            icon={<Send />}
-                            disabled={!planData.hasHumanClarificationRequest && (!input.trim())}
-                        />
+                    <InlineToaster />
+                    <div ref={inputContainerRef} className="plan-chat-input-container">
+                        <div className="plan-chat-input-wrapper">
+                            <ChatInput
+                                value={input}
+                                onChange={setInput}
+                                onEnter={() => OnChatSubmit(input)}
+                                disabledChat={!planData.hasHumanClarificationRequest}
+                            >
+                                <Button
+                                    appearance="transparent"
+                                    onClick={() => OnChatSubmit(input)}
+                                    icon={<Send />}
+                                    disabled={!planData?.hasHumanClarificationRequest && (!input.trim())}
+                                />
 
-                    </ChatInput>
-                </div>
+                            </ChatInput>
+                        </div>
 
-            </div>
-
-
+                    </div>
+                </>)}
         </div>
     );
 };

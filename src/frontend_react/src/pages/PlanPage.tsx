@@ -151,19 +151,19 @@ const PlanPage: React.FC = () => {
             <CoralShellRow>
                 <PlanPanelLeft onNewTaskButton={handleNewTaskButton} />
                 <Content>
-                    {loading && <Spinner />}
-                    {!loading && (
-                        <>
-                            <ContentToolbar
-                                panelTitle={planData?.plan?.initial_goal || 'Plan Details'}
-                                panelIcon={<Sparkle20Filled />}
-                            ></ContentToolbar>
-                            <PlanChat
-                                planData={planData}
-                                OnChatSubmit={handleOnchatSubmit}
-                            />
-                        </>
-                    )}
+
+
+                    <ContentToolbar
+                        panelTitle={planData?.plan?.initial_goal || 'Plan Details'}
+                        panelIcon={<Sparkle20Filled />}
+                    ></ContentToolbar>
+                    <PlanChat
+                        planData={planData}
+                        OnChatSubmit={handleOnchatSubmit}
+                        loading={loading}
+                    />
+
+
                 </Content>
 
                 <PlanPanelRight
@@ -171,9 +171,10 @@ const PlanPage: React.FC = () => {
                     OnApproveStep={handleApproveStep}
                     OnRejectStep={handleRejectStep}
                     processingSubtaskId={processingSubtaskId}
+                    loading={loading}
                 />
             </CoralShellRow>
-        </CoralShellColumn>
+        </CoralShellColumn >
     );
 
 

@@ -115,5 +115,6 @@ export interface ProcessedPlanData {
 
 export interface PlanChatProps {
     planData: ProcessedPlanData;
+    loading: boolean;
     OnChatSubmit: (message: string) => void;
 }
