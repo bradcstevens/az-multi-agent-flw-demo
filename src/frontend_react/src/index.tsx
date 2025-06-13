@@ -14,7 +14,6 @@ const AppWrapper = () => {
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
   type ConfigType = typeof defaultConfig;
-  console.log("defaultConfig", defaultConfig);
   const [config, setConfig] = useState<ConfigType>(defaultConfig);
   useEffect(() => {
     const initConfig = async () => {
@@ -36,7 +35,7 @@ const AppWrapper = () => {
         setConfig(config);
 
       } catch (error) {
-        console.info("Error fetching config:", error);
+        console.info("frontend config did not load from python", error);
       } finally {
         setIsConfigLoaded(true);
       }

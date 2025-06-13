@@ -16,7 +16,6 @@ export let config = {
 };
 
 export function setApiUrl(url: string | null) {
-    console.log('setApiUrl called with:', url);
     if (url) {
         API_URL = url.includes('/api') ? url : `${url}/api`;
     }
@@ -41,7 +40,6 @@ export function getConfigData() {
 }
 
 export function getApiUrl() {
-    console.log('getApiUrl called');
     if (!API_URL) {
         // Check if window.appConfig exists
         if (window.appConfig && window.appConfig.API_URL) {
