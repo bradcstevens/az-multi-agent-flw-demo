@@ -46,7 +46,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
     const handleSubmit = async () => {
         if (input.trim()) {
             setSubmitting(true);
-            showToast("Creating a task...", "progress", { dismissible: false });
+            showToast("Creating a plan..", "progress", { dismissible: false });
             try {
                 const response = await TaskService.submitInputTask(input.trim());
 
@@ -55,7 +55,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     textareaRef.current.style.height = "auto";
                 }
 
-                showToast("Task created!", "success");
+                showToast("Plan created!", "success");
                 navigate(`/plan/${response.plan_id}`);
                 console.log('Task response', response);
                 if (response.plan_id != null) {
@@ -64,10 +64,10 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 } else {
                     // plan_id is not valid, handle accordingly
                     console.log('Invalid plan:', response.status);
-                    showToast("Failed to create task", "error");
+                    showToast("Failed to create plan", "error");
                 }
             } catch (error) {
-                console.error("Failed to create task:", error);
+                console.error("Failed to create plan:", error);
                 showToast("Something went wrong", "error");
             } finally {
                 setSubmitting(false);

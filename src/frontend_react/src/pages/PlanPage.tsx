@@ -38,7 +38,7 @@ const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
     const { showToast } = useInlineToaster();
-
+    const [input, setInput] = useState("");
     // State for plan data
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -51,9 +51,9 @@ const PlanPage: React.FC = () => {
         if (!planId) return;
 
         try {
+            setPlanData(null);
             setLoading(true);
             setError(null);
-
             const data = await PlanDataService.fetchPlanData(planId);
             console.log('Fetched plan data:', data);
             setPlanData(data);
@@ -66,6 +66,7 @@ const PlanPage: React.FC = () => {
     }, [planId]);
 
     const loadPlanData2 = useCallback(async () => {
+        console.log('loadPlanData2 called with planId:', planId);
         if (!planId) return;
 
         try {
@@ -94,9 +95,13 @@ const PlanPage: React.FC = () => {
                     planData.plan.session_id, // session_id
                     chatInput // human_clarification
                 );
+                showToast("Clarification submitted successfully", "success");
                 await loadPlanData2();
             } catch (error) {
+                showToast("Failed to submit clarification", "error");
                 console.error('Failed to submit clarification:', error);
+            } finally {
+                setInput(""); // Clear input after submission
             }
         },
         [planData, loadPlanData2]
@@ -108,8 +113,11 @@ const PlanPage: React.FC = () => {
         showToast("Submitting approval...", "progress", { dismissible: false });
         try {
             await PlanDataService.approveStep(step);
+            showToast("Step approved successfully", "success");
             await loadPlanData2();
         } catch (error) {
+            showToast("Failed to approve step", "error");
+            // Log the error for debugging
             console.error('Failed to reject step:', error);
         } finally {
             setProcessingSubtaskId(null);
@@ -121,8 +129,10 @@ const PlanPage: React.FC = () => {
         showToast("Submitting rejection...", "progress", { dismissible: false });
         try {
             await PlanDataService.rejectStep(step);
+            showToast("Step rejected successfully", "success");
             await loadPlanData2();
         } catch (error) {
+            showToast("Failed to reject step", "error");
             console.error('Failed to reject step:', error);
         } finally {
             setProcessingSubtaskId(null);
@@ -161,6 +171,7 @@ const PlanPage: React.FC = () => {
                         planData={planData}
                         OnChatSubmit={handleOnchatSubmit}
                         loading={loading}
+                        input={input}
                     />
 
 

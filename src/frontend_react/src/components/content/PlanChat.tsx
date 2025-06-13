@@ -14,11 +14,12 @@ import "../../styles/prism-material-oceanic.css"
 import InlineToaster from "../toast/InlineToaster";
 const PlanChat: React.FC<PlanChatProps> = ({
     planData,
+    input,
     loading,
     OnChatSubmit
 }) => {
     // const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
-    const [input, setInput] = useState("");
+    const [inputValue, setInput] = useState(input);
     const [isTyping, setIsTyping] = useState(false);
     const [showScrollButton, setShowScrollButton] = useState(false);
     const [inputHeight, setInputHeight] = useState(0);
@@ -30,7 +31,6 @@ const PlanChat: React.FC<PlanChatProps> = ({
     const scrollToBottom = () => {
     };
     const clearChat = async () => {
-        setInput("");
         setCurrentConversationId(undefined);
     };
     return (
@@ -86,16 +86,17 @@ const PlanChat: React.FC<PlanChatProps> = ({
                     <div ref={inputContainerRef} className="plan-chat-input-container">
                         <div className="plan-chat-input-wrapper">
                             <ChatInput
-                                value={input}
+                                value={inputValue}
                                 onChange={setInput}
-                                onEnter={() => OnChatSubmit(input)}
-                                disabledChat={!planData.hasHumanClarificationRequest}
+                                onEnter={() => OnChatSubmit(inputValue)}
+                                disabledChat={!planData.enableChat}
+                                placeholder="Add more info to this task..."
                             >
                                 <Button
                                     appearance="transparent"
-                                    onClick={() => OnChatSubmit(input)}
+                                    onClick={() => OnChatSubmit(inputValue)}
                                     icon={<Send />}
-                                    disabled={!planData?.hasHumanClarificationRequest && (!input.trim())}
+                                    disabled={!planData?.enableChat && (!input.trim())}
                                 />
 
                             </ChatInput>
