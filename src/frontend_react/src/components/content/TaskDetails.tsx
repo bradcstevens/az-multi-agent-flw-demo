@@ -9,6 +9,7 @@ import {
     Checkbox,
     Body1,
     Body1Strong,
+    Caption1,
 } from "@fluentui/react-components";
 import {
     Add20Regular,
@@ -94,7 +95,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
 
                 <div className="task-details-subtask-list">
                     {subTasks.map((subtask) => {
-                        const { description } = TaskService.splitSubtaskAction(
+                        const { description, functionOrDetails } = TaskService.splitSubtaskAction(
                             subtask.action
                         );
                         const canInteract = planData.plan.human_clarification_response !== null
@@ -105,7 +106,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                             </div>
                             <div className="task-details-subtask-content">
                                 <span className={`task-details-subtask-description ${subtask.human_approval_status === "rejected" ? "strikethrough" : ""}`}>
-                                    {description}
+                                    {description} {functionOrDetails && <Caption1>{functionOrDetails}</Caption1>}
                                 </span>
                                 <div className="task-details-action-buttons">
                                     {(subtask.human_approval_status !== "accepted" && subtask.human_approval_status !== "rejected") && (

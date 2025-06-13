@@ -106,11 +106,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
                         maxHeight: "32px",
                     }}
                 >
-                    <FluentTooltip content="AI-generated content may be incorrect." relationship="label">
-                        <Tag appearance="filled" size="small">
-                            AI Generated
-                        </Tag>
-                    </FluentTooltip>
 
                     <HeaderTools>
                         {children}

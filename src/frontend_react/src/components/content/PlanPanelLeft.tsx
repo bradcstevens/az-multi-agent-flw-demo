@@ -20,6 +20,7 @@ import { PlanPanelLefProps, PlanWithSteps, Task } from "@/models";
 import { apiService } from "@/api";
 import { TaskService } from "@/services";
 import MsftColor from "@/coral/imports/MsftColor";
+import ContosoLogo from "./contoso";
 import "../../styles/PlanPanelLeft.css";
 import PanelFooter from "@/coral/components/Panels/PanelFooter";
 import PanelUserCard from "../../coral/components/Panels/UserCard";
@@ -99,7 +100,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
   return (
     <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
       <PanelLeft panelWidth={280} panelResize={true}>
-        <PanelLeftToolbar panelTitle="Microsoft" panelIcon={<MsftColor />}>
+        <PanelLeftToolbar panelTitle="Contoso" panelIcon={<ContosoLogo />}>
           <Tooltip content="New task" relationship={"label"} />
         </PanelLeftToolbar>
 
