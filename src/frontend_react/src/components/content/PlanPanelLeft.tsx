@@ -20,8 +20,10 @@ import { PlanPanelLefProps, PlanWithSteps, Task } from "@/models";
 import { apiService } from "@/api";
 import { TaskService } from "@/services";
 import MsftColor from "@/coral/imports/MsftColor";
-import ContosoLogo from "./contoso";
+import ContosoLogo from "../../coral/imports/ContosoLogo";
 import "../../styles/PlanPanelLeft.css";
+import PanelFooter from "@/coral/components/Panels/PanelFooter";
+import PanelUserCard from "../../coral/components/Panels/UserCard";
 
 const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
   const { dispatchToast } = useToastController("toast");
@@ -98,7 +100,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
   return (
     <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
       <PanelLeft panelWidth={280} panelResize={true}>
-        <PanelLeftToolbar panelTitle="Contoso" panelIcon={<ContosoLogo />}>
+        <PanelLeftToolbar panelTitle="Contoso" panelIcon={<ContosoLogo style={{ width: 20, height: 20 }} />}>
           <Tooltip content="New task" relationship={"label"} />
         </PanelLeftToolbar>
 
@@ -119,6 +121,18 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
           loading={plansLoading}
           selectedTaskId={selectedTaskId ?? undefined}
         />
+
+        <PanelFooter>
+          <PanelUserCard
+            name="Pepper Hayuki"
+            alias="pepperhayuki@microsoft.com"
+            // image={{ src: "https://fabricweb.azureedge.net/fabric-website/assets/images/avatar/KatriAthokas.jpg" }}
+            // shape="square"
+            // badge={{ status: 'available' }}
+            // color="colorful"
+            size={32} // Default=32
+          />
+        </PanelFooter>
       </PanelLeft>
     </div>
   );

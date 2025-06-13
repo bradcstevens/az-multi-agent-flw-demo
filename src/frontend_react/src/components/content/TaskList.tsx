@@ -1,13 +1,8 @@
 import {
-  Accordion,
-  AccordionHeader,
-  AccordionItem,
-  AccordionPanel,
   Button,
   Menu,
   MenuTrigger,
   Caption1,
-  Body1,
   Skeleton,
   SkeletonItem,
 } from "@fluentui/react-components";
