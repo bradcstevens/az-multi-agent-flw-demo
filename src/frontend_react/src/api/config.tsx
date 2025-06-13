@@ -1,9 +1,12 @@
 // src/config.js
 
+import { UserInfo } from "@/models";
+
 declare global {
     interface Window {
         appConfig?: Record<string, any>;
         activeUserId?: string;
+        userInfo?: UserInfo[];
     }
 }
 
@@ -38,7 +41,21 @@ export function getConfigData() {
 
     return { ...config };
 }
-
+export async function getUserInfo(): Promise<UserInfo[]> {
+    try {
+        const response = await fetch("/.auth/me");
+        if (!response.ok) {
+            console.log(
+                "No identity provider found. Access to chat will be blocked."
+            );
+            return [];
+        }
+        const payload = await response.json();
+        return payload;
+    } catch (e) {
+        return [];
+    }
+}
 export function getApiUrl() {
     if (!API_URL) {
         // Check if window.appConfig exists
@@ -56,7 +73,7 @@ export function getApiUrl() {
 }
 
 export function getUserId(): string {
-    USER_ID = window.activeUserId ?? null;
+    USER_ID = window.userInfo ? window.userInfo[0].user_id : null;
     const userId = USER_ID ?? "00000000-0000-0000-0000-000000000000";
     return userId;
 }
