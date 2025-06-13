@@ -18,6 +18,7 @@ import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
 import ChatInput from "@/coral/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
+import PromptCard from "@/coral/components/PromptCard";
 
 const HomeInput: React.FC<HomeInputProps> = ({
     onInputSubmit,
@@ -124,33 +125,13 @@ const HomeInput: React.FC<HomeInputProps> = ({
                         </div>
                         <div className="home-input-quick-tasks">
                             {quickTasks.map((task) => (
-                                <Card
+                                <PromptCard
                                     key={task.id}
-                                    className="home-input-quick-task-card"
-                                    onMouseOver={(e) =>
-                                    (e.currentTarget.style.backgroundColor =
-                                        "var(--colorNeutralBackground4Hover)")
-                                    }
-                                    onMouseOut={(e) =>
-                                    (e.currentTarget.style.backgroundColor =
-                                        "var(--colorNeutralBackground3)")
-                                    }
-                                    onClick={
-                                        !submitting ? () => handleQuickTaskClick(task) : undefined
-                                    }
-                                >
-                                    <div className="home-input-quick-task-content">
-                                        <div className="home-input-quick-task-icon">
-                                            {task.icon}
-                                        </div>
-                                        <div className="home-input-quick-task-text-content">
-                                            <Body1Strong>{task.title}</Body1Strong>
-                                            <Body1 className="home-input-quick-task-description">
-                                                {task.description}
-                                            </Body1>
-                                        </div>
-                                    </div>
-                                </Card>
+                                    title={task.title}
+                                    icon={task.icon}
+                                    description={task.description}
+                                    onClick={() => handleQuickTaskClick(task)}
+                                />
                             ))}
                         </div>
                     </div>

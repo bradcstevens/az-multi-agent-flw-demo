@@ -1,34 +1,8 @@
 /* TaskList Component Styles */
 
-/* .task-list-task-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition-property: background-color;
-    transition-duration: 0.1s; 
-    transition-timing-function: cubic-bezier(0.33, 0.00, 0.67, 1.00); 
-} */
-
-.task-accordion-header {
-    color: var(--colorNeutralForeground3);
-    padding: 0px 16px 0px 0;
-    background-color: transparent;
-    cursor: pointer;
-    justify-content: space-between;
-    height: 32px;
-}
-
 .task-list-task-date {
     color: var(--colorNeutralForeground3); /* tokens.colorNeutralForeground2 */
 }
-
-
-/* HI */
-
-/* APP */
-
 
 .tab {
   display: flex;
@@ -103,7 +77,8 @@
   opacity: 1;
 }
 
-/* New styles for migrated inline styles */
+/* SKELETON */
+
 .task-skeleton-container {
   padding: 8px;
   border-radius: 6px;
@@ -112,37 +87,9 @@
   background-color: transparent;
 }
 
-.task-skeleton-content {
+.task-skeleton-wrapper {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.task-skeleton-item {
-  width: 100%;
-  height: 24px;
-  border-radius: 4px;
-}
-
-.task-accordion-header-in-progress {
-  color: var(--colorNeutralForeground3);
-  padding: 0px 16px 0px 0;
-  background-color: transparent;
-  cursor: pointer;
-  justify-content: space-between;
-  height: 40px;
-}
-
-.task-accordion-header-completed {
-  color: var(--colorNeutralForeground3);
-  padding: 0px 16px 0px 0;
-  background-color: transparent;
-  cursor: pointer;
-  justify-content: space-between;
-  height: 32px;
-}
-
-.task-accordion-panel {
-  margin: 8px;
 }
 
