@@ -25,14 +25,15 @@ import "../../styles/TaskDetails.css";
 
 const TaskDetails: React.FC<TaskDetailsProps> = ({
     planData,
+    loading,
     OnApproveStep,
     OnRejectStep,
 }) => {
-    const completedCount = planData.plan.completed || 0;
-    const total = planData.plan.total_steps || 1;
+    const completedCount = planData?.plan.completed || 0;
+    const total = planData?.plan.total_steps || 1;
     const subTasks = planData.steps || [];
     const progress = completedCount / total;
-    const agents = planData.agents || [];
+    const agents = planData?.agents || [];
 
     const renderStatusIcon = (status: string) => {
         switch (status) {
@@ -96,7 +97,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                         const { description } = TaskService.splitSubtaskAction(
                             subtask.action
                         );
-                        const canInteract = !planData.hasHumanClarificationRequest;
+                        const canInteract = planData.plan.human_clarification_response !== null
 
                         return (<div key={subtask.id} className="task-details-subtask-item">
                             <div className="task-details-status-icon">
