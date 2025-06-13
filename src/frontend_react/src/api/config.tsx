@@ -75,7 +75,7 @@ export function getApiUrl() {
 }
 
 export function getUserId(): string {
-    USER_ID = window.userInfo ? window.userInfo[0].user_id : null;
+    USER_ID = window.userInfo && window.userInfo[0] && window.userInfo[0].user_id ? window.userInfo[0].user_id : null;
     const userId = USER_ID ?? "00000000-0000-0000-0000-000000000000";
     return userId;
 }
