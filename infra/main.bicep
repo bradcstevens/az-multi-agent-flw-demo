@@ -791,23 +791,23 @@ module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.11.0'
           }
         ])
       : []
-    roleAssignments: [
-      // {
-      //   principalId: userAssignedIdentity.outputs.principalId
-      //   principalType: 'ServicePrincipal'
-      //   roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-      // }
-      {
-        principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
-        principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-      }
-      {
-        principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
-        principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: '53ca6127-db72-4b80-b1b0-d745d6d5456d'
-      }
-    ]
+    // roleAssignments: [
+    //   // {
+    //   //   principalId: userAssignedIdentity.outputs.principalId
+    //   //   principalType: 'ServicePrincipal'
+    //   //   roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
+    //   // }
+    //   {
+    //     principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
+    //     principalType: 'ServicePrincipal'
+    //     roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
+    //   }
+    //   {
+    //     principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
+    //     principalType: 'ServicePrincipal'
+    //     roleDefinitionIdOrName: '53ca6127-db72-4b80-b1b0-d745d6d5456d'
+    //   }
+    // ]
     deployments: aiFoundryAiServicesConfiguration.?deployments ?? [
       {
         name: aiFoundryAiServicesModelDeployment.name
@@ -1007,6 +1007,9 @@ resource aiFoundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-04
     description: aiProjectDescription
     displayName: aiFoundryAiProjectName
   }
+  dependsOn:[
+    aiServices
+  ]
 }
 
 resource aiUser 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
@@ -1022,11 +1025,20 @@ resource aiUserAccessProj 'Microsoft.Authorization/roleAssignments@2022-04-01' =
   }
 }
 
+resource aiUserAccessFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerApp.name, aiServices.id, aiUser.id)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: aiUser.id
+    principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
+  }
+}
+
 resource aiDeveloper 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
   name: '64702f94-c441-49e6-a78b-ef80e0188fee'
 }
 
-resource aiUserAccessFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource aiDeveloperAccessFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(containerApp.name, aiServices.id, aiDeveloper.id)
   scope: aiFoundryProject
   properties: {
@@ -1035,6 +1047,18 @@ resource aiUserAccessFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01
   }
 }
 
+resource CognitiveServiceOpenAIUser 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+}
+
+resource cognitiveServiceOpenAIUserAccessFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerApp.name, aiServices.id, CognitiveServiceOpenAIUser.id)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: CognitiveServiceOpenAIUser.id
+    principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
+  }
+}
 
 // ========== Cosmos DB ========== //
 // WAF best practices for Cosmos DB: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/cosmos-db
