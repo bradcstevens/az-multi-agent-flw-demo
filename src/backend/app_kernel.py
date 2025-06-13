@@ -519,12 +519,12 @@ async def approve_step_endpoint(
         return {"status": "All steps approved"}
 
 
-@app.get("/api/plans", response_model=List[PlanWithSteps])
+@app.get("/api/plans")
 async def get_plans(
     request: Request,
     session_id: Optional[str] = Query(None),
     plan_id: Optional[str] = Query(None),
-) -> List[PlanWithSteps]:
+):
     """
     Retrieve plans for the current user.
 
@@ -620,9 +620,12 @@ async def get_plans(
 
         # Use get_steps_by_plan to match the original implementation
         steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
+        messages = await memory_store.get_data_by_type_and_plan_id(
+            "agent_message", plan_id=plan.id
+        )
         plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
         plan_with_steps.update_step_counts()
-        return [plan_with_steps]
+        return [plan_with_steps, messages]
 
     all_plans = await memory_store.get_all_plans()
     # Fetch steps for all plans concurrently

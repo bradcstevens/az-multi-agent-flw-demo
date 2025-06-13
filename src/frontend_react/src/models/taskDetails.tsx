@@ -22,6 +22,8 @@ export interface Human {
 
 export interface TaskDetailsProps {
     planData: ProcessedPlanData;
+    loading: boolean;
+    processingSubtaskId: string | null;
     OnApproveStep: (step: Step) => void;
     OnRejectStep: (step: Step) => void;
 }

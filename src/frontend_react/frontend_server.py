@@ -1,3 +1,4 @@
+import html
 import os
 
 import uvicorn
@@ -20,7 +21,7 @@ app.add_middleware(
 )
 
 # Build paths
-BUILD_DIR = os.path.join(os.path.dirname(__file__), "dist")
+BUILD_DIR = os.path.join(os.path.dirname(__file__), "build")
 INDEX_HTML = os.path.join(BUILD_DIR, "index.html")
 
 # Serve static files from build directory
@@ -36,21 +37,13 @@ async def serve_index():
 
 @app.get("/config")
 async def get_config():
+    backend_url = html.escape(os.getenv("BACKEND_API_URL", "http://localhost:8000"))
+    auth_enabled = html.escape(os.getenv("AUTH_ENABLED", "false"))
+    backend_url = backend_url + "/api"
+
     config = {
-        "API_URL": os.getenv("API_URL", "API_URL not set"),
-        "REACT_APP_MSAL_AUTH_CLIENTID": os.getenv(
-            "REACT_APP_MSAL_AUTH_CLIENTID", "Client ID not set"
-        ),
-        "REACT_APP_MSAL_AUTH_AUTHORITY": os.getenv(
-            "REACT_APP_MSAL_AUTH_AUTHORITY", "Authority not set"
-        ),
-        "REACT_APP_MSAL_REDIRECT_URL": os.getenv(
-            "REACT_APP_MSAL_REDIRECT_URL", "Redirect URL not set"
-        ),
-        "REACT_APP_MSAL_POST_REDIRECT_URL": os.getenv(
-            "REACT_APP_MSAL_POST_REDIRECT_URL", "Post Redirect URL not set"
-        ),
-        "ENABLE_AUTH": os.getenv("ENABLE_AUTH", "false"),
+        "API_URL": backend_url,
+        "ENABLE_AUTH": auth_enabled,
     }
     return config
 

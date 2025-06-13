@@ -11,11 +11,13 @@ import ReactMarkdown from "react-markdown";
 import "../../styles/PlanChat.css"; // Assuming you have a CSS file for additional styles
 import "../../styles/Chat.css"; // Assuming you have a CSS file for additional styles
 import "../../styles/prism-material-oceanic.css"
+import InlineToaster from "../toast/InlineToaster";
 const PlanChat: React.FC<PlanChatProps> = ({
     planData,
+    loading,
     OnChatSubmit
 }) => {
-    const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+    // const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
     const [input, setInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const [showScrollButton, setShowScrollButton] = useState(false);
@@ -24,26 +26,27 @@ const PlanChat: React.FC<PlanChatProps> = ({
 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputContainerRef = useRef<HTMLDivElement>(null);
-    const sendMessage = async () => {
-    };
+    const messages = planData?.messages || [];
     const scrollToBottom = () => {
     };
     const clearChat = async () => {
-        setMessages([]);
         setInput("");
         setCurrentConversationId(undefined);
     };
     return (
         <div className="chat-container">
-            <div className="messages" ref={messagesContainerRef}>
-                <div className="message-wrapper">
-                    {messages.map((msg, index) => (<div key={index} className={`message ${msg.role}`}>
-                        <Body1>
-                            <div className="plan-chat-message-content">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]}>
-                                    {msg.content}
-                                </ReactMarkdown>
-                                {/* {msg.role === "assistant" && (
+            {planData && (
+                <>
+                    <div className="messages" ref={messagesContainerRef}>
+                        <div className="message-wrapper">
+
+                            {messages.map((msg, index) => (<div key={index} className={`message ${msg.source !== "human" ? "assistant" : "user"}`}>
+                                <Body1>
+                                    <div className="plan-chat-message-content">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]}>
+                                            {msg.content}
+                                        </ReactMarkdown>
+                                        {/* {msg.role === "assistant" && (
                                     <div className="assistant-footer">
                                         <div className="assistant-actions">
                                             <Button
@@ -63,64 +66,43 @@ const PlanChat: React.FC<PlanChatProps> = ({
                                         </div>
                                     </div>
                                 )} */}
+                                    </div>
+                                </Body1>
                             </div>
-                        </Body1>
+                            ))}</div>
                     </div>
-                    ))}</div>
+                    {showScrollButton && (
+                        <Tag
+                            onClick={scrollToBottom}
+                            className="scroll-to-bottom plan-chat-scroll-button"
+                            shape="circular"
+                            style={{ bottom: inputHeight }}
+                        >
+                            Back to bottom
+                        </Tag>
+                    )}
 
-
-                {isTyping && (
-                    <div className="typing-indicator">
-                        <span>Thinking...</span>
-                    </div>
-                )}
-            </div>
-            {showScrollButton && (
-                <Tag
-                    onClick={scrollToBottom}
-                    className="scroll-to-bottom plan-chat-scroll-button"
-                    shape="circular"
-                    style={{ bottom: inputHeight }}
-                >
-                    Back to bottom
-                </Tag>
-            )}
-
-            <div ref={inputContainerRef} className="plan-chat-input-container">
-                <div className="plan-chat-input-wrapper">
-                    <ChatInput
-                        value={input}
-                        onChange={setInput}
-                        onEnter={sendMessage}
-
-                    >
-                        <Button
-                            appearance="transparent"
-                            onClick={sendMessage}
-                            icon={<Send />}
-                            disabled={planData.hasHumanClarificationRequest && (isTyping || !input.trim())}
-                        />
-
-                        {messages.length > 0 && (
-                            <HeaderTools>
-                                <ToolbarDivider />
+                    <InlineToaster />
+                    <div ref={inputContainerRef} className="plan-chat-input-container">
+                        <div className="plan-chat-input-wrapper">
+                            <ChatInput
+                                value={input}
+                                onChange={setInput}
+                                onEnter={() => OnChatSubmit(input)}
+                                disabledChat={!planData.hasHumanClarificationRequest}
+                            >
                                 <Button
-
-                                    onClick={clearChat}
                                     appearance="transparent"
-                                    icon={<ChatDismiss20Regular />}
-                                    disabled={isTyping || messages.length === 0} />
+                                    onClick={() => OnChatSubmit(input)}
+                                    icon={<Send />}
+                                    disabled={!planData?.hasHumanClarificationRequest && (!input.trim())}
+                                />
 
-                            </HeaderTools>
+                            </ChatInput>
+                        </div>
 
-                        )}
-
-                    </ChatInput>
-                </div>
-
-            </div>
-
-
+                    </div>
+                </>)}
         </div>
     );
 };

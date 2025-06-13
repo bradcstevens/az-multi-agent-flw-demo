@@ -147,7 +147,19 @@ export class TaskService {
             description: description
         };
 
-        return await apiService.submitInputTask(inputTask);
+        try {
+            return await apiService.submitInputTask(inputTask);
+        } catch (error: any) {
+            // You can customize this logic as needed
+            let message = "Failed to create task.";
+            if (error?.response?.data?.message) {
+                message = error.response.data.message;
+            } else if (error?.message) {
+                message = error.message;
+            }
+            // Throw a new error with a user-friendly message
+            throw new Error(message);
+        }
     }
 }
 

@@ -1,7 +1,4 @@
-import { headerBuilder } from '../auth';
-
-// Get base API URL
-const api = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
+import { headerBuilder, getApiUrl } from './config';
 
 // Helper function to build URL with query parameters
 const buildUrl = (url: string, params?: Record<string, any>): string => {
@@ -46,7 +43,9 @@ const fetchWithAuth = async (url: string, method: string = "GET", body: BodyInit
     };
 
     try {
-        const response = await fetch(`${api}${url}`, options);
+        const apiUrl = getApiUrl();
+
+        const response = await fetch(`${apiUrl}${url}`, options);
         console.log('response', response);
 
         if (!response.ok) {
@@ -75,7 +74,8 @@ const fetchWithoutAuth = async (url: string, method: string = "POST", body: Body
     };
 
     try {
-        const response = await fetch(`${api}${url}`, options);
+        const apiUrl = getApiUrl();
+        const response = await fetch(`${apiUrl}${url}`, options);
 
         if (!response.ok) {
             const errorText = await response.text();

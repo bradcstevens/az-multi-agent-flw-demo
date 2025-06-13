@@ -1,4 +1,4 @@
-import { PlanWithSteps, Step, AgentType, ProcessedPlanData } from '@/models';
+import { PlanWithSteps, Step, AgentType, ProcessedPlanData, PlanMessage } from '@/models';
 import { apiService } from '@/api';
 
 
@@ -13,8 +13,8 @@ export class PlanDataService {    /**
     static async fetchPlanData(planId: string): Promise<ProcessedPlanData> {
         try {
             // Use optimized getPlanById method for better performance
-            const plan = await apiService.getPlanById(planId);
-            return this.processPlanData(plan);
+            const planBody = await apiService.getPlanById(planId);
+            return this.processPlanData(planBody.plan_with_steps, planBody.messages || []);
         } catch (error) {
             console.error('Failed to fetch plan data:', error);
             throw error;
@@ -26,7 +26,7 @@ export class PlanDataService {    /**
      * @param plan PlanWithSteps object to process
      * @returns Processed plan data
      */
-    static processPlanData(plan: PlanWithSteps): ProcessedPlanData {
+    static processPlanData(plan: PlanWithSteps, messages: PlanMessage[]): ProcessedPlanData {
         // Extract unique agents from steps
         const uniqueAgents = new Set<AgentType>();
         plan.steps.forEach(step => {
@@ -49,7 +49,8 @@ export class PlanDataService {    /**
             plan,
             agents,
             steps,
-            hasHumanClarificationRequest
+            hasHumanClarificationRequest,
+            messages
         };
     }
 
@@ -88,5 +89,44 @@ export class PlanDataService {    /**
      */
     static getPlanCompletionPercentage(plan: PlanWithSteps): number {
         return apiService.getPlanCompletionPercentage(plan);
+    }
+
+    /**
+     * Approve a plan step
+     * @param step Step to approve
+     * @returns Promise with API response
+     */
+    static async approveStep(step: Step): Promise<{ status: string }> {
+        return apiService.approveSteps(
+            step.plan_id,
+            step.session_id,
+            true, // approved
+            step.id
+        );
+    }
+
+    /**
+     * Reject a plan step
+     * @param step Step to reject
+     * @returns Promise with API response
+     */
+    static async rejectStep(step: Step): Promise<{ status: string }> {
+        return apiService.approveSteps(
+            step.plan_id,
+            step.session_id,
+            false, // not approved
+            step.id
+        );
+    }
+
+    /**
+     * Submit human clarification for a plan
+     * @param planId Plan ID
+     * @param sessionId Session ID
+     * @param clarification Clarification text
+     * @returns Promise with API response
+     */
+    static async submitClarification(planId: string, sessionId: string, clarification: string) {
+        return apiService.submitClarification(planId, sessionId, clarification);
     }
 }

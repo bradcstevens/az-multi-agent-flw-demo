@@ -10,8 +10,10 @@ import { TaskDetailsProps } from "@/models";
 
 const PlanPanelRight: React.FC<TaskDetailsProps> = ({
     planData,
+    loading,
     OnApproveStep,
     OnRejectStep,
+    processingSubtaskId
 }) => {
     if (!planData) return null;
 
@@ -28,6 +30,8 @@ const PlanPanelRight: React.FC<TaskDetailsProps> = ({
                     planData={planData}
                     OnApproveStep={OnApproveStep}
                     OnRejectStep={OnRejectStep}
+                    processingSubtaskId={processingSubtaskId}
+                    loading={loading}
                 />
             </div>
         </PanelRight>
