@@ -51,6 +51,7 @@ const PlanPage: React.FC = () => {
         if (!planId) return;
 
         try {
+            setInput(""); // Clear input on new load
             setPlanData(null);
             setLoading(true);
             setError(null);
@@ -87,14 +88,20 @@ const PlanPage: React.FC = () => {
     // Accept chat input and submit clarification
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
+            console.log('handleOnchatSubmit called with input:', chatInput);
+            if (!chatInput.trim()) {
+                showToast("Please enter a clarification", "error");
+                return;
+            }
             if (!planData?.plan) return;
-            showToast("Submitting clarification...", "progress", { dismissible: false });
+            showToast("Submitting clarification...", "progress");
             try {
                 await PlanDataService.submitClarification(
                     planData.plan.id, // plan_id
                     planData.plan.session_id, // session_id
                     chatInput // human_clarification
                 );
+                setInput(""); // Clear input after submission
                 showToast("Clarification submitted successfully", "success");
                 await loadPlanData2();
             } catch (error) {
@@ -110,7 +117,7 @@ const PlanPage: React.FC = () => {
     // Move handlers here to fix dependency order
     const handleApproveStep = useCallback(async (step: Step) => {
         setProcessingSubtaskId(step.id);
-        showToast("Submitting approval...", "progress", { dismissible: false });
+        showToast("Submitting approval...", "progress");
         try {
             await PlanDataService.approveStep(step);
             showToast("Step approved successfully", "success");
@@ -126,7 +133,7 @@ const PlanPage: React.FC = () => {
 
     const handleRejectStep = useCallback(async (step: Step) => {
         setProcessingSubtaskId(step.id);
-        showToast("Submitting rejection...", "progress", { dismissible: false });
+        showToast("Submitting rejection...", "progress");
         try {
             await PlanDataService.rejectStep(step);
             showToast("Step rejected successfully", "success");

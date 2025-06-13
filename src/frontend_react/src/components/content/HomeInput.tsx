@@ -46,7 +46,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
     const handleSubmit = async () => {
         if (input.trim()) {
             setSubmitting(true);
-            showToast("Creating a plan..", "progress", { dismissible: false });
+            showToast("Creating a plan..", "progress");
             try {
                 const response = await TaskService.submitInputTask(input.trim());
 

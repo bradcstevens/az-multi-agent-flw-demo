@@ -81,7 +81,7 @@ const fetchWithoutAuth = async (url: string, method: string = "POST", body: Body
             const errorText = await response.text();
             throw new Error(errorText || 'Login failed');
         }
-
+        console.log('response', response);
         const isJson = response.headers.get('content-type')?.includes('application/json');
         return isJson ? await response.json() : null;
     } catch (error) {

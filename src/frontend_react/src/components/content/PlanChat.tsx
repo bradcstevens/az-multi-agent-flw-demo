@@ -117,7 +117,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
                     >
                         <Button
                             appearance="transparent"
-                            onClick={sendMessage}
+                            onClick={() => OnChatSubmit(inputValue)}
                             icon={<Send />}
                             disabled={!planData?.enableChat}
                         />
