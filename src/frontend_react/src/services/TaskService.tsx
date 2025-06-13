@@ -108,7 +108,7 @@ export class TaskService {
         if (colonIndex !== -1) {
             return {
                 description: action.substring(0, colonIndex).trim(),
-                functionOrDetails: action.substring(colonIndex + 1).trim()
+                functionOrDetails: null
             };
         }
 
