@@ -1,3 +1,4 @@
+import html
 import os
 
 import uvicorn
@@ -36,8 +37,12 @@ async def serve_index():
 
 @app.get("/config")
 async def get_config():
+    backend_url = html.escape(os.getenv("BACKEND_API_URL", "http://localhost:8000"))
+    auth_enabled = html.escape(os.getenv("AUTH_ENABLED", "false"))
+    backend_url = backend_url + "/api"
+
     config = {
-        "API_URL": os.getenv("API_URL", "API_URL not set"),
+        "API_URL": backend_url,
         "REACT_APP_MSAL_AUTH_CLIENTID": os.getenv(
             "REACT_APP_MSAL_AUTH_CLIENTID", "Client ID not set"
         ),
@@ -50,7 +55,7 @@ async def get_config():
         "REACT_APP_MSAL_POST_REDIRECT_URL": os.getenv(
             "REACT_APP_MSAL_POST_REDIRECT_URL", "Post Redirect URL not set"
         ),
-        "ENABLE_AUTH": os.getenv("ENABLE_AUTH", "false"),
+        "ENABLE_AUTH": auth_enabled,
     }
     return config
 
