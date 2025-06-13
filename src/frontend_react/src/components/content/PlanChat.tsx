@@ -20,6 +20,7 @@ import "../../styles/PlanChat.css";
 import "../../styles/Chat.css";
 import "../../styles/prism-material-oceanic.css";
 import { TaskService } from "@/services/TaskService";
+import InlineToaster from "../toast/InlineToaster";
 
 const PlanChat: React.FC<PlanChatProps> = ({
     planData,
@@ -104,7 +105,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
                     Back to bottom
                 </Tag>
             )}
-
+            <InlineToaster />
             <div ref={inputContainerRef} className="plan-chat-input-container">
                 <div className="plan-chat-input-wrapper">
                     <ChatInput
@@ -118,12 +119,13 @@ const PlanChat: React.FC<PlanChatProps> = ({
                             appearance="transparent"
                             onClick={sendMessage}
                             icon={<Send />}
-                            disabled={!planData?.enableChat || isTyping || !input.trim()}
+                            disabled={!planData?.enableChat}
                         />
                     </ChatInput>
                 </div>
             </div>
         </div>
+
     );
 };
 

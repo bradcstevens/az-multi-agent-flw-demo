@@ -45,7 +45,7 @@ export class PlanDataService {    /**
         const hasClarificationRequest = plan.human_clarification_request != null && plan.human_clarification_request.trim().length > 0;
         const hasClarificationResponse = plan.human_clarification_response != null && plan.human_clarification_response.trim().length > 0;
         const enableChat = hasClarificationRequest && !hasClarificationResponse;
-        const enableStepButtons = hasClarificationRequest && hasClarificationResponse;
+        const enableStepButtons = (hasClarificationRequest && hasClarificationResponse) || (!hasClarificationRequest && !hasClarificationResponse);
         return {
             plan,
             agents,
