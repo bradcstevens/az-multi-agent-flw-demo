@@ -95,6 +95,7 @@ export class TaskService {
      */
     static splitSubtaskAction(action: string): { description: string; functionOrDetails: string | null } {
         // Check for "Function:" pattern (with period before Function)
+
         const functionMatch = action.match(/^(.+?)\.\s*Function:\s*(.+)$/);
         if (functionMatch) {
             return {
@@ -125,9 +126,8 @@ export class TaskService {
      */
     static cleanTextToSpaces(text: string): string {
         if (!text) return '';
-
         // Replace any non-alphanumeric character with a space
-        let cleanedText = text.replace(/[^a-zA-Z0-9]/g, ' ');
+        let cleanedText = text.replace("Hr_Agent", "HR_Agent").trim().replace(/[^a-zA-Z0-9]/g, ' ');
 
         // Clean up multiple spaces and trim
         cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
