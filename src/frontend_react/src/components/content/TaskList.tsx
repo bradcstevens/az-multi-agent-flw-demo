@@ -1,19 +1,18 @@
 import {
-  Accordion,
-  AccordionHeader,
-  AccordionItem,
-  AccordionPanel,
   Button,
   Menu,
   MenuTrigger,
   Caption1,
-  Body1,
   Skeleton,
   SkeletonItem,
 } from "@fluentui/react-components";
 import { MoreHorizontal20Regular } from "@fluentui/react-icons";
 import React from "react";
 import "../../styles/TaskList.css";
+import CoralAccordion from "@/coral/components/CoralAccordion/CoralAccordion";
+import CoralAccordionItem from "@/coral/components/CoralAccordion/CoralAccordionItem";
+import CoralAccordionHeader from "@/coral/components/CoralAccordion/CoralAccordionHeader";
+import CoralAccordionPanel from "@/coral/components/CoralAccordion/CoralAccordionPanel";
 
 interface Task {
   id: string;
@@ -67,85 +66,44 @@ const TaskList: React.FC<TaskListProps> = ({
     );
   };
 
-  const renderSkeleton = (key: string) => (
-    <div
-      key={key}
-      style={{
-        padding: "8px",
-        borderRadius: 6,
-        pointerEvents: "none",
-        cursor: "default",
-        backgroundColor: "transparent",
-      }}
-    >
-      <Skeleton aria-label="Loading task">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-          }}
-        >
-          <SkeletonItem
-            shape="rectangle"
-            animation="wave"
-            style={{ width: "100%", height: 24, borderRadius: 4 }}
-          />
-        </div>
-      </Skeleton>
-    </div>
-  );
+const renderSkeleton = (key: string) => (
+  <div key={key} className="task-skeleton-container">
+    <Skeleton aria-label="Loading task">
+      <div className="task-skeleton-wrapper">
+        <SkeletonItem
+          shape="rectangle"
+          animation="wave"
+          size={24}
+        />
+      </div>
+    </Skeleton>
+  </div>
+);
 
   return (
-    <Accordion defaultOpenItems={["inprogress"]} collapsible>
-      <AccordionItem value="inprogress">
-        <AccordionHeader
-          expandIconPosition="end"
-          style={{
-            color: "var(--colorNeutralForeground3)",
-            padding: "0px 16px 0px 0",
-            backgroundColor: "transparent",
-            cursor: "pointer",
-            justifyContent: "space-between",
-            height: "40px",
-          }}
-        >
-          <Body1>In progress</Body1>
-        </AccordionHeader>
+    <CoralAccordion>
+      <CoralAccordionItem  defaultOpen>
+        <CoralAccordionHeader chevron>In progress</CoralAccordionHeader>
 
-        <AccordionPanel style={{ margin: "8px" }}>
+        <CoralAccordionPanel>
           {loading && inProgressTasks.length === 0
             ? [...Array(3)].map((_, i) =>
                 renderSkeleton(`inprogress-skel-${i}`)
               )
             : inProgressTasks.map(renderTaskItem)}
-        </AccordionPanel>
-      </AccordionItem>
+        </CoralAccordionPanel>
+      </CoralAccordionItem>
 
-      <AccordionItem value="completed">
-        <AccordionHeader
-          expandIconPosition="end"
-          style={{
-            color: "var(--colorNeutralForeground3)",
-            padding: "0px 16px 0px 0",
-            backgroundColor: "transparent",
-            cursor: "pointer",
-            justifyContent: "space-between",
-            height: "32px",
-          }}
-        >
-          <Body1>Completed</Body1>
-        </AccordionHeader>
+      <CoralAccordionItem >
+        <CoralAccordionHeader chevron>Completed</CoralAccordionHeader>
 
-        <AccordionPanel style={{ margin: "8px" }}>
+        <CoralAccordionPanel>
           {loading && completedTasks.length === 0
-            ? [...Array(2)].map((_, i) =>
-                renderSkeleton(`completed-skel-${i}`)
-              )
+            ? [...Array(2)].map((_, i) => renderSkeleton(`completed-skel-${i}`))
             : completedTasks.map(renderTaskItem)}
-        </AccordionPanel>
-      </AccordionItem>
-    </Accordion>
+        </CoralAccordionPanel>
+      </CoralAccordionItem>
+    </CoralAccordion>
   );
 };
 

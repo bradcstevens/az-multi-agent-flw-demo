@@ -1,34 +1,8 @@
 /* TaskList Component Styles */
 
-/* .task-list-task-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition-property: background-color;
-    transition-duration: 0.1s; 
-    transition-timing-function: cubic-bezier(0.33, 0.00, 0.67, 1.00); 
-} */
-
-.task-accordion-header {
-    color: var(--colorNeutralForeground3);
-    padding: 0px 16px 0px 0;
-    background-color: transparent;
-    cursor: pointer;
-    justify-content: space-between;
-    height: 32px;
-}
-
 .task-list-task-date {
     color: var(--colorNeutralForeground3); /* tokens.colorNeutralForeground2 */
 }
-
-
-/* HI */
-
-/* APP */
-
 
 .tab {
   display: flex;
@@ -101,5 +75,21 @@
 
 .task-tab:hover .task-menu-button {
   opacity: 1;
+}
+
+/* SKELETON */
+
+.task-skeleton-container {
+  padding: 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  cursor: default;
+  background-color: transparent;
+}
+
+.task-skeleton-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 

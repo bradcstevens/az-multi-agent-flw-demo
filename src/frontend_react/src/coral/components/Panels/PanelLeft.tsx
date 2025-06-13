@@ -1,5 +1,12 @@
-import React, { useState, useEffect, ReactNode, ReactElement } from "react";
-import PanelToolbar from "./PanelLeftToolbar.js"; // Import to identify toolbar
+import React, {
+  useState,
+  useEffect,
+  ReactNode,
+  ReactElement,
+  isValidElement,
+} from "react";
+import PanelToolbar from "./PanelLeftToolbar.js";
+import PanelFooter from "./PanelFooter"; // 👈 new
 import {
   Avatar,
   Body1,
@@ -43,24 +50,27 @@ const PanelLeft: React.FC<PanelLeftProps> = ({
     const onMouseUp = () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
-
-      // Re-enable text selection
       document.body.style.userSelect = "";
     };
 
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
-
-    // Disable text selection
     document.body.style.userSelect = "none";
   };
 
   const childrenArray = React.Children.toArray(children) as ReactElement[];
   const toolbar = childrenArray.find(
-    (child) => React.isValidElement(child) && child.type === PanelToolbar
+    (child) => isValidElement(child) && child.type === PanelToolbar
+  );
+  const footer = childrenArray.find(
+    (child) => isValidElement(child) && child.type === PanelFooter
   );
   const content = childrenArray.filter(
-    (child) => !(React.isValidElement(child) && child.type === PanelToolbar)
+    (child) =>
+      !(
+        isValidElement(child) &&
+        (child.type === PanelToolbar || child.type === PanelFooter)
+      )
   );
 
   return (
@@ -90,11 +100,12 @@ const PanelLeft: React.FC<PanelLeftProps> = ({
           overflowY: "auto",
           overflowX: "hidden",
           boxSizing: "border-box",
-          // padding: "16px",
         }}
       >
         {content}
       </div>
+
+      {footer && <div>{footer}</div>}
 
       {panelResize && (
         <div
@@ -116,28 +127,6 @@ const PanelLeft: React.FC<PanelLeftProps> = ({
           }}
         />
       )}
-
-      <div
-        style={{
-          display: "flex",
-          padding: "24px 16px",
-          gap: "12px",
-          alignItems: "center",
-        }}
-      >
-        <Avatar
-          name="Pepper Hayuki"
-          image={{
-            src: Human,
-          }}
-        />
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <Body1Strong>Pepper Hayuki</Body1Strong>
-          <Caption1 style={{ color: "var(--colorNeutralForeground3)" }}>
-            pepperhayuki@microsoft.com
-          </Caption1>
-        </div>
-      </div>
     </div>
   );
 };
