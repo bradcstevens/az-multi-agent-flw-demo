@@ -992,6 +992,9 @@ var aiFoundryAiProjectName = aiFoundryAiProjectConfiguration.?name ?? 'aifp-${so
 
 resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = {
   name: aiFoundryAiServicesResourceName
+  dependsOn:[
+      aiFoundryAiServices
+    ]
 }
 
 var aiProjectDescription = 'AI Foundry Project'
@@ -1007,9 +1010,6 @@ resource aiFoundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-04
     description: aiProjectDescription
     displayName: aiFoundryAiProjectName
   }
-  dependsOn:[
-    aiServices
-  ]
 }
 
 resource aiUser 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
@@ -1268,11 +1268,11 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
             name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
             value: applicationInsights.outputs.connectionString
           }
-          // {
-          //   name: 'AZURE_AI_AGENT_PROJECT_CONNECTION_STRING'
-          //   value: '${toLower(replace(azureOpenAILocation,' ',''))}.api.azureml.ms;${subscription().subscriptionId};${resourceGroup().name};${aiFoundryAiProjectName}'
-          //   //Location should be the AI Foundry AI Project location
-          // }
+          {
+            name: 'AZURE_AI_AGENT_PROJECT_CONNECTION_STRING'
+            value: '${toLower(replace(azureOpenAILocation,' ',''))}.api.azureml.ms;${subscription().subscriptionId};${resourceGroup().name};${aiFoundryAiProjectName}'
+            //Location should be the AI Foundry AI Project location
+          }
           {
             name: 'AZURE_AI_SUBSCRIPTION_ID'
             value: subscription().subscriptionId
