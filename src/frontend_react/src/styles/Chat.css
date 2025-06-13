@@ -25,6 +25,16 @@
       white-space: pre-wrap;
       line-height: 1.5rem;
     }
+
+        h5 {
+      margin: 12px 0;
+      white-space: pre-wrap;
+      line-height: 1.5rem;
+      /* border: 1px solid red; */
+      background-color: var(--colorNeutralBackground1);
+      padding: 12px;
+      border-radius: 8px;
+    }
   
     li {
       white-space: normal;
@@ -282,12 +292,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 6px;
+    margin-top: 4px;
     margin-left: -10px;
   }
   
   .assistant-actions {
     display: flex;
+    align-items: center;
     /* gap: 8px; */
   }
   
@@ -298,13 +309,13 @@
   display: flex;
 
   align-items: center;
-  padding: 0 16px 16px 16px;
+  padding: 40px 16px 16px 16px;
 }
 
 .message-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 40px;
   width: 100%;
   max-width: 768px;
 }
