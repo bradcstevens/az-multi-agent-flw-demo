@@ -8,6 +8,7 @@ type PromptCardProps = {
   description: string;
   icon?: React.ReactNode;
   onClick?: () => void;
+  disabled?: boolean; // ✅ New prop for disabling the card
 };
 
 const PromptCard: React.FC<PromptCardProps> = ({
@@ -15,30 +16,39 @@ const PromptCard: React.FC<PromptCardProps> = ({
   description,
   icon,
   onClick,
+  disabled = false, // 🔧 Default is false (enabled)
 }) => {
   return (
     <Card
-      onClick={onClick}
+      onClick={!disabled ? onClick : undefined} // 🚫 Block click if disabled
       style={{
         flex: "1",
         display: "flex",
         flexDirection: "column",
         padding: "16px",
-        backgroundColor: "var(--colorNeutralBackground3)",
+        backgroundColor: disabled
+          ? "var(--colorNeutralBackgroundDisabled)"
+          : "var(--colorNeutralBackground3)",
         border: "1px solid var(--colorNeutralStroke2)",
         borderRadius: "8px",
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
         boxShadow: "none",
+        opacity: disabled ? 0.4 : 1, // 🧼 Matches Fluent disabled visual
         transition: "background-color 0.2s ease-in-out",
       }}
-      onMouseOver={(e) =>
-        (e.currentTarget.style.backgroundColor =
-          "var(--colorNeutralBackground4Hover)")
-      }
-      onMouseOut={(e) =>
-        (e.currentTarget.style.backgroundColor =
-          "var(--colorNeutralBackground3)")
-      }
+      // 🧠 Only apply hover if not disabled
+      onMouseOver={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.backgroundColor =
+            "var(--colorNeutralBackground4Hover)";
+        }
+      }}
+      onMouseOut={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.backgroundColor =
+            "var(--colorNeutralBackground3)";
+        }
+      }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {icon && (

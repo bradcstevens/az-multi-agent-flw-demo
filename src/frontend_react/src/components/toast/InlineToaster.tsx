@@ -28,13 +28,24 @@ export const useInlineToaster = () => {
   const showToast = (
     content: React.ReactNode,
     intent: ToastIntent = "info",
-    options?: { dismissible?: boolean }
+    options?: {
+      dismissible?: boolean;
+      timeoutMs?: number | null;
+    }
   ) => {
     const id = Date.now();
+    const timeout = options?.timeoutMs ?? (intent === "progress" ? null : 3000);
+
     if (_setToasts) {
       _setToasts((prev) => [
         ...prev,
-        { id, content, intent, visible: false, dismissible: options?.dismissible },
+        {
+          id,
+          content,
+          intent,
+          visible: false,
+          dismissible: options?.dismissible,
+        },
       ]);
 
       setTimeout(() => {
@@ -43,18 +54,19 @@ export const useInlineToaster = () => {
         );
       }, 10);
 
-      if (intent !== "progress") {
+      if (timeout !== null) {
         setTimeout(() => {
           _setToasts?.((prev) =>
             prev.map((t) => (t.id === id ? { ...t, visible: false } : t))
           );
-        }, 3000);
+        }, timeout);
 
         setTimeout(() => {
           _setToasts?.((prev) => prev.filter((t) => t.id !== id));
-        }, 3500);
+        }, timeout + 500);
       }
     }
+
     return id;
   };
 
@@ -142,7 +154,9 @@ const InlineToaster: React.FC = () => {
           <Body1>{toast.content}</Body1>
           {toast.dismissible && (
             <button
-              onClick={() => _setToasts?.((prev) => prev.filter((t) => t.id !== toast.id))}
+              onClick={() =>
+                _setToasts?.((prev) => prev.filter((t) => t.id !== toast.id))
+              }
               style={{
                 position: "absolute",
                 top: "50%",
