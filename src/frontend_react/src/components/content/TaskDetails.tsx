@@ -96,7 +96,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                         const { description, functionOrDetails } = TaskService.splitSubtaskAction(
                             subtask.action
                         );
-                        const canInteract = planData.plan.human_clarification_response !== null
+                        const canInteract = planData.enableStepButtons;
 
                         return (<div key={subtask.id} className="task-details-subtask-item">
                             <div className="task-details-status-icon">

@@ -100,7 +100,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
   return (
     <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
       <PanelLeft panelWidth={280} panelResize={true}>
-        <PanelLeftToolbar panelTitle="Contoso" panelIcon={<ContosoLogo style={{ width: 20, height: 20 }} />}>
+        <PanelLeftToolbar panelTitle="Contoso" panelIcon={<ContosoLogo />}>
           <Tooltip content="New task" relationship={"label"} />
         </PanelLeftToolbar>
 

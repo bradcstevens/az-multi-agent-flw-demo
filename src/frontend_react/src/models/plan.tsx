@@ -109,12 +109,16 @@ export interface ProcessedPlanData {
     plan: PlanWithSteps;
     agents: AgentType[];
     steps: Step[];
-    hasHumanClarificationRequest: boolean;
+    hasClarificationRequest: boolean;
+    hasClarificationResponse: boolean;
+    enableChat: boolean;
+    enableStepButtons: boolean;
     messages: PlanMessage[];
 }
 
 export interface PlanChatProps {
     planData: ProcessedPlanData;
+    input: string;
     loading: boolean;
     OnChatSubmit: (message: string) => void;
 }

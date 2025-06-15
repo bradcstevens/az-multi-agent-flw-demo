@@ -42,14 +42,18 @@ export class PlanDataService {    /**
         const steps = plan.steps;
 
         // Check if human_clarification_request is not null
-        const hasHumanClarificationRequest = plan.human_clarification_request != null &&
-            plan.human_clarification_request.trim().length > 0;
-
+        const hasClarificationRequest = plan.human_clarification_request != null && plan.human_clarification_request.trim().length > 0;
+        const hasClarificationResponse = plan.human_clarification_response != null && plan.human_clarification_response.trim().length > 0;
+        const enableChat = hasClarificationRequest && !hasClarificationResponse;
+        const enableStepButtons = hasClarificationRequest && hasClarificationResponse;
         return {
             plan,
             agents,
             steps,
-            hasHumanClarificationRequest,
+            hasClarificationRequest,
+            hasClarificationResponse,
+            enableChat,
+            enableStepButtons,
             messages
         };
     }
@@ -127,6 +131,11 @@ export class PlanDataService {    /**
      * @returns Promise with API response
      */
     static async submitClarification(planId: string, sessionId: string, clarification: string) {
-        return apiService.submitClarification(planId, sessionId, clarification);
+        try {
+            return apiService.submitClarification(planId, sessionId, clarification);
+        } catch (error) {
+            console.error('Failed to submit clarification:', error);
+            throw error;
+        }
     }
 }
