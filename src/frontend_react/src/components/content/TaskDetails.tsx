@@ -52,9 +52,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                 return null;
         }
     }; return (
-        <div
-            className="task-details-container"
-        >
+        <div className="task-details-container">
             <PanelRightToolbar panelTitle="Progress"></PanelRightToolbar>
             <div className="task-details-section">
                 <div className="task-details-progress-header">

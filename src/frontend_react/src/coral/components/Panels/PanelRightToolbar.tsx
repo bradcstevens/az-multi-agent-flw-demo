@@ -76,12 +76,12 @@ const PanelRightToolbar: React.FC<PanelRightToolbarProps> = ({
                 }}
             >
                 {children}
-                <Button
+                {/* <Button
                     appearance="subtle"
                     icon={<Dismiss />}
                     onClick={handleDismiss} // Handle dismiss logic
                     aria-label="Close panel"
-                />
+                /> */}
             </div>
         </div>
     );

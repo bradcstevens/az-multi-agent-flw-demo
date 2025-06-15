@@ -44,6 +44,8 @@ export function getConfigData() {
 export async function getUserInfo(): Promise<UserInfo[]> {
     try {
         const response = await fetch("/.auth/me");
+        console.log("Fetching user info from: ", "/.auth/me");
+        console.log("Response ", response);
         if (!response.ok) {
             console.log(
                 "No identity provider found. Access to chat will be blocked."
