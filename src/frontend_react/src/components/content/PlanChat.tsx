@@ -26,6 +26,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
     planData,
     input,
     loading,
+    submittingChatDisableInput,
     OnChatSubmit
 
 }) => {
@@ -34,7 +35,6 @@ const PlanChat: React.FC<PlanChatProps> = ({
     const [isTyping, setIsTyping] = useState(false);
     const [showScrollButton, setShowScrollButton] = useState(false);
     const [inputHeight, setInputHeight] = useState(0);
-    const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(undefined);
 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputContainerRef = useRef<HTMLDivElement>(null);
@@ -88,11 +88,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
                     })}
                 </div>
 
-                {isTyping && (
-                    <div className="typing-indicator">
-                        <span>Thinking...</span>
-                    </div>
-                )}
+
             </div>
 
             {showScrollButton && (
@@ -112,14 +108,14 @@ const PlanChat: React.FC<PlanChatProps> = ({
                         value={inputValue}
                         onChange={setInput}
                         onEnter={() => OnChatSubmit(inputValue)}
-                        disabledChat={!planData.enableChat}
+                        disabledChat={planData.enableChat ? submittingChatDisableInput : true}
                         placeholder="Add more info to this task..."
                     >
                         <Button
                             appearance="transparent"
                             onClick={() => OnChatSubmit(inputValue)}
                             icon={<Send />}
-                            disabled={!planData?.enableChat && !inputValue.trim()}
+                            disabled={planData.enableChat ? submittingChatDisableInput : true}
                         />
                     </ChatInput>
                 </div>

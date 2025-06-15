@@ -100,28 +100,22 @@ export class PlanDataService {    /**
      * @param step Step to approve
      * @returns Promise with API response
      */
-    static async approveStep(step: Step): Promise<{ status: string }> {
-        return apiService.approveSteps(
-            step.plan_id,
-            step.session_id,
-            true, // approved
-            step.id
-        );
+    static async stepStatus(step: Step, action: boolean): Promise<{ status: string }> {
+        try {
+
+
+            return apiService.stepStatus(
+                step.plan_id,
+                step.session_id,
+                action, // approved
+                step.id
+            );
+        } catch (error) {
+            console.error('Failed to change step status:', error);
+            throw error;
+        }
     }
 
-    /**
-     * Reject a plan step
-     * @param step Step to reject
-     * @returns Promise with API response
-     */
-    static async rejectStep(step: Step): Promise<{ status: string }> {
-        return apiService.approveSteps(
-            step.plan_id,
-            step.session_id,
-            false, // not approved
-            step.id
-        );
-    }
 
     /**
      * Submit human clarification for a plan

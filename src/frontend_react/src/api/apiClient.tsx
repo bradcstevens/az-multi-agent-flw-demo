@@ -44,8 +44,11 @@ const fetchWithAuth = async (url: string, method: string = "GET", body: BodyInit
 
     try {
         const apiUrl = getApiUrl();
-
-        const response = await fetch(`${apiUrl}${url}`, options);
+        const finalUrl = `${apiUrl}${url}`;
+        console.log('Final URL:', finalUrl);
+        console.log('Request Options:', options);
+        // Log the request details
+        const response = await fetch(finalUrl, options);
         console.log('response', response);
 
         if (!response.ok) {
@@ -54,7 +57,10 @@ const fetchWithAuth = async (url: string, method: string = "GET", body: BodyInit
         }
 
         const isJson = response.headers.get('content-type')?.includes('application/json');
-        return isJson ? await response.json() : null;
+        const responseData = isJson ? await response.json() : null;
+
+        console.log('Response JSON:', responseData);
+        return responseData;
     } catch (error) {
         console.error('API Error:', (error as Error).message);
         throw error;

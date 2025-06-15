@@ -11,6 +11,7 @@ import { TaskDetailsProps } from "@/models";
 const PlanPanelRight: React.FC<TaskDetailsProps> = ({
     planData,
     loading,
+    submittingChatDisableInput,
     OnApproveStep,
     OnRejectStep,
     processingSubtaskId
@@ -30,6 +31,7 @@ const PlanPanelRight: React.FC<TaskDetailsProps> = ({
                     planData={planData}
                     OnApproveStep={OnApproveStep}
                     OnRejectStep={OnRejectStep}
+                    submittingChatDisableInput={submittingChatDisableInput}
                     processingSubtaskId={processingSubtaskId}
                     loading={loading}
                 />

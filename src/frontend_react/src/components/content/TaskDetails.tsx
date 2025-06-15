@@ -1,6 +1,6 @@
 // TaskDetails.tsx - Merged TSX + Styles
 
-import { TaskDetailsProps } from "@/models";
+import { HumanFeedbackStatus, Step, TaskDetailsProps } from "@/models";
 import {
     Subtitle1,
     Text,
@@ -19,7 +19,7 @@ import {
     CheckboxChecked20Regular,
     DismissSquare20Regular,
 } from "@fluentui/react-icons";
-import React from "react";
+import React, { useState } from "react";
 import { TaskService } from "@/services";
 import PanelRightToolbar from "@/coral/components/Panels/PanelRightToolbar";
 import "../../styles/TaskDetails.css";
@@ -30,10 +30,14 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
     OnApproveStep,
     OnRejectStep,
 }) => {
-    const completedCount = planData?.plan.completed || 0;
-    const total = planData?.plan.total_steps || 1;
-    const subTasks = planData.steps || [];
-    const progress = completedCount / total;
+    const [steps, setSteps] = useState(planData.steps || []);
+    const [completedCCount, setCompletedCount] = useState(
+        planData?.plan.completed || 0
+    );
+    const [total, setTotal] = useState(planData?.plan.total_steps || 1);
+    const [progress, setProgress] = useState(
+        (planData?.plan.completed || 0) / (planData?.plan.total_steps || 1)
+    );
     const agents = planData?.agents || [];
 
     const renderStatusIcon = (status: string) => {
@@ -42,16 +46,76 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
             case 'accepted':
                 return (<CheckmarkCircle20Regular className="status-icon-completed" />
                 );
-            case "planned":
-                return (<CircleHalfFill20Regular className="status-icon-planned" />
-                );
+
             case "rejected":
                 return (<Dismiss20Regular className="status-icon-rejected" />
                 );
+            case "planned":
             default:
-                return null;
+                return (<CircleHalfFill20Regular className="status-icon-planned" />
+                );
         }
-    }; return (
+
+    };
+    // Pre-step function for approval
+    const preOnApproved = async (step: Step) => {
+        try {
+            // Update the specific step's human_approval_status
+            const updatedStep = {
+                ...step,
+                human_approval_status: 'accepted' as HumanFeedbackStatus
+            };
+
+            // Create a new array with the updated step
+            const updatedSteps = steps.map(s =>
+                s.id === step.id ? updatedStep : s
+            );
+
+            // Update local state to reflect changes immediately
+
+            setSteps(updatedSteps);
+            setCompletedCount(completedCCount + 1); // Increment completed count
+            setProgress((completedCCount + 1) / total); // Update progress
+            // Then call the main approval function
+            // This could be your existing OnApproveStep function that handles API calls, etc.
+            await OnApproveStep(updatedStep);
+
+
+        } catch (error) {
+            console.error('Error in pre-approval step:', error);
+            throw error; // Re-throw to allow caller to handle
+        }
+    };
+
+    // Pre-step function for rejection
+    const preOnRejected = async (step: Step) => {
+        try {
+            // Update the specific step's human_approval_status
+            const updatedStep = {
+                ...step,
+                human_approval_status: 'rejected' as HumanFeedbackStatus
+            };
+
+            // Create a new array with the updated step
+            const updatedSteps = steps.map(s =>
+                s.id === step.id ? updatedStep : s
+            );
+
+            // Update local state to reflect changes immediately
+            setSteps(updatedSteps);
+            setCompletedCount(completedCCount + 1); // Increment completed count
+            setProgress((completedCCount + 1) / total); // Update progress
+            // Then call the main rejection function
+            // This could be your existing OnRejectStep function that handles API calls, etc.
+            await OnRejectStep(updatedStep);
+
+        } catch (error) {
+            console.error('Error in pre-rejection step:', error);
+            throw error; // Re-throw to allow caller to handle
+        }
+    };
+
+    return (
         <div className="task-details-container">
             <PanelRightToolbar panelTitle="Progress"></PanelRightToolbar>
             <div className="task-details-section">
@@ -85,39 +149,39 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                             <Body1Strong>{planData.plan.initial_goal}</Body1Strong>
                             <br />
                             <Text size={200}>
-                                {planData.plan.completed} of {total} completed
+                                {completedCCount} of {total} completed
                             </Text>
                         </div>
                     </div>
                 </div>
 
                 <div className="task-details-subtask-list">
-                    {subTasks.map((subtask) => {
+                    {steps.map((step) => {
                         const { description, functionOrDetails } = TaskService.splitSubtaskAction(
-                            subtask.action
+                            step.action
                         );
                         const canInteract = planData.enableStepButtons;
 
-                        return (<div key={subtask.id} className="task-details-subtask-item">
+                        return (<div key={step.id} className="task-details-subtask-item">
                             <div className="task-details-status-icon">
-                                {renderStatusIcon(subtask.human_approval_status || subtask.status)}
+                                {renderStatusIcon(step.human_approval_status || step.status)}
                             </div>
                             <div className="task-details-subtask-content">
-                                <span className={`task-details-subtask-description ${subtask.human_approval_status === "rejected" ? "strikethrough" : ""}`}>
+                                <span className={`task-details-subtask-description ${step.human_approval_status === "rejected" ? "strikethrough" : ""}`}>
                                     {description} {functionOrDetails && <Caption1>{functionOrDetails}</Caption1>}
                                 </span>
                                 <div className="task-details-action-buttons">
-                                    {(subtask.human_approval_status !== "accepted" && subtask.human_approval_status !== "rejected") && (
+                                    {(step.human_approval_status !== "accepted" && step.human_approval_status !== "rejected") && (
                                         <>
                                             <CheckboxChecked20Regular
                                                 onClick={
-                                                    canInteract ? () => OnApproveStep(subtask) : undefined
+                                                    canInteract ? () => preOnApproved(step) : undefined
                                                 }
                                                 className={canInteract ? "task-details-action-button" : "task-details-action-button-disabled"}
                                             />
                                             <DismissSquare20Regular
                                                 onClick={
-                                                    canInteract ? () => OnRejectStep(subtask) : undefined
+                                                    canInteract ? () => preOnRejected(step) : undefined
                                                 }
                                                 className={canInteract ? "task-details-action-button" : "task-details-action-button-disabled"}
                                             />

@@ -318,7 +318,7 @@ export class APIService {
      * @param updatedAction Optional updated action
      * @returns Promise with response object
      */
-    async approveSteps(
+    async stepStatus(
         planId: string,
         sessionId: string,
         approved: boolean,
