@@ -3,7 +3,7 @@ import { Copy, Send } from "@/coral/imports/bundleicons";
 import ChatInput from "@/coral/modules/ChatInput";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
-import { PlanChatProps } from "@/models";
+import { AgentType, PlanChatProps, role } from "@/models";
 import {
     Body1,
     Button,
@@ -48,10 +48,10 @@ const PlanChat: React.FC<PlanChatProps> = ({
             <div className="messages" ref={messagesContainerRef}>
                 <div className="message-wrapper">
                     {messages.map((msg, index) => {
-                        const isHuman = msg.source.includes("human");
+                        const isHuman = msg.source === AgentType.HUMAN;
 
                         return (
-                            <div key={index} className={`message ${isHuman ? "user" : "assistant"}`}>
+                            <div key={index} className={`message ${isHuman ? role.user : role.assistant}`}>
                                 {!isHuman && (
                                     <div className="plan-chat-header">
                                         <div className="plan-chat-speaker">
@@ -119,7 +119,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
                             appearance="transparent"
                             onClick={() => OnChatSubmit(inputValue)}
                             icon={<Send />}
-                            disabled={!planData?.enableChat}
+                            disabled={!planData?.enableChat && !inputValue.trim()}
                         />
                     </ChatInput>
                 </div>

@@ -17,6 +17,10 @@ export enum AgentType {
     PLANNER = "Planner_Agent"
 }
 
+export enum role {
+    user = "user",
+    assistant = "assistant"
+}
 /**
  * Enumeration of possible statuses for a step.
  */
