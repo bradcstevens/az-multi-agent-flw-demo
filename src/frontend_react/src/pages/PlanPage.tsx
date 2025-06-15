@@ -74,6 +74,7 @@ const PlanPage: React.FC = () => {
     // Accept chat input and submit clarification
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
+            setInput("");
             console.log('handleOnchatSubmit called with input:', chatInput);
             if (!chatInput.trim()) {
                 showToast("Please enter a clarification", "error");
