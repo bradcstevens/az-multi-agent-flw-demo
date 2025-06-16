@@ -19,6 +19,7 @@ from models.messages_kernel import (AgentMessage, AgentType,
 from semantic_kernel.functions import KernelFunction
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 
+
 class PlannerAgent(BaseAgent):
     """Planner agent implementation using Semantic Kernel.
 
@@ -164,8 +165,6 @@ class PlannerAgent(BaseAgent):
             client=client,
             definition=agent_definition,
         )
-
-
 
     async def handle_input_task(self, input_task: InputTask) -> str:
         """Handle the initial input task from the user.
