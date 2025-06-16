@@ -144,7 +144,7 @@ param aiFoundryAiServicesConfiguration aiServicesConfigurationType = {
   sku: 'S0'
   deployments: null //Default value set on module configuration
   subnetResourceId: null //Default value set on module configuration
-  modelCapacity: 140
+  modelCapacity: 50
 }
 
 // @description('Optional. The configuration to apply for the AI Foundry Storage Account resource.')
@@ -749,7 +749,7 @@ var aiFoundryAiServicesModelDeployment = {
   sku: {
     name: modelDeploymentType
     //Curently the capacity is set to 140 for opinanal performance. 
-    capacity: aiFoundryAiServicesConfiguration.?modelCapacity ?? 140
+    capacity: aiFoundryAiServicesConfiguration.?modelCapacity ?? 50
   }
   raiPolicyName: 'Microsoft.Default'
 }
