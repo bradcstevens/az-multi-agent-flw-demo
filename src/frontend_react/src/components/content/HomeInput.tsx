@@ -64,11 +64,11 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 } else {
                     // plan_id is not valid, handle accordingly
                     console.log('Invalid plan:', response.status);
-                    showToast("Failed to create plan.", "error");
+                    showToast("Failed to create plan", "error");
                 }
             } catch (error) {
                 console.error("Failed to create plan:", error);
-                showToast("Something went wrong.", "error");
+                showToast("Something went wrong", "error");
             } finally {
                 setSubmitting(false);
             }
