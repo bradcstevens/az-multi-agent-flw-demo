@@ -102,13 +102,13 @@ const PlanPage: React.FC = () => {
 
             console.log("handleOnchatSubmit called with input:", chatInput);
             if (!chatInput.trim()) {
-                showToast("Please enter a clarification.", "error");
+                showToast("Please enter a clarification", "error");
                 return;
             }
             setInput("");
             if (!planData?.plan) return;
             setSubmitting(true);
-            showToast("Submitting clarification...", "progress");
+            showToast("Submitting clarification", "progress");
             try {
                 await PlanDataService.submitClarification(
                     planData.plan.id,
@@ -116,10 +116,10 @@ const PlanPage: React.FC = () => {
                     chatInput
                 );
                 setInput("");
-                showToast("Clarification submitted successfully.", "success");
+                showToast("Clarification submitted successfully", "success");
                 await loadPlanData(false);
             } catch (error) {
-                showToast("Failed to submit clarification.", "error");
+                showToast("Failed to submit clarification", "error");
                 console.error("Failed to submit clarification:", error);
             } finally {
                 setInput("");
@@ -132,12 +132,12 @@ const PlanPage: React.FC = () => {
     const handleApproveStep = useCallback(
         async (step: Step, total: number, completed: number, approve: boolean) => {
             setProcessingSubtaskId(step.id);
-            const toastMessage = approve ? "Approving step..." : "Rejecting step...";
+            const toastMessage = approve ? "Approving step" : "Rejecting step";
             showToast(toastMessage, "progress");
             setSubmitting(true);
             try {
                 await PlanDataService.stepStatus(step, approve);
-                showToast(`Step ${approve ? "approved" : "rejected"} successfully.`, "success");
+                showToast(`Step ${approve ? "approved" : "rejected"} successfully`, "success");
                 if (total === completed) {
                     setReloadLeftList(true);
                 } else {
@@ -145,7 +145,7 @@ const PlanPage: React.FC = () => {
                 }
                 await loadPlanData(false);
             } catch (error) {
-                showToast(`Failed to ${approve ? "approve" : "reject"} step.`, "error");
+                showToast(`Failed to ${approve ? "approve" : "reject"} step`, "error");
                 console.error(`Failed to ${approve ? "approve" : "reject"} step:`, error);
             } finally {
                 setProcessingSubtaskId(null);
