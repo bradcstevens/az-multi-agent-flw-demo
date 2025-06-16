@@ -102,7 +102,7 @@ const PlanPage: React.FC = () => {
             setInput("");
             console.log("handleOnchatSubmit called with input:", chatInput);
             if (!chatInput.trim()) {
-                showToast("Please enter a clarification", "error");
+                showToast("Please enter a clarification.", "error");
                 return;
             }
             if (!planData?.plan) return;
@@ -115,10 +115,10 @@ const PlanPage: React.FC = () => {
                     chatInput
                 );
                 setInput("");
-                showToast("Clarification submitted successfully", "success");
+                showToast("Clarification submitted successfully.", "success");
                 await loadPlanData(false);
             } catch (error) {
-                showToast("Failed to submit clarification", "error");
+                showToast("Failed to submit clarification.", "error");
                 console.error("Failed to submit clarification:", error);
             } finally {
                 setInput("");
@@ -135,10 +135,10 @@ const PlanPage: React.FC = () => {
             setSubmitting(true);
             try {
                 await PlanDataService.stepStatus(step, true);
-                showToast("Step approved successfully", "success");
+                showToast("Step approved successfully.", "success");
                 await loadPlanData(false);
             } catch (error) {
-                showToast("Failed to approve step", "error");
+                showToast("Failed to approve step.", "error");
                 console.error("Failed to reject step:", error);
             } finally {
                 setProcessingSubtaskId(null);
@@ -155,10 +155,10 @@ const PlanPage: React.FC = () => {
             setSubmitting(true);
             try {
                 await PlanDataService.stepStatus(step, false);
-                showToast("Step rejected successfully", "success");
+                showToast("Step rejected successfully.", "success");
                 await loadPlanData(false);
             } catch (error) {
-                showToast("Failed to reject step", "error");
+                showToast("Failed to reject step.", "error");
                 console.error("Failed to reject step:", error);
             } finally {
                 setProcessingSubtaskId(null);
