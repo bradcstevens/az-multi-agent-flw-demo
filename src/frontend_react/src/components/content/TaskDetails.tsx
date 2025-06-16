@@ -28,10 +28,9 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
     planData,
     loading,
     OnApproveStep,
-    OnRejectStep,
 }) => {
     const [steps, setSteps] = useState(planData.steps || []);
-    const [completedCCount, setCompletedCount] = useState(
+    const [completedCount, setCompletedCount] = useState(
         planData?.plan.completed || 0
     );
     const [total, setTotal] = useState(planData?.plan.total_steps || 1);
@@ -74,11 +73,11 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
             // Update local state to reflect changes immediately
 
             setSteps(updatedSteps);
-            setCompletedCount(completedCCount + 1); // Increment completed count
-            setProgress((completedCCount + 1) / total); // Update progress
+            setCompletedCount(completedCount + 1); // Increment completed count
+            setProgress((completedCount + 1) / total); // Update progress
             // Then call the main approval function
             // This could be your existing OnApproveStep function that handles API calls, etc.
-            await OnApproveStep(updatedStep);
+            await OnApproveStep(updatedStep, total, completedCount + 1, true);
 
 
         } catch (error) {
@@ -103,11 +102,11 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
 
             // Update local state to reflect changes immediately
             setSteps(updatedSteps);
-            setCompletedCount(completedCCount + 1); // Increment completed count
-            setProgress((completedCCount + 1) / total); // Update progress
+            setCompletedCount(completedCount + 1); // Increment completed count
+            setProgress((completedCount + 1) / total); // Update progress
             // Then call the main rejection function
             // This could be your existing OnRejectStep function that handles API calls, etc.
-            await OnRejectStep(updatedStep);
+            await OnApproveStep(updatedStep, total, completedCount + 1, false);
 
         } catch (error) {
             console.error('Error in pre-rejection step:', error);
@@ -149,7 +148,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                             <Body1Strong>{planData.plan.initial_goal}</Body1Strong>
                             <br />
                             <Text size={200}>
-                                {completedCCount} of {total} completed
+                                {completedCount} of {total} completed
                             </Text>
                         </div>
                     </div>

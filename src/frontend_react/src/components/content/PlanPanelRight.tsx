@@ -13,7 +13,6 @@ const PlanPanelRight: React.FC<TaskDetailsProps> = ({
     loading,
     submittingChatDisableInput,
     OnApproveStep,
-    OnRejectStep,
     processingSubtaskId
 }) => {
     if (!planData) return null;
@@ -30,7 +29,6 @@ const PlanPanelRight: React.FC<TaskDetailsProps> = ({
                 <TaskDetails
                     planData={planData}
                     OnApproveStep={OnApproveStep}
-                    OnRejectStep={OnRejectStep}
                     submittingChatDisableInput={submittingChatDisableInput}
                     processingSubtaskId={processingSubtaskId}
                     loading={loading}

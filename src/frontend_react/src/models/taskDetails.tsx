@@ -25,6 +25,5 @@ export interface TaskDetailsProps {
     loading: boolean;
     submittingChatDisableInput: boolean;
     processingSubtaskId: string | null;
-    OnApproveStep: (step: Step) => void;
-    OnRejectStep: (step: Step) => void;
+    OnApproveStep: (step: Step, total: number, completed: number, approve: boolean) => void;
 }

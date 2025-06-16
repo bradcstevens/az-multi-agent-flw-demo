@@ -39,7 +39,6 @@ const PlanChat: React.FC<PlanChatProps> = ({
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputContainerRef = useRef<HTMLDivElement>(null);
 
-    const sendMessage = async () => { };
 
     const scrollToBottom = () => { };
     if (!planData) return <Spinner size="large" />;
