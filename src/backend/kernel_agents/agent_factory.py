@@ -23,7 +23,7 @@ from kernel_agents.tech_support_agent import TechSupportAgent
 from models.messages_kernel import AgentType, PlannerResponsePlan
 # pylint:disable=E0611
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent, AzureAIAgentThread
-from semantic_kernel.agents.azure_ai.azure_ai_agent_settings import AzureAIAgentSettings
+
 logger = logging.getLogger(__name__)
 
 
@@ -265,7 +265,7 @@ class AgentFactory:
             temperature=temperature,
             agent_instances=agent_instances,  # Pass agent instances to the planner
             client=client,
-            response_format = {
+            response_format= {
                 "type": "json_schema",
                 "json_schema": {
                     "name": PlannerResponsePlan.__name__,

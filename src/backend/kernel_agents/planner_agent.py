@@ -3,8 +3,6 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from azure.ai.agents.models import (ResponseFormatJsonSchema,
-                                      ResponseFormatJsonSchemaType)
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from event_utils import track_event_if_configured
 from kernel_agents.agent_base import BaseAgent
@@ -20,7 +18,6 @@ from models.messages_kernel import (AgentMessage, AgentType,
                                     StepStatus)
 from semantic_kernel.functions import KernelFunction
 from semantic_kernel.functions.kernel_arguments import KernelArguments
-
 
 class PlannerAgent(BaseAgent):
     """Planner agent implementation using Semantic Kernel.
