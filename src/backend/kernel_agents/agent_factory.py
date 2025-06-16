@@ -6,7 +6,8 @@ from typing import Any, Dict, Optional, Type
 
 # Import the new AppConfig instance
 from app_config import config
-
+from azure.ai.agents.models import (ResponseFormatJsonSchema,
+                                      ResponseFormatJsonSchemaType)
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from kernel_agents.agent_base import BaseAgent
 from kernel_agents.generic_agent import GenericAgent
@@ -264,14 +265,13 @@ class AgentFactory:
             temperature=temperature,
             agent_instances=agent_instances,  # Pass agent instances to the planner
             client=client,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": PlannerResponsePlan.__name__,
-                    "description": f"respond with {PlannerResponsePlan.__name__.lower()}",
-                    "schema": PlannerResponsePlan.model_json_schema()
-                }
-            },
+            response_format=ResponseFormatJsonSchemaType(
+                json_schema=ResponseFormatJsonSchema(
+                    name=PlannerResponsePlan.__name__,
+                    description=f"respond with {PlannerResponsePlan.__name__.lower()}",
+                    schema=PlannerResponsePlan.model_json_schema(),
+                )
+            ),
         )
         agent_instances[AgentType.PLANNER.value] = (
             planner_agent  # to pass it to group chat manager
