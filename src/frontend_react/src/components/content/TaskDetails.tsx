@@ -202,7 +202,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                 <div className="task-details-agents-list">
                     {agents.map((agent) => (
                         <div key={agent} className="task-details-agent-card">
-                            <Avatar name={agent} size={32} badge={{ status: "available" }} />
+                            <Avatar name={agent} size={32} />
                             <div className="task-details-agent-details">
                                 <span className="task-details-agent-name">
                                     {TaskService.cleanTextToSpaces(agent)}

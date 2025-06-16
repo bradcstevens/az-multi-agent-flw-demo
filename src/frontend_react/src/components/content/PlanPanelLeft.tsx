@@ -26,7 +26,7 @@ import PanelFooter from "@/coral/components/Panels/PanelFooter";
 import PanelUserCard from "../../coral/components/Panels/UserCard";
 import { getUserInfoGlobal } from "@/api/config";
 
-const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
+const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks, onNewTaskButton }) => {
   const { dispatchToast } = useToastController("toast");
   const navigate = useNavigate();
   const { planId } = useParams<{ planId: string }>();
