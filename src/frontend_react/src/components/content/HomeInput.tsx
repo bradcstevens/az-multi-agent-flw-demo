@@ -131,6 +131,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                                     icon={task.icon}
                                     description={task.description}
                                     onClick={() => handleQuickTaskClick(task)}
+                                    disabled
                                 />
                             ))}
                         </div>

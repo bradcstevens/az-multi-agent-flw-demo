@@ -57,6 +57,14 @@
       color: var(--colorBrandForeground1);
     }
   }
+
+  .plan-chat-message-content hr {
+  border: none;
+  border-top: 1px solid var(--colorNeutralStroke1); /* or any visible stroke */
+  margin: 16px 0;
+  width: 100%;
+  display: block;
+}
   
   code.language-tsx,
   code.language-bash {
@@ -117,8 +125,8 @@
   }
   
   .user {
-    background-color: var(--colorNeutralBackground2);
-    color: var(--colorNeutralForeground2);
+    background-color: var(--colorBrandBackground2);
+    color: var(--colorNeutralForegroundOnBrand);
     align-self: flex-end;
     padding: 2px 16px;
     border-radius: 6px;
@@ -293,7 +301,7 @@
     justify-content: space-between;
     align-items: center;
     margin-top: 4px;
-    margin-left: -10px;
+    margin-left: -8px;
   }
   
   .assistant-actions {
@@ -315,7 +323,7 @@
 .message-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: 32px;
   width: 100%;
   max-width: 768px;
 }
