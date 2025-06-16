@@ -16,7 +16,7 @@ import {
 import TaskList from "./TaskList";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { PlanPanelLefProps, PlanWithSteps, Task } from "@/models";
+import { PlanPanelLefProps, PlanWithSteps, Task, UserInfo } from "@/models";
 import { apiService } from "@/api";
 import { TaskService } from "@/services";
 import MsftColor from "@/coral/imports/MsftColor";
@@ -24,6 +24,7 @@ import ContosoLogo from "../../coral/imports/ContosoLogo";
 import "../../styles/PlanPanelLeft.css";
 import PanelFooter from "@/coral/components/Panels/PanelFooter";
 import PanelUserCard from "../../coral/components/Panels/UserCard";
+import { getUserInfoGlobal } from "@/api/config";
 
 const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
   const { dispatchToast } = useToastController("toast");
@@ -35,7 +36,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
   const [plans, setPlans] = useState<PlanWithSteps[] | null>(null);
   const [plansLoading, setPlansLoading] = useState<boolean>(false);
   const [plansError, setPlansError] = useState<Error | null>(null);
-
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(getUserInfoGlobal());
   // Fetch plans
   const loadPlansData = useCallback(async (forceRefresh = false) => {
     try {
@@ -123,15 +124,13 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ onNewTaskButton }) => {
         />
 
         <PanelFooter>
-          <PanelUserCard
-            name="Pepper Hayuki"
-            alias="pepperhayuki@microsoft.com"
-            // image={{ src: "https://fabricweb.azureedge.net/fabric-website/assets/images/avatar/KatriAthokas.jpg" }}
-            // shape="square"
-            // badge={{ status: 'available' }}
-            // color="colorful"
-            size={32} // Default=32
-          />
+          {userInfo && (
+            <PanelUserCard
+              name={userInfo.user_first_last_name || ""}
+              alias={userInfo.user_email || ""}
+              size={32} // Default=32
+            />
+          )}
         </PanelFooter>
       </PanelLeft>
     </div>

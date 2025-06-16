@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { FluentProvider, teamsLightTheme, teamsDarkTheme } from "@fluentui/react-components";
-import { setEnvData, setApiUrl, config as defaultConfig, toBoolean, getUserInfo } from './api/config';
+import { setEnvData, setApiUrl, config as defaultConfig, toBoolean, getUserInfo, setUserInfoGlobal } from './api/config';
 import { UserInfo } from './models';
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
@@ -12,7 +12,6 @@ const AppWrapper = () => {
   // State to store the current theme
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
   const [isUserInfoLoaded, setIsUserInfoLoaded] = useState(false);
-  const [userInfo, setUserInfo] = useState<UserInfo[] | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -36,9 +35,9 @@ const AppWrapper = () => {
         setEnvData(config);
         setApiUrl(config.API_URL);
         setConfig(config);
-        let defaultUserInfo = config.ENABLE_AUTH ? await getUserInfo() : [] as UserInfo[];
+        let defaultUserInfo = config.ENABLE_AUTH ? await getUserInfo() : ({} as UserInfo);
         window.userInfo = defaultUserInfo;
-        setUserInfo(defaultUserInfo);
+        setUserInfoGlobal(defaultUserInfo);
 
       } catch (error) {
         console.info("frontend config did not load from python", error);
