@@ -152,7 +152,7 @@ const InlineToaster: React.FC = () => {
             {getIconForIntent(toast.intent)}
           </span>
           <Body1>{toast.content}</Body1>
-          {toast.dismissible && (
+          {(toast.dismissible || toast.intent === "progress") && (
             <button
               onClick={() =>
                 _setToasts?.((prev) => prev.filter((t) => t.id !== toast.id))

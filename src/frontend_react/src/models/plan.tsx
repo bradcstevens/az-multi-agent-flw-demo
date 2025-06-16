@@ -120,5 +120,6 @@ export interface PlanChatProps {
     planData: ProcessedPlanData;
     input: string;
     loading: boolean;
+    submittingChatDisableInput: boolean;
     OnChatSubmit: (message: string) => void;
 }

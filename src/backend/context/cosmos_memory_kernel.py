@@ -443,8 +443,8 @@ class CosmosMemoryContext(MemoryStoreBase):
             logging.exception(f"Failed to query data by type from Cosmos DB: {e}")
             return []
 
-    async def get_data_by_type_and_plan_id(
-        self, data_type: str, plan_id: str
+    async def get_data_by_type_and_session_id(
+        self, data_type: str, session_id: str
     ) -> List[BaseDataModel]:
         """Query the Cosmos DB for documents with the matching data_type, session_id and user_id."""
         await self.ensure_initialized()
@@ -453,11 +453,11 @@ class CosmosMemoryContext(MemoryStoreBase):
 
         model_class = self.MODEL_CLASS_MAPPING.get(data_type, BaseDataModel)
         try:
-            query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type AND c.plan_id=@plan_id ORDER BY c._ts ASC"
+            query = "SELECT * FROM c WHERE c.session_id=@session_id AND c.user_id=@user_id AND c.data_type=@data_type ORDER BY c._ts ASC"
             parameters = [
+                {"name": "@session_id", "value": session_id},
                 {"name": "@data_type", "value": data_type},
                 {"name": "@user_id", "value": self.user_id},
-                {"name": "@plan_id", "value": plan_id},
             ]
             return await self.query_items(query, parameters, model_class)
         except Exception as e:
