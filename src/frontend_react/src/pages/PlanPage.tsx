@@ -126,12 +126,14 @@ const PlanPage: React.FC = () => {
                 await PlanDataService.stepStatus(step, approve);
                 dismissToast(id);
                 showToast(`Step ${approve ? "approved" : "rejected"} successfully`, "success");
+
+                await loadPlanData(false);
                 if (total === completed) {
+                    await loadPlanData(false); // second call hack?
                     setReloadLeftList(true);
                 } else {
                     setReloadLeftList(false);
                 }
-                await loadPlanData(false);
             } catch (error) {
                 dismissToast(id);
                 showToast(`Failed to ${approve ? "approve" : "reject"} step`, "error");
