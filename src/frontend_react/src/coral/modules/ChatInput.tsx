@@ -62,6 +62,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
           position: "relative",
           boxSizing: "border-box",
           overflow: "hidden",
+   
+    opacity: disabledChat ? 0.3 : 1,
+    pointerEvents: disabledChat ? "none" : "auto",
         }}
       >
         <textarea
@@ -143,7 +146,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           textAlign: "center",
         }}
       >
-        <Caption1>AI-Generated content may be incorrect</Caption1>
+        <Caption1>AI-generated content may be incorrect</Caption1>
       </div>
     </div>
   );

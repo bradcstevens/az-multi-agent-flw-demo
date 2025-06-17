@@ -18,6 +18,8 @@ import {
     CheckmarkCircle24Regular,
     AlertUrgent24Regular,
     Sparkle20Filled,
+    ChatMultipleRegular,
+    ChatMultiple20Regular,
 } from "@fluentui/react-icons";
 import "../styles/PlanPage.css";
 import CoralShellColumn from "../coral/components/Layout/CoralShellColumn";
@@ -190,7 +192,7 @@ const PlanPage: React.FC = () => {
                         <>
                             <ContentToolbar
                                 panelTitle={planData?.plan?.initial_goal || "Plan Details"}
-                                panelIcon={<Sparkle20Filled />}
+                                panelIcon={<ChatMultiple20Regular />}
                             >
                                 <PanelRightToggles>
                                     <ToggleButton
