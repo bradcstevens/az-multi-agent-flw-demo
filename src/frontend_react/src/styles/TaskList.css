@@ -52,6 +52,30 @@
   
 }
 
+.task-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-tab .left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.task-name-truncated {
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+  mask-image: linear-gradient(to right, black 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 80%, transparent 100%);
+}
+
+
 .task-tab .sideNavTick {
   width: 2px;
   height: 100%;
@@ -77,6 +101,8 @@
   opacity: 1;
 }
 
+
+
 /* SKELETON */
 
 .task-skeleton-container {
@@ -92,4 +118,6 @@
   align-items: center;
   gap: 12px;
 }
+
+
 
