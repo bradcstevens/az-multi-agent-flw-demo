@@ -35,7 +35,7 @@ import InlineToaster, {
 } from "../components/toast/InlineToaster";
 import Octo from "../coral/imports/Octopus.png"; // 🐙 Animated PNG loader
 import PanelRightToggles from "@/coral/components/Header/PanelRightToggles";
-import { Dismiss, TaskListSquareLtr } from "@/coral/imports/bundleicons";
+import {TaskListSquareLtr } from "@/coral/imports/bundleicons";
 import LoadingMessage, { loadingMessages } from "@/coral/components/LoadingMessage";
 
 /**
