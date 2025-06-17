@@ -24,12 +24,11 @@ const PlanChat: React.FC<PlanChatProps> = ({
   planData,
   input,
   loading,
+  setInput,
   submittingChatDisableInput,
   OnChatSubmit,
 }) => {
   const messages = planData?.messages || [];
-  const [inputValue, setInput] = useState(input);
-  const [isTyping, setIsTyping] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [inputHeight, setInputHeight] = useState(0);
 
@@ -61,7 +60,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
     if (inputContainerRef.current) {
       setInputHeight(inputContainerRef.current.offsetHeight);
     }
-  }, [inputValue]); // or [inputValue, submittingChatDisableInput]
+  }, [input]); // or [inputValue, submittingChatDisableInput]
 
 
 
@@ -164,9 +163,9 @@ const PlanChat: React.FC<PlanChatProps> = ({
       <div ref={inputContainerRef} className="plan-chat-input-container">
         <div className="plan-chat-input-wrapper">
           <ChatInput
-            value={inputValue}
+            value={input}
             onChange={setInput}
-            onEnter={() => OnChatSubmit(inputValue)}
+            onEnter={() => OnChatSubmit(input)}
             disabledChat={
               planData.enableChat ? submittingChatDisableInput : true
             }
@@ -174,7 +173,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
           >
             <Button
               appearance="transparent"
-              onClick={() => OnChatSubmit(inputValue)}
+              onClick={() => OnChatSubmit(input)}
               icon={<Send />}
               disabled={planData.enableChat ? submittingChatDisableInput : true}
             />

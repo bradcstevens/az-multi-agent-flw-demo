@@ -1,26 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-    Button,
     Text,
-    Card,
-    CardHeader,
-    useToastController,
-    Spinner,
-    Badge,
     ToggleButton,
 } from "@fluentui/react-components";
-import {
-    Add20Regular,
-    ArrowLeft24Regular,
-    ErrorCircle24Regular,
-    Person24Regular,
-    CheckmarkCircle24Regular,
-    AlertUrgent24Regular,
-    Sparkle20Filled,
-    ChatMultipleRegular,
-    ChatMultiple20Regular,
-} from "@fluentui/react-icons";
 import "../styles/PlanPage.css";
 import CoralShellColumn from "../coral/components/Layout/CoralShellColumn";
 import CoralShellRow from "../coral/components/Layout/CoralShellRow";
@@ -209,6 +192,7 @@ const PlanPage: React.FC = () => {
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}
                                 loading={loading}
+                                setInput={setInput}
                                 submittingChatDisableInput={submittingChatDisableInput}
                                 input={input}
                             />
