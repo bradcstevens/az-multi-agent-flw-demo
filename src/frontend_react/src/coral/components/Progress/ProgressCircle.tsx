@@ -12,7 +12,7 @@ const ProgressCircle: React.FC<ProgressCircleProps> = ({
   progress,
   size = 56,
   strokeWidth = 8,
-  backgroundColor = "var(--colorNeutralBackground1)",
+  backgroundColor = "var(--colorNeutralBackground6)",
   fillColor = "var(--colorPaletteSeafoamBorderActive)",
 }) => {
   const circleRef = useRef<SVGCircleElement>(null);

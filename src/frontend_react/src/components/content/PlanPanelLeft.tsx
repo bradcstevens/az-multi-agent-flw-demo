@@ -29,10 +29,7 @@ import PanelFooter from "@/coral/components/Panels/PanelFooter";
 import PanelUserCard from "../../coral/components/Panels/UserCard";
 import { getUserInfoGlobal } from "@/api/config";
 
-const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
-  reloadTasks,
-  onNewTaskButton,
-}) => {
+const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks }) => {
   const { dispatchToast } = useToastController("toast");
   const navigate = useNavigate();
   const { planId } = useParams<{ planId: string }>();
@@ -118,14 +115,22 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         </PanelLeftToolbar>
 
         <br />
-        <div className="tab tab-new-task" onClick={onNewTaskButton}>
-          <div className="tab tab-new-task-icon"
-          >
+        <div
+          className="tab tab-new-task"
+          onClick={() => navigate("/", { state: { focusInput: true } })}
+          tabIndex={0} // ✅ allows tab focus
+          role="button" // ✅ announces as button
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              navigate("/", { state: { focusInput: true } });
+            }
+          }}
+        >
+          <div className="tab tab-new-task-icon">
             <ChatAdd20Regular />
-
           </div>
           <Body1Strong>New task</Body1Strong>
-
         </div>
 
         <br />
@@ -139,7 +144,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
         <PanelFooter>
           <PanelUserCard
-            name={userInfo ? userInfo.user_first_last_name : "Guess"}
+            name={userInfo ? userInfo.user_first_last_name : "Guest"}
             alias={userInfo ? userInfo.user_email : ""}
             size={32}
           />

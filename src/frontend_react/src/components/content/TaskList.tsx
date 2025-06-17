@@ -27,11 +27,20 @@ const TaskList: React.FC<TaskListProps> = ({
     const isActive = task.id === selectedTaskId;
 
     return (
-      <div
-        key={task.id}
-        className={`task-tab${isActive ? " active" : ""}`}
-        onClick={() => onTaskSelect(task.id)}
-      >
+<div
+  key={task.id}
+  className={`task-tab${isActive ? " active" : ""}`}
+  role="button"
+  tabIndex={0}
+  onClick={() => onTaskSelect(task.id)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onTaskSelect(task.id);
+    }
+  }}
+>
+
         <div className="sideNavTick" />
         <div className="left">
           <div className="task-name-truncated" title={task.name}>
@@ -85,7 +94,7 @@ const TaskList: React.FC<TaskListProps> = ({
         </CoralAccordionPanel>
       </CoralAccordionItem>
 
-      <CoralAccordionItem>
+      <CoralAccordionItem defaultOpen>
         <CoralAccordionHeader chevron>Completed</CoralAccordionHeader>
 
         <CoralAccordionPanel>
