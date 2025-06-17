@@ -126,7 +126,7 @@
   
   .user {
     background-color: var(--colorBrandBackground2);
-    color: var(--colorNeutralForegroundOn2);
+    color: var(--colorNeutralForeground1);
     align-self: flex-end;
     padding: 2px 16px;
     border-radius: 6px;
