@@ -35,7 +35,7 @@ import InlineToaster, {
 } from "../components/toast/InlineToaster";
 import Octo from "../coral/imports/Octopus.png"; // 🐙 Animated PNG loader
 import PanelRightToggles from "@/coral/components/Header/PanelRightToggles";
-import { TaskListSquareLtr } from "@/coral/imports/bundleicons";
+import { Dismiss, TaskListSquareLtr } from "@/coral/imports/bundleicons";
 import LoadingMessage, { loadingMessages } from "@/coral/components/LoadingMessage";
 
 /**
@@ -45,7 +45,7 @@ import LoadingMessage, { loadingMessages } from "@/coral/components/LoadingMessa
 const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
-    const { showToast } = useInlineToaster();
+    const { showToast,dismissToast } = useInlineToaster();
 
     const [input, setInput] = useState("");
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
@@ -133,10 +133,11 @@ const PlanPage: React.FC = () => {
         async (step: Step, total: number, completed: number, approve: boolean) => {
             setProcessingSubtaskId(step.id);
             const toastMessage = approve ? "Approving step" : "Rejecting step";
-            showToast(toastMessage, "progress");
+            let id = showToast(toastMessage, "progress");
             setSubmitting(true);
             try {
                 await PlanDataService.stepStatus(step, approve);
+                dismissToast(id);
                 showToast(`Step ${approve ? "approved" : "rejected"} successfully`, "success");
                 if (total === completed) {
                     setReloadLeftList(true);
@@ -145,6 +146,7 @@ const PlanPage: React.FC = () => {
                 }
                 await loadPlanData(false);
             } catch (error) {
+                 dismissToast(id);
                 showToast(`Failed to ${approve ? "approve" : "reject"} step`, "error");
                 console.error(`Failed to ${approve ? "approve" : "reject"} step:`, error);
             } finally {
