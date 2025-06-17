@@ -125,7 +125,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
           </div>
           <Body1Strong>New task</Body1Strong>
-          
+
         </div>
 
         <br />
@@ -138,13 +138,11 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         />
 
         <PanelFooter>
-          {userInfo && (
-            <PanelUserCard
-              name={userInfo.user_first_last_name || ""}
-              alias={userInfo.user_email || ""}
-              size={32} // Default=32
-            />
-          )}
+          <PanelUserCard
+            name={userInfo ? userInfo.user_first_last_name : "Guess"}
+            alias={userInfo ? userInfo.user_email : ""}
+            size={32}
+          />
         </PanelFooter>
       </PanelLeft>
     </div>

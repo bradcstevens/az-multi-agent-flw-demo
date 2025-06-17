@@ -154,11 +154,10 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                 </div>
                 <div className="task-details-subtask-content">
                   <Body1
-                    className={`task-details-subtask-description ${
-                      step.human_approval_status === "rejected"
-                        ? "strikethrough"
-                        : ""
-                    }`}
+                    className={`task-details-subtask-description ${step.human_approval_status === "rejected"
+                      ? "strikethrough"
+                      : ""
+                      }`}
                   >
                     {description}{" "}
                     {functionOrDetails && (
@@ -171,7 +170,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                         <div>
                           <Tooltip relationship="label" content="Approve">
                             <Button
-                       
+
                               icon={<Checkmark20Regular />}
                               appearance="subtle"
                               onClick={

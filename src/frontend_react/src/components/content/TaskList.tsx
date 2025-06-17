@@ -16,10 +16,6 @@ import CoralAccordionItem from "@/coral/components/CoralAccordion/CoralAccordion
 import CoralAccordionHeader from "@/coral/components/CoralAccordion/CoralAccordionHeader";
 import CoralAccordionPanel from "@/coral/components/CoralAccordion/CoralAccordionPanel";
 
-
-
-
-
 const TaskList: React.FC<TaskListProps> = ({
   inProgressTasks,
   completedTasks,
@@ -38,9 +34,9 @@ const TaskList: React.FC<TaskListProps> = ({
       >
         <div className="sideNavTick" />
         <div className="left">
-<div className="task-name-truncated" title={task.name}>
-  {task.name}
-</div>
+          <div className="task-name-truncated" title={task.name}>
+            {task.name}
+          </div>
 
 
           {task.date && (

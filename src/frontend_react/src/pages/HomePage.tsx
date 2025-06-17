@@ -54,7 +54,6 @@ const HomePage: React.FC = () => {
                     <Content>
                         <ContentToolbar
                             panelTitle={"Multi-Agent Planner"}
-                            // panelIcon={<Sparkle20Filled />}
                         ></ContentToolbar>
                         <HomeInput
                             onInputSubmit={handleNewTask}

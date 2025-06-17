@@ -28,7 +28,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
     const [input, setInput] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const navigate = useNavigate();
-    const { showToast } = useInlineToaster();
+    const { showToast, dismissToast } = useInlineToaster();
 
     const resetTextarea = () => {
         setInput("");
@@ -46,7 +46,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
     const handleSubmit = async () => {
         if (input.trim()) {
             setSubmitting(true);
-            showToast("Creating a plan", "progress");
+            let id = showToast("Creating a plan", "progress");
             try {
                 const response = await TaskService.submitInputTask(input.trim());
 
@@ -60,16 +60,21 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 if (response.plan_id && response.plan_id !== null) {
                     // plan_id is valid (not null or undefined)
                     showToast("Plan created!", "success");
+                    dismissToast(id);
                     navigate(`/plan/${response.plan_id}`);
                 } else {
                     // plan_id is not valid, handle accordingly
                     console.log('Invalid plan:', response.status);
+
                     showToast("Failed to create plan", "error");
+                    dismissToast(id);
                 }
             } catch (error) {
                 console.error("Failed to create plan:", error);
+                dismissToast(id);
                 showToast("Something went wrong", "error");
             } finally {
+                setInput("");
                 setSubmitting(false);
             }
         }
@@ -144,3 +149,4 @@ const HomeInput: React.FC<HomeInputProps> = ({
 };
 
 export default HomeInput;
+

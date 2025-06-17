@@ -37,7 +37,7 @@ import InlineToaster, {
 } from "../components/toast/InlineToaster";
 import Octo from "../coral/imports/Octopus.png"; // 🐙 Animated PNG loader
 import PanelRightToggles from "@/coral/components/Header/PanelRightToggles";
-import {TaskListSquareLtr } from "@/coral/imports/bundleicons";
+import { TaskListSquareLtr } from "@/coral/imports/bundleicons";
 import LoadingMessage, { loadingMessages } from "@/coral/components/LoadingMessage";
 
 /**
@@ -47,7 +47,7 @@ import LoadingMessage, { loadingMessages } from "@/coral/components/LoadingMessa
 const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
-    const { showToast,dismissToast } = useInlineToaster();
+    const { showToast, dismissToast } = useInlineToaster();
 
     const [input, setInput] = useState("");
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
@@ -110,7 +110,7 @@ const PlanPage: React.FC = () => {
             setInput("");
             if (!planData?.plan) return;
             setSubmitting(true);
-            showToast("Submitting clarification", "progress");
+            let id = showToast("Submitting clarification", "progress");
             try {
                 await PlanDataService.submitClarification(
                     planData.plan.id,
@@ -118,9 +118,11 @@ const PlanPage: React.FC = () => {
                     chatInput
                 );
                 setInput("");
+                dismissToast(id);
                 showToast("Clarification submitted successfully", "success");
                 await loadPlanData(false);
             } catch (error) {
+                dismissToast(id);
                 showToast("Failed to submit clarification", "error");
                 console.error("Failed to submit clarification:", error);
             } finally {
@@ -148,7 +150,7 @@ const PlanPage: React.FC = () => {
                 }
                 await loadPlanData(false);
             } catch (error) {
-                 dismissToast(id);
+                dismissToast(id);
                 showToast(`Failed to ${approve ? "approve" : "reject"} step`, "error");
                 console.error(`Failed to ${approve ? "approve" : "reject"} step:`, error);
             } finally {
@@ -194,7 +196,7 @@ const PlanPage: React.FC = () => {
                         <>
                             <ContentToolbar
                                 panelTitle={planData?.plan?.initial_goal || "Plan Details"}
-                                // panelIcon={<ChatMultiple20Regular />}
+                            // panelIcon={<ChatMultiple20Regular />}
                             >
                                 <PanelRightToggles>
                                     <ToggleButton
