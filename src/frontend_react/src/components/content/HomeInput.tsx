@@ -55,11 +55,11 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     textareaRef.current.style.height = "auto";
                 }
 
-                showToast("Plan created!", "success");
-                navigate(`/plan/${response.plan_id}`);
+
                 console.log('Task response', response);
-                if (response.plan_id != null) {
+                if (response.plan_id && response.plan_id !== null) {
                     // plan_id is valid (not null or undefined)
+                    showToast("Plan created!", "success");
                     navigate(`/plan/${response.plan_id}`);
                 } else {
                     // plan_id is not valid, handle accordingly
