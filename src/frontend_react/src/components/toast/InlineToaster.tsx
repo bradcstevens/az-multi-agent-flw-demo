@@ -6,12 +6,11 @@ import {
   DismissCircle20Regular,
   Dismiss20Regular,
 } from "@fluentui/react-icons";
-import { Body1, Spinner } from "@fluentui/react-components";
+import { Body1, Button, Spinner } from "@fluentui/react-components";
 
 // Toast type
 export type ToastIntent = "info" | "success" | "warning" | "error" | "progress";
 
-// Toast data structure
 type Toast = {
   id: number;
   content: React.ReactNode;
@@ -20,10 +19,8 @@ type Toast = {
   dismissible?: boolean;
 };
 
-// Internal state setter reference
 let _setToasts: React.Dispatch<React.SetStateAction<Toast[]>> | null = null;
 
-// Hook for triggering toasts
 export const useInlineToaster = () => {
   const showToast = (
     content: React.ReactNode,
@@ -82,7 +79,6 @@ export const useInlineToaster = () => {
   return { showToast, dismissToast };
 };
 
-// Icon mapping
 const getIconForIntent = (intent: ToastIntent) => {
   switch (intent) {
     case "success":
@@ -100,7 +96,6 @@ const getIconForIntent = (intent: ToastIntent) => {
   }
 };
 
-// Toaster render mount
 const InlineToaster: React.FC = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -123,6 +118,7 @@ const InlineToaster: React.FC = () => {
         gap: 8,
         zIndex: 1000,
         pointerEvents: "none",
+                alignContent:'center'
       }}
     >
       {toasts.map((toast) => (
@@ -131,37 +127,47 @@ const InlineToaster: React.FC = () => {
           style={{
             background: "var(--colorNeutralBackground3)",
             border: "1px solid var(--colorNeutralStroke1)",
-            padding: "16px",
+            padding: "12px 16px",
             borderRadius: 9999,
             color: "var(--colorNeutralForeground1)",
             boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-            minWidth: 160,
-            textAlign: "left",
-            fontSize: 14,
             display: "flex",
             alignItems: "center",
+            fontSize: 14,
             gap: 8,
             opacity: toast.visible ? 1 : 0,
             transform: toast.visible ? "translateY(0px)" : "translateY(20px)",
             transition: "opacity 0.3s ease, transform 0.3s ease",
             pointerEvents: "auto",
-            position: "relative",
+            maxWidth: "calc(100vw - 48px)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            justifyContent:'center',
+        alignContent:'center',
+        height:'54px',
+        boxSizing:'border-box'
           }}
         >
-          <span style={{ display: "flex", alignItems: "center" }}>
-            {getIconForIntent(toast.intent)}
-          </span>
-          <Body1>{toast.content}</Body1>
+          <span style={{ flexShrink: 0 }}>{getIconForIntent(toast.intent)}</span>
+
+          <Body1
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flexGrow: 1,
+            }}
+          >
+            {toast.content}
+          </Body1>
+
           {(toast.dismissible || toast.intent === "progress") && (
-            <button
+            <Button
               onClick={() =>
                 _setToasts?.((prev) => prev.filter((t) => t.id !== toast.id))
               }
               style={{
-                position: "absolute",
-                top: "50%",
-                right: 8,
-                transform: "translateY(-50%)",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
@@ -169,11 +175,16 @@ const InlineToaster: React.FC = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                flexShrink: 0,
               }}
               aria-label="Dismiss"
+              icon={<Dismiss20Regular />}
+              appearance="subtle"
+              shape="circular"
             >
-              <Dismiss20Regular />
-            </button>
+              
+              
+            </Button>
           )}
         </div>
       ))}
