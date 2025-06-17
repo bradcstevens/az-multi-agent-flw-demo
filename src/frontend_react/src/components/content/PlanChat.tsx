@@ -5,16 +5,14 @@ import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 import { AgentType, PlanChatProps, role } from "@/models";
 import {
-    Body1,
-    Button,
-    Spinner,
-    Tag,
-    ToolbarDivider
+  Body1,
+  Button,
+  Spinner,
+  Tag,
+  ToolbarDivider,
 } from "@fluentui/react-components";
-import {
-    HeartRegular,
-} from "@fluentui/react-icons";
-import { useRef, useState } from "react";
+import { DiamondRegular, HeartRegular } from "@fluentui/react-icons";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import "../../styles/PlanChat.css";
 import "../../styles/Chat.css";
@@ -23,105 +21,168 @@ import { TaskService } from "@/services/TaskService";
 import InlineToaster from "../toast/InlineToaster";
 
 const PlanChat: React.FC<PlanChatProps> = ({
-    planData,
-    input,
-    loading,
-    submittingChatDisableInput,
-    OnChatSubmit
-
+  planData,
+  input,
+  loading,
+  submittingChatDisableInput,
+  OnChatSubmit,
 }) => {
-    const messages = planData?.messages || [];
-    const [inputValue, setInput] = useState(input);
-    const [isTyping, setIsTyping] = useState(false);
-    const [showScrollButton, setShowScrollButton] = useState(false);
-    const [inputHeight, setInputHeight] = useState(0);
+  const messages = planData?.messages || [];
+  const [inputValue, setInput] = useState(input);
+  const [isTyping, setIsTyping] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [inputHeight, setInputHeight] = useState(0);
 
-    const messagesContainerRef = useRef<HTMLDivElement>(null);
-    const inputContainerRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
 
+  // Scroll to Bottom useEffect
 
-    const scrollToBottom = () => { };
-    if (!planData) return <Spinner size="large" />;
-    return (
-        <div className="chat-container">
-            <div className="messages" ref={messagesContainerRef}>
-                <div className="message-wrapper">
-                    {messages.map((msg, index) => {
-                        const isHuman = msg.source === AgentType.HUMAN;
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-                        return (
-                            <div key={index} className={`message ${isHuman ? role.user : role.assistant}`}>
-                                {!isHuman && (
-                                    <div className="plan-chat-header">
-                                        <div className="plan-chat-speaker">
-                                            <span className="speaker-name">{TaskService.cleanTextToSpaces(msg.source)}</span>
-                                            <Tag size="extra-small" shape="rounded" appearance="filled" className="bot-tag">BOT</Tag>
-                                        </div>
-                                    </div>
-                                )}
+  //Scroll to Bottom Buttom
 
-                                <Body1>
-                                    <div className="plan-chat-message-content">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]}>
-                                            {msg.content || ""}
-                                        </ReactMarkdown>
+  useEffect(() => {
+  const container = messagesContainerRef.current;
+  if (!container) return;
 
-                                        {!isHuman && (
-                                            <div className="assistant-footer">
-                                                <div className="assistant-actions">
-                                                    <Button
-                                                        onClick={() => msg.content && navigator.clipboard.writeText(msg.content)}
-                                                        title="Copy Response"
-                                                        appearance="subtle"
-                                                        style={{ height: 28, width: 28 }}
-                                                        icon={<Copy />}
-                                                    />
-                                                    <Tag size="extra-small">Sample data for demonstration purposes only.</Tag>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </Body1>
-                            </div>
-                        );
-                    })}
-                </div>
+  const handleScroll = () => {
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    setShowScrollButton(scrollTop + clientHeight < scrollHeight - 100);
+  };
+
+  container.addEventListener("scroll", handleScroll);
+  return () => container.removeEventListener("scroll", handleScroll);
+}, []);
+
+useEffect(() => {
+  if (inputContainerRef.current) {
+    setInputHeight(inputContainerRef.current.offsetHeight);
+  }
+}, [inputValue]); // or [inputValue, submittingChatDisableInput]
 
 
-            </div>
 
-            {showScrollButton && (
-                <Tag
-                    onClick={scrollToBottom}
-                    className="scroll-to-bottom plan-chat-scroll-button"
-                    shape="circular"
-                    style={{ bottom: inputHeight }}
-                >
-                    Back to bottom
-                </Tag>
-            )}
-            <InlineToaster />
-            <div ref={inputContainerRef} className="plan-chat-input-container">
-                <div className="plan-chat-input-wrapper">
-                    <ChatInput
-                        value={inputValue}
-                        onChange={setInput}
-                        onEnter={() => OnChatSubmit(inputValue)}
-                        disabledChat={planData.enableChat ? submittingChatDisableInput : true}
-                        placeholder="Add more info to this task..."
+const scrollToBottom = () => {
+  messagesContainerRef.current?.scrollTo({
+    top: messagesContainerRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+  setShowScrollButton(false);
+};
+
+  if (!planData) return <Spinner size="large" />;
+  return (
+    <div className="chat-container">
+      <div className="messages" ref={messagesContainerRef}>
+        <div className="message-wrapper">
+          {messages.map((msg, index) => {
+            const isHuman = msg.source === AgentType.HUMAN;
+
+            return (
+              <div
+                key={index}
+                className={`message ${isHuman ? role.user : role.assistant}`}
+              >
+                {!isHuman && (
+                  <div className="plan-chat-header">
+                    <div className="plan-chat-speaker">
+                      <Body1 className="speaker-name">
+                        {TaskService.cleanTextToSpaces(msg.source)}
+                      </Body1>
+                      <Tag
+                        size="extra-small"
+                        shape="rounded"
+                        appearance="brand"
+                        className="bot-tag"
+                      >
+                        BOT
+                      </Tag>
+                    </div>
+                  </div>
+                )}
+
+                <Body1>
+                  <div className="plan-chat-message-content">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypePrism]}
                     >
-                        <Button
-                            appearance="transparent"
-                            onClick={() => OnChatSubmit(inputValue)}
-                            icon={<Send />}
-                            disabled={planData.enableChat ? submittingChatDisableInput : true}
-                        />
-                    </ChatInput>
-                </div>
-            </div>
-        </div>
+                      {msg.content || ""}
+                    </ReactMarkdown>
 
-    );
+                    {!isHuman && (
+                      <div className="assistant-footer">
+                        <div className="assistant-actions">
+                            <div>
+                                    <Button
+                            onClick={() =>
+                              msg.content &&
+                              navigator.clipboard.writeText(msg.content)
+                            }
+                            title="Copy Response"
+                            appearance="subtle"
+                            style={{ height: 28, width: 28 }}
+                            icon={<Copy />}
+                          />
+       
+                            </div>
+                      
+                          <Tag icon={<DiamondRegular/>} appearance="filled" size="extra-small">
+                            Sample data for demonstration purposes only.
+                          </Tag>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Body1>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {showScrollButton && (
+<Tag
+  onClick={scrollToBottom}
+  className="scroll-to-bottom plan-chat-scroll-button"
+  shape="circular"
+  style={{
+    bottom: inputHeight,
+    position: "absolute", // ensure this or your class handles it
+    right: 16,            // optional, for right alignment
+    zIndex: 5,
+  }}
+>
+  Back to bottom
+</Tag>
+
+      )}
+      <InlineToaster />
+      <div ref={inputContainerRef} className="plan-chat-input-container">
+        <div className="plan-chat-input-wrapper">
+          <ChatInput
+            value={inputValue}
+            onChange={setInput}
+            onEnter={() => OnChatSubmit(inputValue)}
+            disabledChat={
+              planData.enableChat ? submittingChatDisableInput : true
+            }
+            placeholder="Add more info to this task..."
+          >
+            <Button
+              appearance="transparent"
+              onClick={() => OnChatSubmit(inputValue)}
+              icon={<Send />}
+              disabled={planData.enableChat ? submittingChatDisableInput : true}
+            />
+          </ChatInput>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default PlanChat;

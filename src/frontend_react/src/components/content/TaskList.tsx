@@ -5,6 +5,7 @@ import {
   Caption1,
   Skeleton,
   SkeletonItem,
+  Tooltip,
 } from "@fluentui/react-components";
 import { MoreHorizontal20Regular } from "@fluentui/react-icons";
 import React from "react";
@@ -37,7 +38,11 @@ const TaskList: React.FC<TaskListProps> = ({
       >
         <div className="sideNavTick" />
         <div className="left">
-          <div>{task.name}</div>
+<div className="task-name-truncated" title={task.name}>
+  {task.name}
+</div>
+
+
           {task.date && (
             <Caption1 className="task-list-task-date">{task.date}</Caption1>
           )}

@@ -33,7 +33,7 @@
 .plan-chat-header {
   display: flex;
   justify-content: flex-start;
-  margin-bottom: 0px;
+  margin-bottom: 8px;
 }
 
 .plan-chat-speaker {

@@ -1,7 +1,10 @@
 import PanelLeft from "@/coral/components/Panels/PanelLeft";
 import PanelLeftToolbar from "@/coral/components/Panels/PanelLeftToolbar";
 import {
+  Body1Strong,
   Button,
+  Subtitle1,
+  Subtitle2,
   Toast,
   ToastBody,
   ToastTitle,
@@ -26,7 +29,10 @@ import PanelFooter from "@/coral/components/Panels/PanelFooter";
 import PanelUserCard from "../../coral/components/Panels/UserCard";
 import { getUserInfoGlobal } from "@/api/config";
 
-const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks, onNewTaskButton }) => {
+const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
+  reloadTasks,
+  onNewTaskButton,
+}) => {
   const { dispatchToast } = useToastController("toast");
   const navigate = useNavigate();
   const { planId } = useParams<{ planId: string }>();
@@ -36,7 +42,9 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks, onNewTaskButt
   const [plans, setPlans] = useState<PlanWithSteps[] | null>(null);
   const [plansLoading, setPlansLoading] = useState<boolean>(false);
   const [plansError, setPlansError] = useState<Error | null>(null);
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(getUserInfoGlobal());
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(
+    getUserInfoGlobal()
+  );
   // Fetch plans
   const loadPlansData = useCallback(async (forceRefresh = false) => {
     try {
@@ -101,17 +109,23 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks, onNewTaskButt
   return (
     <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
       <PanelLeft panelWidth={280} panelResize={true}>
-        <PanelLeftToolbar linkTo="/" panelTitle="Contoso" panelIcon={<ContosoLogo />}>
+        <PanelLeftToolbar
+          linkTo="/"
+          panelTitle="Contoso"
+          panelIcon={<ContosoLogo />}
+        >
           <Tooltip content="New task" relationship={"label"} />
         </PanelLeftToolbar>
 
         <br />
-        <div
-          className="tab tab-new-task"
-          onClick={onNewTaskButton}
-        >
-          <ChatAdd20Regular />
-          New task
+        <div className="tab tab-new-task" onClick={onNewTaskButton}>
+          <div className="tab tab-new-task-icon"
+          >
+            <ChatAdd20Regular />
+
+          </div>
+          <Body1Strong>New task</Body1Strong>
+          
         </div>
 
         <br />

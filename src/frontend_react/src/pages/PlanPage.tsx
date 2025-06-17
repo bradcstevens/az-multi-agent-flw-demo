@@ -192,7 +192,7 @@ const PlanPage: React.FC = () => {
                         <>
                             <ContentToolbar
                                 panelTitle={planData?.plan?.initial_goal || "Plan Details"}
-                                panelIcon={<ChatMultiple20Regular />}
+                                // panelIcon={<ChatMultiple20Regular />}
                             >
                                 <PanelRightToggles>
                                     <ToggleButton

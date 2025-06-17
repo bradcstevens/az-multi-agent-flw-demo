@@ -1,6 +1,6 @@
 import React from "react";
 import { Body1 } from "@fluentui/react-components";
-import { ChevronDown20Regular } from "@fluentui/react-icons";
+import { ChevronDown20Regular, ChevronUp20Regular } from "@fluentui/react-icons";
 import { useCoralAccordion } from "./CoralAccordionContext";
 
 type Props = {
@@ -39,7 +39,7 @@ const CoralAccordionHeader: React.FC<Props> = ({
             transform: open ? "rotate(-180deg)" : "rotate(0deg)",
           }}
         >
-          <ChevronDown20Regular />
+          <ChevronUp20Regular />
         </span>
       )}
     </div>
