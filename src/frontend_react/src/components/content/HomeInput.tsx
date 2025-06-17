@@ -104,6 +104,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                         value={input}
                         placeholder="Tell us what needs planning, building, or connecting—we'll handle the rest."
                         onChange={setInput}
+                        onEnter={handleSubmit}
                         disabledChat={submitting}
                     >
                         <Button
