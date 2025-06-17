@@ -134,6 +134,15 @@ export class TaskService {
 
         return cleanedText;
     }
+
+    static cleanHRAgent(text: string): string {
+        if (!text) return '';
+        // Replace any non-alphanumeric character with a space
+        let cleanedText = text.replace("Hr_Agent", "HR Agent").replace("Hr Agent", "HR Agent").trim();
+
+
+        return cleanedText;
+    }
     /**
      * Submit an input task to create a new plan
      * @param description Task description

@@ -63,7 +63,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
                                 <Body1>
                                     <div className="plan-chat-message-content">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]}>
-                                            {msg.content || ""}
+                                            {TaskService.cleanHRAgent(msg.content) || ""}
                                         </ReactMarkdown>
 
                                         {!isHuman && (
