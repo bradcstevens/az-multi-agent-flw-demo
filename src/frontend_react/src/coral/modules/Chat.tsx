@@ -65,7 +65,7 @@ const Chat: React.FC<ChatProps> = ({
         // const chatMessages = await chatService.getUserHistory(userId);
         // setMessages(chatMessages);
       } catch (err) {
-        console.error("Failed to load chat history.", err);
+        console.log("Failed to load chat history.", err);
       }
     };
     loadHistory();
@@ -105,7 +105,7 @@ const Chat: React.FC<ChatProps> = ({
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).catch((err) => {
-      console.error("Failed to copy text:", err);
+      console.log("Failed to copy text:", err);
     });
   };
 
@@ -153,7 +153,7 @@ const Chat: React.FC<ChatProps> = ({
         // setMessages([...updatedMessages, assistantMessage]);
       }
     } catch (err) {
-      console.error("Send Message Error:", err);
+      console.log("Send Message Error:", err);
       setMessages([
         ...updatedMessages,
         { role: "assistant", content: "Oops! Something went wrong sending your message." },
@@ -173,7 +173,7 @@ const Chat: React.FC<ChatProps> = ({
       setMessages([]);
       setCurrentConversationId(undefined);
     } catch (err) {
-      console.error("Failed to clear chat history:", err);
+      console.log("Failed to clear chat history:", err);
     }
   };
 

@@ -74,7 +74,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     dismissToast(id);
                 }
             } catch (error) {
-                console.error("Failed to create plan:", error);
+                console.log("Failed to create plan:", error);
                 dismissToast(id);
                 showToast("Something went wrong", "error");
             } finally {

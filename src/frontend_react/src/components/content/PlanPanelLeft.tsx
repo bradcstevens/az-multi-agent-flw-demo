@@ -50,7 +50,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks }) => {
       const plansData = await apiService.getPlans(undefined, !forceRefresh);
       setPlans(plansData);
     } catch (error) {
-      console.error("Failed to load plans:", error);
+      console.log("Failed to load plans:", error);
       setPlansError(
         error instanceof Error ? error : new Error("Failed to load plans")
       );

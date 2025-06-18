@@ -74,7 +74,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
       // This could be your existing OnApproveStep function that handles API calls, etc.
       await OnApproveStep(updatedStep, total, completedCount + 1, true);
     } catch (error) {
-      console.error("Error in pre-approval step:", error);
+      console.log("Error in pre-approval step:", error);
       throw error; // Re-throw to allow caller to handle
     }
   };
@@ -101,7 +101,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
       // This could be your existing OnRejectStep function that handles API calls, etc.
       await OnApproveStep(updatedStep, total, completedCount + 1, false);
     } catch (error) {
-      console.error("Error in pre-rejection step:", error);
+      console.log("Error in pre-rejection step:", error);
       throw error; // Re-throw to allow caller to handle
     }
   };

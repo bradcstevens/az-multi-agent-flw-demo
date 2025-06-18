@@ -74,7 +74,6 @@ export async function getUserInfo(): Promise<UserInfo> {
         console.log("User info: ", userInfo);
         return userInfo;
     } catch (e) {
-        console.error("Error fetching user info: ", e);
         return {} as UserInfo;
     }
 }

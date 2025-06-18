@@ -62,7 +62,7 @@ const fetchWithAuth = async (url: string, method: string = "GET", body: BodyInit
         console.log('Response JSON:', responseData);
         return responseData;
     } catch (error) {
-        console.error('API Error:', (error as Error).message);
+        console.info('API Error:', (error as Error).message);
         throw error;
     }
 };
@@ -91,7 +91,7 @@ const fetchWithoutAuth = async (url: string, method: string = "POST", body: Body
         const isJson = response.headers.get('content-type')?.includes('application/json');
         return isJson ? await response.json() : null;
     } catch (error) {
-        console.error('Login Error:', (error as Error).message);
+        console.log('Login Error:', (error as Error).message);
         throw error;
     }
 };

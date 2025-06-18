@@ -16,7 +16,7 @@ export class PlanDataService {    /**
             const planBody = await apiService.getPlanById(planId);
             return this.processPlanData(planBody.plan_with_steps, planBody.messages || []);
         } catch (error) {
-            console.error('Failed to fetch plan data:', error);
+            console.log('Failed to fetch plan data:', error);
             throw error;
         }
     }
@@ -111,7 +111,7 @@ export class PlanDataService {    /**
                 step.id
             );
         } catch (error) {
-            console.error('Failed to change step status:', error);
+            console.log('Failed to change step status:', error);
             throw error;
         }
     }
@@ -128,7 +128,7 @@ export class PlanDataService {    /**
         try {
             return apiService.submitClarification(planId, sessionId, clarification);
         } catch (error) {
-            console.error('Failed to submit clarification:', error);
+            console.log('Failed to submit clarification:', error);
             throw error;
         }
     }

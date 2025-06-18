@@ -64,6 +64,8 @@ const PlanPage: React.FC = () => {
                 if (navigate) {
                     setPlanData(null);
                     setLoading(true);
+                    setError(null);
+                    setProcessingSubtaskId(null);
                 }
 
                 setError(null);
@@ -71,7 +73,7 @@ const PlanPage: React.FC = () => {
                 console.log("Fetched plan data:", data);
                 setPlanData(data);
             } catch (err) {
-                console.error("Failed to load plan data:", err);
+                console.log("Failed to load plan data:", err);
                 setError(
                     err instanceof Error ? err : new Error("Failed to load plan data")
                 );
@@ -107,7 +109,7 @@ const PlanPage: React.FC = () => {
             } catch (error) {
                 dismissToast(id);
                 showToast("Failed to submit clarification", "error");
-                console.error("Failed to submit clarification:", error);
+                console.log("Failed to submit clarification:", error);
             } finally {
                 setInput("");
                 setSubmitting(false);
@@ -123,22 +125,17 @@ const PlanPage: React.FC = () => {
             let id = showToast(toastMessage, "progress");
             setSubmitting(true);
             try {
-                let approveRejectDetails=await PlanDataService.stepStatus(step, approve);
+                let approveRejectDetails = await PlanDataService.stepStatus(step, approve);
                 dismissToast(id);
                 showToast(`Step ${approve ? "approved" : "rejected"} successfully`, "success");
                 if (approveRejectDetails && Object.keys(approveRejectDetails).length > 0) {
                     await loadPlanData(false);
                 }
-                if (total === completed) {
-                    setReloadLeftList(true);
-                } else {
-                    setReloadLeftList(false);
-                }
-                
+                setReloadLeftList(total === completed);
             } catch (error) {
                 dismissToast(id);
                 showToast(`Failed to ${approve ? "approve" : "reject"} step`, "error");
-                console.error(`Failed to ${approve ? "approve" : "reject"} step:`, error);
+                console.log(`Failed to ${approve ? "approve" : "reject"} step:`, error);
             } finally {
                 setProcessingSubtaskId(null);
                 setSubmitting(false);
