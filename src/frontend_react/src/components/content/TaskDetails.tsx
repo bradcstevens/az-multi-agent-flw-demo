@@ -154,10 +154,11 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                 </div>
                 <div className="task-details-subtask-content">
                   <Body1
-                    className={`task-details-subtask-description ${step.human_approval_status === "rejected"
-                      ? "strikethrough"
-                      : ""
-                      }`}
+                    className={`task-details-subtask-description ${
+                      step.human_approval_status === "rejected"
+                        ? "strikethrough"
+                        : ""
+                    }`}
                   >
                     {description}{" "}
                     {functionOrDetails && (
@@ -167,10 +168,8 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                   <div className="task-details-action-buttons">
                     {step.human_approval_status !== "accepted" &&
                       step.human_approval_status !== "rejected" && (
-                        <div>
-                          <Tooltip relationship="label" content="Approve">
+     <>             <Tooltip relationship="label" content="Approve">
                             <Button
-
                               icon={<Checkmark20Regular />}
                               appearance="subtle"
                               onClick={
@@ -201,8 +200,8 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                                   : "task-details-action-button-disabled"
                               }
                             />
-                          </Tooltip>
-                        </div>
+                          </Tooltip></>
+             
                       )}
                   </div>
                 </div>

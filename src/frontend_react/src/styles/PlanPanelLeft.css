@@ -29,11 +29,14 @@
   display: flex;
   width: 40px;
   height: 40px;
-  background-color: var(--colorNeutralBackground2);
+  background-color: var(--colorNeutralBackground1);
   justify-content: center;
   align-items: center;
   border-radius: 16px;
   box-sizing: border-box;
+  /* background: #eeaedd;
+background: radial-gradient(circle, rgba(238, 174, 221, 1) 0%, rgba(117, 121, 235, 1) 100%);
+color: #2F2F4A; */
 }
 
 /* TASKLIST */
