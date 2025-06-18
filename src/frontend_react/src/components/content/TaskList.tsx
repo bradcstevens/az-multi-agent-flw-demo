@@ -5,7 +5,6 @@ import {
   Caption1,
   Skeleton,
   SkeletonItem,
-  Tooltip,
 } from "@fluentui/react-components";
 import { MoreHorizontal20Regular } from "@fluentui/react-icons";
 import React from "react";
@@ -27,19 +26,19 @@ const TaskList: React.FC<TaskListProps> = ({
     const isActive = task.id === selectedTaskId;
 
     return (
-<div
-  key={task.id}
-  className={`task-tab${isActive ? " active" : ""}`}
-  role="button"
-  tabIndex={0}
-  onClick={() => onTaskSelect(task.id)}
-  onKeyDown={(e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      onTaskSelect(task.id);
-    }
-  }}
->
+      <div
+        key={task.id}
+        className={`task-tab${isActive ? " active" : ""}`}
+        role="button"
+        tabIndex={0}
+        onClick={() => onTaskSelect(task.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onTaskSelect(task.id);
+          }
+        }}
+      >
 
         <div className="sideNavTick" />
         <div className="left">

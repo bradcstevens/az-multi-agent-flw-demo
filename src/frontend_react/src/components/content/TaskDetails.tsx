@@ -2,11 +2,8 @@
 
 import { HumanFeedbackStatus, Step, TaskDetailsProps } from "@/models";
 import {
-  Subtitle1,
   Text,
-  Divider,
   Avatar,
-  Checkbox,
   Body1,
   Body1Strong,
   Caption1,
@@ -14,21 +11,10 @@ import {
   Tooltip,
 } from "@fluentui/react-components";
 import {
-  Add20Regular,
-  CheckmarkCircle20Regular,
   Dismiss20Regular,
-  CircleHalfFill20Regular,
-  CheckboxChecked20Regular,
-  DismissSquare20Regular,
-  Check20Regular,
   CheckmarkCircle20Filled,
-  Circle20Regular,
-  Dismiss20Filled,
   DismissCircle20Filled,
-  Flash20Regular,
-  ArrowForwardDownLightningRegular,
   Checkmark20Regular,
-  CircleHint20Regular,
   CircleHint20Filled,
 } from "@fluentui/react-icons";
 import React, { useState } from "react";
@@ -154,11 +140,10 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                 </div>
                 <div className="task-details-subtask-content">
                   <Body1
-                    className={`task-details-subtask-description ${
-                      step.human_approval_status === "rejected"
-                        ? "strikethrough"
-                        : ""
-                    }`}
+                    className={`task-details-subtask-description ${step.human_approval_status === "rejected"
+                      ? "strikethrough"
+                      : ""
+                      }`}
                   >
                     {description}{" "}
                     {functionOrDetails && (
@@ -168,22 +153,22 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                   <div className="task-details-action-buttons">
                     {step.human_approval_status !== "accepted" &&
                       step.human_approval_status !== "rejected" && (
-     <>             <Tooltip relationship="label" content="Approve">
-                            <Button
-                              icon={<Checkmark20Regular />}
-                              appearance="subtle"
-                              onClick={
-                                canInteract
-                                  ? () => preOnApproved(step)
-                                  : undefined
-                              }
-                              className={
-                                canInteract
-                                  ? "task-details-action-button"
-                                  : "task-details-action-button-disabled"
-                              }
-                            />
-                          </Tooltip>
+                        <>             <Tooltip relationship="label" content="Approve">
+                          <Button
+                            icon={<Checkmark20Regular />}
+                            appearance="subtle"
+                            onClick={
+                              canInteract
+                                ? () => preOnApproved(step)
+                                : undefined
+                            }
+                            className={
+                              canInteract
+                                ? "task-details-action-button"
+                                : "task-details-action-button-disabled"
+                            }
+                          />
+                        </Tooltip>
 
                           <Tooltip relationship="label" content="Reject">
                             <Button
@@ -201,7 +186,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                               }
                             />
                           </Tooltip></>
-             
+
                       )}
                   </div>
                 </div>
