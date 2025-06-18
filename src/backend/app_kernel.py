@@ -1,6 +1,7 @@
 # app_kernel.py
 import asyncio
 import logging
+import os
 import uuid
 from typing import Dict, List, Optional
 
@@ -9,6 +10,7 @@ from app_config import config
 from auth.auth_utils import get_authenticated_user_details
 
 # Azure monitoring
+from azure.monitor.opentelemetry import configure_azure_monitor
 from config_kernel import Config
 from event_utils import track_event_if_configured
 
@@ -32,19 +34,19 @@ from models.messages_kernel import (
 # Updated import for KernelArguments
 from utils_kernel import initialize_runtime_and_context, rai_success
 
-# # Check if the Application Insights Instrumentation Key is set in the environment variables
-# connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
-# if connection_string:
-#     # Configure Application Insights if the Instrumentation Key is found
-#     configure_azure_monitor(connection_string=connection_string)
-#     logging.info(
-#         "Application Insights configured with the provided Instrumentation Key"
-#     )
-# else:
-#     # Log a warning if the Instrumentation Key is not found
-#     logging.warning(
-#         "No Application Insights Instrumentation Key found. Skipping configuration"
-#     )
+# Check if the Application Insights Instrumentation Key is set in the environment variables
+connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+if connection_string:
+    # Configure Application Insights if the Instrumentation Key is found
+    configure_azure_monitor(connection_string=connection_string)
+    logging.info(
+        "Application Insights configured with the provided Instrumentation Key"
+    )
+else:
+    # Log a warning if the Instrumentation Key is not found
+    logging.warning(
+        "No Application Insights Instrumentation Key found. Skipping configuration"
+    )
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -137,9 +139,8 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
         # Convert input task to JSON for the kernel function, add user_id here
 
         # Use the planner to handle the task
-        result = await group_chat_manager.handle_input_task(input_task)
+        await group_chat_manager.handle_input_task(input_task)
 
-        print(f"Result: {result}")
         # Get plan from memory store
         plan = await memory_store.get_plan_by_session(input_task.session_id)
 
@@ -176,7 +177,6 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
         }
 
     except Exception as e:
-        logging.exception(f"Error handling input task: {e}")
         track_event_if_configured(
             "InputTaskError",
             {
@@ -185,7 +185,7 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
                 "error": str(e),
             },
         )
-        raise HTTPException(status_code=400, detail="Error creating plan")
+        raise HTTPException(status_code=400, detail=f"Error creating plan: {e}")
 
 
 @app.post("/api/human_feedback")
@@ -867,18 +867,17 @@ async def delete_all_messages(request: Request) -> Dict[str, str]:
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
         raise HTTPException(status_code=400, detail="no user")
 
     # Initialize memory context
     kernel, memory_store = await initialize_runtime_and_context("", user_id)
 
-    logging.info("Deleting all plans")
     await memory_store.delete_all_items("plan")
-    logging.info("Deleting all sessions")
     await memory_store.delete_all_items("session")
-    logging.info("Deleting all steps")
     await memory_store.delete_all_items("step")
-    logging.info("Deleting all agent_messages")
     await memory_store.delete_all_items("agent_message")
 
     # Clear the agent factory cache
@@ -928,6 +927,9 @@ async def get_all_messages(request: Request):
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
         raise HTTPException(status_code=400, detail="no user")
 
     # Initialize memory context

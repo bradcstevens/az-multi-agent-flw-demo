@@ -1,4 +1,4 @@
-name: Validate Deployment
+name: Validate WAF Deployment 
 
 on:
   push:
@@ -101,6 +101,7 @@ jobs:
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
+            --parameters infra/main.waf-aligned.bicepparam \
             --parameters azureOpenAILocation=${{ env.AZURE_LOCATION }}
 
 
