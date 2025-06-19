@@ -145,7 +145,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks }) => {
         <PanelFooter>
           <PanelUserCard
             name={userInfo ? userInfo.user_first_last_name : "Guest"}
-            alias={userInfo ? userInfo.user_email : ""}
+            // alias={userInfo ? userInfo.user_email : ""}
             size={32}
           />
         </PanelFooter>
