@@ -134,15 +134,19 @@ Consider the following settings during your deployment to modify specific settin
 <details>
   <summary><b>Configurable Deployment Settings</b></summary>
 
-When you start the deployment, most parameters will have **default values**, but you can update the following settings:
+When you start the deployment, most parameters will have **default values**, but you can update the following settings [here](../docs/CustomizingAzdParameters.md):
 
-| **Setting**                       | **Description**                                                                             | **Default value** |
-| --------------------------------- | ------------------------------------------------------------------------------------------- | ----------------- |
-| **Azure Region**                  | The region where resources will be created.                                                 | East US           |
-| **Secondary Location**            | A **less busy** region for **Azure Cosmos DB**, useful in case of availability constraints. | eastus2           |
-| **Deployment Type**               | Select from a drop-down list.                                                               | GlobalStandard    |
-| **GPT Model**                     | Choose from **gpt-4, gpt-4o, gpt-4o-mini**.                                                 | gpt-4o            |
-| **GPT Model Deployment Capacity** | Configure capacity for **GPT models**.                                                      | 140k              |
+| **Setting**                    | **Description**                                                                      | **Default value** |
+| ------------------------------ | ------------------------------------------------------------------------------------ | ----------------- |
+| **Environment Name**           | Used as a prefix for all resource names to ensure uniqueness across environments.    | macae             |
+| **Azure Region**               | Location of the Azure resources. Controls where the infrastructure will be deployed. | swedencentral     |
+| **OpenAI Deployment Location** | Specifies the region for OpenAI resource deployment.                                 | swedencentral     |
+| **Model Deployment Type**      | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).      | GlobalStandard    |
+| **GPT Model Name**             | Specifies the name of the GPT model to be deployed.                                 | gpt-4o            |
+| **GPT Model Version**          | Version of the GPT model to be used for deployment.                                 | 2024-08-06        |
+| **Image Tag**                  | Docker image tag used for container deployments.                                    | latest            |
+| **Enable Telemetry**           | Enables telemetry for monitoring and diagnostics.                                    | true              |
+
 
 </details>
 
