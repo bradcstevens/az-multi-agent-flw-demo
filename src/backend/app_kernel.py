@@ -38,7 +38,7 @@ from utils_kernel import initialize_runtime_and_context, rai_success
 connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
 if connection_string:
     # Configure Application Insights if the Instrumentation Key is found
-    #configure_azure_monitor(connection_string=connection_string)
+    # configure_azure_monitor(connection_string=connection_string)
     logging.info(
         "Application Insights configured with the provided Instrumentation Key"
     )
@@ -70,7 +70,7 @@ frontend_url = Config.FRONTEND_SITE_NAME
 # Add this near the top of your app.py, after initializing the app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Add your frontend server URL
+    allow_origins=[frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
