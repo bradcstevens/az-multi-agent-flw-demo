@@ -10,7 +10,7 @@ from app_config import config
 from auth.auth_utils import get_authenticated_user_details
 
 # Azure monitoring
-from azure.monitor.opentelemetry import configure_azure_monitor
+# from azure.monitor.opentelemetry import configure_azure_monitor
 from config_kernel import Config
 from event_utils import track_event_if_configured
 
