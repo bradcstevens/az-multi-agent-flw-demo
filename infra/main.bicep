@@ -16,6 +16,19 @@ param enableTelemetry bool = true
 @description('Azure OpenAI Location')
 param azureOpenAILocation string
 
+@minLength(1)
+@description('Name of the GPT model to deploy:')
+param gptModelName string = 'gpt-4o'
+
+param gptModelVersion string = '2024-08-06'
+
+@minLength(1)
+@description('GPT model deployment type:')
+param modelDeploymentType string = 'GlobalStandard'
+
+@description('Set the image tag for the container images used in the solution. Default is "latest".')
+param imageTag string = 'latest'
+
 // @description('Set this if you want to deploy to a different region than the resource group. Otherwise, it will use the resource group location by default.')
 // param AZURE_LOCATION string=''
 // param solutionLocation string = empty(AZURE_LOCATION) ? resourceGroup().location
@@ -134,30 +147,10 @@ param aiFoundryAiServicesConfiguration aiServicesConfigurationType = {
   modelCapacity: 50
 }
 
-@description('Optional. The configuration to apply for the AI Foundry Storage Account resource.')
-param aiFoundryStorageAccountConfiguration storageAccountType = {
-  enabled: true
-  name: replace('sthub${solutionPrefix}', '-', '')
-  location: azureOpenAILocation
-  tags: tags
-  sku: 'Standard_ZRS'
-  subnetResourceId: null //Default value set on module configuration
-}
-
-@description('Optional. The configuration to apply for the AI Foundry AI Hub resource.')
-param aiFoundryAiHubConfiguration aiHubType = {
-  enabled: true
-  name: 'aih-${solutionPrefix}'
-  location: azureOpenAILocation
-  sku: 'Basic'
-  tags: tags
-  subnetResourceId: null //Default value set on module configuration
-}
-
 @description('Optional. The configuration to apply for the AI Foundry AI Project resource.')
 param aiFoundryAiProjectConfiguration aiProjectConfigurationType = {
   enabled: true
-  name: 'aihb-${solutionPrefix}'
+  name: 'aifp-${solutionPrefix}'
   location: azureOpenAILocation
   sku: 'Basic'
   tags: tags
@@ -194,7 +187,7 @@ param containerAppConfiguration containerAppConfigurationType = {
   containerMemory: '4.0Gi'
   containerImageRegistryDomain: 'biabcontainerreg.azurecr.io'
   containerImageName: 'macaebackend'
-  containerImageTag: 'dev01'
+  containerImageTag: imageTag
   containerName: 'backend'
   ingressTargetPort: 8000
   maxReplicas: 1
@@ -218,7 +211,7 @@ param webSiteConfiguration webSiteConfigurationType = {
   location: solutionLocation
   containerImageRegistryDomain: 'biabcontainerreg.azurecr.io'
   containerImageName: 'macaefrontend'
-  containerImageTag: 'dev01'
+  containerImageTag: imageTag
   containerName: 'backend'
   tags: tags
   environmentResourceId: null //Default value set on module configuration
@@ -731,17 +724,17 @@ var aiFoundryAiServicesResourceName = aiFoundryAiServicesConfiguration.?name ?? 
 var aiFoundryAIservicesEnabled = aiFoundryAiServicesConfiguration.?enabled ?? true
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
-  name: 'gpt-4o'
-  version: '2024-08-06'
+  name: gptModelName
+  version: gptModelVersion
   sku: {
-    name: 'GlobalStandard'
+    name: modelDeploymentType
     //Curently the capacity is set to 140 for opinanal performance. 
     capacity: aiFoundryAiServicesConfiguration.?modelCapacity ?? 50
   }
   raiPolicyName: 'Microsoft.Default'
 }
 
-module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.10.2' = if (aiFoundryAIservicesEnabled) {
+module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.11.0' = if (aiFoundryAIservicesEnabled) {
   name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
@@ -755,6 +748,10 @@ module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.10.2'
     customSubDomainName: aiFoundryAiServicesResourceName
     apiProperties: {
       //staticsEnabled: false
+    }
+    allowProjectManagement: true
+    managedIdentities: {
+      systemAssigned: true
     }
     //publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
     //publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
@@ -774,18 +771,18 @@ module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.10.2'
           }
         ])
       : []
-    roleAssignments: [
-      // {
-      //   principalId: userAssignedIdentity.outputs.principalId
-      //   principalType: 'ServicePrincipal'
-      //   roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-      // }
-      {
-        principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
-        principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-      }
-    ]
+    // roleAssignments: [
+    //   // {
+    //   //   principalId: userAssignedIdentity.outputs.principalId
+    //   //   principalType: 'ServicePrincipal'
+    //   //   roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
+    //   // }
+    //   {
+    //     principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
+    //     principalType: 'ServicePrincipal'
+    //     roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
+    //   }
+    // ]
     deployments: aiFoundryAiServicesConfiguration.?deployments ?? [
       {
         name: aiFoundryAiServicesModelDeployment.name
@@ -804,167 +801,77 @@ module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.10.2'
   }
 }
 
-// AI Foundry: storage account
-// WAF best practices for Azure Blob Storage: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-blob-storage
-var storageAccountPrivateDnsZones = {
-  'privatelink.blob.${environment().suffixes.storage}': 'blob'
-  'privatelink.file.${environment().suffixes.storage}': 'file'
-}
-
-module privateDnsZonesAiFoundryStorageAccount 'br/public:avm/res/network/private-dns-zone:0.3.1' = [
-  for zone in objectKeys(storageAccountPrivateDnsZones): if (virtualNetworkEnabled && aiFoundryStorageAccountEnabled) {
-    name: take(
-      'avm.res.network.private-dns-zone.storage-account.${uniqueString(aiFoundryStorageAccountResourceName,zone)}.${solutionPrefix}',
-      64
-    )
-    params: {
-      name: zone
-      tags: tags
-      enableTelemetry: enableTelemetry
-      virtualNetworkLinks: [
-        {
-          name: 'vnetlink-${split(zone, '.')[1]}'
-          virtualNetworkResourceId: virtualNetwork.outputs.resourceId
-        }
-      ]
-    }
-  }
-]
-var aiFoundryStorageAccountEnabled = aiFoundryStorageAccountConfiguration.?enabled ?? true
-var aiFoundryStorageAccountResourceName = aiFoundryStorageAccountConfiguration.?name ?? replace(
-  'sthub${solutionPrefix}',
-  '-',
-  ''
-)
-
-module aiFoundryStorageAccount 'br/public:avm/res/storage/storage-account:0.18.2' = if (aiFoundryStorageAccountEnabled) {
-  name: take('avm.res.storage.storage-account.${aiFoundryStorageAccountResourceName}', 64)
-  dependsOn: [
-    privateDnsZonesAiFoundryStorageAccount
-  ]
-  params: {
-    name: aiFoundryStorageAccountResourceName
-    location: aiFoundryStorageAccountConfiguration.?location ?? azureOpenAILocation
-    tags: aiFoundryStorageAccountConfiguration.?tags ?? tags
-    enableTelemetry: enableTelemetry
-    diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspaceId }]
-    skuName: aiFoundryStorageAccountConfiguration.?sku ?? 'Standard_ZRS'
-    allowSharedKeyAccess: false
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Allow'
-    }
-    blobServices: {
-      deleteRetentionPolicyEnabled: false
-      containerDeleteRetentionPolicyDays: 7
-      containerDeleteRetentionPolicyEnabled: false
-      diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspaceId }]
-    }
-    publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
-    allowBlobPublicAccess: false
-    privateEndpoints: virtualNetworkEnabled
-      ? map(items(storageAccountPrivateDnsZones), zone => {
-          name: 'pep-${zone.value}-${aiFoundryStorageAccountResourceName}'
-          customNetworkInterfaceName: 'nic-${zone.value}-${aiFoundryStorageAccountResourceName}'
-          service: zone.value
-          subnetResourceId: aiFoundryStorageAccountConfiguration.?subnetResourceId ?? virtualNetwork.outputs.subnetResourceIds[0] ?? ''
-          privateDnsZoneResourceIds: [resourceId('Microsoft.Network/privateDnsZones', zone.key)]
-        })
-      : null
-    roleAssignments: [
-      {
-        principalId: userAssignedIdentity.outputs.principalId
-        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-      }
-    ]
-  }
-}
-
-// AI Foundry: AI Hub
-// WAF best practices for Open AI: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-openai
-var mlTargetSubResource = 'amlworkspace'
-var mlPrivateDnsZones = {
-  'privatelink.api.azureml.ms': mlTargetSubResource
-  'privatelink.notebooks.azure.net': mlTargetSubResource
-}
-module privateDnsZonesAiFoundryWorkspaceHub 'br/public:avm/res/network/private-dns-zone:0.3.1' = [
-  for zone in objectKeys(mlPrivateDnsZones): if (virtualNetworkEnabled && aiFoundryAiHubEnabled) {
-    name: take('avm.res.network.private-dns-zone.ai-hub.${uniqueString(aiFoundryAiHubName,zone)}.${solutionPrefix}', 64)
-    params: {
-      name: zone
-      enableTelemetry: enableTelemetry
-      tags: tags
-      virtualNetworkLinks: [
-        {
-          name: 'vnetlink-${split(zone, '.')[1]}'
-          virtualNetworkResourceId: virtualNetwork.outputs.resourceId
-        }
-      ]
-    }
-  }
-]
-var aiFoundryAiHubEnabled = aiFoundryAiHubConfiguration.?enabled ?? true
-var aiFoundryAiHubName = aiFoundryAiHubConfiguration.?name ?? 'aih-${solutionPrefix}'
-module aiFoundryAiHub 'modules/ai-hub.bicep' = if (aiFoundryAiHubEnabled) {
-  name: take('module.ai-hub.${aiFoundryAiHubName}', 64)
-  dependsOn: [
-    privateDnsZonesAiFoundryWorkspaceHub
-  ]
-  params: {
-    name: aiFoundryAiHubName
-    location: aiFoundryAiHubConfiguration.?location ?? azureOpenAILocation
-    tags: aiFoundryAiHubConfiguration.?tags ?? tags
-    sku: aiFoundryAiHubConfiguration.?sku ?? 'Basic'
-    aiFoundryAiServicesName: aiFoundryAiServices.outputs.name
-    applicationInsightsResourceId: applicationInsights.outputs.resourceId
-    enableTelemetry: enableTelemetry
-    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceId
-    storageAccountResourceId: aiFoundryStorageAccount.outputs.resourceId
-    virtualNetworkEnabled: virtualNetworkEnabled
-    privateEndpoints: virtualNetworkEnabled
-      ? [
-          {
-            name: 'pep-${aiFoundryAiHubName}'
-            customNetworkInterfaceName: 'nic-${aiFoundryAiHubName}'
-            service: mlTargetSubResource
-            subnetResourceId: virtualNetworkEnabled
-              ? aiFoundryAiHubConfiguration.?subnetResourceId ?? virtualNetwork.?outputs.?subnetResourceIds[0]
-              : null
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: map(objectKeys(mlPrivateDnsZones), zone => {
-                name: replace(zone, '.', '-')
-                privateDnsZoneResourceId: resourceId('Microsoft.Network/privateDnsZones', zone)
-              })
-            }
-          }
-        ]
-      : []
-  }
-}
-
 // AI Foundry: AI Project
 // WAF best practices for Open AI: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-openai
-var aiFoundryAiProjectEnabled = aiFoundryAiProjectConfiguration.?enabled ?? true
-var aiFoundryAiProjectName = aiFoundryAiProjectConfiguration.?name ?? 'aihb-${solutionPrefix}'
+// var aiFoundryAiProjectEnabled = aiFoundryAiProjectConfiguration.?enabled ?? true
+var aiFoundryAiProjectName = aiFoundryAiProjectConfiguration.?name ?? 'aifp-${solutionPrefix}'
+var aiProjectDescription = 'AI Foundry Project'
 
-module aiFoundryAiProject 'br/public:avm/res/machine-learning-services/workspace:0.12.0' = if (aiFoundryAiProjectEnabled) {
-  name: take('avm.res.machine-learning-services.workspace.${aiFoundryAiProjectName}', 64)
-  params: {
-    name: aiFoundryAiProjectName
-    location: aiFoundryAiProjectConfiguration.?location ?? azureOpenAILocation
-    tags: aiFoundryAiProjectConfiguration.?tags ?? tags
-    enableTelemetry: enableTelemetry
-    diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspaceId }]
-    sku: aiFoundryAiProjectConfiguration.?sku ?? 'Basic'
-    kind: 'Project'
-    hubResourceId: aiFoundryAiHub.outputs.resourceId
-    roleAssignments: [
-      {
-        principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
-        // Assigning the role with the role name instead of the role ID freezes the deployment at this point
-        roleDefinitionIdOrName: '64702f94-c441-49e6-a78b-ef80e0188fee' //'Azure AI Developer'
-      }
+resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = {
+  name: aiFoundryAiServicesResourceName
+  dependsOn:[
+      aiFoundryAiServices
     ]
+}
+
+resource aiFoundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-preview' = {
+  parent: aiServices
+  name: aiFoundryAiProjectName
+  location: aiFoundryAiProjectConfiguration.?location ?? azureOpenAILocation
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    description: aiProjectDescription
+    displayName: aiFoundryAiProjectName
+  }
+}
+
+resource aiUser 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '53ca6127-db72-4b80-b1b0-d745d6d5456d'
+}
+
+resource aiUserAccessProj 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerApp.name, aiFoundryProject.id, aiUser.id)
+  scope: aiFoundryProject
+  properties: {
+    roleDefinitionId: aiUser.id
+    principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
+  }
+}
+
+resource aiUserAccessFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerApp.name, aiServices.id, aiUser.id)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: aiUser.id
+    principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
+  }
+}
+
+resource aiDeveloper 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '64702f94-c441-49e6-a78b-ef80e0188fee'
+}
+
+resource aiDeveloperAccessFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerApp.name, aiServices.id, aiDeveloper.id)
+  scope: aiFoundryProject
+  properties: {
+    roleDefinitionId: aiDeveloper.id
+    principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
+  }
+}
+
+resource cognitiveServiceOpenAIUser 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+}
+
+resource cognitiveServiceOpenAIUserAccessFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerApp.name, aiServices.id, cognitiveServiceOpenAIUser.id)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: cognitiveServiceOpenAIUser.id
+    principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
   }
 }
 
@@ -1177,11 +1084,6 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
             value: applicationInsights.outputs.connectionString
           }
           {
-            name: 'AZURE_AI_AGENT_PROJECT_CONNECTION_STRING'
-            value: '${toLower(replace(azureOpenAILocation,' ',''))}.api.azureml.ms;${subscription().subscriptionId};${resourceGroup().name};${aiFoundryAiProjectName}'
-            //Location should be the AI Foundry AI Project location
-          }
-          {
             name: 'AZURE_AI_SUBSCRIPTION_ID'
             value: subscription().subscriptionId
           }
@@ -1196,6 +1098,14 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
           {
             name: 'FRONTEND_SITE_NAME'
             value: 'https://${webSiteName}.azurewebsites.net'
+          }
+          {
+            name: 'AZURE_AI_AGENT_ENDPOINT'
+            value: aiFoundryProject.properties.endpoints['AI Foundry API']
+          }
+          {
+            name: 'AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME'
+            value: aiFoundryAiServicesModelDeployment.name
           }
         ]
       }
@@ -1707,54 +1617,6 @@ type aiServicesConfigurationType = {
 
   @description('Optional. The capacity to set for AI Services GTP model.')
   modelCapacity: int?
-}
-
-@export()
-@description('The type for the Multi-Agent Custom Automation Engine Storage Account resource configuration.')
-type storageAccountType = {
-  @description('Optional. If the Storage Account resource should be deployed or not.')
-  enabled: bool?
-
-  @description('Optional. The name of the Storage Account resource.')
-  @maxLength(60)
-  name: string?
-
-  @description('Optional. Location for the Storage Account resource.')
-  @metadata({ azd: { type: 'location' } })
-  location: string?
-
-  @description('Optional. The tags to set for the Storage Account resource.')
-  tags: object?
-
-  @description('Optional. The SKU for the Storage Account resource.')
-  sku: ('Standard_LRS' | 'Standard_GRS' | 'Standard_RAGRS' | 'Standard_ZRS' | 'Premium_LRS' | 'Premium_ZRS')?
-
-  @description('Optional. The resource Id of the subnet where the Storage Account private endpoint should be created.')
-  subnetResourceId: string?
-}
-
-@export()
-@description('The type for the Multi-Agent Custom Automation Engine AI Hub resource configuration.')
-type aiHubType = {
-  @description('Optional. If the AI Hub resource should be deployed or not.')
-  enabled: bool?
-
-  @description('Optional. The name of the AI Hub resource.')
-  @maxLength(90)
-  name: string?
-
-  @description('Optional. Location for the AI Hub resource.')
-  @metadata({ azd: { type: 'location' } })
-  location: string?
-
-  @description('Optional. The tags to set for the AI Hub resource.')
-  tags: object?
-
-  @description('Optional. The SKU of the AI Hub resource.')
-  sku: ('Basic' | 'Free' | 'Standard' | 'Premium')?
-
-  @description('Optional. The resource Id of the subnet where the AI Hub private endpoint should be created.')
-  subnetResourceId: string?
 }
 
 @export()
