@@ -1,6 +1,0 @@
-fastapi
-uvicorn
-jinja2
-azure-identity
-python-dotenv
-python-multipart
