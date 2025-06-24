@@ -101,8 +101,10 @@ jobs:
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
-            --parameters infra/main.waf-aligned.bicepparam \
-            --parameters azureOpenAILocation=${{ env.AZURE_LOCATION }}
+            --parameters \
+              azureOpenAILocation='${{ env.AZURE_LOCATION }}' \
+              virtualMachineConfiguration='{"adminUsername": "adminuser", "adminPassword": "P@ssw0rd1234"}' \
+              logAnalyticsWorkspaceConfiguration='{"existingWorkspaceResourceId": ""}'
 
 
       - name: Send Notification on Failure
