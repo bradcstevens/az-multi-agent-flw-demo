@@ -1,5 +1,5 @@
 # Migration Script for React Scripts to Vite
-# Run these commands in PowerShell from your frontend_react directory
+# Run these commands in PowerShell from your frontend directory
 
 # 1. Remove react-scripts
 npm uninstall react-scripts
