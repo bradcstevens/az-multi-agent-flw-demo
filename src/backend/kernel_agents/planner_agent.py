@@ -14,10 +14,17 @@ from kernel_tools.marketing_tools import MarketingTools
 from kernel_tools.procurement_tools import ProcurementTools
 from kernel_tools.product_tools import ProductTools
 from kernel_tools.tech_support_tools import TechSupportTools
-from models.messages_kernel import (AgentMessage, AgentType,
-                                    HumanFeedbackStatus, InputTask, Plan,
-                                    PlannerResponsePlan, PlanStatus, Step,
-                                    StepStatus)
+from models.messages_kernel import (
+    AgentMessage,
+    AgentType,
+    HumanFeedbackStatus,
+    InputTask,
+    Plan,
+    PlannerResponsePlan,
+    PlanStatus,
+    Step,
+    StepStatus,
+)
 from semantic_kernel.functions import KernelFunction
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 
@@ -188,7 +195,7 @@ class PlannerAgent(BaseAgent):
                     session_id=input_task.session_id,
                     user_id=self._user_id,
                     plan_id=plan.id,
-                    content=f"Generated a plan with {len(steps)} steps. Click the blue check box beside each step to complete it, click the x to remove this step.",
+                    content=f"Generated a plan with {len(steps)} steps. Click the checkmark beside each step to complete it, click the x to reject this step.",
                     source=AgentType.PLANNER.value,
                     step_id="",
                 )
@@ -200,7 +207,7 @@ class PlannerAgent(BaseAgent):
                     "session_id": input_task.session_id,
                     "user_id": self._user_id,
                     "plan_id": plan.id,
-                    "content": f"Generated a plan with {len(steps)} steps. Click the blue check box beside each step to complete it, click the x to remove this step.",
+                    "content": f"Generated a plan with {len(steps)} steps. Click the checkmark beside each step to complete it, click the x to reject this step.",
                     "source": AgentType.PLANNER.value,
                 },
             )
