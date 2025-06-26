@@ -27,7 +27,7 @@ param existingLogAnalyticsWorkspaceId string = ''
 })
 @allowed(['australiaeast', 'eastus2', 'francecentral', 'japaneast', 'norwayeast', 'swedencentral', 'uksouth', 'westus'])
 @description('Azure OpenAI Location')
-param azureOpenAILocation string
+param aiDeploymentsLocation string
 
 @minLength(1)
 @description('Name of the GPT model to deploy:')
@@ -156,7 +156,7 @@ param virtualMachineConfiguration virtualMachineConfigurationType = {
 param aiFoundryAiServicesConfiguration aiServicesConfigurationType = {
   enabled: true
   name: 'aisa-${solutionPrefix}'
-  location: azureOpenAILocation
+  location: aiDeploymentsLocation
   sku: 'S0'
   deployments: null //Default value set on module configuration
   subnetResourceId: null //Default value set on module configuration
@@ -167,7 +167,7 @@ param aiFoundryAiServicesConfiguration aiServicesConfigurationType = {
 param aiFoundryAiProjectConfiguration aiProjectConfigurationType = {
   enabled: true
   name: 'aifp-${solutionPrefix}'
-  location: azureOpenAILocation
+  location: aiDeploymentsLocation
   sku: 'Basic'
   tags: tags
 }
@@ -755,7 +755,7 @@ module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.11.0'
   params: {
     name: aiFoundryAiServicesResourceName
     tags: aiFoundryAiServicesConfiguration.?tags ?? tags
-    location: aiFoundryAiServicesConfiguration.?location ?? azureOpenAILocation
+    location: aiFoundryAiServicesConfiguration.?location ?? aiDeploymentsLocation
     enableTelemetry: enableTelemetry
     diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspaceId }]
     sku: aiFoundryAiServicesConfiguration.?sku ?? 'S0'
@@ -833,7 +833,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' ex
 resource aiFoundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-preview' = {
   parent: aiServices
   name: aiFoundryAiProjectName
-  location: aiFoundryAiProjectConfiguration.?location ?? azureOpenAILocation
+  location: aiFoundryAiProjectConfiguration.?location ?? aiDeploymentsLocation
   identity: {
     type: 'SystemAssigned'
   }
