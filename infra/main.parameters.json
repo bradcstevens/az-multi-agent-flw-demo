@@ -24,7 +24,7 @@
       "solutionLocation": {
         "value": "${AZURE_LOCATION}"
       },
-      "azureOpenAILocation": {
+      "aiDeploymentsLocation": {
         "value": "${AZURE_ENV_OPENAI_LOCATION}"
       },
       "modelDeploymentType": {
