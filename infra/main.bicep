@@ -21,7 +21,7 @@ param existingLogAnalyticsWorkspaceId string = ''
   azd : {
     type: 'location'
     usageName : [
-      'OpenAI.GlobalStandard.gpt-4o, 50'
+      'OpenAI.GlobalStandard.gpt-4o, 150'
     ]
   }
 })
@@ -38,6 +38,9 @@ param gptModelVersion string = '2024-08-06'
 @minLength(1)
 @description('GPT model deployment type:')
 param modelDeploymentType string = 'GlobalStandard'
+
+@description('Optional. AI model deployment token capacity.')
+param gptModelCapacity int = 150
 
 @description('Set the image tag for the container images used in the solution. Default is "latest".')
 param imageTag string = 'latest'
@@ -157,7 +160,7 @@ param aiFoundryAiServicesConfiguration aiServicesConfigurationType = {
   sku: 'S0'
   deployments: null //Default value set on module configuration
   subnetResourceId: null //Default value set on module configuration
-  modelCapacity: 50
+  modelCapacity: gptModelCapacity
 }
 
 @description('Optional. The configuration to apply for the AI Foundry AI Project resource.')
@@ -742,7 +745,7 @@ var aiFoundryAiServicesModelDeployment = {
   sku: {
     name: modelDeploymentType
     //Curently the capacity is set to 140 for opinanal performance. 
-    capacity: aiFoundryAiServicesConfiguration.?modelCapacity ?? 50
+    capacity: aiFoundryAiServicesConfiguration.?modelCapacity ?? gptModelCapacity
   }
   raiPolicyName: 'Microsoft.Default'
 }
