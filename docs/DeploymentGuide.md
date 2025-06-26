@@ -46,6 +46,8 @@ When running `azd up`, you’ll now be prompted to choose between a **WAF-aligne
 
 When prompted during `azd up`:
 
+![useWAFAlignedArchitecture](images/macae_waf_prompt.png)
+
 - Select **`true`** to deploy a **WAF-aligned, production-ready environment**  
 - Select **`false`** to deploy a **lightweight sandbox/dev environment**
 
