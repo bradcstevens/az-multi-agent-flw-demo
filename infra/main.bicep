@@ -1,6 +1,9 @@
 metadata name = 'Multi-Agent Custom Automation Engine'
 metadata description = 'This module contains the resources required to deploy the Multi-Agent Custom Automation Engine solution accelerator for both Sandbox environments and WAF aligned environments.'
 
+@description('Set to true if you want to deploy WAF-aligned infrastructure.')
+param useWafAlignedArchitecture bool
+
 @description('Optional. The prefix to add in the default names given to all deployed Azure resources.')
 @maxLength(19)
 param solutionPrefix string = 'macae${uniqueString(deployer().objectId, deployer().tenantId, subscription().subscriptionId, resourceGroup().id)}'
@@ -11,7 +14,17 @@ param solutionLocation string = resourceGroup().location
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
+param existingLogAnalyticsWorkspaceId string = ''
+
 // Restricting deployment to only supported Azure OpenAI regions validated with GPT-4o model
+@metadata({
+  azd : {
+    type: 'location'
+    usageName : [
+      'OpenAI.GlobalStandard.gpt-4o, 50'
+    ]
+  }
+})
 @allowed(['australiaeast', 'eastus2', 'francecentral', 'japaneast', 'norwayeast', 'swedencentral', 'uksouth', 'westus'])
 @description('Azure OpenAI Location')
 param azureOpenAILocation string
@@ -46,8 +59,8 @@ param logAnalyticsWorkspaceConfiguration logAnalyticsWorkspaceConfigurationType 
   location: solutionLocation
   sku: 'PerGB2018'
   tags: tags
-  dataRetentionInDays: 365
-  existingWorkspaceResourceId: ''
+  dataRetentionInDays: useWafAlignedArchitecture ? 365 : 30
+  existingWorkspaceResourceId: existingLogAnalyticsWorkspaceId
 }
 
 @description('Optional. The configuration to apply for the Multi-Agent Custom Automation Engine Application Insights resource.')
@@ -56,7 +69,7 @@ param applicationInsightsConfiguration applicationInsightsConfigurationType = {
   name: 'appi-${solutionPrefix}'
   location: solutionLocation
   tags: tags
-  retentionInDays: 365
+  retentionInDays: useWafAlignedArchitecture ? 365 : 30
 }
 
 @description('Optional. The configuration to apply for the Multi-Agent Custom Automation Engine Managed Identity resource.')
@@ -105,7 +118,7 @@ param networkSecurityGroupAdministrationConfiguration networkSecurityGroupConfig
 
 @description('Optional. The configuration to apply for the Multi-Agent Custom Automation Engine virtual network resource.')
 param virtualNetworkConfiguration virtualNetworkConfigurationType = {
-  enabled: true
+  enabled: useWafAlignedArchitecture ? true : false
   name: 'vnet-${solutionPrefix}'
   location: solutionLocation
   tags: tags
@@ -131,7 +144,7 @@ param virtualMachineConfiguration virtualMachineConfigurationType = {
   location: solutionLocation
   tags: tags
   adminUsername: 'adminuser'
-  adminPassword: guid(solutionPrefix, subscription().subscriptionId)
+  adminPassword: useWafAlignedArchitecture? 'P@ssw0rd1234' : guid(solutionPrefix, subscription().subscriptionId)
   vmSize: 'Standard_D2s_v3'
   subnetResourceId: null //Default value set on module configuration
 }
@@ -199,8 +212,8 @@ param webServerFarmConfiguration webServerFarmConfigurationType = {
   enabled: true
   name: 'asp-${solutionPrefix}'
   location: solutionLocation
-  skuName: 'P1v3'
-  skuCapacity: 3
+  skuName: useWafAlignedArchitecture? 'P1v3' : 'B2'
+  skuCapacity: useWafAlignedArchitecture ? 3 : 1
   tags: tags
 }
 
