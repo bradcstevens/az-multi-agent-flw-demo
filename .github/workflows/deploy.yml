@@ -102,6 +102,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
             --parameters \
+              useWafAlignedArchitecture=false \
               aiDeploymentsLocation='${{ env.AZURE_LOCATION }}' \
               logAnalyticsWorkspaceConfiguration='{"dataRetentionInDays": 30, "existingWorkspaceResourceId": ""}' \
               applicationInsightsConfiguration='{"retentionInDays": 30}' \

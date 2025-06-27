@@ -102,6 +102,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
             --parameters \
+              useWafAlignedArchitecture=true \
               aiDeploymentsLocation='${{ env.AZURE_LOCATION }}' \
               virtualMachineConfiguration='{"adminUsername": "adminuser", "adminPassword": "P@ssw0rd1234"}' \
               logAnalyticsWorkspaceConfiguration='{"existingWorkspaceResourceId": ""}'
