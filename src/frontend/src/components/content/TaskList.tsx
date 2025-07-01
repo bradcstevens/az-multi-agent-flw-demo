@@ -45,10 +45,11 @@ const TaskList: React.FC<TaskListProps> = ({
           <div className="task-name-truncated" title={task.name}>
             {task.name}
           </div>
-
-
-          {task.date && (
+          {task.date && task.status == "completed" &&(
             <Caption1 className="task-list-task-date">{task.date}</Caption1>
+          )}
+          {task.status == "inprogress" &&(
+            <Caption1 className="task-list-task-date">{`${task?.completed_steps} of ${task?.total_steps} completed`}</Caption1>
           )}
         </div>
         <Menu>
