@@ -38,6 +38,16 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
   );
   const agents = planData?.agents || [];
 
+  React.useEffect(() => {
+    // Initialize steps and counts from planData
+    setSteps(planData.steps || []);
+    setCompletedCount(planData?.plan.completed || 0);
+    setTotal(planData?.plan.total_steps || 1);
+    setProgress(
+      (planData?.plan.completed || 0) / (planData?.plan.total_steps || 1)
+    );
+  }, [planData]);
+
   const renderStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
@@ -59,17 +69,6 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
         ...step,
         human_approval_status: "accepted" as HumanFeedbackStatus,
       };
-
-      // Create a new array with the updated step
-      const updatedSteps = steps.map((s) =>
-        s.id === step.id ? updatedStep : s
-      );
-
-      // Update local state to reflect changes immediately
-
-      setSteps(updatedSteps);
-      setCompletedCount(completedCount + 1); // Increment completed count
-      setProgress((completedCount + 1) / total); // Update progress
       // Then call the main approval function
       // This could be your existing OnApproveStep function that handles API calls, etc.
       await OnApproveStep(updatedStep, total, completedCount + 1, true);
@@ -88,15 +87,6 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
         human_approval_status: "rejected" as HumanFeedbackStatus,
       };
 
-      // Create a new array with the updated step
-      const updatedSteps = steps.map((s) =>
-        s.id === step.id ? updatedStep : s
-      );
-
-      // Update local state to reflect changes immediately
-      setSteps(updatedSteps);
-      setCompletedCount(completedCount + 1); // Increment completed count
-      setProgress((completedCount + 1) / total); // Update progress
       // Then call the main rejection function
       // This could be your existing OnRejectStep function that handles API calls, etc.
       await OnApproveStep(updatedStep, total, completedCount + 1, false);
