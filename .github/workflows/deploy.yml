@@ -2,14 +2,29 @@ name: Validate Deployment
 
 on:
   push:
+  workflow_run:
+    workflows: ["Build Docker and Optional Push"]
+    types:
+      - completed
     branches:
       - main
+      - hotfix
   schedule:
-    - cron: '0 11,23 * * *'  # Runs at 11:00 AM and 11:00 PM GMT
+    - cron: "0 11,23 * * *" # Runs at 11:00 AM and 11:00 PM GMT
+  workflow_dispatch: #Allow manual triggering
+env:
+  GPT_MIN_CAPACITY: 250
+  TEXT_EMBEDDING_MIN_CAPACITY: 90
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    outputs:
+      RESOURCE_GROUP_NAME: ${{ steps.check_create_rg.outputs.RESOURCE_GROUP_NAME }}
+      WEBAPP_URL: ${{ steps.get_output.outputs.WEBAPP_URL }}
+      DEPLOYMENT_SUCCESS: ${{ steps.deployment_status.outputs.SUCCESS }}
+      API_APP_URL: ${{ steps.get_output.outputs.API_APP_URL }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -55,7 +70,7 @@ jobs:
       - name: Set Deployment Region
         run: |
           echo "Selected Region: $VALID_REGION"
-          echo "AZURE_LOCATION=$VALID_REGION" >> $GITHUB_ENV 
+          echo "AZURE_LOCATION=$VALID_REGION" >> $GITHUB_ENV
 
       - name: Setup Azure CLI
         run: |
@@ -77,8 +92,7 @@ jobs:
           SHORT_UUID=$(uuidgen | cut -d'-' -f1)
           UNIQUE_RG_NAME="arg-${ACCL_NAME}-${SHORT_UUID}"
           echo "RESOURCE_GROUP_NAME=${UNIQUE_RG_NAME}" >> $GITHUB_ENV
-          echo "Generated Resource_GROUP_PREFIX: ${UNIQUE_RG_NAME}" 
-      
+          echo "Generated Resource_GROUP_PREFIX: ${UNIQUE_RG_NAME}"
 
       - name: Check and Create Resource Group
         id: check_create_rg
@@ -93,36 +107,134 @@ jobs:
             echo "Resource group already exists."
           fi
 
+      - name: Generate Unique Solution Prefix
+        id: generate_solution_prefix
+        run: |
+          set -e
+          COMMON_PART="macae"
+          TIMESTAMP=$(date +%s)  
+          UPDATED_TIMESTAMP=$(echo $TIMESTAMP | tail -c 6) 
+          UNIQUE_SOLUTION_PREFIX="${COMMON_PART}${UPDATED_TIMESTAMP}"
+          echo "SOLUTION_PREFIX=${UNIQUE_SOLUTION_PREFIX}" >> $GITHUB_ENV
+          echo "Generated SOLUTION_PREFIX: ${UNIQUE_SOLUTION_PREFIX}"
 
       - name: Deploy Bicep Template
         id: deploy
         run: |
           set -e
+          # set image tag based on branch
+          if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
+            IMAGE_TAG="latest"
+          elif [[ "${{ env.BRANCH_NAME }}" == "hotfix" ]]; then
+            IMAGE_TAG="hotfix"
+          else
+            IMAGE_TAG="latest"
+          fi
+
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
-            --parameters azureOpenAILocation=${{ env.AZURE_LOCATION }}
+            --parameters \
+                environmentName=${{env.SOLUTION_PREFIX}} \
+                solutionLocation="swedencentral" \
+                azureOpenAILocation="swedencentral" \
+                modelDeploymentType="GlobalStandard" \
+                gptModelName="gpt-4o" \
+                gptModelVersion="2024-08-06" \
+                imageTag="${IMAGE_TAG}"
 
-
-      - name: Send Notification on Failure
-        if: failure()
+      - name: Extract Web App and API App URLs
+        id: get_output # <-- Add this
         run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-      
-          # Construct the email body
-          EMAIL_BODY=$(cat <<EOF
-          {
-            "body": "<p>Dear Team,</p><p>We would like to inform you that the Multi-Agent-Custom-Automation-Engine-Solution-Accelerator Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Build URL:</strong> ${RUN_URL}<br> ${OUTPUT}</p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>"
-          }
-          EOF
-          )
-      
-          # Send the notification
-          curl -X POST "${{ secrets.LOGIC_APP_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "$EMAIL_BODY" || echo "Failed to send notification"
-  
-    
+          echo "Fetching Web Apps..."
+
+          WEBAPP_NAMES=$(az webapp list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query "[].name" -o tsv)
+          echo "Detected Web Apps: $WEBAPP_NAMES"
+          for NAME in $WEBAPP_NAMES; do
+            if [[ $NAME == app-* ]]; then
+              WEBAPP_URL="https://${NAME}.azurewebsites.net"
+              echo "WEBAPP_URL=$WEBAPP_URL" >> $GITHUB_OUTPUT
+              echo "WEBAPP_URL=$WEBAPP_URL" 
+            elif [[ $NAME == api-* ]]; then
+              API_APP_URL="https://${NAME}.azurewebsites.net"
+              echo "API_APP_URL=$API_APP_URL" >> $GITHUB_OUTPUT
+              echo "API_APP_URL=$API_APP_URL"
+            fi
+          done
+
+      - name: Extract AI Services and Key Vault Names
+        if: always()
+        run: |
+          echo "Fetching AI Services and Key Vault names before deletion..."
+
+          # Get Key Vault name
+          KEYVAULT_NAME=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.KeyVault/vaults" --query "[].name" -o tsv)
+          echo "Detected Key Vault: $KEYVAULT_NAME"
+          echo "KEYVAULT_NAME=$KEYVAULT_NAME" >> $GITHUB_ENV
+
+          # Get AI Services names and convert them into a space-separated string
+          AI_SERVICES=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.CognitiveServices/accounts" --query "[].name" -o tsv | tr '\n' ' ')
+
+          echo "Detected AI Services: $AI_SERVICES"
+          echo "AI_SERVICES=$AI_SERVICES" >> $GITHUB_ENV
+
+      - name: Set Deployment Status
+        id: deployment_status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "SUCCESS=true" >> $GITHUB_OUTPUT
+          else
+            echo "SUCCESS=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Logout from Azure
+        if: always()
+        run: |
+          az logout
+          echo "Logged out from Azure."
+
+  # NEW: E2E Test Job that calls the reusable workflow
+  e2e-test:
+    needs: deploy
+    if: needs.deploy.outputs.DEPLOYMENT_SUCCESS == 'true'
+    uses: ./.github/workflows/test-automation.yml
+    with:
+      MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
+      MACAE_URL_API: ${{ needs.deploy.outputs.API_APP_URL }}
+    secrets: inherit
+  cleanup-deployment:
+    if: always() && needs.deploy.outputs.RESOURCE_GROUP_NAME != ''
+    needs: [deploy, e2e-test]
+    runs-on: ubuntu-latest
+    env:
+      RESOURCE_GROUP_NAME: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
+    steps:
+      - name: Setup Azure CLI
+        run: |
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          az --version
+      - name: Login to Azure
+        run: |
+          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+
+      - name: Extract AI Services and Key Vault Names
+        if: always()
+        run: |
+          echo "Fetching AI Services and Key Vault names before deletion..."
+
+          # Get Key Vault name
+          KEYVAULT_NAME=$(az resource list --resource-group "${{ env.RESOURCE_GROUP_NAME }}" --resource-type "Microsoft.KeyVault/vaults" --query "[].name" -o tsv)
+          echo "Detected Key Vault: $KEYVAULT_NAME"
+          echo "KEYVAULT_NAME=$KEYVAULT_NAME" >> $GITHUB_ENV
+          # Extract AI Services names
+          echo "Fetching AI Services..."
+          AI_SERVICES=$(az resource list --resource-group '${{ env.RESOURCE_GROUP_NAME }}' --resource-type "Microsoft.CognitiveServices/accounts" --query "[].name" -o tsv)
+          # Flatten newline-separated values to space-separated
+          AI_SERVICES=$(echo "$AI_SERVICES" | paste -sd ' ' -)
+          echo "Detected AI Services: $AI_SERVICES"
+          echo "AI_SERVICES=$AI_SERVICES" >> $GITHUB_ENV
+
       - name: Get OpenAI Resource from Resource Group
         id: get_openai_resource
         run: |
@@ -130,7 +242,7 @@ jobs:
 
           set -e
           echo "Fetching OpenAI resource from resource group ${{ env.RESOURCE_GROUP_NAME }}..."
-          
+
           # Run the az resource list command to get the OpenAI resource name
           openai_resource_name=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.CognitiveServices/accounts" --query "[0].name" -o tsv)
 
@@ -142,9 +254,6 @@ jobs:
             echo "OpenAI resource name: ${openai_resource_name}" 
           fi
 
-          
-
-          
       - name: Delete Bicep Deployment
         if: always()
         run: |
@@ -162,11 +271,10 @@ jobs:
             echo "Resource group does not exists."
           fi
 
-
       - name: Wait for resource deletion to complete
         run: |
 
-          
+
           # Add resources to the array
           resources_to_check=("${{ env.OPENAI_RESOURCE_NAME }}")
 
@@ -214,7 +322,6 @@ jobs:
             fi
           done
 
-          
       - name: Purging the Resources
         if: always()
         run: |
@@ -231,3 +338,26 @@ jobs:
           fi
 
           echo "Resource purging completed successfully"
+
+      - name: Send Notification on Failure
+        if: failure()
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Construct the email body
+          EMAIL_BODY=$(cat <<EOF
+          {
+            "body": "<p>Dear Team,</p><p>We would like to inform you that the Multi-Agent-Custom-Automation-Engine-Solution-Accelerator Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Build URL:</strong> ${RUN_URL}<br> ${OUTPUT}</p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>"
+          }
+          EOF
+          )
+
+          # Send the notification
+          curl -X POST "${{ secrets.LOGIC_APP_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "$EMAIL_BODY" || echo "Failed to send notification"
+      - name: Logout from Azure
+        if: always()
+        run: |
+          az logout
+          echo "Logged out from Azure."
