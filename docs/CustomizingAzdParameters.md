@@ -15,6 +15,7 @@ By default this template will use the environment name as the prefix to prevent 
 | `AZURE_ENV_MODEL_NAME`          | string | `gpt-4o`          | Specifies the name of the GPT model to be deployed.                                                |
 | `AZURE_ENV_FOUNDRY_PROJECT_ID`          | string | `<Existing Workspace Id>`          | Set this if you want to reuse an AI Foundry Project instead of creating a new one.                                                |                        
 | `AZURE_ENV_MODEL_VERSION`       | string | `2024-08-06`      | Version of the GPT model to be used for deployment.                                                |
+| `AZURE_ENV_MODEL_CAPACITY`       | int | `150`      | Sets the GPT model capacity.                                                |
 | `AZURE_ENV_IMAGETAG`            | string | `latest`          | Docker image tag used for container deployments.                                                   |
 | `AZURE_ENV_ENABLE_TELEMETRY`    | bool   | `true`            | Enables telemetry for monitoring and diagnostics.                                                  |
 | `AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID` | string  | `<Existing Workspace Id>`     | Set this if you want to reuse an existing Log Analytics Workspace instead of creating a new one.     |
