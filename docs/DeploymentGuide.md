@@ -144,6 +144,7 @@ When you start the deployment, most parameters will have **default values**, but
 | **Model Deployment Type**      | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).      | GlobalStandard    |
 | **GPT Model Name**             | Specifies the name of the GPT model to be deployed.                                 | gpt-4o            |
 | **GPT Model Version**          | Version of the GPT model to be used for deployment.                                 | 2024-08-06        |
+| **GPT Model Capacity**          | Sets the GPT model capacity.                                 | 150        |
 | **Image Tag**                  | Docker image tag used for container deployments.                                    | latest            |
 | **Enable Telemetry**           | Enables telemetry for monitoring and diagnostics.                                    | true              |
 
