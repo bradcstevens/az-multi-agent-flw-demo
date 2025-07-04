@@ -3,6 +3,7 @@ import { Task } from "../models/taskList";
 import { apiService } from "../api/apiService";
 import { InputTask, InputTaskResponse } from "../models/inputTask";
 import { formatDate } from "@/utils/utils";
+import * as cr from "crypto-js/core";
 
 /**
  * TaskService - Service for handling task-related operations and transformations
@@ -98,8 +99,8 @@ export class TaskService {
    */
   static generateSessionId(): string {
     const timestamp = new Date().getTime();
-    const random = Math.floor(Math.random() * 10000);
-    return `sid_${timestamp}_${random}`;
+    const randomBytes = cr.randomBytes(4).toString("hex");
+    return `sid_${timestamp}_${randomBytes}`;
   }
   /**
    * Split subtask action into description and function/details parts
