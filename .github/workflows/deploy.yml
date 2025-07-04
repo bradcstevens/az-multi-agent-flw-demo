@@ -134,7 +134,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
             --parameters \
-                environmentName=${{env.SOLUTION_PREFIX}} \
+                solutionPrefix=${{env.SOLUTION_PREFIX}} \
                 solutionLocation="swedencentral" \
                 azureOpenAILocation="swedencentral" \
                 modelDeploymentType="GlobalStandard" \
