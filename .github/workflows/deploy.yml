@@ -135,8 +135,8 @@ jobs:
             --template-file infra/main.bicep \
             --parameters \
                 solutionPrefix=${{env.SOLUTION_PREFIX}} \
-                solutionLocation="swedencentral" \
-                azureOpenAILocation="swedencentral" \
+                solutionLocation="${{AZURE_LOCATION}}" \
+                azureOpenAILocation="${{AZURE_LOCATION}}" \
                 modelDeploymentType="GlobalStandard" \
                 gptModelName="gpt-4o" \
                 gptModelVersion="2024-08-06" \
