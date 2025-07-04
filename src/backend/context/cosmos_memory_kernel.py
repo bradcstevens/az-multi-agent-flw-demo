@@ -268,7 +268,7 @@ class CosmosMemoryContext(MemoryStoreBase):
 
     async def get_all_plans(self) -> List[Plan]:
         """Retrieve all plans."""
-        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type ORDER BY c._ts DESC OFFSET 0 LIMIT 10"
+        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type ORDER BY c._ts DESC"
         parameters = [
             {"name": "@data_type", "value": "plan"},
             {"name": "@user_id", "value": self.user_id},
