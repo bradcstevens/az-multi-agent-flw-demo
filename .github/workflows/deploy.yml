@@ -140,7 +140,8 @@ jobs:
                 modelDeploymentType="GlobalStandard" \
                 gptModelName="gpt-4o" \
                 gptModelVersion="2024-08-06" \
-                imageTag="${IMAGE_TAG}"
+                imageTag="${IMAGE_TAG}" \
+                gptdeploymentCapacity="${{env.GPT_MIN_CAPACITY}}"
 
       - name: Extract Web App and API App URLs
         id: get_output # <-- Add this
