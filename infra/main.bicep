@@ -697,7 +697,9 @@ module privateDnsZonesAiServices 'br/public:avm/res/network/private-dns-zone:0.7
 ]
 
 // NOTE: Required version 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' not available in AVM
-var aiFoundryAiServicesResourceName = aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'
+var useExistingFoundryProject = !empty(existingFoundryProjectResourceId)
+var existingAiFounryName = useExistingFoundryProject?split( existingFoundryProjectResourceId,'/')[8]:''
+var aiFoundryAiServicesResourceName = useExistingFoundryProject? existingAiFounryName : aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'
 var aiFoundryAIservicesEnabled = aiFoundryAiServicesConfiguration.?enabled ?? true
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
@@ -743,8 +745,8 @@ module aiFoundryAiServices 'modules/account/main.bicep' = if (aiFoundryAIservice
     privateEndpoints: virtualNetworkEnabled
       ? ([
           {
-            name: 'pep-${aiFoundryAiServicesResourceName}'
-            customNetworkInterfaceName: 'nic-${aiFoundryAiServicesResourceName}'
+            name: 'pep-${aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'}'
+            customNetworkInterfaceName: 'nic-${aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'}'
             subnetResourceId: aiFoundryAiServicesConfiguration.?subnetResourceId ?? virtualNetwork.outputs.subnetResourceIds[0]
             privateDnsZoneGroup: {
               privateDnsZoneGroupConfigs: map(objectKeys(openAiPrivateDnsZones), zone => {
@@ -775,7 +777,8 @@ module aiFoundryAiServices 'modules/account/main.bicep' = if (aiFoundryAIservice
 
 // AI Foundry: AI Project
 // WAF best practices for Open AI: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-openai
-var aiFoundryAiProjectName = aiFoundryAiProjectConfiguration.?name ?? 'aifp-${solutionPrefix}'
+var existingAiFounryProjectName = useExistingFoundryProject?last(split( existingFoundryProjectResourceId,'/')): ''
+var aiFoundryAiProjectName =  useExistingFoundryProject? existingAiFounryProjectName : aiFoundryAiProjectConfiguration.?name ?? 'aifp-${solutionPrefix}'
 
 resource aiUser 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
   name: '53ca6127-db72-4b80-b1b0-d745d6d5456d'
