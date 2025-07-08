@@ -31,7 +31,10 @@ export class TaskService {
         completed_steps: plan.completed,
         total_steps: plan.total_steps,
         status: apiService.isPlanComplete(plan) ? "completed" : "inprogress",
-        date: formatDate(plan.timestamp),
+        date: new Intl.DateTimeFormat(undefined, {
+          dateStyle: "long",
+          // timeStyle: "short",
+        }).format(new Date(plan.timestamp)),
       };
 
       // Categorize based on plan status and completion
@@ -98,8 +101,8 @@ export class TaskService {
    */
   static generateSessionId(): string {
     const timestamp = new Date().getTime();
-     const random = Math.floor(Math.random() * 10000);
-        return `sid_${timestamp}_${random}`;
+    const random = Math.floor(Math.random() * 10000);
+    return `sid_${timestamp}_${random}`;
   }
   /**
    * Split subtask action into description and function/details parts
