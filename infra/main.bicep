@@ -698,8 +698,8 @@ module privateDnsZonesAiServices 'br/public:avm/res/network/private-dns-zone:0.7
 
 // NOTE: Required version 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' not available in AVM
 var useExistingFoundryProject = !empty(existingFoundryProjectResourceId)
-var existingAiFounryName = useExistingFoundryProject?split( existingFoundryProjectResourceId,'/')[8]:''
-var aiFoundryAiServicesResourceName = useExistingFoundryProject? existingAiFounryName : aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'
+var existingAiFoundryName = useExistingFoundryProject?split( existingFoundryProjectResourceId,'/')[8]:''
+var aiFoundryAiServicesResourceName = useExistingFoundryProject? existingAiFoundryName : aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'
 var aiFoundryAIservicesEnabled = aiFoundryAiServicesConfiguration.?enabled ?? true
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
