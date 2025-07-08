@@ -202,7 +202,7 @@ jobs:
     with:
       MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
       MACAE_URL_API: ${{ needs.deploy.outputs.API_APP_URL }}
-      MACAE_CONTAINER_APP: ${{needs.deploy.outputs.SOLUTION_PREFIX}}
+
     secrets: inherit
   cleanup-deployment:
     if: always() && needs.deploy.outputs.RESOURCE_GROUP_NAME != ''
