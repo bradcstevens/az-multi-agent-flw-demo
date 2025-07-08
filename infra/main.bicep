@@ -740,13 +740,13 @@ module aiFoundryAiServices 'modules/account/main.bicep' = if (aiFoundryAIservice
       bypass: 'AzureServices'
       defaultAction: (virtualNetworkEnabled) ? 'Deny' : 'Allow' 
     }
-    
- 
-    privateEndpoints: virtualNetworkEnabled
+
+  
+    privateEndpoints: virtualNetworkEnabled && !useExistingFoundryProject
       ? ([
           {
-            name: 'pep-${aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'}'
-            customNetworkInterfaceName: 'nic-${aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'}'
+            name: 'pep-${aiFoundryAiServicesResourceName}'
+            customNetworkInterfaceName: 'nic-${aiFoundryAiServicesResourceName}'
             subnetResourceId: aiFoundryAiServicesConfiguration.?subnetResourceId ?? virtualNetwork.outputs.subnetResourceIds[0]
             privateDnsZoneGroup: {
               privateDnsZoneGroupConfigs: map(objectKeys(openAiPrivateDnsZones), zone => {
@@ -756,7 +756,7 @@ module aiFoundryAiServices 'modules/account/main.bicep' = if (aiFoundryAIservice
             }
           }
         ])
-      : []
+      : [] 
     deployments: aiFoundryAiServicesConfiguration.?deployments ?? [
       {
         name: aiFoundryAiServicesModelDeployment.name
