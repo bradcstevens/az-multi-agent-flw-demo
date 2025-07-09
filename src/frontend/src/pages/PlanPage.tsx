@@ -146,7 +146,7 @@ const PlanPage: React.FC = () => {
                 if (approveRejectDetails && Object.keys(approveRejectDetails).length > 0) {
                     await loadPlanData(false);
                 }
-                setReloadLeftList(total === completed);
+                setReloadLeftList(true);
             } catch (error) {
                 dismissToast(id);
                 showToast(`Failed to ${approve ? "approve" : "reject"} step`, "error");
@@ -179,7 +179,7 @@ const PlanPage: React.FC = () => {
     return (
         <CoralShellColumn>
             <CoralShellRow>
-                <PlanPanelLeft onNewTaskButton={handleNewTaskButton} />
+                <PlanPanelLeft onNewTaskButton={handleNewTaskButton} reloadTasks={reloadLeftList} restReload={()=>setReloadLeftList(false)}/>
 
                 <Content>
                     {/* 🐙 Only replaces content body, not page shell */}
