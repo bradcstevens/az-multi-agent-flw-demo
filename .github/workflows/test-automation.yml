@@ -76,7 +76,7 @@ jobs:
           if [ -z "${{ env.MACAE_WEB_URL }}" ]; then
             echo "ERROR: No Web URL provided for testing"
             exit 1
-          elif [ -z "${{ env.CONTAINER_APP_URL }}" ]; then
+          elif [ -z "${{ env.MACAE_URL_API  }}" ]; then
             echo "ERROR: No API URL provided for testing"
             exit 1
           elif [ -z "${{ env.MACAE_RG }}" ]; then
