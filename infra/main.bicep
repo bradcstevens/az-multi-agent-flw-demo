@@ -697,7 +697,9 @@ module privateDnsZonesAiServices 'br/public:avm/res/network/private-dns-zone:0.7
 ]
 
 // NOTE: Required version 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' not available in AVM
-var aiFoundryAiServicesResourceName = aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'
+var useExistingFoundryProject = !empty(existingFoundryProjectResourceId)
+var existingAiFoundryName = useExistingFoundryProject?split( existingFoundryProjectResourceId,'/')[8]:''
+var aiFoundryAiServicesResourceName = useExistingFoundryProject? existingAiFoundryName : aiFoundryAiServicesConfiguration.?name ?? 'aisa-${solutionPrefix}'
 var aiFoundryAIservicesEnabled = aiFoundryAiServicesConfiguration.?enabled ?? true
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
@@ -738,9 +740,7 @@ module aiFoundryAiServices 'modules/account/main.bicep' = if (aiFoundryAIservice
       bypass: 'AzureServices'
       defaultAction: (virtualNetworkEnabled) ? 'Deny' : 'Allow' 
     }
-    
- 
-    privateEndpoints: virtualNetworkEnabled
+    privateEndpoints: virtualNetworkEnabled && !useExistingFoundryProject
       ? ([
           {
             name: 'pep-${aiFoundryAiServicesResourceName}'
@@ -754,7 +754,7 @@ module aiFoundryAiServices 'modules/account/main.bicep' = if (aiFoundryAIservice
             }
           }
         ])
-      : []
+      : [] 
     deployments: aiFoundryAiServicesConfiguration.?deployments ?? [
       {
         name: aiFoundryAiServicesModelDeployment.name
@@ -775,31 +775,24 @@ module aiFoundryAiServices 'modules/account/main.bicep' = if (aiFoundryAIservice
 
 // AI Foundry: AI Project
 // WAF best practices for Open AI: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-openai
-var aiFoundryAiProjectName = aiFoundryAiProjectConfiguration.?name ?? 'aifp-${solutionPrefix}'
-
-resource aiUser 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: '53ca6127-db72-4b80-b1b0-d745d6d5456d'
-}
+var existingAiFounryProjectName = useExistingFoundryProject ? last(split( existingFoundryProjectResourceId,'/')) : ''
+var aiFoundryAiProjectName =  useExistingFoundryProject ? existingAiFounryProjectName : aiFoundryAiProjectConfiguration.?name ?? 'aifp-${solutionPrefix}'
 
 var useExistingResourceId = !empty(existingFoundryProjectResourceId)
 
-module Newroles './modules/role.bicep' = if(!useExistingResourceId){
+module cogServiceRoleAssignmentsNew './modules/role.bicep' = if(!useExistingResourceId) {
   params: {
-    name: 'new-${guid(containerApp.name, aiFoundryAiServices.outputs.resourceId, aiUser.id)}'
-    roleDefinitionId: aiUser.id
+    name: 'new-${guid(containerApp.name, aiFoundryAiServices.outputs.resourceId)}'
     principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
-    aiUserid: aiUser.id
     aiServiceName: aiFoundryAiServices.outputs.name
   }
   scope: resourceGroup(subscription().subscriptionId, resourceGroup().name)
 }
 
-module Existingroles './modules/role.bicep' = if(useExistingResourceId){
+module cogServiceRoleAssignmentsExisting './modules/role.bicep' = if(useExistingResourceId) {
   params: {
-    name: 'reuse-${guid(containerApp.name, aiFoundryAiServices.outputs.aiProjectInfo.resourceId, aiUser.id)}'
-    roleDefinitionId: aiUser.id
+    name: 'reuse-${guid(containerApp.name, aiFoundryAiServices.outputs.aiProjectInfo.resourceId)}'
     principalId: containerApp.outputs.?systemAssignedMIPrincipalId!
-    aiUserid: aiUser.id
     aiServiceName: aiFoundryAiServices.outputs.name
   }
   scope: resourceGroup( split(existingFoundryProjectResourceId, '/')[2], split(existingFoundryProjectResourceId, '/')[4])
