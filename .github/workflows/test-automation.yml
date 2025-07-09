@@ -34,6 +34,8 @@ env:
   # Use input URL if provided (from deploy pipeline), otherwise fall back to vars
   url: ${{ inputs.MACAE_WEB_URL  }}
   api_url: ${{ inputs.MACAE_URL_API}}
+  MACAE_RG: ${{inputs.MACAE_RG}}
+  MACAE_CONTAINER_APP: ${{inputs.MACAE_CONTAINER_APP}}
   accelerator_name: "MACAE"
 
 jobs:
@@ -59,7 +61,7 @@ jobs:
         with:
           azcliversion: "latest"
           inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ vars.MACAE_BACKEND_CONTAINER_NAME }}/start?api-version=2025-01-01"
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/start?api-version=2025-01-01"
 
       - name: Install dependencies
         run: |
@@ -191,5 +193,5 @@ jobs:
         with:
           azcliversion: "latest"
           inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ vars.MACAE_BACKEND_CONTAINER_NAME  }}/stop?api-version=2025-01-01"
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP  }}/stop?api-version=2025-01-01"
             az logout
