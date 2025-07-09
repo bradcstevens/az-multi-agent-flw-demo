@@ -61,7 +61,7 @@ jobs:
         with:
           azcliversion: "latest"
           inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/start?api-version=2025-01-01"
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/start?api-version=2025-04-01"
 
       - name: Install dependencies
         run: |
@@ -92,19 +92,16 @@ jobs:
           echo "Waiting for application to be ready at ${{ env.MACAE_WEB_URL }}"
           max_attempts=10
           attempt=1
-
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt: Checking if application is ready..."
             if curl -f -s "${{ env.MACAE_WEB_URL }}" > /dev/null; then
               echo "Application is ready!"
               break
             fi
-
             if [ $attempt -eq $max_attempts ]; then
               echo "Application is not ready after $max_attempts attempts"
               exit 1
             fi
-
             echo "Application not ready, waiting 30 seconds..."
             sleep 30
             attempt=$((attempt + 1))
@@ -170,21 +167,21 @@ jobs:
           IS_SUCCESS=${{ steps.test_result.outputs.IS_SUCCESS }}
 
           if [ "$IS_SUCCESS" = "true" ]; then
-            EMAIL_BODY=$(cat <<EOF
-            {
-              "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has completed successfully.</p><p><strong>Run URL:</strong> <a href=\"${RUN_URL}\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\"${REPORT_URL}\">${REPORT_URL}</a></p><p>Best regards,<br>Your Automation Team</p>",
-              "subject": "${{ env.accelerator_name }} Test Automation - Success"
-            }
-          EOF
-            )
+                  EMAIL_BODY=$(cat <<EOF
+                  {
+                    "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has completed successfully.</p><p><strong>Run URL:</strong> <a href=\\"${RUN_URL}\\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\\"${REPORT_URL}\\">${REPORT_URL}</a></p><p>Best regards,<br>Your Automation Team</p>",
+                    "subject": "${{ env.accelerator_name }} Test Automation - Success"
+                  }
+                  EOF
+                  )
           else
-            EMAIL_BODY=$(cat <<EOF
-            {
-              "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Run URL:</strong> <a href=\"${RUN_URL}\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\"${REPORT_URL}\">${REPORT_URL}</a></p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>",
-              "subject": "${{ env.accelerator_name }} Test Automation - Failure"
-            }
-          EOF
-            )
+                  EMAIL_BODY=$(cat <<EOF
+                  {
+                    "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Run URL:</strong> <a href=\\"${RUN_URL}\\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\\"${REPORT_URL}\\">${REPORT_URL}</a></p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>",
+                    "subject": "${{ env.accelerator_name }} Test Automation - Failure"
+                  }
+                  EOF
+                  )
           fi
 
           curl -X POST "${{ secrets.EMAILNOTIFICATION_LOGICAPP_URL_TA }}" \
@@ -197,5 +194,5 @@ jobs:
         with:
           azcliversion: "latest"
           inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/stop?api-version=2025-01-01"
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/stop?api-version=2025-04-01"
             az logout
