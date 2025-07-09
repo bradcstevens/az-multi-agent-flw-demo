@@ -23,7 +23,7 @@ jobs:
       RESOURCE_GROUP_NAME: ${{ steps.check_create_rg.outputs.RESOURCE_GROUP_NAME }}
       WEBAPP_URL: ${{ steps.get_output.outputs.WEBAPP_URL }}
       DEPLOYMENT_SUCCESS: ${{ steps.deployment_status.outputs.SUCCESS }}
-      API_APP_URL: ${{ steps.get_output.outputs.CONTAINER_APP_URL }}
+      API_APP_URL: ${{ steps.get_backend_url.outputs.CONTAINER_APP_URL }} 
       CONTAINER_APP: ${{steps.get_backend_url.outputs.CONTAINER_APP}}
     steps:
       - name: Checkout Code
@@ -162,6 +162,7 @@ jobs:
           echo "CONTAINER_APP_URL=https://${CONTAINER_APP_URL}" >> $GITHUB_OUTPUT
           echo "CONTAINER_APP=${CONTAINER_APP_NAME}" >> $GITHUB_OUTPUT
 
+
       - name: Set Deployment Status
         id: deployment_status
         if: always()
@@ -178,7 +179,7 @@ jobs:
     uses: ./.github/workflows/test-automation.yml
     with:
       MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
-      MACAE_URL_API: ${{ needs.deploy.outputs.CONTAINER_APP_URL }}
+      MACAE_URL_API: ${{ needs.deploy.outputs.API_APP_URL }}
       MACAE_RG: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
       MACAE_CONTAINER_APP: ${{ needs.deploy.outputs.CONTAINER_APP }}
     secrets: inherit
