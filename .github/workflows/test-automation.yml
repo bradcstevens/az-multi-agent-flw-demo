@@ -22,6 +22,9 @@ on:
         required: false
         type: string
         description: "API URL for MACAE (overrides environment variable)"
+      MACAE_RG:
+        required: true
+        type: string
       MACAE_CONTAINER_APP:
         required: false
         type: string
