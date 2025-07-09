@@ -162,22 +162,6 @@ jobs:
           echo "CONTAINER_APP_URL=https://${CONTAINER_APP_URL}" >> $GITHUB_OUTPUT
           echo "CONTAINER_APP=${CONTAINER_APP_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Extract AI Services and Key Vault Names
-        if: always()
-        run: |
-          echo "Fetching AI Services and Key Vault names before deletion..."
-
-          # Get Key Vault name
-          KEYVAULT_NAME=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.KeyVault/vaults" --query "[].name" -o tsv)
-          echo "Detected Key Vault: $KEYVAULT_NAME"
-          echo "KEYVAULT_NAME=$KEYVAULT_NAME" >> $GITHUB_ENV
-
-          # Get AI Services names and convert them into a space-separated string
-          AI_SERVICES=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.CognitiveServices/accounts" --query "[].name" -o tsv | tr '\n' ' ')
-
-          echo "Detected AI Services: $AI_SERVICES"
-          echo "AI_SERVICES=$AI_SERVICES" >> $GITHUB_ENV
-
       - name: Set Deployment Status
         id: deployment_status
         if: always()
@@ -187,13 +171,7 @@ jobs:
           else
             echo "SUCCESS=false" >> $GITHUB_OUTPUT
           fi
-      - name: Logout from Azure
-        if: always()
-        run: |
-          az logout
-          echo "Logged out from Azure."
 
-  # NEW: E2E Test Job that calls the reusable workflow
   e2e-test:
     needs: deploy
     if: needs.deploy.outputs.DEPLOYMENT_SUCCESS == 'true'
