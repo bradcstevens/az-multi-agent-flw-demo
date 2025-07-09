@@ -153,14 +153,19 @@ jobs:
           CONTAINER_APP_NAME=$(az containerapp list \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --query "[0].name" -o tsv)
-
+      
+          echo "Detected container app name: $CONTAINER_APP_NAME"
+      
           CONTAINER_APP_URL=$(az containerapp show \
             --name "$CONTAINER_APP_NAME" \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --query "properties.configuration.ingress.fqdn" -o tsv)
-
+      
+          echo "Detected container app URL: https://${CONTAINER_APP_URL}"
+      
           echo "CONTAINER_APP_URL=https://${CONTAINER_APP_URL}" >> $GITHUB_OUTPUT
           echo "CONTAINER_APP=${CONTAINER_APP_NAME}" >> $GITHUB_OUTPUT
+
 
       - name: Set Deployment Status
         id: deployment_status
