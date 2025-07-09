@@ -24,7 +24,7 @@ jobs:
       WEBAPP_URL: ${{ steps.get_output.outputs.WEBAPP_URL }}
       DEPLOYMENT_SUCCESS: ${{ steps.deployment_status.outputs.SUCCESS }}
       API_APP_URL: ${{ steps.get_output.outputs.API_APP_URL }}
-      CONTAINER_APP: ${{steps.get_backend_url.outputs.CONTAINER_APP}}
+      CONTAINER_APP: ${{steps.get_backend_url.outputs.CONTAINER_APP_URL}}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -232,7 +232,7 @@ jobs:
       MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
       MACAE_URL_API: ${{ needs.deploy.outputs.API_APP_URL }}
       MACAE_RG: ${{needs.deploy.outputs.RESOURCE_GROUP_NAME}}
-      MACAE_CONTAINER_APP: ${{needs.deploy.outputs.CONTAINER_APP}}
+      MACAE_CONTAINER_APP: ${{needs.deploy.outputs.CONTAINER_APP_URL}}
 
     secrets: inherit
   cleanup-deployment:

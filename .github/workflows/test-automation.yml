@@ -23,7 +23,7 @@ on:
         type: string
         description: "API URL for MACAE (overrides environment variable)"
       MACAE_RG:
-        required: true
+        required: false
         type: string
       MACAE_CONTAINER_APP:
         required: false
@@ -64,7 +64,7 @@ jobs:
         with:
           azcliversion: "latest"
           inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/start?api-version=2025-01-01"
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/start?api-version=2025-04-01"
 
       - name: Install dependencies
         run: |
@@ -196,5 +196,5 @@ jobs:
         with:
           azcliversion: "latest"
           inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP  }}/stop?api-version=2025-01-01"
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP  }}/stop?api-version=2025-04-01"
             az logout
