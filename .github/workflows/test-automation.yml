@@ -9,9 +9,8 @@ on:
     paths:
       - "tests/e2e-test/**"
   schedule:
-    - cron: "0 13 * * *" # Runs at 1 PM UTC
+    - cron: "0 13 * * *"
   workflow_dispatch:
-
   workflow_call:
     inputs:
       MACAE_WEB_URL:
@@ -33,17 +32,16 @@ on:
         required: false
         description: "Logic App URL for email notifications"
 
-env:
-  # Use input URL if provided (from deploy pipeline), otherwise fall back to vars
-  url: ${{ inputs.MACAE_WEB_URL  }}
-  api_url: ${{ inputs.MACAE_URL_API}}
-  MACAE_RG: ${{inputs.MACAE_RG}}
-  MACAE_CONTAINER_APP: ${{inputs.MACAE_CONTAINER_APP}}
-  accelerator_name: "MACAE"
-
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      MACAE_WEB_URL: ${{ inputs.MACAE_WEB_URL }}
+      MACAE_URL_API: ${{ inputs.MACAE_URL_API }}
+      MACAE_RG: ${{ inputs.MACAE_RG }}
+      MACAE_CONTAINER_APP: ${{ inputs.MACAE_CONTAINER_APP }}
+      accelerator_name: "MACAE"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -59,12 +57,11 @@ jobs:
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
 
       - name: Start Container App
-        id: start-container-app
         uses: azure/cli@v2
         with:
           azcliversion: "latest"
           inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/start?api-version=2025-04-01"
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/start?api-version=2025-04-01"
 
       - name: Install dependencies
         run: |
@@ -74,41 +71,46 @@ jobs:
       - name: Ensure browsers are installed
         run: python -m playwright install --with-deps chromium
 
-      - name: Validate URL
+      - name: Validate Inputs
         run: |
-          if [ -z "${{ env.url }}" ]; then
-            echo "ERROR: No URL provided for testing"
+          if [ -z "${{ env.MACAE_WEB_URL }}" ]; then
+            echo "ERROR: No Web URL provided for testing"
             exit 1
-          elif [ -z "${{ env.api_url }}" ]; then
+          elif [ -z "${{ env.MACAE_URL_API }}" ]; then
             echo "ERROR: No API URL provided for testing"
             exit 1
+          elif [ -z "${{ env.MACAE_RG }}" ]; then
+            echo "ERROR: Resource group name missing"
+            exit 1
+          elif [ -z "${{ env.MACAE_CONTAINER_APP }}" ]; then
+            echo "ERROR: Container app name missing"
+            exit 1
           fi
-          echo "Testing URL: ${{ env.url }}"
-          echo "Testing API URL: ${{ env.api_url }}"
+
       - name: Wait for Application to be Ready
         run: |
-          echo "Waiting for application to be ready at ${{ env.url }} "
+          echo "Waiting for application to be ready at ${{ env.MACAE_WEB_URL }}"
           max_attempts=10
           attempt=1
 
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt: Checking if application is ready..."
-            if curl -f -s "${{ env.url }}" > /dev/null; then
+            if curl -f -s "${{ env.MACAE_WEB_URL }}" > /dev/null; then
               echo "Application is ready!"
               break
             fi
-            
+
             if [ $attempt -eq $max_attempts ]; then
               echo "Application is not ready after $max_attempts attempts"
               exit 1
             fi
-            
+
             echo "Application not ready, waiting 30 seconds..."
             sleep 30
             attempt=$((attempt + 1))
           done
 
-      - name: Run tests(1)
+      - name: Run tests (1)
         id: test1
         run: |
           xvfb-run pytest --headed --html=report/report.html --self-contained-html
@@ -116,26 +118,26 @@ jobs:
         continue-on-error: true
 
       - name: Sleep for 30 seconds
-        if: ${{ steps.test1.outcome == 'failure' }}
+        if: steps.test1.outcome == 'failure'
         run: sleep 30s
         shell: bash
 
-      - name: Run tests(2)
+      - name: Run tests (2)
         id: test2
-        if: ${{ steps.test1.outcome == 'failure' }}
+        if: steps.test1.outcome == 'failure'
         run: |
           xvfb-run pytest --headed --html=report/report.html --self-contained-html
         working-directory: tests/e2e-test
         continue-on-error: true
 
       - name: Sleep for 60 seconds
-        if: ${{ steps.test2.outcome == 'failure' }}
+        if: steps.test2.outcome == 'failure'
         run: sleep 60s
         shell: bash
 
-      - name: Run tests(3)
+      - name: Run tests (3)
         id: test3
-        if: ${{ steps.test2.outcome == 'failure' }}
+        if: steps.test2.outcome == 'failure'
         run: |
           xvfb-run pytest --headed --html=report/report.html --self-contained-html
         working-directory: tests/e2e-test
@@ -147,15 +149,15 @@ jobs:
         with:
           name: test-report-${{ github.run_id }}
           path: tests/e2e-test/report/*
+
       - name: Determine Test Result
         id: test_result
         run: |
-          IS_SUCCESS=${{ steps.test1.outcome == 'success' || steps.test2.outcome == 'success' || steps.test3.outcome == 'success' }}
-          echo "IS_SUCCESS=$IS_SUCCESS" >> $GITHUB_OUTPUT
-
-          if [ "$IS_SUCCESS" = "true" ]; then
+          if [[ "${{ steps.test1.outcome }}" == "success" || "${{ steps.test2.outcome }}" == "success" || "${{ steps.test3.outcome }}" == "success" ]]; then
+            echo "IS_SUCCESS=true" >> $GITHUB_OUTPUT
             echo "✅ Tests passed!"
           else
+            echo "IS_SUCCESS=false" >> $GITHUB_OUTPUT
             echo "❌ All test attempts failed"
             exit 1
           fi
@@ -166,7 +168,7 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           REPORT_URL=${{ steps.upload_report.outputs.artifact-url }}
           IS_SUCCESS=${{ steps.test_result.outputs.IS_SUCCESS }}
-          # Construct the email body
+
           if [ "$IS_SUCCESS" = "true" ]; then
             EMAIL_BODY=$(cat <<EOF
             {
@@ -178,14 +180,13 @@ jobs:
           else
             EMAIL_BODY=$(cat <<EOF
             {
-              "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process  has encountered an issue and has failed to complete successfully.</p><p><strong>Run URL:</strong> <a href=\"${RUN_URL}\">${RUN_URL}</a><br> ${OUTPUT}</p><p><strong>Test Report:</strong> <a href=\"${REPORT_URL}\">${REPORT_URL}</a></p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>",
+              "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Run URL:</strong> <a href=\"${RUN_URL}\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\"${REPORT_URL}\">${REPORT_URL}</a></p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>",
               "subject": "${{ env.accelerator_name }} Test Automation - Failure"
             }
           EOF
             )
           fi
 
-          # Send the notification
           curl -X POST "${{ secrets.EMAILNOTIFICATION_LOGICAPP_URL_TA }}" \
             -H "Content-Type: application/json" \
             -d "$EMAIL_BODY" || echo "Failed to send notification"
@@ -196,5 +197,5 @@ jobs:
         with:
           azcliversion: "latest"
           inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG  }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP  }}/stop?api-version=2025-04-01"
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/stop?api-version=2025-04-01"
             az logout
