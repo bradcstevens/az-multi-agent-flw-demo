@@ -17,7 +17,7 @@ on:
         required: false
         type: string
         description: "Web URL for MACAE (overrides environment variable)"
-      MACAE_URL_API:
+      CONTAINER_APP_URL:
         required: false
         type: string
         description: "API URL for MACAE (overrides environment variable)"
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MACAE_WEB_URL: ${{ inputs.MACAE_WEB_URL }}
-      MACAE_URL_API: ${{ inputs.CONTAINER_APP_URL }}
+      CONTAINER_APP_URL: ${{ inputs.CONTAINER_APP_URL }}
       MACAE_RG: ${{ inputs.MACAE_RG }}
       MACAE_CONTAINER_APP: ${{ inputs.MACAE_CONTAINER_APP }}
       accelerator_name: "MACAE"
