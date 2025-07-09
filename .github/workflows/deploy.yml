@@ -178,7 +178,7 @@ jobs:
     uses: ./.github/workflows/test-automation.yml
     with:
       MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
-      MACAE_URL_API: ${{ needs.deploy.outputs.API_APP_URL }}
+      MACAE_URL_API: ${{ needs.deploy.outputs.CONTAINER_APP_URL }}
       MACAE_RG: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
       MACAE_CONTAINER_APP: ${{ needs.deploy.outputs.CONTAINER_APP }}
     secrets: inherit
