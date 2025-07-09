@@ -11,7 +11,7 @@ on:
       - hotfix
   schedule:
     - cron: "0 11,23 * * *" # Runs at 11:00 AM and 11:00 PM GMT
-  workflow_dispatch:
+  workflow_dispatch: #Allow manual triggering
 env:
   GPT_MIN_CAPACITY: 140
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
@@ -23,7 +23,8 @@ jobs:
       RESOURCE_GROUP_NAME: ${{ steps.check_create_rg.outputs.RESOURCE_GROUP_NAME }}
       WEBAPP_URL: ${{ steps.get_output.outputs.WEBAPP_URL }}
       DEPLOYMENT_SUCCESS: ${{ steps.deployment_status.outputs.SUCCESS }}
-      API_APP_URL: ${{ steps.get_output.outputs.API_APP_URL }}
+      API_APP_URL: ${{ steps.get_output.outputs.CONTAINER_APP_URL }}
+      CONTAINER_APP: ${{steps.get_backend_url.outputs.CONTAINER_APP}}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -129,18 +130,19 @@ jobs:
           else
             IMAGE_TAG="latest"
           fi
+
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
-            --parameters infra/main.waf-aligned.bicepparam \
             --parameters \
                 solutionPrefix=${{env.SOLUTION_PREFIX}} \
-                solutionLocation="swedencentral" \
-                azureOpenAILocation="swedencentral" \
+                solutionLocation="${{env.AZURE_LOCATION}}" \
+                azureOpenAILocation="${{env.AZURE_LOCATION}}" \
                 modelDeploymentType="GlobalStandard" \
                 gptModelName="gpt-4o" \
                 gptModelVersion="2024-08-06" \
-                imageTag="${IMAGE_TAG}"
+                imageTag="${IMAGE_TAG}" \
+              --output json
 
       - name: Extract Web App and API App URLs
         id: get_output # <-- Add this
@@ -154,12 +156,38 @@ jobs:
               WEBAPP_URL="https://${NAME}.azurewebsites.net"
               echo "WEBAPP_URL=$WEBAPP_URL" >> $GITHUB_OUTPUT
               echo "WEBAPP_URL=$WEBAPP_URL" 
-            elif [[ $NAME == api-* ]]; then
-              API_APP_URL="https://${NAME}.azurewebsites.net"
-              echo "API_APP_URL=$API_APP_URL" >> $GITHUB_OUTPUT
-              echo "API_APP_URL=$API_APP_URL"
             fi
           done
+
+      - name: Get Container App Backend URL
+        id: get_backend_url
+        run: |
+          set -e
+          echo "Fetching backend Container App URL from resource group: ${{ env.RESOURCE_GROUP_NAME }}"
+
+          CONTAINER_APP_NAME=$(az containerapp list \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query "[0].name" -o tsv)
+
+          if [ -z "$CONTAINER_APP_NAME" ]; then
+          echo "❌ No container app found in resource group."
+          exit 1
+          fi
+
+
+          CONTAINER_APP_URL=$(az containerapp show \
+          --name "$CONTAINER_APP_NAME" \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query "properties.configuration.ingress.fqdn" -o tsv)
+
+          if [ -z "$CONTAINER_APP_URL" ]; then
+          echo "❌ Failed to retrieve the backend container app URL."
+          exit 1
+          fi
+
+          echo "✅ Backend Container App URL: https://${CONTAINER_APP_URL}"
+          echo "CONTAINER_APP_URL=https://${CONTAINER_APP_URL}" >> $GITHUB_OUTPUT
+          echo "CONTAINER_APP_NAME=${CONTAINER_APP_NAME}" >> $GITHUB_OUTPUT
 
       - name: Extract AI Services and Key Vault Names
         if: always()
@@ -199,7 +227,10 @@ jobs:
     uses: ./.github/workflows/test-automation.yml
     with:
       MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
-      MACAE_URL_API: ${{ needs.deploy.outputs.API_APP_URL }}
+      MACAE_URL_API: ${{ needs.deploy.outputs.CONTAINER_APP_URL }}
+      MACAE_RG: ${{needs.deploy.outputs.RESOURCE_GROUP_NAME}}
+      MACAE_CONTAINER_APP: ${{needs.deploy.outputs.CONTAINER_APP}}
+
     secrets: inherit
   cleanup-deployment:
     if: always() && needs.deploy.outputs.RESOURCE_GROUP_NAME != ''
@@ -355,3 +386,8 @@ jobs:
           curl -X POST "${{ secrets.LOGIC_APP_URL }}" \
             -H "Content-Type: application/json" \
             -d "$EMAIL_BODY" || echo "Failed to send notification"
+      - name: Logout from Azure
+        if: always()
+        run: |
+          az logout
+          echo "Logged out from Azure."
