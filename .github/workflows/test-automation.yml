@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MACAE_WEB_URL: ${{ inputs.MACAE_WEB_URL }}
-      MACAE_URL_API: ${{ inputs.MACAE_URL_API }}
+      MACAE_URL_API: ${{ inputs.CONTAINER_APP_URL }}
       MACAE_RG: ${{ inputs.MACAE_RG }}
       MACAE_CONTAINER_APP: ${{ inputs.MACAE_CONTAINER_APP }}
       accelerator_name: "MACAE"
@@ -76,7 +76,7 @@ jobs:
           if [ -z "${{ env.MACAE_WEB_URL }}" ]; then
             echo "ERROR: No Web URL provided for testing"
             exit 1
-          elif [ -z "${{ env.MACAE_URL_API }}" ]; then
+          elif [ -z "${{ env.CONTAINER_APP_URL }}" ]; then
             echo "ERROR: No API URL provided for testing"
             exit 1
           elif [ -z "${{ env.MACAE_RG }}" ]; then
