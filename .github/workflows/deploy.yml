@@ -9,7 +9,6 @@ on:
     branches:
       - main
       - hotfix
-      - dev
   schedule:
     - cron: "0 11,23 * * *" # Runs at 11:00 AM and 11:00 PM GMT
   workflow_dispatch: #Allow manual triggering
@@ -39,7 +38,6 @@ jobs:
           export AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
           export GPT_MIN_CAPACITY="140"
           export AZURE_REGIONS="${{ vars.AZURE_REGIONS }}"
-
           chmod +x infra/scripts/checkquota.sh
           if ! infra/scripts/checkquota.sh; then
             # If quota check fails due to insufficient quota, set the flag
@@ -48,7 +46,6 @@ jobs:
             fi
             exit 1  # Fail the pipeline if any other failure occurs
           fi
-
       - name: Send Notification on Quota Failure
         if: env.QUOTA_FAILED == 'true'
         run: |
@@ -59,11 +56,9 @@ jobs:
           }
           EOF
           )
-
           curl -X POST "${{ secrets.AUTO_LOGIC_APP_URL }}" \
             -H "Content-Type: application/json" \
             -d "$EMAIL_BODY" || echo "Failed to send notification"
-
       - name: Fail Pipeline if Quota Check Fails
         if: env.QUOTA_FAILED == 'true'
         run: exit 1
@@ -72,16 +67,13 @@ jobs:
         run: |
           echo "Selected Region: $VALID_REGION"
           echo "AZURE_LOCATION=$VALID_REGION" >> $GITHUB_ENV
-
       - name: Setup Azure CLI
         run: |
           curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
           az --version  # Verify installation
-
       - name: Login to Azure
         run: |
           az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-
       - name: Install Bicep CLI
         run: az bicep install
 
@@ -93,7 +85,6 @@ jobs:
           UNIQUE_RG_NAME="arg-${ACCL_NAME}-${SHORT_UUID}"
           echo "RESOURCE_GROUP_NAME=${UNIQUE_RG_NAME}" >> $GITHUB_ENV
           echo "Generated Resource_GROUP_PREFIX: ${UNIQUE_RG_NAME}"
-
       - name: Check and Create Resource Group
         id: check_create_rg
         run: |
@@ -103,7 +94,6 @@ jobs:
             az group create --name ${{ env.RESOURCE_GROUP_NAME }} --location ${{ env.AZURE_LOCATION }}
           fi
           echo "RESOURCE_GROUP_NAME=${{ env.RESOURCE_GROUP_NAME }}" >> $GITHUB_OUTPUT
-
       - name: Generate Unique Solution Prefix
         id: generate_solution_prefix
         run: |
@@ -112,7 +102,6 @@ jobs:
           UPDATED_TIMESTAMP=$(echo $TIMESTAMP | tail -c 6)
           UNIQUE_SOLUTION_PREFIX="${COMMON_PART}${UPDATED_TIMESTAMP}"
           echo "SOLUTION_PREFIX=${UNIQUE_SOLUTION_PREFIX}" >> $GITHUB_ENV
-
       - name: Deploy Bicep Template
         id: deploy
         run: |
@@ -123,7 +112,6 @@ jobs:
           else
             IMAGE_TAG="latest"
           fi
-
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
@@ -136,7 +124,6 @@ jobs:
               gptModelVersion="2024-08-06" \
               imageTag="${IMAGE_TAG}" \
             --output json
-
       - name: Extract Web App and API App URLs
         id: get_output
         run: |
@@ -147,22 +134,18 @@ jobs:
               echo "WEBAPP_URL=$WEBAPP_URL" >> $GITHUB_OUTPUT
             fi
           done
-
       - name: Get Container App Backend URL
         id: get_backend_url
         run: |
           CONTAINER_APP_NAME=$(az containerapp list \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --query "[0].name" -o tsv)
-
           MACAE_URL_API=$(az containerapp show \
             --name "$CONTAINER_APP_NAME" \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --query "properties.configuration.ingress.fqdn" -o tsv)
-
           echo "MACAE_URL_API=https://${MACAE_URL_API}" >> $GITHUB_OUTPUT
           echo "CONTAINER_APP=${CONTAINER_APP_NAME}" >> $GITHUB_OUTPUT
-
       - name: Set Deployment Status
         id: deployment_status
         if: always()
@@ -172,7 +155,6 @@ jobs:
           else
             echo "SUCCESS=false" >> $GITHUB_OUTPUT
           fi
-
   e2e-test:
     needs: deploy
     if: needs.deploy.outputs.DEPLOYMENT_SUCCESS == 'true'
