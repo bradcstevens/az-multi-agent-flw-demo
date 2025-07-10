@@ -2,341 +2,197 @@ name: Test Automation MACAE
 
 on:
   push:
-  workflow_run:
-    workflows: ["Build Docker and Optional Push"]
-    types:
-      - completed
     branches:
       - main
+      - dev
       - hotfix
+    paths:
+      - "tests/e2e-test/**"
   schedule:
-    - cron: "0 11,23 * * *" # Runs at 11:00 AM and 11:00 PM GMT
-  workflow_dispatch: #Allow manual triggering
-env:
-  GPT_MIN_CAPACITY: 140
-  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      MACAE_WEB_URL:
+        required: false
+        type: string
+        description: "Web URL for MACAE (overrides environment variable)"
+      MACAE_URL_API:
+        required: false
+        type: string
+        description: "API URL for MACAE (overrides environment variable)"
+      MACAE_RG:
+        required: false
+        type: string
+      MACAE_CONTAINER_APP:
+        required: false
+        type: string
+    secrets:
+      EMAILNOTIFICATION_LOGICAPP_URL_TA:
+        required: false
+        description: "Logic App URL for email notifications"
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    outputs:
-      RESOURCE_GROUP_NAME: ${{ steps.check_create_rg.outputs.RESOURCE_GROUP_NAME }}
-      WEBAPP_URL: ${{ steps.get_output.outputs.WEBAPP_URL }}
-      DEPLOYMENT_SUCCESS: ${{ steps.deployment_status.outputs.SUCCESS }}
-      MACAE_URL_API: ${{ steps.get_backend_url.outputs.MACAE_URL_API }}
-      CONTAINER_APP: ${{steps.get_backend_url.outputs.CONTAINER_APP}}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Run Quota Check
-        id: quota-check
-        run: |
-          export AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
-          export AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
-          export AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }}
-          export AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-          export GPT_MIN_CAPACITY="140"
-          export AZURE_REGIONS="${{ vars.AZURE_REGIONS }}"
-
-          chmod +x infra/scripts/checkquota.sh
-          if ! infra/scripts/checkquota.sh; then
-            # If quota check fails due to insufficient quota, set the flag
-            if grep -q "No region with sufficient quota found" infra/scripts/checkquota.sh; then
-              echo "QUOTA_FAILED=true" >> $GITHUB_ENV
-            fi
-            exit 1  # Fail the pipeline if any other failure occurs
-          fi
-
-      - name: Send Notification on Quota Failure
-        if: env.QUOTA_FAILED == 'true'
-        run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          EMAIL_BODY=$(cat <<EOF
-          {
-            "body": "<p>Dear Team,</p><p>The quota check has failed, and the pipeline cannot proceed.</p><p><strong>Build URL:</strong> ${RUN_URL}</p><p>Please take necessary action.</p><p>Best regards,<br>Your Automation Team</p>"
-          }
-          EOF
-          )
-
-          curl -X POST "${{ secrets.AUTO_LOGIC_APP_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "$EMAIL_BODY" || echo "Failed to send notification"
-
-      - name: Fail Pipeline if Quota Check Fails
-        if: env.QUOTA_FAILED == 'true'
-        run: exit 1
-
-      - name: Set Deployment Region
-        run: |
-          echo "Selected Region: $VALID_REGION"
-          echo "AZURE_LOCATION=$VALID_REGION" >> $GITHUB_ENV
-
-      - name: Setup Azure CLI
-        run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-          az --version  # Verify installation
-
-      - name: Login to Azure
-        run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-
-      - name: Install Bicep CLI
-        run: az bicep install
-
-      - name: Generate Resource Group Name
-        id: generate_rg_name
-        run: |
-          ACCL_NAME="macae"
-          SHORT_UUID=$(uuidgen | cut -d'-' -f1)
-          UNIQUE_RG_NAME="arg-${ACCL_NAME}-${SHORT_UUID}"
-          echo "RESOURCE_GROUP_NAME=${UNIQUE_RG_NAME}" >> $GITHUB_ENV
-          echo "Generated Resource_GROUP_PREFIX: ${UNIQUE_RG_NAME}"
-
-      - name: Check and Create Resource Group
-        id: check_create_rg
-        run: |
-          set -e
-          rg_exists=$(az group exists --name ${{ env.RESOURCE_GROUP_NAME }})
-          if [ "$rg_exists" = "false" ]; then
-            az group create --name ${{ env.RESOURCE_GROUP_NAME }} --location ${{ env.AZURE_LOCATION }}
-          fi
-          echo "RESOURCE_GROUP_NAME=${{ env.RESOURCE_GROUP_NAME }}" >> $GITHUB_OUTPUT
-
-      - name: Generate Unique Solution Prefix
-        id: generate_solution_prefix
-        run: |
-          COMMON_PART="macae"
-          TIMESTAMP=$(date +%s)
-          UPDATED_TIMESTAMP=$(echo $TIMESTAMP | tail -c 6)
-          UNIQUE_SOLUTION_PREFIX="${COMMON_PART}${UPDATED_TIMESTAMP}"
-          echo "SOLUTION_PREFIX=${UNIQUE_SOLUTION_PREFIX}" >> $GITHUB_ENV
-
-      - name: Deploy Bicep Template
-        id: deploy
-        run: |
-          if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
-            IMAGE_TAG="latest"
-          elif [[ "${{ env.BRANCH_NAME }}" == "hotfix" ]]; then
-            IMAGE_TAG="hotfix"
-          else
-            IMAGE_TAG="latest"
-          fi
-
-          az deployment group create \
-            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --template-file infra/main.bicep \
-            --parameters \
-              solutionPrefix=${{ env.SOLUTION_PREFIX }} \
-              solutionLocation="${{ env.AZURE_LOCATION }}" \
-              azureOpenAILocation="${{ env.AZURE_LOCATION }}" \
-              modelDeploymentType="GlobalStandard" \
-              gptModelName="gpt-4o" \
-              gptModelVersion="2024-08-06" \
-              imageTag="${IMAGE_TAG}" \
-            --output json
-
-      - name: Extract Web App and API App URLs
-        id: get_output
-        run: |
-          WEBAPP_NAMES=$(az webapp list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query "[].name" -o tsv)
-          for NAME in $WEBAPP_NAMES; do
-            if [[ $NAME == app-* ]]; then
-              WEBAPP_URL="https://${NAME}.azurewebsites.net"
-              echo "WEBAPP_URL=$WEBAPP_URL" >> $GITHUB_OUTPUT
-            fi
-          done
-
-      - name: Get Container App Backend URL
-        id: get_backend_url
-        run: |
-          CONTAINER_APP_NAME=$(az containerapp list \
-            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --query "[0].name" -o tsv)
-
-          MACAE_URL_API=$(az containerapp show \
-            --name "$CONTAINER_APP_NAME" \
-            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --query "properties.configuration.ingress.fqdn" -o tsv)
-
-          echo "MACAE_URL_API=https://${MACAE_URL_API}" >> $GITHUB_OUTPUT
-          echo "CONTAINER_APP=${CONTAINER_APP_NAME}" >> $GITHUB_OUTPUT
-
-      - name: Set Deployment Status
-        id: deployment_status
-        if: always()
-        run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "SUCCESS=true" >> $GITHUB_OUTPUT
-          else
-            echo "SUCCESS=false" >> $GITHUB_OUTPUT
-          fi
-
-  e2e-test:
-    needs: deploy
-    if: needs.deploy.outputs.DEPLOYMENT_SUCCESS == 'true'
-    uses: ./.github/workflows/test-automation.yml
-    with:
-      MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
-      MACAE_URL_API: ${{ needs.deploy.outputs.MACAE_URL_API }}
-      MACAE_RG: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
-      MACAE_CONTAINER_APP: ${{ needs.deploy.outputs.CONTAINER_APP }}
-    secrets: inherit
-
-  cleanup-deployment:
-    if: always() && needs.deploy.outputs.RESOURCE_GROUP_NAME != ''
-    needs: [deploy, e2e-test]
+  test:
     runs-on: ubuntu-latest
     env:
-      RESOURCE_GROUP_NAME: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
+      MACAE_WEB_URL: ${{ inputs.MACAE_WEB_URL }}
+      MACAE_URL_API: ${{ inputs.MACAE_URL_API }}
+      MACAE_RG: ${{ inputs.MACAE_RG }}
+      MACAE_CONTAINER_APP: ${{ inputs.MACAE_CONTAINER_APP }}
+      accelerator_name: "MACAE"
+
     steps:
-      - name: Setup Azure CLI
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Azure CLI Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Start Container App
+        uses: azure/cli@v2
+        with:
+          azcliversion: "latest"
+          inlineScript: |
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/start?api-version=2025-01-01"
+
+      - name: Install dependencies
         run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-          az --version
-      - name: Login to Azure
+          python -m pip install --upgrade pip
+          pip install -r tests/e2e-test/requirements.txt
+
+      - name: Ensure browsers are installed
+        run: python -m playwright install --with-deps chromium
+
+      - name: Validate Inputs
         run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-
-      - name: Extract AI Services and Key Vault Names
-        if: always()
-        run: |
-          echo "Fetching AI Services and Key Vault names before deletion..."
-
-          # Get Key Vault name
-          KEYVAULT_NAME=$(az resource list --resource-group "${{ env.RESOURCE_GROUP_NAME }}" --resource-type "Microsoft.KeyVault/vaults" --query "[].name" -o tsv)
-          echo "Detected Key Vault: $KEYVAULT_NAME"
-          echo "KEYVAULT_NAME=$KEYVAULT_NAME" >> $GITHUB_ENV
-          # Extract AI Services names
-          echo "Fetching AI Services..."
-          AI_SERVICES=$(az resource list --resource-group '${{ env.RESOURCE_GROUP_NAME }}' --resource-type "Microsoft.CognitiveServices/accounts" --query "[].name" -o tsv)
-          # Flatten newline-separated values to space-separated
-          AI_SERVICES=$(echo "$AI_SERVICES" | paste -sd ' ' -)
-          echo "Detected AI Services: $AI_SERVICES"
-          echo "AI_SERVICES=$AI_SERVICES" >> $GITHUB_ENV
-
-      - name: Get OpenAI Resource from Resource Group
-        id: get_openai_resource
-        run: |
-
-          set -e
-          echo "Fetching OpenAI resource from resource group ${{ env.RESOURCE_GROUP_NAME }}..."
-
-          # Run the az resource list command to get the OpenAI resource name
-          openai_resource_name=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.CognitiveServices/accounts" --query "[0].name" -o tsv)
-
-          if [ -z "$openai_resource_name" ]; then
-            echo "No OpenAI resource found in resource group ${{ env.RESOURCE_GROUP_NAME }}."
+          if [ -z "${{ env.MACAE_WEB_URL }}" ]; then
+            echo "ERROR: No Web URL provided for testing"
             exit 1
-          else
-            echo "OPENAI_RESOURCE_NAME=${openai_resource_name}" >> $GITHUB_ENV
-            echo "OpenAI resource name: ${openai_resource_name}"
+          elif [ -z "${{ env.MACAE_URL_API  }}" ]; then
+            echo "ERROR: No API URL provided for testing"
+            exit 1
+          elif [ -z "${{ env.MACAE_RG }}" ]; then
+            echo "ERROR: Resource group name missing"
+            exit 1
+          elif [ -z "${{ env.MACAE_CONTAINER_APP }}" ]; then
+            echo "ERROR: Container app name missing"
+            exit 1
           fi
 
-      - name: Delete Bicep Deployment
-        if: always()
+      - name: Wait for Application to be Ready
         run: |
-          set -e
-          echo "Checking if resource group exists..."
-          rg_exists=$(az group exists --name ${{ env.RESOURCE_GROUP_NAME }})
-          if [ "$rg_exists" = "true" ]; then
-            echo "Resource group exist. Cleaning..."
-            az group delete \
-                --name ${{ env.RESOURCE_GROUP_NAME }} \
-                --yes \
-                --no-wait
-            echo "Resource group deleted...  ${{ env.RESOURCE_GROUP_NAME }}"
-          else
-            echo "Resource group does not exists."
-          fi
-
-      - name: Wait for resource deletion to complete
-        run: |
-
-          # Add resources to the array
-          resources_to_check=("${{ env.OPENAI_RESOURCE_NAME }}")
-
-          echo "List of resources to check: ${resources_to_check[@]}"
-
-          # Maximum number of retries
-          max_retries=3
-
-          # Retry intervals in seconds (30, 60, 120)
-          retry_intervals=(30 60 120)
-
-          # Retry mechanism to check resources
-          retries=0
-          while true; do
-            resource_found=false
-
-            # Get the list of resources in YAML format again on each retry
-            resource_list=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --output yaml)
-
-            # Iterate through the resources to check
-            for resource in "${resources_to_check[@]}"; do
-              echo "Checking resource: $resource"
-              if echo "$resource_list" | grep -q "name: $resource"; then
-                echo "Resource '$resource' exists in the resource group."
-                resource_found=true
-              else
-                echo "Resource '$resource' does not exist in the resource group."
-              fi
-            done
-
-            # If any resource exists, retry
-            if [ "$resource_found" = true ]; then
-              retries=$((retries + 1))
-              if [ "$retries" -gt "$max_retries" ]; then
-                echo "Maximum retry attempts reached. Exiting."
-                break
-              else
-                # Wait for the appropriate interval for the current retry
-                echo "Waiting for ${retry_intervals[$retries-1]} seconds before retrying..."
-                sleep ${retry_intervals[$retries-1]}
-              fi
-            else
-              echo "No resources found. Exiting."
+          echo "Waiting for application to be ready at ${{ env.MACAE_WEB_URL }}"
+          max_attempts=10
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt: Checking if application is ready..."
+            if curl -f -s "${{ env.MACAE_WEB_URL }}" > /dev/null; then
+              echo "Application is ready!"
               break
             fi
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Application is not ready after $max_attempts attempts"
+              exit 1
+            fi
+            echo "Application not ready, waiting 30 seconds..."
+            sleep 30
+            attempt=$((attempt + 1))
           done
 
-      - name: Purging the Resources
-        if: always()
+      - name: Run tests (1)
+        id: test1
         run: |
+          xvfb-run pytest --headed --html=report/report.html --self-contained-html
+        working-directory: tests/e2e-test
+        continue-on-error: true
 
-          set -e
-          echo "Azure OpenAI: ${{ env.OPENAI_RESOURCE_NAME }}"
+      - name: Sleep for 30 seconds
+        if: steps.test1.outcome == 'failure'
+        run: sleep 30s
+        shell: bash
 
-          # Purge OpenAI Resource
-          echo "Purging the OpenAI Resource..."
-          if ! az resource delete --ids /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/providers/Microsoft.CognitiveServices/locations/eastus/resourceGroups/${{ env.RESOURCE_GROUP_NAME }}/deletedAccounts/${{ env.OPENAI_RESOURCE_NAME }} --verbose; then
-            echo "Failed to purge openai resource: ${{ env.OPENAI_RESOURCE_NAME }}"
+      - name: Run tests (2)
+        id: test2
+        if: steps.test1.outcome == 'failure'
+        run: |
+          xvfb-run pytest --headed --html=report/report.html --self-contained-html
+        working-directory: tests/e2e-test
+        continue-on-error: true
+
+      - name: Sleep for 60 seconds
+        if: steps.test2.outcome == 'failure'
+        run: sleep 60s
+        shell: bash
+
+      - name: Run tests (3)
+        id: test3
+        if: steps.test2.outcome == 'failure'
+        run: |
+          xvfb-run pytest --headed --html=report/report.html --self-contained-html
+        working-directory: tests/e2e-test
+
+      - name: Upload test report
+        id: upload_report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: test-report-${{ github.run_id }}
+          path: tests/e2e-test/report/*
+
+      - name: Determine Test Result
+        id: test_result
+        run: |
+          if [[ "${{ steps.test1.outcome }}" == "success" || "${{ steps.test2.outcome }}" == "success" || "${{ steps.test3.outcome }}" == "success" ]]; then
+            echo "IS_SUCCESS=true" >> $GITHUB_OUTPUT
+            echo "✅ Tests passed!"
           else
-            echo "Purged the openai resource: ${{ env.OPENAI_RESOURCE_NAME }}"
+            echo "IS_SUCCESS=false" >> $GITHUB_OUTPUT
+            echo "❌ All test attempts failed"
+            exit 1
           fi
 
-          echo "Resource purging completed successfully"
-
-      - name: Send Notification on Failure
-        if: failure()
-        run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-          # Construct the email body
-          EMAIL_BODY=$(cat <<EOF
-          {
-            "body": "<p>Dear Team,</p><p>We would like to inform you that the Multi-Agent-Custom-Automation-Engine-Solution-Accelerator Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Build URL:</strong> ${RUN_URL}<br> ${OUTPUT}</p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>"
-          }
-          EOF
-          )
-
-          # Send the notification
-          curl -X POST "${{ secrets.LOGIC_APP_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "$EMAIL_BODY" || echo "Failed to send notification"
-      - name: Logout from Azure
+      - name: Send Notification
         if: always()
         run: |
-          az logout
-          echo "Logged out from Azure."
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          REPORT_URL=${{ steps.upload_report.outputs.artifact-url }}
+          IS_SUCCESS=${{ steps.test_result.outputs.IS_SUCCESS }}
+
+          if [ "$IS_SUCCESS" = "true" ]; then
+                  EMAIL_BODY=$(cat <<EOF
+                  {
+                    "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has completed successfully.</p><p><strong>Run URL:</strong> <a href=\\"${RUN_URL}\\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\\"${REPORT_URL}\\">${REPORT_URL}</a></p><p>Best regards,<br>Your Automation Team</p>",
+                    "subject": "${{ env.accelerator_name }} Test Automation - Success"
+                  }
+          EOF
+            )
+          else
+                  EMAIL_BODY=$(cat <<EOF
+                  {
+                    "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Run URL:</strong> <a href=\\"${RUN_URL}\\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\\"${REPORT_URL}\\">${REPORT_URL}</a></p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>",
+                    "subject": "${{ env.accelerator_name }} Test Automation - Failure"
+                  }
+          EOF
+            )
+          fi
+
+          curl -X POST "${{ secrets.EMAILNOTIFICATION_LOGICAPP_URL_TA }}" \
+            -H "Content-Type: application/json" \
+            -d "$EMAIL_BODY" || echo "Failed to send notification"
+
+      - name: Stop Container App
+        if: always()
+        uses: azure/cli@v2
+        with:
+          azcliversion: "latest"
+          inlineScript: |
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/stop?api-version=2025-01-01"
+            az logout
