@@ -23,7 +23,7 @@ jobs:
       RESOURCE_GROUP_NAME: ${{ steps.check_create_rg.outputs.RESOURCE_GROUP_NAME }}
       WEBAPP_URL: ${{ steps.get_output.outputs.WEBAPP_URL }}
       DEPLOYMENT_SUCCESS: ${{ steps.deployment_status.outputs.SUCCESS }}
-      API_APP_URL: ${{ steps.get_backend_url.outputs.CONTAINER_APP_URL }}
+      MACAE_URL_API: ${{ steps.get_backend_url.outputs.MACAE_URL_API }}
       CONTAINER_APP: ${{steps.get_backend_url.outputs.CONTAINER_APP}}
     steps:
       - name: Checkout Code
@@ -154,12 +154,12 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --query "[0].name" -o tsv)
 
-          CONTAINER_APP_URL=$(az containerapp show \
+          MACAE_URL_API=$(az containerapp show \
             --name "$CONTAINER_APP_NAME" \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --query "properties.configuration.ingress.fqdn" -o tsv)
 
-          echo "CONTAINER_APP_URL=https://${CONTAINER_APP_URL}" >> $GITHUB_OUTPUT
+          echo "MACAE_URL_API=https://${MACAE_URL_API}" >> $GITHUB_OUTPUT
           echo "CONTAINER_APP=${CONTAINER_APP_NAME}" >> $GITHUB_OUTPUT
 
       - name: Set Deployment Status
@@ -178,7 +178,7 @@ jobs:
     uses: ./.github/workflows/test-automation.yml
     with:
       MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
-      MACAE_URL_API: ${{ needs.deploy.outputs.API_APP_URL }}
+      MACAE_URL_API: ${{ needs.deploy.outputs.MACAE_URL_API }}
       MACAE_RG: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
       MACAE_CONTAINER_APP: ${{ needs.deploy.outputs.CONTAINER_APP }}
     secrets: inherit
