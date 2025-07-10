@@ -117,7 +117,7 @@ If you're not using one of the above options for opening the project, then you'l
 1. Make sure the following tools are installed:
 
    - [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.5) <small>(v7.0+)</small> - available for Windows, macOS, and Linux.
-   - [Azure Developer CLI (azd)](https://aka.ms/install-azd)
+   - [Azure Developer CLI (azd)](https://aka.ms/install-azd) <small>(v1.15.0+)</small> - version
    - [Python 3.9+](https://www.python.org/downloads/)
    - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
    - [Git](https://git-scm.com/downloads)
@@ -150,6 +150,7 @@ When you start the deployment, most parameters will have **default values**, but
 | **Model Deployment Type**      | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).      | GlobalStandard    |
 | **GPT Model Name**             | Specifies the name of the GPT model to be deployed.                                 | gpt-4o            |
 | **GPT Model Version**          | Version of the GPT model to be used for deployment.                                 | 2024-08-06        |
+| **GPT Model Capacity**          | Sets the GPT model capacity.                                 | 150        |
 | **Image Tag**                  | Docker image tag used for container deployments.                                    | latest            |
 | **Enable Telemetry**           | Enables telemetry for monitoring and diagnostics.                                    | true              |
 
