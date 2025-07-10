@@ -103,5 +103,6 @@ class BIABPage(BasePage):
 
                 plan_id = BasePage.get_first_plan_id(self)
                 BasePage.approve_plan_by_id(self, plan_id)
+                self.page.wait_for_timeout(7000)
 
         expect(self.page.locator(self.COMPLETED_TASK)).to_contain_text("completed")
