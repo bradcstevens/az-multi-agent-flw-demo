@@ -2,3 +2,5 @@
 name: multi-agent-custom-automation-engine-solution-accelerator
 metadata:
   template: multi-agent-custom-automation-engine-solution-accelerator@1.0
+requiredVersions:
+  azd: '>= 1.15.0'
