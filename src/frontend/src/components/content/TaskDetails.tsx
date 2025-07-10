@@ -149,7 +149,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                   <div className="task-details-action-buttons">
                     {step.human_approval_status !== "accepted" &&
                       step.human_approval_status !== "rejected" && (
-                        <>             <Tooltip relationship="label" content="Approve">
+                        <>             <Tooltip relationship="label" content={canInteract?"Approve":"You must first provide feedback to the planner"}>
                           <Button
                             icon={<Checkmark20Regular />}
                             appearance="subtle"
@@ -166,7 +166,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                           />
                         </Tooltip>
 
-                          <Tooltip relationship="label" content="Reject">
+                          <Tooltip relationship="label" content={canInteract?"Reject":"You must first provide feedback to the planner"}>
                             <Button
                               icon={<Dismiss20Regular />}
                               appearance="subtle"
