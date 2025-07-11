@@ -106,6 +106,7 @@ jobs:
               virtualMachineConfiguration='{"adminUsername": "adminuser", "adminPassword": "P@ssw0rd1234"}' \
               logAnalyticsWorkspaceConfiguration='{"existingWorkspaceResourceId": ""}'
 
+
       - name: Send Notification on Failure
         if: failure()
         run: |

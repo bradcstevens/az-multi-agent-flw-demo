@@ -34,4 +34,6 @@ class LoginPage(BasePage):
             self.page.locator(self.YES_BUTTON).click()
             self.page.wait_for_timeout(10000)
 
+
         self.page.wait_for_load_state("networkidle")
+

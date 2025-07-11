@@ -5,6 +5,7 @@ from semantic_kernel.functions import kernel_function
 from models.messages_kernel import AgentType
 import json
 from typing import get_type_hints
+from utils_date import format_date_for_user
 
 
 class HrTools:
@@ -15,12 +16,15 @@ class HrTools:
     @staticmethod
     @kernel_function(description="Schedule an orientation session for a new employee.")
     async def schedule_orientation_session(employee_name: str, date: str) -> str:
+        formatted_date = format_date_for_user(date)
+
         return (
             f"##### Orientation Session Scheduled\n"
             f"**Employee Name:** {employee_name}\n"
-            f"**Date:** {date}\n\n"
+            f"**Date:** {formatted_date}\n\n"
             f"Your orientation session has been successfully scheduled. "
             f"Please mark your calendar and be prepared for an informative session.\n"
+            f"AGENT SUMMARY: I scheduled the orientation session for {employee_name} on {formatted_date}, as part of her onboarding process.\n"
             f"{HrTools.formatting_instructions}"
         )
 

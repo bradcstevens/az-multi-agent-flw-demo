@@ -106,3 +106,4 @@ class BIABPage(BasePage):
                 self.page.wait_for_timeout(7000)
 
         expect(self.page.locator(self.COMPLETED_TASK)).to_contain_text("completed")
+

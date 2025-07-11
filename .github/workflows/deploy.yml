@@ -37,7 +37,7 @@ jobs:
           export AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
           export AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }}
           export AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-          export GPT_MIN_CAPACITY="140"
+          export GPT_MIN_CAPACITY="5"
           export AZURE_REGIONS="${{ vars.AZURE_REGIONS }}"
 
           chmod +x infra/scripts/checkquota.sh
@@ -128,6 +128,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
             --parameters \
+
               solutionPrefix=${{ env.SOLUTION_PREFIX }} \
               solutionLocation="${{ env.AZURE_LOCATION }}" \
               azureOpenAILocation="${{ env.AZURE_LOCATION }}" \
@@ -135,6 +136,13 @@ jobs:
               gptModelName="gpt-4o" \
               gptModelVersion="2024-08-06" \
               imageTag="${IMAGE_TAG}" \
+              useWafAlignedArchitecture=false \
+              aiDeploymentsLocation='${{ env.AZURE_LOCATION }}' \
+              gptModelCapacity=5 \
+              logAnalyticsWorkspaceConfiguration='{"dataRetentionInDays": 30, "existingWorkspaceResourceId": ""}' \
+              applicationInsightsConfiguration='{"retentionInDays": 30}' \
+              virtualNetworkConfiguration='{"enabled": false}' \
+              webServerFarmConfiguration='{"skuCapacity": 1, "skuName": "B2"}'
             --output json
 
       - name: Extract Web App and API App URLs
@@ -147,6 +155,7 @@ jobs:
               echo "WEBAPP_URL=$WEBAPP_URL" >> $GITHUB_OUTPUT
             fi
           done
+
 
       - name: Get Container App Backend URL
         id: get_backend_url
