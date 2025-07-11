@@ -232,6 +232,16 @@ param webSiteConfiguration webSiteConfigurationType = {
   environmentResourceId: null //Default value set on module configuration
 }
 
+// ========== Resource Group Tag ========== //
+resource resourceGroupTags 'Microsoft.Resources/tags@2021-04-01' = {
+  name: 'default'
+  properties: {
+    tags: {
+      ...tags
+      TemplateName: 'Macae'
+    }
+  }
+}
 
 // ========== Log Analytics Workspace ========== //
 // WAF best practices for Log Analytics: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-log-analytics
