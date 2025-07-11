@@ -9,7 +9,7 @@ class BIABPage(BasePage):
 
     WELCOME_PAGE_TITLE = "//span[normalize-space()='Multi-Agent Planner']"
     NEW_TASK_PROMPT = "//textarea[@placeholder='Tell us what needs planning, building, or connecting—we'll handle the rest.']"
-    SEND_BUTTON = "//button[@type='button']"
+    SEND_BUTTON = "//div[@role='toolbar']"
     CREATING_PLAN = "//span[normalize-space()='Creating a plan']"
     TASK_LIST = "//span[contains(text(),'1.')]"
     NEW_TASK = "//span[normalize-space()='New task']"
@@ -92,6 +92,7 @@ class BIABPage(BasePage):
     def processing_different_stage(self):
         """Process and approve each stage sequentially if present."""
         self.page.wait_for_timeout(3000)
+        total_count = self.page.locator(self.STAGES).count()
         if self.page.locator(self.STAGES).count() >= 1:
             for _ in range(self.page.locator(self.STAGES).count()):
                 approve_stages = self.page.locator(self.STAGES).nth(0)
@@ -103,5 +104,6 @@ class BIABPage(BasePage):
 
                 plan_id = BasePage.get_first_plan_id(self)
                 BasePage.approve_plan_by_id(self, plan_id)
+                self.page.wait_for_timeout(7000)
 
-        expect(self.page.locator(self.COMPLETED_TASK)).to_contain_text("completed")
+        expect(self.page.locator(self.COMPLETED_TASK)).to_contain_text(f"{total_count} of {total_count} completed")
