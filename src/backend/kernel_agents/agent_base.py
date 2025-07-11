@@ -276,8 +276,8 @@ class BaseAgent(AzureAIAgent):
             # # First try to get an existing agent with this name as assistant_id
             try:
                 agent_id = None
-                agent_list = await client.agents.list_agents()
-                for agent in agent_list.data:
+                agent_list = client.agents.list_agents()
+                async for agent in agent_list:
                     if agent.name == agent_name:
                         agent_id = agent.id
                         break
