@@ -120,6 +120,8 @@ jobs:
             IMAGE_TAG="latest"
           elif [[ "${{ env.BRANCH_NAME }}" == "dev" ]]; then
             IMAGE_TAG="dev"
+          elif [[ "${{ env.BRANCH_NAME }}" == "hotfix" ]]; then
+            IMAGE_TAG="hotfix"
           else
             IMAGE_TAG="latest"
           fi
