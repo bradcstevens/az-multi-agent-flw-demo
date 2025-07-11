@@ -26,6 +26,7 @@ class BasePage:
         """Step 1: Get plan list and return the first plan ID."""
         load_dotenv()
         base_url = os.getenv("MACAE_URL_API")
+
         get_url = f"{base_url}/api/plans"
         headers = {
             "Accept": "*/*",
@@ -49,7 +50,9 @@ class BasePage:
 
     def approve_plan_by_id(self, plan_id: str):
         """Step 2: Approve plan using the given plan ID."""
+
         base_url = os.getenv("MACAE_URL_API")
+
         approve_url = f"{base_url}/api/plans?plan_id={plan_id}"
         headers = {
             "Accept": "*/*",
@@ -63,4 +66,6 @@ class BasePage:
                 f"Body: {response.text()}"
             )
 
+
         print("✅ GET approval successful.")
+

@@ -92,7 +92,7 @@ The files for the dev container are located in `/.devcontainer/` folder.
      ```
 
      ```bash
-     az role assignment create --assignee <aad-user-upn> --role "Cognitive Services OpenAI User" --scope /subscriptions/<subscription-id>/resourceGroups/<solution-accelerator-rg>/providers/Microsoft.CognitiveServices/accounts/<azure-openai-account-name>
+     az role assignment create --assignee <aad-user-upn> --role "Azure AI User" --scope /subscriptions/<subscription-id>/resourceGroups/<solution-accelerator-rg>/providers/Microsoft.CognitiveServices/accounts/<azure-ai-foundry-name>
      ```
       **Using a Different Database in Cosmos:**
 
@@ -123,7 +123,7 @@ The files for the dev container are located in `/.devcontainer/` folder.
 10. **Run the application:**
    - From the src/backend directory:
    ```bash
-   python app.py
+   python app_kernel.py
    ```
    - In a new terminal from the src/frontend directory
   ```bash

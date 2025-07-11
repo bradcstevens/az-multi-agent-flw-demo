@@ -85,3 +85,4 @@ def test_biab_prompt_case(login_logout, prompt, action, request):
     request.node._report_sections.append(
         ("call", "log", f"Execution time: {duration:.2f}s")
     )
+
