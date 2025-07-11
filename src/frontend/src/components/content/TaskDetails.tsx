@@ -1,6 +1,9 @@
 // TaskDetails.tsx - Merged TSX + Styles
 
-import { HumanFeedbackStatus, Step, TaskDetailsProps } from "@/models";
+import { HumanFeedbackStatus, Step as OriginalStep, TaskDetailsProps } from "@/models";
+
+// Extend Step to include _isActionLoading
+type Step = OriginalStep & { _isActionLoading?: boolean };
 import {
   Text,
   Avatar,
@@ -28,7 +31,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
   loading,
   OnApproveStep,
 }) => {
-  const [steps, setSteps] = useState(planData.steps || []);
+  const [steps, setSteps] = useState<Step[]>(planData.steps || []);
   const [completedCount, setCompletedCount] = useState(
     planData?.plan.completed || 0
   );
