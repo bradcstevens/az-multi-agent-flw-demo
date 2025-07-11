@@ -130,7 +130,6 @@ jobs:
             --parameters \
               solutionPrefix=${{ env.SOLUTION_PREFIX }} \
               solutionLocation="${{ env.AZURE_LOCATION }}" \
-              azureOpenAILocation="${{ env.AZURE_LOCATION }}" \
               modelDeploymentType="GlobalStandard" \
               gptModelName="gpt-4o" \
               gptModelVersion="2024-08-06" \
