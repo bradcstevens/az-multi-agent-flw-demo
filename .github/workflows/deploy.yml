@@ -118,8 +118,8 @@ jobs:
         run: |
           if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
             IMAGE_TAG="latest"
-          elif [[ "${{ env.BRANCH_NAME }}" == "hotfix" ]]; then
-            IMAGE_TAG="hotfix"
+          elif [[ "${{ env.BRANCH_NAME }}" == "dev" ]]; then
+            IMAGE_TAG="dev"
           else
             IMAGE_TAG="latest"
           fi
@@ -142,7 +142,7 @@ jobs:
               logAnalyticsWorkspaceConfiguration='{"dataRetentionInDays": 30, "existingWorkspaceResourceId": ""}' \
               applicationInsightsConfiguration='{"retentionInDays": 30}' \
               virtualNetworkConfiguration='{"enabled": false}' \
-              webServerFarmConfiguration='{"skuCapacity": 1, "skuName": "B2"}'
+              webServerFarmConfiguration='{"skuCapacity": 1, "skuName": "B2"}' \
             --output json
 
       - name: Extract Web App and API App URLs
@@ -155,7 +155,6 @@ jobs:
               echo "WEBAPP_URL=$WEBAPP_URL" >> $GITHUB_OUTPUT
             fi
           done
-
 
       - name: Get Container App Backend URL
         id: get_backend_url
