@@ -118,6 +118,8 @@ jobs:
         run: |
           if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
             IMAGE_TAG="latest"
+          elif [[ "${{ env.BRANCH_NAME }}" == "dev" ]]; then
+            IMAGE_TAG="dev"
           elif [[ "${{ env.BRANCH_NAME }}" == "hotfix" ]]; then
             IMAGE_TAG="hotfix"
           else
@@ -235,7 +237,7 @@ jobs:
 
           if [ -z "$openai_resource_name" ]; then
             echo "No OpenAI resource found in resource group ${{ env.RESOURCE_GROUP_NAME }}."
-            exit 1
+            exit 0
           else
             echo "OPENAI_RESOURCE_NAME=${openai_resource_name}" >> $GITHUB_ENV
             echo "OpenAI resource name: ${openai_resource_name}"
