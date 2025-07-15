@@ -18,7 +18,7 @@
           }
         ]
       },     
-      "solutionPrefix": {
+      "environmentName": {
         "value": "${AZURE_ENV_NAME}"
       },
       "solutionLocation": {
