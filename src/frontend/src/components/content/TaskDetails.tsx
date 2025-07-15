@@ -1,6 +1,9 @@
 // TaskDetails.tsx - Merged TSX + Styles
 
-import { HumanFeedbackStatus, Step, TaskDetailsProps } from "@/models";
+import { HumanFeedbackStatus, Step as OriginalStep, TaskDetailsProps } from "@/models";
+
+// Extend Step to include _isActionLoading
+type Step = OriginalStep & { _isActionLoading?: boolean };
 import {
   Text,
   Avatar,
@@ -28,7 +31,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
   loading,
   OnApproveStep,
 }) => {
-  const [steps, setSteps] = useState(planData.steps || []);
+  const [steps, setSteps] = useState<Step[]>(planData.steps || []);
   const [completedCount, setCompletedCount] = useState(
     planData?.plan.completed || 0
   );
@@ -146,45 +149,94 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                       <Caption1>{functionOrDetails}</Caption1>
                     )}
                   </Body1>
-                  <div className="task-details-action-buttons">
+                    <div className="task-details-action-buttons">
                     {step.human_approval_status !== "accepted" &&
                       step.human_approval_status !== "rejected" && (
-                        <>             <Tooltip relationship="label" content={canInteract?"Approve":"You must first provide feedback to the planner"}>
-                          <Button
-                            icon={<Checkmark20Regular />}
-                            appearance="subtle"
-                            onClick={
-                              canInteract
-                                ? () => preOnApproved(step)
-                                : undefined
+                      <>
+                        <Tooltip relationship="label" content={canInteract ? "Approve" : "You must first provide feedback to the planner"}>
+                        <Button
+                          icon={<Checkmark20Regular />}
+                          appearance="subtle"
+                          onClick={
+                          canInteract
+                            ? async (e) => {
+                              // Disable buttons for this step
+                              setSteps((prev) =>
+                              prev.map((s) =>
+                                s.id === step.id
+                                ? { ...s, _isActionLoading: true }
+                                : s
+                              )
+                              );
+                              try {
+                              await preOnApproved(step);
+                              } finally {
+                              // Remove loading state after API call
+                              setSteps((prev) =>
+                                prev.map((s) =>
+                                s.id === step.id
+                                  ? { ...s, _isActionLoading: false }
+                                  : s
+                                )
+                              );
+                              }
                             }
-                            className={
-                              canInteract
-                                ? "task-details-action-button"
-                                : "task-details-action-button-disabled"
-                            }
-                          />
+                            : undefined
+                          }
+                          disabled={
+                          !canInteract ||
+                          !!step._isActionLoading
+                          }
+                          className={
+                          canInteract
+                            ? "task-details-action-button"
+                            : "task-details-action-button-disabled"
+                          }
+                        />
                         </Tooltip>
 
-                          <Tooltip relationship="label" content={canInteract?"Reject":"You must first provide feedback to the planner"}>
-                            <Button
-                              icon={<Dismiss20Regular />}
-                              appearance="subtle"
-                              onClick={
-                                canInteract
-                                  ? () => preOnRejected(step)
-                                  : undefined
+                        <Tooltip relationship="label" content={canInteract ? "Reject" : "You must first provide feedback to the planner"}>
+                        <Button
+                          icon={<Dismiss20Regular />}
+                          appearance="subtle"
+                          onClick={
+                          canInteract
+                            ? async (e) => {
+                              setSteps((prev) =>
+                              prev.map((s) =>
+                                s.id === step.id
+                                ? { ...s, _isActionLoading: true }
+                                : s
+                              )
+                              );
+                              try {
+                              await preOnRejected(step);
+                              } finally {
+                              setSteps((prev) =>
+                                prev.map((s) =>
+                                s.id === step.id
+                                  ? { ...s, _isActionLoading: false }
+                                  : s
+                                )
+                              );
                               }
-                              className={
-                                canInteract
-                                  ? "task-details-action-button"
-                                  : "task-details-action-button-disabled"
-                              }
-                            />
-                          </Tooltip></>
-
+                            }
+                            : undefined
+                          }
+                          disabled={
+                          !canInteract ||
+                          !!step._isActionLoading
+                          }
+                          className={
+                          canInteract
+                            ? "task-details-action-button"
+                            : "task-details-action-button-disabled"
+                          }
+                        />
+                        </Tooltip>
+                      </>
                       )}
-                  </div>
+                    </div>
                 </div>
               </div>
             );
