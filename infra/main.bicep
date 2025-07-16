@@ -664,7 +664,7 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.13.0' = if (v
       name: 'osdisk-${virtualMachineResourceName}'
       createOption: 'FromImage'
       managedDisk: {
-        storageAccountType: 'Premium_ZRS'
+        storageAccountType: 'Standard_LRS'
       }
       diskSizeGB: 128
       caching: 'ReadWrite'
