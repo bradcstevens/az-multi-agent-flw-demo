@@ -92,6 +92,15 @@ jobs:
             echo "Resource group already exists."
           fi
 
+      - name: Generate Unique Solution Prefix
+        id: generate_solution_prefix
+        run: |
+          COMMON_PART="macae"
+          TIMESTAMP=$(date +%s)
+          UPDATED_TIMESTAMP=$(echo $TIMESTAMP | tail -c 6)
+          UNIQUE_SOLUTION_PREFIX="${COMMON_PART}${UPDATED_TIMESTAMP}"
+          echo "SOLUTION_PREFIX=${UNIQUE_SOLUTION_PREFIX}" >> $GITHUB_ENV
+
       - name: Deploy Bicep Template
         id: deploy
         run: |
@@ -100,6 +109,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
             --parameters \
+              environmentName=${{ env.SOLUTION_PREFIX }} \
               useWafAlignedArchitecture=true \
               aiDeploymentsLocation='${{ env.AZURE_LOCATION }}' \
               gptModelCapacity=5 \
