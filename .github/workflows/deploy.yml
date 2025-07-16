@@ -1,7 +1,6 @@
 name: Validate Deployment
 
 on:
-  push:
   workflow_run:
     workflows: ["Build Docker and Optional Push"]
     types:
