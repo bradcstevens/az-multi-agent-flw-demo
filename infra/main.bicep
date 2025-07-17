@@ -7,9 +7,8 @@ param useWafAlignedArchitecture bool
 @description('Use this parameter to use an existing AI project resource ID')
 param existingFoundryProjectResourceId string = ''
 
-@description('Optional. The prefix to add in the default names given to all deployed Azure resources.')
-@maxLength(19)
-param solutionPrefix string = 'macae${uniqueString(deployer().objectId, deployer().tenantId, subscription().subscriptionId, resourceGroup().id)}'
+@description('Required. Name of the environment to deploy the solution into.')
+param environmentName string
 
 @description('Required. Location for all Resources except AI Foundry.')
 param solutionLocation string = resourceGroup().location
@@ -47,6 +46,8 @@ param gptModelCapacity int = 150
 
 @description('Set the image tag for the container images used in the solution. Default is "latest".')
 param imageTag string = 'latest'
+
+param solutionPrefix string = 'macae-${padLeft(take(toLower(uniqueString(subscription().id, environmentName, resourceGroup().location)), 12), 12, '0')}'
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags object = {
@@ -616,6 +617,7 @@ module bastionHost 'br/public:avm/res/network/bastion-host:0.6.1' = if (virtualN
     virtualNetworkResourceId: bastionConfiguration.?virtualNetworkResourceId ?? virtualNetwork.?outputs.?resourceId
     publicIPAddressObject: {
       name: bastionConfiguration.?publicIpResourceName ?? 'pip-bas${solutionPrefix}'
+      zones: []
     }
     disableCopyPaste: false
     enableFileCopy: false
@@ -662,7 +664,7 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.13.0' = if (v
       name: 'osdisk-${virtualMachineResourceName}'
       createOption: 'FromImage'
       managedDisk: {
-        storageAccountType: 'Premium_ZRS'
+        storageAccountType: 'Standard_LRS'
       }
       diskSizeGB: 128
       caching: 'ReadWrite'

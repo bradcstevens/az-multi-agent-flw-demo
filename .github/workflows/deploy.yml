@@ -129,7 +129,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
             --parameters \
-              solutionPrefix=${{ env.SOLUTION_PREFIX }} \
+              environmentName=${{ env.SOLUTION_PREFIX }} \
               solutionLocation="${{ env.AZURE_LOCATION }}" \
               modelDeploymentType="GlobalStandard" \
               gptModelName="gpt-4o" \
