@@ -47,7 +47,7 @@ param gptModelCapacity int = 150
 @description('Set the image tag for the container images used in the solution. Default is "latest".')
 param imageTag string = 'latest'
 
-param solutionPrefix string = 'macae-${padLeft(take(toLower(uniqueString(subscription().id, environmentName, resourceGroup().location)), 12), 12, '0')}'
+param solutionPrefix string = 'macae-${padLeft(take(toLower(uniqueString(subscription().id, environmentName, resourceGroup().location, resourceGroup().name)), 12), 12, '0')}'
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags object = {
