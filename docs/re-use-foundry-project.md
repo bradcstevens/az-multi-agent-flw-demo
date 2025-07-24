@@ -41,4 +41,4 @@ azd env set AZURE_ENV_FOUNDRY_PROJECT_ID '<Existing Foundry Project Resource ID>
 Replace `<Existing Foundry Project Resource ID>` with the value obtained from Step 5.
 
 ### 7. Continue Deployment
-Proceed with the next steps in the [deployment guide](/docs/DeploymentGuide.md).
+Proceed with the next steps in the [deployment guide](/docs/DeploymentGuide.md#deployment-steps).

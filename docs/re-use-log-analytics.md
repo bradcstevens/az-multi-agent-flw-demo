@@ -28,4 +28,4 @@ azd env set AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID '<Existing Log Analytics Worksp
 Replace `<Existing Log Analytics Workspace Id>` with the value obtained from Step 3.
 
 ### 5. Continue Deployment
-Proceed with the next steps in the [deployment guide](/docs/DeploymentGuide.md).
+Proceed with the next steps in the [deployment guide](/docs/DeploymentGuide.md#deployment-steps).
