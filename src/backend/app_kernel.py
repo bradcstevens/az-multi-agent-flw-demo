@@ -364,8 +364,7 @@ async def human_clarification_endpoint(
             },
         )
         raise HTTPException(status_code=400, detail="Invalida Clarification")
-
-        
+ 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
