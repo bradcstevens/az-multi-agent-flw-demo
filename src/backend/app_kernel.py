@@ -29,6 +29,7 @@ from models.messages_kernel import (
     InputTask,
     PlanWithSteps,
     Step,
+    UserLanguage
 )
 
 # Updated import for KernelArguments
@@ -70,7 +71,7 @@ frontend_url = Config.FRONTEND_SITE_NAME
 # Add this near the top of your app.py, after initializing the app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url],
+    allow_origins=['*'],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,6 +81,39 @@ app.add_middleware(
 app.add_middleware(HealthCheckMiddleware, password="", checks={})
 logging.info("Added health check middleware")
 
+@app.post("/api/user_browser_language")
+async def user_browser_language_endpoint(
+    user_language: UserLanguage,
+    request: Request
+):
+    """
+    Receive the user's browser language.
+
+    ---
+    tags:
+      - User
+    parameters:
+      - name: language
+        in: query
+        type: string
+        required: true
+        description: The user's browser language
+    responses:
+      200:
+        description: Language received successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              description: Confirmation message
+    """
+    config.set_user_local_browser_language(user_language.language)
+
+    # Log the received language for the user
+    logging.info(f"Received browser language '{user_language}' for user ")
+
+    return {"status": "Language received successfully"}
 
 @app.post("/api/input_task")
 async def input_task_endpoint(input_task: InputTask, request: Request):

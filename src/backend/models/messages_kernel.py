@@ -262,6 +262,9 @@ class InputTask(KernelBaseModel):
 
     session_id: str
     description: str  # Initial goal
+    
+class UserLanguage(KernelBaseModel):
+    language: str
 
 
 class ApprovalRequest(KernelBaseModel):
