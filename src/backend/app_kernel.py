@@ -352,9 +352,7 @@ async def human_clarification_endpoint(
         description: Missing or invalid user information
     """
     if not await rai_success(human_clarification.human_clarification, False):
-        
         print("RAI failed")
-
         track_event_if_configured(
             "RAI failed",
             {
