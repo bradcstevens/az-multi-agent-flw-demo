@@ -11,8 +11,10 @@ import semantic_kernel as sk
 
 # Import AppConfig from app_config
 from app_config import config
-from azure.identity import DefaultAzureCredential
 from context.cosmos_memory_kernel import CosmosMemoryContext
+
+# Import the credential utility
+from helpers.azure_credential_utils import get_azure_credential
 
 # Import agent factory and the new AppConfig
 from kernel_agents.agent_factory import AgentFactory
@@ -169,8 +171,8 @@ async def rai_success(description: str) -> bool:
         True if it passes, False otherwise
     """
     try:
-        # Use DefaultAzureCredential for authentication to Azure OpenAI
-        credential = DefaultAzureCredential()
+        # Use managed identity for authentication to Azure OpenAI
+        credential = get_azure_credential()
         access_token = credential.get_token(
             "https://cognitiveservices.azure.com/.default"
         ).token
