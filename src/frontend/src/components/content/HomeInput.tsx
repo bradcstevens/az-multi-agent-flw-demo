@@ -75,7 +75,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
             } catch (error) {
                 dismissToast(id);
                 console.log("ERROR:", error);
-                showToast("Something went wrong", "error");
+                showToast(error instanceof Error ? error.message : String(error ?? ""), "error");
             } finally {
                 setInput("");
                 setSubmitting(false);
