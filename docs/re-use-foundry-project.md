@@ -1,4 +1,4 @@
-[← Back to *DEPLOYMENT* guide](/docs/DeploymentGuide.md)
+[← Back to *DEPLOYMENT* guide](/docs/DeploymentGuide.md#deployment-steps)
 
 # Reusing an Existing Azure AI Foundry Project
 To configure your environment to use an existing Azure AI Foundry Project, follow these steps:

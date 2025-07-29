@@ -1,4 +1,4 @@
-[← Back to *DEPLOYMENT* guide](/docs/DeploymentGuide.md)
+[← Back to *DEPLOYMENT* guide](/docs/DeploymentGuide.md#deployment-steps)
 
 # Reusing an Existing Log Analytics Workspace
 To configure your environment to use an existing Log Analytics Workspace, follow these steps:
