@@ -24,7 +24,6 @@ const AppWrapper = () => {
       setEnvData(config);
       setApiUrl(config.API_URL);
       const browserLanguage = await apiService.sendUserBrowserLanguage();
-      console.log(" ******** Browser language sent:", browserLanguage);
       try {
         const response = await fetch('/config');
         let config = defaultConfig;
