@@ -84,14 +84,15 @@ app.add_middleware(
 app.add_middleware(HealthCheckMiddleware, password="", checks={})
 logging.info("Added health check middleware")
 
+
 def format_dates_in_messages(messages, target_locale="en-US"):
     """
     Format dates in agent messages according to the specified locale.
-    
+
     Args:
         messages: List of message objects or string content
         target_locale: Target locale for date formatting (default: en-US)
-    
+
     Returns:
         Formatted messages with dates converted to target locale format
     """
@@ -100,11 +101,11 @@ def format_dates_in_messages(messages, target_locale="en-US"):
         "en-IN": "%d %b %Y",       # 30 Jul 2025
         "en-US": "%b %d, %Y",      # Jul 30, 2025
     }
-    
+
     output_format = locale_date_formats.get(target_locale, "%d %b %Y")
     # Match both "Jul 30, 2025, 12:00:00 AM" and "30 Jul 2025"
     date_pattern = r'(\d{1,2} [A-Za-z]{3,9} \d{4}|[A-Za-z]{3,9} \d{1,2}, \d{4}(, \d{1,2}:\d{2}:\d{2} ?[APap][Mm])?)'
-    
+
     def convert_date(match):
         date_str = match.group(0)
         try:
@@ -112,7 +113,7 @@ def format_dates_in_messages(messages, target_locale="en-US"):
             return dt.strftime(output_format)
         except Exception:
             return date_str  # Leave it unchanged if parsing fails
-    
+
     # Process messages
     if isinstance(messages, list):
         formatted_messages = []
@@ -130,6 +131,7 @@ def format_dates_in_messages(messages, target_locale="en-US"):
         return re.sub(date_pattern, convert_date, messages)
     else:
         return messages
+
 
 @app.post("/api/user_browser_language")
 async def user_browser_language_endpoint(
@@ -164,6 +166,7 @@ async def user_browser_language_endpoint(
     logging.info(f"Received browser language '{user_language}' for user ")
 
     return {"status": "Language received successfully"}
+
 
 @app.post("/api/input_task")
 async def input_task_endpoint(input_task: InputTask, request: Request):
@@ -267,7 +270,7 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
             match = re.search(r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg)
             if match:
                 error_msg = f"Rate limit is exceeded. Try again in {match.group(1)} seconds."
-        
+
         track_event_if_configured(
             "InputTaskError",
             {
@@ -729,10 +732,10 @@ async def get_plans(
 
         plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
         plan_with_steps.update_step_counts()
-        
+
         # Format dates in messages according to locale
         formatted_messages = format_dates_in_messages(messages, config.get_user_local_browser_language())
-        
+
         return [plan_with_steps, formatted_messages]
 
     all_plans = await memory_store.get_all_plans()

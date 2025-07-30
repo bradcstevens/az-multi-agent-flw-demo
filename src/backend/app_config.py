@@ -165,7 +165,7 @@ class AppConfig:
         except Exception as exc:
             logging.error("Failed to create AIProjectClient: %s", exc)
             raise
-        
+
     def get_user_local_browser_language(self) -> str:
         """Get the user's local browser language from environment variables.
 
