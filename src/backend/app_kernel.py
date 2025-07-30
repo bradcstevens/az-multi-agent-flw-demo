@@ -87,7 +87,7 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
     Receive the initial input task from the user.
     """
     # Fix 1: Properly await the async rai_success function
-    if not await rai_success(input_task.description):
+    if not await rai_success(input_task.description, True):
         print("RAI failed")
 
         track_event_if_configured(
@@ -351,6 +351,18 @@ async def human_clarification_endpoint(
       400:
         description: Missing or invalid user information
     """
+    if not await rai_success(human_clarification.human_clarification, False):
+        print("RAI failed")
+        track_event_if_configured(
+            "RAI failed",
+            {
+                "status": "Clarification is not received",
+                "description": human_clarification.human_clarification,
+                "session_id": human_clarification.session_id,
+            },
+        )
+        raise HTTPException(status_code=400, detail="Invalida Clarification")
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
