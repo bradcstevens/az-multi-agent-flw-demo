@@ -1034,6 +1034,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
             name: 'AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME'
             value: aiFoundryAiServicesModelDeployment.name
           }
+          {
+            name: 'APP_ENV'
+            value: 'Prod'
+          }
         ]
       }
     ]
@@ -1087,6 +1091,7 @@ module webSite 'br/public:avm/res/web/site:0.15.1' = if (webSiteEnabled) {
       WEBSITES_CONTAINER_START_TIME_LIMIT: '1800' // 30 minutes, adjust as needed
       BACKEND_API_URL: 'https://${containerApp.outputs.fqdn}'
       AUTH_ENABLED: 'false'
+      APP_ENV: 'Prod'
     }
   }
 }
