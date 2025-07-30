@@ -72,10 +72,9 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     showToast("Failed to create plan", "error");
                     dismissToast(id);
                 }
-            } catch (error) {
+            } catch (error:any) {
                 dismissToast(id);
-                console.log("ERROR:", error);
-                showToast(error instanceof Error ? error.message : String(error ?? ""), "error");
+                showToast(JSON.parse(error?.message)?.detail, "error");
             } finally {
                 setInput("");
                 setSubmitting(false);
