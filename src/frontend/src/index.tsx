@@ -23,7 +23,6 @@ const AppWrapper = () => {
       window.appConfig = config;
       setEnvData(config);
       setApiUrl(config.API_URL);
-      const browserLanguage = await apiService.sendUserBrowserLanguage();
       try {
         const response = await fetch('/config');
         let config = defaultConfig;
@@ -39,7 +38,7 @@ const AppWrapper = () => {
         let defaultUserInfo = config.ENABLE_AUTH ? await getUserInfo() : ({} as UserInfo);
         window.userInfo = defaultUserInfo;
         setUserInfoGlobal(defaultUserInfo);
-
+        const browserLanguage = await apiService.sendUserBrowserLanguage();
       } catch (error) {
         console.info("frontend config did not load from python", error);
       } finally {
