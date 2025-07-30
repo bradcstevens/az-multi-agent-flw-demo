@@ -166,6 +166,22 @@ class AppConfig:
             logging.error("Failed to create AIProjectClient: %s", exc)
             raise
 
+    def get_user_local_browser_language(self) -> str:
+        """Get the user's local browser language from environment variables.
+
+        Returns:
+            The user's local browser language or 'en-US' if not set
+        """
+        return self._get_optional("USER_LOCAL_BROWSER_LANGUAGE", "en-US")
+
+    def set_user_local_browser_language(self, language: str):
+        """Set the user's local browser language in environment variables.
+
+        Args:
+            language: The language code to set (e.g., 'en-US')
+        """
+        os.environ["USER_LOCAL_BROWSER_LANGUAGE"] = language
+
 
 # Create a global instance of AppConfig
 config = AppConfig()
