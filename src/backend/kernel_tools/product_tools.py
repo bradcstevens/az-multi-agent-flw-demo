@@ -10,7 +10,7 @@ from models.messages_kernel import AgentType
 import json
 from typing import get_type_hints
 from utils_date import format_date_for_user
-from app_config import config 
+from app_config import config
 
 
 class ProductTools:
@@ -19,6 +19,7 @@ class ProductTools:
     agent_name = AgentType.PRODUCT.value
     selecetd_language = config.get_user_local_browser_language()
     @staticmethod
+    
     @kernel_function(
         description="Add an extras pack/new product to the mobile plan for the customer. For example, adding a roaming plan to their service. Convert all date strings in the following text to short date format with 3-letter month (MMM) in the {selecetd_language} locale (e.g., en-US, en-IN), remove time, and replace original dates with the formatted ones"
     )

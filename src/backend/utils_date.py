@@ -3,6 +3,7 @@ from datetime import datetime
 import logging
 from typing import Optional
 
+
 def format_date_for_user(date_str: str, user_locale: Optional[str] = None) -> str:
     """
     Format date based on user's desktop locale preference.
