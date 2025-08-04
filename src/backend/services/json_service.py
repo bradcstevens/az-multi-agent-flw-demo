@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any, List, Optional
 
-from ..models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
+from models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
 
 
 class JsonService:
