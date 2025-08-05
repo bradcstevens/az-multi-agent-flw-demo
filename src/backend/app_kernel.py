@@ -2,41 +2,32 @@
 import asyncio
 import logging
 import os
+# Azure monitoring
+import re
 import uuid
 from typing import Dict, List, Optional
 
 # Semantic Kernel imports
 from app_config import config
 from auth.auth_utils import get_authenticated_user_details
-
-# Azure monitoring
-import re
-from dateutil import parser
 from azure.monitor.opentelemetry import configure_azure_monitor
 from config_kernel import Config
+from dateutil import parser
 from event_utils import track_event_if_configured
-
 # FastAPI imports
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
-
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
-from models.messages_kernel import (
-    AgentMessage,
-    AgentType,
-    HumanClarification,
-    HumanFeedback,
-    InputTask,
-    PlanWithSteps,
-    Step,
-    UserLanguage
-)
-
+from models.messages_kernel import (AgentMessage, AgentType,
+                                    HumanClarification, HumanFeedback,
+                                    InputTask, PlanWithSteps, Step,
+                                    UserLanguage)
 # Updated import for KernelArguments
 from utils_kernel import initialize_runtime_and_context, rai_success
-
+from v3.orchestration.manager import OnboardingOrchestrationManager
+from v3.scenarios.onboarding_cases import MagenticScenarios
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
 connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
@@ -281,6 +272,119 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
         )
         raise HTTPException(status_code=400, detail=f"Error creating plan: {error_msg}") from e
 
+@app.post("/api/input_task_2")
+async def input_task_endpoint_2(input_task: InputTask, request: Request):
+    """
+    Receive the initial input task from the user.
+    """
+    # Fix 1: Properly await the async rai_success function
+    if not await rai_success(input_task.description, True):
+        print("RAI failed")
+
+        track_event_if_configured(
+            "RAI failed",
+            {
+                "status": "Plan not created",
+                "description": input_task.description,
+                "session_id": input_task.session_id,
+            },
+        )
+
+        return {
+            "status": "Plan not created",
+        }
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+
+    if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    # Generate session ID if not provided
+    if not input_task.session_id:
+        input_task.session_id = str(uuid.uuid4())
+
+    try:
+        # Create all agents instead of just the planner agent
+        # This ensures other agents are created first and the planner has access to them
+        # <? Do we need to do this every time? >
+        kernel, memory_store = await initialize_runtime_and_context(
+            input_task.session_id, user_id
+        )
+        client = None
+        try:
+            client = config.get_ai_project_client()
+        except Exception as client_exc:
+            logging.error(f"Error creating AIProjectClient: {client_exc}")
+
+        agents = await AgentFactory.create_all_agents(
+            session_id=input_task.session_id,
+            user_id=user_id,
+            memory_store=memory_store,
+            client=client,
+        )
+
+        group_chat_manager = agents[AgentType.GROUP_CHAT_MANAGER.value]
+
+        # Convert input task to JSON for the kernel function, add user_id here
+
+        # Use the planner to handle the task
+        await group_chat_manager.handle_input_task(input_task)
+
+        # Get plan from memory store
+        plan = await memory_store.get_plan_by_session(input_task.session_id)
+
+        if not plan:  # If the plan is not found, raise an error
+            track_event_if_configured(
+                "PlanNotFound",
+                {
+                    "status": "Plan not found",
+                    "session_id": input_task.session_id,
+                    "description": input_task.description,
+                },
+            )
+            raise HTTPException(status_code=404, detail="Plan not found")
+        # Log custom event for successful input task processing
+        track_event_if_configured(
+            "InputTaskProcessed",
+            {
+                "status": f"Plan created with ID: {plan.id}",
+                "session_id": input_task.session_id,
+                "plan_id": plan.id,
+                "description": input_task.description,
+            },
+        )
+        if client:
+            try:
+                client.close()
+            except Exception as e:
+                logging.error(f"Error sending to AIProjectClient: {e}")
+        return {
+            "status": f"Plan created with ID: {plan.id}",
+            "session_id": input_task.session_id,
+            "plan_id": plan.id,
+            "description": input_task.description,
+        }
+
+    except Exception as e:
+        # Extract clean error message for rate limit errors
+        error_msg = str(e)
+        if "Rate limit is exceeded" in error_msg:
+            match = re.search(r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg)
+            if match:
+                error_msg = f"Rate limit is exceeded. Try again in {match.group(1)} seconds."
+
+        track_event_if_configured(
+            "InputTaskError",
+            {
+                "session_id": input_task.session_id,
+                "description": input_task.description,
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=400, detail=f"Error creating plan: {error_msg}") from e
 
 @app.post("/api/human_feedback")
 async def human_feedback_endpoint(human_feedback: HumanFeedback, request: Request):
