@@ -43,15 +43,6 @@
             "index_name": ""
         },
         {
-            "input_key": "planner-001",
-            "type": "Planner",
-            "name": "Task Planner",
-            "system_message": "You are a Planner agent. You break down complex tasks into manageable steps and coordinate between different agents to achieve the desired outcome.",
-            "description": "Plans and coordinates complex multi-step tasks across different business areas.",
-            "icon": "TaskList",
-            "index_name": ""
-        },
-        {
             "input_key": "generic-001",
             "type": "Generic",
             "name": "General Assistant",
