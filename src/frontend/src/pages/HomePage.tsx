@@ -22,12 +22,18 @@ import HomeInput from '@/components/content/HomeInput';
 import { NewTaskService } from '../services/NewTaskService';
 import PlanPanelLeft from '@/components/content/PlanPanelLeft';
 import ContentToolbar from '@/coral/components/Content/ContentToolbar';
+import { TaskService } from '../services/TaskService';
+import { TeamConfig } from '../models/Team';
 
 /**
  * HomePage component - displays task lists and provides navigation
  * Accessible via the route "/"
  */
 const HomePage: React.FC = () => {
+    const navigate = useNavigate();
+    const { dispatchToast } = useToastController("toast");
+    const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
+
     /**
     * Handle new task creation from the "New task" button
     * Resets textarea to empty state on HomePage
@@ -37,11 +43,69 @@ const HomePage: React.FC = () => {
     }, []);
 
     /**
-     * Handle new task creation from input submission - placeholder for future implementation
+     * Handle team selection from the Settings button
      */
-    const handleNewTask = useCallback((taskName: string) => {
-        console.log('Creating new task:', taskName);
-    }, []);
+    const handleTeamSelect = useCallback((team: TeamConfig) => {
+        setSelectedTeam(team);
+        dispatchToast(
+            <Toast>
+                <ToastTitle>Team Selected</ToastTitle>
+                <ToastBody>
+                    {team.name} team has been selected with {team.agents.length} agents
+                </ToastBody>
+            </Toast>,
+            { intent: "success" }
+        );
+    }, [dispatchToast]);
+
+    /**
+     * Handle new task creation from input submission
+     * Creates a plan and navigates to the create plan page
+     */
+    const handleNewTask = useCallback(async (taskName: string) => {
+        if (taskName.trim()) {
+            try {
+                const response = await TaskService.createPlan(taskName.trim());
+                
+                if (response.plan_id && response.plan_id !== null) {
+                    dispatchToast(
+                        <Toast>
+                            <ToastTitle>Plan Created!</ToastTitle>
+                            <ToastBody>
+                                Successfully created plan for: {taskName}
+                                {selectedTeam && ` using ${selectedTeam.name} team`}
+                            </ToastBody>
+                        </Toast>,
+                        { intent: "success" }
+                    );
+                    navigate(`/plan/${response.plan_id}/create`);
+                } else {
+                    dispatchToast(
+                        <Toast>
+                            <ToastTitle>
+                                <ErrorCircle20Regular />
+                                Failed to create plan
+                            </ToastTitle>
+                            <ToastBody>Unable to create plan. Please try again.</ToastBody>
+                        </Toast>,
+                        { intent: "error" }
+                    );
+                }
+            } catch (error: any) {
+                console.error('Error creating plan:', error);
+                dispatchToast(
+                    <Toast>
+                        <ToastTitle>
+                            <ErrorCircle20Regular />
+                            Error creating plan
+                        </ToastTitle>
+                        <ToastBody>{error.message || 'Something went wrong'}</ToastBody>
+                    </Toast>,
+                    { intent: "error" }
+                );
+            }
+        }
+    }, [navigate, dispatchToast, selectedTeam]);
 
     return (
         <>
@@ -50,6 +114,8 @@ const HomePage: React.FC = () => {
                 <CoralShellRow>
                     <PlanPanelLeft
                         onNewTaskButton={handleNewTaskButton}
+                        onTeamSelect={handleTeamSelect}
+                        selectedTeam={selectedTeam}
                     />
                     <Content>
                         <ContentToolbar

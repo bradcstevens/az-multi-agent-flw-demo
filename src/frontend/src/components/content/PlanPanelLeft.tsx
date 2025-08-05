@@ -28,8 +28,15 @@ import "../../styles/PlanPanelLeft.css";
 import PanelFooter from "@/coral/components/Panels/PanelFooter";
 import PanelUserCard from "../../coral/components/Panels/UserCard";
 import { getUserInfoGlobal } from "@/api/config";
+import SettingsButton from "../common/SettingsButton";
+import { TeamConfig } from "../../models/Team";
 
-const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks,restReload }) => {
+const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ 
+  reloadTasks, 
+  restReload, 
+  onTeamSelect, 
+  selectedTeam: parentSelectedTeam 
+}) => {
   const { dispatchToast } = useToastController("toast");
   const navigate = useNavigate();
   const { planId } = useParams<{ planId: string }>();
@@ -42,6 +49,10 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks,restReload }) 
   const [userInfo, setUserInfo] = useState<UserInfo | null>(
     getUserInfoGlobal()
   );
+  
+  // Use parent's selected team if provided, otherwise use local state
+  const [localSelectedTeam, setLocalSelectedTeam] = useState<TeamConfig | null>(null);
+  const selectedTeam = parentSelectedTeam || localSelectedTeam;
 
   const loadPlansData = useCallback(async (forceRefresh = false) => {
     try {
@@ -112,6 +123,27 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks,restReload }) 
     [plans, navigate]
   );
 
+  const handleTeamSelect = useCallback(
+    (team: TeamConfig) => {
+      // Use parent's team select handler if provided, otherwise use local state
+      if (onTeamSelect) {
+        onTeamSelect(team);
+      } else {
+        setLocalSelectedTeam(team);
+        dispatchToast(
+          <Toast>
+            <ToastTitle>Team Selected</ToastTitle>
+            <ToastBody>
+              {team.name} team has been selected with {team.agents.length} agents
+            </ToastBody>
+          </Toast>,
+          { intent: "success" }
+        );
+      }
+    },
+    [onTeamSelect, dispatchToast]
+  );
+
   return (
     <div style={{ flexShrink: 0, display: "flex", overflow: "hidden" }}>
       <PanelLeft panelWidth={280} panelResize={true}>
@@ -152,11 +184,19 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ reloadTasks,restReload }) 
         />
 
         <PanelFooter>
-          <PanelUserCard
-            name={userInfo ? userInfo.user_first_last_name : "Guest"}
-            // alias={userInfo ? userInfo.user_email : ""}
-            size={32}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+            {/* Settings Button on top */}
+            <SettingsButton
+              onTeamSelect={handleTeamSelect}
+              selectedTeam={selectedTeam}
+            />
+            {/* User Card below */}
+            <PanelUserCard
+              name={userInfo ? userInfo.user_first_last_name : "Guest"}
+              // alias={userInfo ? userInfo.user_email : ""}
+              size={32}
+            />
+          </div>
         </PanelFooter>
       </PanelLeft>
     </div>

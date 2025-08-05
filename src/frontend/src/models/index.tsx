@@ -14,6 +14,7 @@ export * from './taskDetails';
 export * from './taskList';
 export * from './planPanelLeft';
 export * from './homeInput';
-export * from './auth'
+export * from './auth';
+export * from './Team';
 
 // Add other model exports as needed
