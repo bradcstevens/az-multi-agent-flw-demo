@@ -345,11 +345,12 @@ The files for the dev container are located in `/.devcontainer/` folder.
 
 5. **Create a `.env` file:**
 
-   - Navigate to the `src` folder and create a `.env` file based on the provided `.env.sample` file.
+   - Navigate to the `src\backend` folder and create a `.env` file based on the provided `.env.sample` file.
 
 6. **Fill in the `.env` file:**
 
    - Use the output from the deployment or check the Azure Portal under "Deployments" in the resource group.
+   - Make sure to set APP_ENV to "**dev**" in `.env` file.
 
 7. **(Optional) Set up a virtual environment:**
 
