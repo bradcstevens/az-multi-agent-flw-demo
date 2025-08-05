@@ -310,6 +310,12 @@ class UserLanguage(KernelBaseModel):
     language: str
 
 
+class GeneratePlanRequest(KernelBaseModel):
+    """Message representing a request to generate a plan from an existing plan ID."""
+
+    plan_id: str
+
+
 class ApprovalRequest(KernelBaseModel):
     """Message sent to HumanAgent to request approval for a step."""
 
