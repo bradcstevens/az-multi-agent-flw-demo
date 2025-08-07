@@ -168,6 +168,65 @@ class CosmosMemoryContext(MemoryStoreBase):
             logging.exception(f"Failed to retrieve item from Cosmos DB: {e}")
             return None
 
+    async def query_items_with_parameters(
+        self, query: str, parameters: List[Dict[str, Any]], limit: int = 1000
+    ) -> List[Dict[str, Any]]:
+        """Query items from Cosmos DB with parameters and return raw dictionaries."""
+        await self.ensure_initialized()
+
+        try:
+            items = self._container.query_items(
+                query=query, 
+                parameters=parameters,
+                enable_cross_partition_query=True
+            )
+            result_list = []
+            count = 0
+            async for item in items:
+                if count >= limit:
+                    break
+                result_list.append(item)
+                count += 1
+            return result_list
+        except Exception as e:
+            logging.exception(f"Failed to query items from Cosmos DB: {e}")
+            return []
+
+    async def get_async(self, key: str) -> Optional[Dict[str, Any]]:
+        """Get an item by its key/ID."""
+        await self.ensure_initialized()
+        
+        try:
+            # Query by ID across all partitions since we don't know the partition key
+            query = "SELECT * FROM c WHERE c.id=@id"
+            parameters = [{"name": "@id", "value": key}]
+            
+            items = self._container.query_items(
+                query=query, 
+                parameters=parameters,
+                enable_cross_partition_query=True
+            )
+            
+            async for item in items:
+                return item
+            return None
+        except Exception as e:
+            logging.exception(f"Failed to get item from Cosmos DB: {e}")
+            return None
+
+    async def delete_async(self, key: str) -> None:
+        """Delete an item by its key/ID."""
+        await self.ensure_initialized()
+        
+        try:
+            # First get the item to find its partition key
+            item = await self.get_async(key)
+            if item:
+                partition_key = item.get("session_id", item.get("user_id", key))
+                await self._container.delete_item(item=key, partition_key=partition_key)
+        except Exception as e:
+            logging.exception(f"Failed to delete item from Cosmos DB: {e}")
+
     async def query_items(
         self,
         query: str,

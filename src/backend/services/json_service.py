@@ -5,14 +5,15 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
+from context.cosmos_memory_kernel import CosmosMemoryContext
 
 
 class JsonService:
     """Service for handling JSON team configuration operations."""
 
-    def __init__(self, memory_store):
-        """Initialize with memory store."""
-        self.memory_store = memory_store
+    def __init__(self, memory_context: CosmosMemoryContext):
+        """Initialize with memory context."""
+        self.memory_context = memory_context
         self.logger = logging.getLogger(__name__)
 
     async def validate_and_parse_team_config(
@@ -148,14 +149,15 @@ class JsonService:
             The unique ID of the saved configuration
         """
         try:
-            # Convert to dictionary for storage
+            # Convert to dictionary and add data_type for proper querying
             config_dict = team_config.model_dump()
-
-            # Add the full JSON string for storage (with proper datetime serialization)
-            config_dict["json_data"] = json.dumps(config_dict, indent=2, default=str)
-
-            # Save to memory store using the config ID as the key
-            await self.memory_store.upsert_async(team_config.id, config_dict)
+            config_dict["data_type"] = "team_config"
+            
+            # Use the cosmos memory context to save the team configuration
+            await self.memory_context.upsert_async(
+                collection_name=team_config.id,
+                record=config_dict
+            )
 
             self.logger.info(
                 "Successfully saved team configuration with ID: %s", team_config.id
@@ -180,12 +182,12 @@ class JsonService:
             TeamConfiguration object or None if not found
         """
         try:
-            # Get the specific configuration by its ID
-            config_dict = await self.memory_store.get_async(config_id)
-
+            # Get the specific configuration using cosmos memory context
+            config_dict = await self.memory_context.get_async(config_id)
+            
             if config_dict is None:
                 return None
-
+            
             # Verify the configuration belongs to the user
             if config_dict.get("user_id") != user_id:
                 self.logger.warning(
@@ -214,13 +216,14 @@ class JsonService:
             List of TeamConfiguration objects
         """
         try:
-            # Query configurations using SQL with parameters
-            query = "SELECT * FROM memory WHERE memory.user_id=@user_id"
+            # Query configurations using SQL with parameters through cosmos memory context
+            query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type"
             parameters = [
                 {"name": "@user_id", "value": user_id},
+                {"name": "@data_type", "value": "team_config"},
             ]
-
-            configs = await self.memory_store.query_items_with_parameters(
+            
+            configs = await self.memory_context.query_items_with_parameters(
                 query, parameters, limit=1000
             )
 
@@ -254,25 +257,24 @@ class JsonService:
         """
         try:
             # First, verify the configuration exists and belongs to the user
-            config_dict = await self.memory_store.get_async(config_id)
-
+            config_dict = await self.memory_context.get_async(config_id)
+            
             if config_dict is None:
                 self.logger.warning(
                     "Team configuration not found for deletion: %s", config_id
                 )
                 return False
-
+            
             # Verify the configuration belongs to the user
             if config_dict.get("user_id") != user_id:
                 self.logger.warning(
-                    "Access denied: cannot delete config %s for user %s",
-                    config_id,
-                    user_id,
+                    "Access denied: cannot delete config %s for user %s", 
+                    config_id, user_id
                 )
                 return False
 
-            # Delete the configuration
-            await self.memory_store.delete_async(config_id)
+            # Delete the configuration using cosmos memory context
+            await self.memory_context.delete_async(config_id)
 
             self.logger.info("Successfully deleted team configuration: %s", config_id)
             return True
