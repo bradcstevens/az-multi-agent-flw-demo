@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Dict, Any, List, Optional
 
 from models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
@@ -29,10 +30,8 @@ class JsonService:
             ValueError: If JSON structure is invalid
         """
         try:
-            # Validate required top-level fields
+            # Validate required top-level fields (id and team_id will be generated)
             required_fields = [
-                "id",
-                "team_id",
                 "name",
                 "status",
                 "created",
@@ -41,6 +40,10 @@ class JsonService:
             for field in required_fields:
                 if field not in json_data:
                     raise ValueError(f"Missing required field: {field}")
+
+            # Generate unique IDs
+            unique_id = str(uuid.uuid4())
+            unique_team_id = str(uuid.uuid4())
 
             # Validate agents array exists and is not empty
             if "agents" not in json_data or not isinstance(json_data["agents"], list):
@@ -76,7 +79,8 @@ class JsonService:
 
             # Create team configuration
             team_config = TeamConfiguration(
-                team_id=json_data["team_id"],
+                id=unique_id,  # Use generated GUID
+                team_id=unique_team_id,  # Use generated GUID
                 name=json_data["name"],
                 status=json_data["status"],
                 created=json_data["created"],
@@ -90,7 +94,9 @@ class JsonService:
             )
 
             self.logger.info(
-                "Successfully validated team configuration: %s", team_config.team_id
+                "Successfully validated team configuration: %s (ID: %s)",
+                team_config.team_id,
+                team_config.id,
             )
             return team_config
 
