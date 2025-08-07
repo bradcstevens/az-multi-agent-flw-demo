@@ -63,7 +63,10 @@ const HomeInput: React.FC<HomeInputProps> = ({
             let id = showToast("Creating a plan", "progress");
 
             try {
-                const response = await TaskService.createPlan(input.trim());
+                const response = await TaskService.createPlan(
+                    input.trim(), 
+                    selectedTeam?.team_id
+                );
                 setInput("");
 
                 if (textareaRef.current) {
@@ -74,12 +77,9 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     showToast("Plan created!", "success");
                     dismissToast(id);
                     
-                    // Navigate with team ID if a team is selected
-                    const navPath = selectedTeam 
-                        ? `/plan/${response.plan_id}/create/${selectedTeam.team_id}`
-                        : `/plan/${response.plan_id}/create`;
-                    console.log('HomeInput: Navigating to:', navPath, 'with team:', selectedTeam?.name);
-                    navigate(navPath);
+                    // Navigate to create page (no team ID in URL anymore)
+                    console.log('HomeInput: Navigating to plan creation with team:', selectedTeam?.name);
+                    navigate(`/plan/${response.plan_id}/create`);
                 } else {
                     showToast("Failed to create plan", "error");
                     dismissToast(id);

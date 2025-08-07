@@ -131,7 +131,10 @@ const HomePage: React.FC = () => {
     const handleNewTask = useCallback(async (taskName: string) => {
         if (taskName.trim()) {
             try {
-                const response = await TaskService.createPlan(taskName.trim());
+                const response = await TaskService.createPlan(
+                    taskName.trim(), 
+                    selectedTeam?.team_id
+                );
                 
                 if (response.plan_id && response.plan_id !== null) {
                     dispatchToast(
@@ -145,12 +148,9 @@ const HomePage: React.FC = () => {
                         { intent: "success" }
                     );
                     
-                    // Navigate with team ID if a team is selected
-                    const navPath = selectedTeam 
-                        ? `/plan/${response.plan_id}/create/${selectedTeam.team_id}`
-                        : `/plan/${response.plan_id}/create`;
-                    console.log('Navigating to:', navPath, 'with team:', selectedTeam?.name);
-                    navigate(navPath);
+                    // Navigate to create page (no team ID in URL anymore)
+                    console.log('Navigating to plan creation with team:', selectedTeam?.name);
+                    navigate(`/plan/${response.plan_id}/create`);
                 } else {
                     dispatchToast(
                         <Toast>
