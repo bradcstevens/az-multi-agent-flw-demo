@@ -1,7 +1,9 @@
 # app_kernel.py
 import asyncio
+import json
 import logging
 import os
+
 # Azure monitoring
 import re
 import uuid
@@ -14,16 +16,30 @@ from azure.monitor.opentelemetry import configure_azure_monitor
 from config_kernel import Config
 from dateutil import parser
 from event_utils import track_event_if_configured
+
 # FastAPI imports
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
+
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
-from models.messages_kernel import (AgentMessage, AgentType,
-                                    HumanClarification, HumanFeedback,
-                                    InputTask, PlanWithSteps, Step,
-                                    UserLanguage)
+from models.messages_kernel import (
+    AgentMessage,
+    AgentType,
+    GeneratePlanRequest,
+    HumanClarification,
+    HumanFeedback,
+    InputTask,
+    Plan,
+    PlanStatus,
+    PlanWithSteps,
+    Step,
+    UserLanguage,
+    TeamConfiguration,
+)
+from services.json_service import JsonService
+
 # Updated import for KernelArguments
 from utils_kernel import initialize_runtime_and_context, rai_success
 from v3.orchestration.manager import OnboardingOrchestrationManager
@@ -65,7 +81,9 @@ frontend_url = Config.FRONTEND_SITE_NAME
 # Add this near the top of your app.py, after initializing the app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url],
+    allow_origins=[
+        frontend_url
+    ],  # Allow all origins for development; restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,13 +107,13 @@ def format_dates_in_messages(messages, target_locale="en-US"):
     """
     # Define target format patterns per locale
     locale_date_formats = {
-        "en-IN": "%d %b %Y",       # 30 Jul 2025
-        "en-US": "%b %d, %Y",      # Jul 30, 2025
+        "en-IN": "%d %b %Y",  # 30 Jul 2025
+        "en-US": "%b %d, %Y",  # Jul 30, 2025
     }
 
     output_format = locale_date_formats.get(target_locale, "%d %b %Y")
     # Match both "Jul 30, 2025, 12:00:00 AM" and "30 Jul 2025"
-    date_pattern = r'(\d{1,2} [A-Za-z]{3,9} \d{4}|[A-Za-z]{3,9} \d{1,2}, \d{4}(, \d{1,2}:\d{2}:\d{2} ?[APap][Mm])?)'
+    date_pattern = r"(\d{1,2} [A-Za-z]{3,9} \d{4}|[A-Za-z]{3,9} \d{1,2}, \d{4}(, \d{1,2}:\d{2}:\d{2} ?[APap][Mm])?)"
 
     def convert_date(match):
         date_str = match.group(0)
@@ -109,11 +127,15 @@ def format_dates_in_messages(messages, target_locale="en-US"):
     if isinstance(messages, list):
         formatted_messages = []
         for message in messages:
-            if hasattr(message, 'content') and message.content:
+            if hasattr(message, "content") and message.content:
                 # Create a copy of the message with formatted content
-                formatted_message = message.model_copy() if hasattr(message, 'model_copy') else message
-                if hasattr(formatted_message, 'content'):
-                    formatted_message.content = re.sub(date_pattern, convert_date, formatted_message.content)
+                formatted_message = (
+                    message.model_copy() if hasattr(message, "model_copy") else message
+                )
+                if hasattr(formatted_message, "content"):
+                    formatted_message.content = re.sub(
+                        date_pattern, convert_date, formatted_message.content
+                    )
                 formatted_messages.append(formatted_message)
             else:
                 formatted_messages.append(message)
@@ -125,10 +147,7 @@ def format_dates_in_messages(messages, target_locale="en-US"):
 
 
 @app.post("/api/user_browser_language")
-async def user_browser_language_endpoint(
-    user_language: UserLanguage,
-    request: Request
-):
+async def user_browser_language_endpoint(user_language: UserLanguage, request: Request):
     """
     Receive the user's browser language.
 
@@ -171,14 +190,22 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
         track_event_if_configured(
             "RAI failed",
             {
-                "status": "Plan not created",
+                "status": "Plan not created - RAI validation failed",
                 "description": input_task.description,
                 "session_id": input_task.session_id,
             },
         )
 
         return {
-            "status": "Plan not created",
+            "status": "RAI_VALIDATION_FAILED",
+            "message": "Content Safety Check Failed",
+            "detail": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+            "suggestions": [
+                "Remove any potentially harmful, inappropriate, or unsafe content",
+                "Use more professional and constructive language",
+                "Focus on legitimate business or educational objectives",
+                "Ensure your request complies with content policies",
+            ],
         }
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -258,9 +285,11 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
         # Extract clean error message for rate limit errors
         error_msg = str(e)
         if "Rate limit is exceeded" in error_msg:
-            match = re.search(r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg)
+            match = re.search(
+                r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg
+            )
             if match:
-                error_msg = f"Rate limit is exceeded. Try again in {match.group(1)} seconds."
+                error_msg = "Application temporarily unavailable due to quota limits. Please try again later."
 
         track_event_if_configured(
             "InputTaskError",
@@ -270,7 +299,303 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
                 "error": str(e),
             },
         )
-        raise HTTPException(status_code=400, detail=f"Error creating plan: {error_msg}") from e
+        raise HTTPException(
+            status_code=400, detail=f"Error creating plan: {error_msg}"
+        ) from e
+
+
+@app.post("/api/create_plan")
+async def create_plan_endpoint(input_task: InputTask, request: Request):
+    """
+    Create a new plan without full processing.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            session_id:
+              type: string
+              description: Session ID for the plan
+            description:
+              type: string
+              description: The task description to validate and create plan for
+    responses:
+      200:
+        description: Plan created successfully
+        schema:
+          type: object
+          properties:
+            plan_id:
+              type: string
+              description: The ID of the newly created plan
+            status:
+              type: string
+              description: Success message
+            session_id:
+              type: string
+              description: Session ID associated with the plan
+      400:
+        description: RAI check failed or invalid input
+        schema:
+          type: object
+          properties:
+            detail:
+              type: string
+              description: Error message
+    """
+    # Perform RAI check on the description
+    if not await rai_success(input_task.description, False):
+        track_event_if_configured(
+            "RAI failed",
+            {
+                "status": "Plan not created - RAI check failed",
+                "description": input_task.description,
+                "session_id": input_task.session_id,
+            },
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "RAI_VALIDATION_FAILED",
+                "message": "Content Safety Check Failed",
+                "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+                "suggestions": [
+                    "Remove any potentially harmful, inappropriate, or unsafe content",
+                    "Use more professional and constructive language",
+                    "Focus on legitimate business or educational objectives",
+                    "Ensure your request complies with content policies",
+                ],
+                "user_action": "Please revise your request and try again",
+            },
+        )
+
+    # Get authenticated user
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+
+    if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    # Generate session ID if not provided
+    if not input_task.session_id:
+        input_task.session_id = str(uuid.uuid4())
+
+    try:
+        # Initialize memory store
+        kernel, memory_store = await initialize_runtime_and_context(
+            input_task.session_id, user_id
+        )
+
+        # Create a new Plan object
+        plan = Plan(
+            session_id=input_task.session_id,
+            user_id=user_id,
+            initial_goal=input_task.description,
+            overall_status=PlanStatus.in_progress,
+            source=AgentType.PLANNER.value,
+        )
+
+        # Save the plan to the database
+        await memory_store.add_plan(plan)
+
+        # Log successful plan creation
+        track_event_if_configured(
+            "PlanCreated",
+            {
+                "status": f"Plan created with ID: {plan.id}",
+                "session_id": input_task.session_id,
+                "plan_id": plan.id,
+                "description": input_task.description,
+            },
+        )
+
+        return {
+            "plan_id": plan.id,
+            "status": "Plan created successfully",
+            "session_id": input_task.session_id,
+        }
+
+    except Exception as e:
+        track_event_if_configured(
+            "CreatePlanError",
+            {
+                "session_id": input_task.session_id,
+                "description": input_task.description,
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=400, detail=f"Error creating plan: {e}")
+
+
+@app.post("/api/generate_plan")
+async def generate_plan_endpoint(
+    generate_plan_request: GeneratePlanRequest, request: Request
+):
+    """
+    Generate plan steps for an existing plan using the planner agent.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            plan_id:
+              type: string
+              description: The ID of the existing plan to generate steps for
+    responses:
+      200:
+        description: Plan generation completed successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              description: Success message
+            plan_id:
+              type: string
+              description: The ID of the plan that was generated
+            steps_created:
+              type: integer
+              description: Number of steps created
+      400:
+        description: Invalid request or processing error
+        schema:
+          type: object
+          properties:
+            detail:
+              type: string
+              description: Error message
+      404:
+        description: Plan not found
+        schema:
+          type: object
+          properties:
+            detail:
+              type: string
+              description: Error message
+    """
+    # Get authenticated user
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+
+    if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    try:
+        # Initialize memory store
+        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+
+        # Get the existing plan
+        plan = await memory_store.get_plan_by_plan_id(
+            plan_id=generate_plan_request.plan_id
+        )
+        if not plan:
+            track_event_if_configured(
+                "GeneratePlanNotFound",
+                {
+                    "status_code": 404,
+                    "detail": "Plan not found",
+                    "plan_id": generate_plan_request.plan_id,
+                },
+            )
+            raise HTTPException(status_code=404, detail="Plan not found")
+
+        # Create the agents for this session
+        client = None
+        try:
+            client = config.get_ai_project_client()
+        except Exception as client_exc:
+            logging.error(f"Error creating AIProjectClient: {client_exc}")
+
+        agents = await AgentFactory.create_all_agents(
+            session_id=plan.session_id,
+            user_id=user_id,
+            memory_store=memory_store,
+            client=client,
+        )
+
+        # Get the group chat manager to process the plan
+        group_chat_manager = agents[AgentType.GROUP_CHAT_MANAGER.value]
+
+        # Create an InputTask from the plan's initial goal
+        input_task = InputTask(
+            session_id=plan.session_id, description=plan.initial_goal
+        )
+
+        # Use the group chat manager to generate the plan steps
+        await group_chat_manager.handle_input_task(input_task)
+
+        # Get the updated plan with steps
+        updated_plan = await memory_store.get_plan_by_plan_id(
+            plan_id=generate_plan_request.plan_id
+        )
+        steps = await memory_store.get_steps_by_plan(
+            plan_id=generate_plan_request.plan_id
+        )
+
+        # Log successful plan generation
+        track_event_if_configured(
+            "PlanGenerated",
+            {
+                "status": f"Plan generation completed for plan ID: {generate_plan_request.plan_id}",
+                "plan_id": generate_plan_request.plan_id,
+                "session_id": plan.session_id,
+                "steps_created": len(steps),
+            },
+        )
+
+        if client:
+            try:
+                client.close()
+            except Exception as e:
+                logging.error(f"Error closing AIProjectClient: {e}")
+
+        return {
+            "status": "Plan generation completed successfully",
+            "plan_id": generate_plan_request.plan_id,
+            "steps_created": len(steps),
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        track_event_if_configured(
+            "GeneratePlanError",
+            {
+                "plan_id": generate_plan_request.plan_id,
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=400, detail=f"Error generating plan: {e}")
+
 
 @app.post("/api/input_task_2")
 async def input_task_endpoint_2(input_task: InputTask, request: Request):
@@ -372,9 +697,13 @@ async def input_task_endpoint_2(input_task: InputTask, request: Request):
         # Extract clean error message for rate limit errors
         error_msg = str(e)
         if "Rate limit is exceeded" in error_msg:
-            match = re.search(r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg)
+            match = re.search(
+                r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg
+            )
             if match:
-                error_msg = f"Rate limit is exceeded. Try again in {match.group(1)} seconds."
+                error_msg = (
+                    f"Rate limit is exceeded. Try again in {match.group(1)} seconds."
+                )
 
         track_event_if_configured(
             "InputTaskError",
@@ -384,7 +713,10 @@ async def input_task_endpoint_2(input_task: InputTask, request: Request):
                 "error": str(e),
             },
         )
-        raise HTTPException(status_code=400, detail=f"Error creating plan: {error_msg}") from e
+        raise HTTPException(
+            status_code=400, detail=f"Error creating plan: {error_msg}"
+        ) from e
+
 
 @app.post("/api/human_feedback")
 async def human_feedback_endpoint(human_feedback: HumanFeedback, request: Request):
@@ -554,12 +886,26 @@ async def human_clarification_endpoint(
         track_event_if_configured(
             "RAI failed",
             {
-                "status": "Clarification is not received",
+                "status": "Clarification rejected - RAI validation failed",
                 "description": human_clarification.human_clarification,
                 "session_id": human_clarification.session_id,
             },
         )
-        raise HTTPException(status_code=400, detail="Invalida Clarification")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "RAI_VALIDATION_FAILED",
+                "message": "Clarification Safety Check Failed",
+                "description": "Your clarification contains content that doesn't meet our safety guidelines. Please provide a more appropriate clarification.",
+                "suggestions": [
+                    "Use clear and professional language",
+                    "Avoid potentially harmful or inappropriate content",
+                    "Focus on providing constructive feedback or clarification",
+                    "Ensure your message complies with content policies",
+                ],
+                "user_action": "Please revise your clarification and try again",
+            },
+        )
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -838,7 +1184,9 @@ async def get_plans(
         plan_with_steps.update_step_counts()
 
         # Format dates in messages according to locale
-        formatted_messages = format_dates_in_messages(messages, config.get_user_local_browser_language())
+        formatted_messages = format_dates_in_messages(
+            messages, config.get_user_local_browser_language()
+        )
 
         return [plan_with_steps, formatted_messages]
 
@@ -1182,6 +1530,351 @@ async def get_agent_tools():
                 description: Arguments required by the tool function
     """
     return []
+
+
+@app.post("/api/upload_team_config")
+async def upload_team_config_endpoint(request: Request, file: UploadFile = File(...)):
+    """
+    Upload and save a team configuration JSON file.
+
+    ---
+    tags:
+      - Team Configuration
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+      - name: file
+        in: formData
+        type: file
+        required: true
+        description: JSON file containing team configuration
+    responses:
+      200:
+        description: Team configuration uploaded successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+            config_id:
+              type: string
+            team_id:
+              type: string
+            name:
+              type: string
+      400:
+        description: Invalid request or file format
+      401:
+        description: Missing or invalid user information
+      500:
+        description: Internal server error
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    # Validate file is provided and is JSON
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    if not file.filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="File must be a JSON file")
+
+    try:
+        # Read and parse JSON content
+        content = await file.read()
+        try:
+            json_data = json.loads(content.decode("utf-8"))
+        except json.JSONDecodeError as e:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid JSON format: {str(e)}"
+            )
+
+        # Initialize memory store and service
+        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        json_service = JsonService(memory_store)
+
+        # Validate and parse the team configuration
+        try:
+            team_config = await json_service.validate_and_parse_team_config(
+                json_data, user_id
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # Save the configuration
+        try:
+            config_id = await json_service.save_team_configuration(team_config)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to save configuration: {str(e)}"
+            )
+
+        # Track the event
+        track_event_if_configured(
+            "Team configuration uploaded",
+            {
+                "status": "success",
+                "config_id": config_id,
+                "team_id": team_config.team_id,
+                "user_id": user_id,
+                "agents_count": len(team_config.agents),
+                "tasks_count": len(team_config.starting_tasks),
+            },
+        )
+
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "team_id": team_config.team_id,
+            "name": team_config.name,
+            "message": "Team configuration uploaded and saved successfully",
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log and return generic error for unexpected exceptions
+        logging.error(f"Unexpected error uploading team configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app.get("/api/team_configs")
+async def get_team_configs_endpoint(request: Request):
+    """
+    Retrieve all team configurations for the current user.
+
+    ---
+    tags:
+      - Team Configuration
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    responses:
+      200:
+        description: List of team configurations for the user
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              team_id:
+                type: string
+              name:
+                type: string
+              status:
+                type: string
+              created:
+                type: string
+              created_by:
+                type: string
+              description:
+                type: string
+              logo:
+                type: string
+              plan:
+                type: string
+              agents:
+                type: array
+              starting_tasks:
+                type: array
+      401:
+        description: Missing or invalid user information
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    try:
+        # Initialize memory store and service
+        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        json_service = JsonService(memory_store)
+
+        # Retrieve all team configurations
+        team_configs = await json_service.get_all_team_configurations(user_id)
+
+        # Convert to dictionaries for response
+        configs_dict = [config.model_dump() for config in team_configs]
+
+        return configs_dict
+
+    except Exception as e:
+        logging.error(f"Error retrieving team configurations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app.get("/api/team_configs/{config_id}")
+async def get_team_config_by_id_endpoint(config_id: str, request: Request):
+    """
+    Retrieve a specific team configuration by ID.
+
+    ---
+    tags:
+      - Team Configuration
+    parameters:
+      - name: config_id
+        in: path
+        type: string
+        required: true
+        description: The ID of the team configuration to retrieve
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    responses:
+      200:
+        description: Team configuration details
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            team_id:
+              type: string
+            name:
+              type: string
+            status:
+              type: string
+            created:
+              type: string
+            created_by:
+              type: string
+            description:
+              type: string
+            logo:
+              type: string
+            plan:
+              type: string
+            agents:
+              type: array
+            starting_tasks:
+              type: array
+      401:
+        description: Missing or invalid user information
+      404:
+        description: Team configuration not found
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    try:
+        # Initialize memory store and service
+        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        json_service = JsonService(memory_store)
+
+        # Retrieve the specific team configuration
+        team_config = await json_service.get_team_configuration(config_id, user_id)
+
+        if team_config is None:
+            raise HTTPException(status_code=404, detail="Team configuration not found")
+
+        # Convert to dictionary for response
+        return team_config.model_dump()
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logging.error(f"Error retrieving team configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app.delete("/api/team_configs/{config_id}")
+async def delete_team_config_endpoint(config_id: str, request: Request):
+    """
+    Delete a team configuration by ID.
+
+    ---
+    tags:
+      - Team Configuration
+    parameters:
+      - name: config_id
+        in: path
+        type: string
+        required: true
+        description: The ID of the team configuration to delete
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    responses:
+      200:
+        description: Team configuration deleted successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+            message:
+              type: string
+            config_id:
+              type: string
+      401:
+        description: Missing or invalid user information
+      404:
+        description: Team configuration not found
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    try:
+        # Initialize memory store and service
+        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        json_service = JsonService(memory_store)
+
+        # Delete the team configuration
+        deleted = await json_service.delete_team_configuration(config_id, user_id)
+
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Team configuration not found")
+
+        # Track the event
+        track_event_if_configured(
+            "Team configuration deleted",
+            {"status": "success", "config_id": config_id, "user_id": user_id},
+        )
+
+        return {
+            "status": "success",
+            "message": "Team configuration deleted successfully",
+            "config_id": config_id,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logging.error(f"Error deleting team configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 
 # Run the app

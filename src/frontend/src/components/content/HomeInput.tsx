@@ -14,6 +14,7 @@ import "./../../styles/HomeInput.css";
 import { HomeInputProps, quickTasks, QuickTask } from "../../models/homeInput";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
+import { RAIErrorCard, RAIErrorData } from "../errors";
 
 import ChatInput from "@/coral/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
@@ -26,6 +27,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
 }) => {
     const [submitting, setSubmitting] = useState(false);
     const [input, setInput] = useState("");
+    const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const navigate = useNavigate();
@@ -40,6 +42,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
 
     const resetTextarea = () => {
         setInput("");
+        setRAIError(null); // Clear any RAI errors
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
             textareaRef.current.focus();
@@ -54,10 +57,11 @@ const HomeInput: React.FC<HomeInputProps> = ({
     const handleSubmit = async () => {
         if (input.trim()) {
             setSubmitting(true);
+            setRAIError(null); // Clear any previous RAI errors
             let id = showToast("Creating a plan", "progress");
 
             try {
-                const response = await TaskService.submitInputTask(input.trim());
+                const response = await TaskService.createPlan(input.trim());
                 setInput("");
 
                 if (textareaRef.current) {
@@ -67,14 +71,41 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 if (response.plan_id && response.plan_id !== null) {
                     showToast("Plan created!", "success");
                     dismissToast(id);
-                    navigate(`/plan/${response.plan_id}`);
+                    navigate(`/plan/${response.plan_id}/create`);
                 } else {
                     showToast("Failed to create plan", "error");
                     dismissToast(id);
                 }
-            } catch (error:any) {
+            } catch (error: any) {
                 dismissToast(id);
-                showToast(JSON.parse(error?.message)?.detail, "error");
+                
+                // Check if this is an RAI validation error
+                let errorDetail = null;
+                try {
+                    // Try to parse the error detail if it's a string
+                    if (typeof error?.response?.data?.detail === 'string') {
+                        errorDetail = JSON.parse(error.response.data.detail);
+                    } else {
+                        errorDetail = error?.response?.data?.detail;
+                    }
+                } catch (parseError) {
+                    // If parsing fails, use the original error
+                    errorDetail = error?.response?.data?.detail;
+                }
+
+                // Handle RAI validation errors with better UX
+                if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
+                    setRAIError(errorDetail);
+                } else {
+                    // Handle other errors with toast messages
+                    const errorMessage = errorDetail?.description || 
+                                        errorDetail?.message || 
+                                        error?.response?.data?.message ||
+                                        error?.message || 
+                                        "Something went wrong";
+                    showToast(errorMessage, "error");
+                }
+
             } finally {
                 setInput("");
                 setSubmitting(false);
@@ -84,6 +115,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
 
     const handleQuickTaskClick = (task: QuickTask) => {
         setInput(task.description);
+        setRAIError(null); // Clear any RAI errors when selecting a quick task
         if (textareaRef.current) {
             textareaRef.current.focus();
         }
@@ -104,6 +136,20 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     <div className="home-input-title-wrapper">
                         <Title2>How can I help?</Title2>
                     </div>
+
+                    {/* Show RAI error if present */}
+                    {raiError && (
+                        <RAIErrorCard
+                            error={raiError}
+                            onRetry={() => {
+                                setRAIError(null);
+                                if (textareaRef.current) {
+                                    textareaRef.current.focus();
+                                }
+                            }}
+                            onDismiss={() => setRAIError(null)}
+                        />
+                    )}
 
                     <ChatInput
                         ref={textareaRef} // forwarding
