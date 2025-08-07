@@ -36,8 +36,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
   selectedTeam,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [defaultTeams, setDefaultTeams] = useState<TeamConfig[]>([]);
-  const [userTeams, setUserTeams] = useState<TeamConfig[]>([]);
+  const [teams, setTeams] = useState<TeamConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,12 +46,9 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const [defaultTeamsData, userTeamsData] = await Promise.all([
-        TeamService.getDefaultTeams(),
-        TeamService.getUserTeams(),
-      ]);
-      setDefaultTeams(defaultTeamsData);
-      setUserTeams(userTeamsData);
+      // Get all teams from the API (no separation between default and user teams)
+      const teamsData = await TeamService.getUserTeams();
+      setTeams(teamsData);
     } catch (err: any) {
       setError(err.message || 'Failed to load teams');
     } finally {
@@ -310,14 +306,9 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
                 display: 'block',
                 width: '100%'
               }}>
-                {defaultTeams.map((team) => (
+                {teams.map((team) => (
                   <div key={team.team_id} style={{ marginBottom: '8px', width: '100%' }}>
-                    {renderTeamCard(team)}
-                  </div>
-                ))}
-                {userTeams.map((team) => (
-                  <div key={team.team_id} style={{ marginBottom: '8px', width: '100%' }}>
-                    {renderTeamCard(team, true)}
+                    {renderTeamCard(team, team.created_by !== 'system')}
                   </div>
                 ))}
               </div>

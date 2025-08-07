@@ -12,6 +12,7 @@ import "../../styles/prism-material-oceanic.css";
 import "./../../styles/HomeInput.css";
 
 import { HomeInputProps, quickTasks, QuickTask } from "../../models/homeInput";
+import { TeamConfig } from "../../models/Team";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
 import { RAIErrorCard, RAIErrorData } from "../errors";
@@ -24,6 +25,7 @@ import { Send } from "@/coral/imports/bundleicons";
 const HomeInput: React.FC<HomeInputProps> = ({
     onInputSubmit,
     onQuickTaskSelect,
+    selectedTeam,
 }) => {
     const [submitting, setSubmitting] = useState(false);
     const [input, setInput] = useState("");
@@ -129,12 +131,35 @@ const HomeInput: React.FC<HomeInputProps> = ({
         }
     }, [input]);
 
+    // Convert team starting_tasks to QuickTask format or use default
+    const tasksToDisplay: QuickTask[] = selectedTeam ? 
+        selectedTeam.starting_tasks.map((task, index) => ({
+            id: `team-task-${index}`,
+            title: task,
+            description: task,
+            icon: quickTasks[index % quickTasks.length]?.icon || quickTasks[0].icon
+        })) : quickTasks;
+
     return (
         <div className="home-input-container">
             <div className="home-input-content">
                 <div className="home-input-center-content">
                     <div className="home-input-title-wrapper">
                         <Title2>How can I help?</Title2>
+                        {selectedTeam && (
+                            <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                marginTop: '8px',
+                                justifyContent: 'center'
+                            }}>
+                                <span style={{ fontSize: '20px' }}>{selectedTeam.logo}</span>
+                                <Body1Strong style={{ color: '#666' }}>
+                                    {selectedTeam.name}
+                                </Body1Strong>
+                            </div>
+                        )}
                     </div>
 
                     {/* Show RAI error if present */}
@@ -176,7 +201,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                         </div>
 
                         <div className="home-input-quick-tasks">
-                            {quickTasks.map((task) => (
+                            {tasksToDisplay.map((task) => (
                                 <PromptCard
                                     key={task.id}
                                     title={task.title}

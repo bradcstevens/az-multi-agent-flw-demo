@@ -124,6 +124,7 @@ const HomePage: React.FC = () => {
                         <HomeInput
                             onInputSubmit={handleNewTask}
                             onQuickTaskSelect={handleNewTask}
+                            selectedTeam={selectedTeam}
                         />
                     </Content>
 
