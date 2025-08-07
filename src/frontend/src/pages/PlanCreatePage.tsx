@@ -23,12 +23,13 @@ import PanelRightToggles from "@/coral/components/Header/PanelRightToggles";
 import { TaskListSquareLtr } from "@/coral/imports/bundleicons";
 import LoadingMessage, { loadingMessages } from "@/coral/components/LoadingMessage";
 import { RAIErrorCard, RAIErrorData } from "../components/errors";
+import { apiClient } from "../api/apiClient";
 
 /**
- * Page component for displaying a specific plan
- * Accessible via the route /plan/{plan_id}
+ * Page component for creating and viewing a plan being generated
+ * Accessible via the route /plan/{plan_id}/create
  */
-const PlanPage: React.FC = () => {
+const PlanCreatePage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
     const { showToast, dismissToast } = useInlineToaster();
@@ -44,6 +45,7 @@ const PlanPage: React.FC = () => {
     );
     const [reloadLeftList, setReloadLeftList] = useState(true);
     const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
+    const [planGenerated, setPlanGenerated] = useState<boolean>(false);
 
     const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
 
@@ -58,13 +60,42 @@ const PlanPage: React.FC = () => {
         return () => clearInterval(interval);
     }, [loading]);
 
-
     useEffect(() => {
         const currentPlan = allPlans.find(
             (plan) => plan.plan.id === planId
         );
         setPlanData(currentPlan || null);
-    }, [allPlans,planId]);
+    }, [allPlans, planId]);
+
+    const generatePlan = useCallback(async () => {
+        if (!planId) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+            
+            let toastId = showToast("Generating plan steps...", "progress");
+            
+            // Call the generate_plan endpoint using apiClient for proper authentication
+            const result = await apiClient.post('/generate_plan', {
+                plan_id: planId
+            });
+
+            dismissToast(toastId);
+            showToast("Plan generated successfully!", "success");
+            setPlanGenerated(true);
+            
+            // Now load the plan data to display it
+            await loadPlanData(false);
+            
+        } catch (err) {
+            console.error("Failed to generate plan:", err);
+            setError(
+                err instanceof Error ? err : new Error("Failed to generate plan")
+            );
+            setLoading(false);
+        }
+    }, [planId, showToast, dismissToast]);
 
     const loadPlanData = useCallback(
         async (navigate: boolean = true) => {
@@ -80,7 +111,7 @@ const PlanPage: React.FC = () => {
                 }
 
                 setError(null);
-                const data = await PlanDataService.fetchPlanData(planId,navigate);
+                const data = await PlanDataService.fetchPlanData(planId, navigate);
                 let plans = [...allPlans];
                 const existingIndex = plans.findIndex(p => p.plan.id === data.plan.id);
                 if (existingIndex !== -1) {
@@ -89,7 +120,12 @@ const PlanPage: React.FC = () => {
                     plans.push(data);
                 }
                 setAllPlans(plans);
-                //setPlanData(data);
+                
+                // If plan has steps and we haven't generated yet, mark as generated
+                if (data.plan.steps && data.plan.steps.length > 0 && !planGenerated) {
+                    setPlanGenerated(true);
+                }
+                
             } catch (err) {
                 console.log("Failed to load plan data:", err);
                 setError(
@@ -99,12 +135,11 @@ const PlanPage: React.FC = () => {
                 setLoading(false);
             }
         },
-        [planId]
+        [planId, allPlans, planGenerated]
     );
 
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
-
             if (!chatInput.trim()) {
                 showToast("Please enter a clarification", "error");
                 return;
@@ -181,10 +216,21 @@ const PlanPage: React.FC = () => {
         [loadPlanData]
     );
 
-
     useEffect(() => {
-        loadPlanData(true);
-    }, [loadPlanData]);
+        const initializePage = async () => {
+            // Load the basic plan data first
+            await loadPlanData(true);
+        };
+        
+        initializePage();
+    }, []);
+
+    // Separate effect for plan generation when plan data is loaded
+    useEffect(() => {
+        if (planData && (!planData.plan.steps || planData.plan.steps.length === 0) && !planGenerated && !loading) {
+            generatePlan();
+        }
+    }, [planData, planGenerated, loading]);
 
     const handleNewTaskButton = () => {
         NewTaskService.handleNewTaskFromPlan(navigate);
@@ -208,15 +254,14 @@ const PlanPage: React.FC = () => {
                     {loading ? (
                         <>
                             <LoadingMessage
-                                loadingMessage={loadingMessage}
+                                loadingMessage={planGenerated ? loadingMessage : "Generating your plan..."}
                                 iconSrc={Octo}
                             />
                         </>
                     ) : (
                         <>
                             <ContentToolbar
-                                panelTitle={planData?.plan?.initial_goal || "Plan Details"}
-                            // panelIcon={<ChatMultiple20Regular />}
+                                panelTitle={planData?.plan?.initial_goal || "Plan Creation"}
                             >
                                 <PanelRightToggles>
                                     <ToggleButton
@@ -263,4 +308,4 @@ const PlanPage: React.FC = () => {
     );
 };
 
-export default PlanPage;
+export default PlanCreatePage;

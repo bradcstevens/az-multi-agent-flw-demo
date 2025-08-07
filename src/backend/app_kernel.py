@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 from typing import Dict, List, Optional
 
@@ -27,6 +28,7 @@ from middleware.health_check import HealthCheckMiddleware
 from models.messages_kernel import (
     AgentMessage,
     AgentType,
+    GeneratePlanRequest,
     HumanClarification,
     HumanFeedback,
     InputTask,
@@ -188,14 +190,22 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
         track_event_if_configured(
             "RAI failed",
             {
-                "status": "Plan not created",
+                "status": "Plan not created - RAI validation failed",
                 "description": input_task.description,
                 "session_id": input_task.session_id,
             },
         )
 
         return {
-            "status": "Plan not created",
+            "status": "RAI_VALIDATION_FAILED",
+            "message": "Content Safety Check Failed",
+            "detail": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+            "suggestions": [
+                "Remove any potentially harmful, inappropriate, or unsafe content",
+                "Use more professional and constructive language",
+                "Focus on legitimate business or educational objectives",
+                "Ensure your request complies with content policies",
+            ],
         }
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -345,7 +355,7 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
               description: Error message
     """
     # Perform RAI check on the description
-    if not await rai_success(input_task.description):
+    if not await rai_success(input_task.description, False):
         track_event_if_configured(
             "RAI failed",
             {
@@ -356,7 +366,18 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
         )
         raise HTTPException(
             status_code=400,
-            detail="Task description failed safety validation. Please revise your request.",
+            detail={
+                "error_type": "RAI_VALIDATION_FAILED",
+                "message": "Content Safety Check Failed",
+                "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+                "suggestions": [
+                    "Remove any potentially harmful, inappropriate, or unsafe content",
+                    "Use more professional and constructive language",
+                    "Focus on legitimate business or educational objectives",
+                    "Ensure your request complies with content policies",
+                ],
+                "user_action": "Please revise your request and try again",
+            },
         )
 
     # Get authenticated user
@@ -418,6 +439,162 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
             },
         )
         raise HTTPException(status_code=400, detail=f"Error creating plan: {e}")
+
+
+@app.post("/api/generate_plan")
+async def generate_plan_endpoint(
+    generate_plan_request: GeneratePlanRequest, request: Request
+):
+    """
+    Generate plan steps for an existing plan using the planner agent.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            plan_id:
+              type: string
+              description: The ID of the existing plan to generate steps for
+    responses:
+      200:
+        description: Plan generation completed successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              description: Success message
+            plan_id:
+              type: string
+              description: The ID of the plan that was generated
+            steps_created:
+              type: integer
+              description: Number of steps created
+      400:
+        description: Invalid request or processing error
+        schema:
+          type: object
+          properties:
+            detail:
+              type: string
+              description: Error message
+      404:
+        description: Plan not found
+        schema:
+          type: object
+          properties:
+            detail:
+              type: string
+              description: Error message
+    """
+    # Get authenticated user
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+
+    if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    try:
+        # Initialize memory store
+        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+
+        # Get the existing plan
+        plan = await memory_store.get_plan_by_plan_id(
+            plan_id=generate_plan_request.plan_id
+        )
+        if not plan:
+            track_event_if_configured(
+                "GeneratePlanNotFound",
+                {
+                    "status_code": 404,
+                    "detail": "Plan not found",
+                    "plan_id": generate_plan_request.plan_id,
+                },
+            )
+            raise HTTPException(status_code=404, detail="Plan not found")
+
+        # Create the agents for this session
+        client = None
+        try:
+            client = config.get_ai_project_client()
+        except Exception as client_exc:
+            logging.error(f"Error creating AIProjectClient: {client_exc}")
+
+        agents = await AgentFactory.create_all_agents(
+            session_id=plan.session_id,
+            user_id=user_id,
+            memory_store=memory_store,
+            client=client,
+        )
+
+        # Get the group chat manager to process the plan
+        group_chat_manager = agents[AgentType.GROUP_CHAT_MANAGER.value]
+
+        # Create an InputTask from the plan's initial goal
+        input_task = InputTask(
+            session_id=plan.session_id, description=plan.initial_goal
+        )
+
+        # Use the group chat manager to generate the plan steps
+        await group_chat_manager.handle_input_task(input_task)
+
+        # Get the updated plan with steps
+        updated_plan = await memory_store.get_plan_by_plan_id(
+            plan_id=generate_plan_request.plan_id
+        )
+        steps = await memory_store.get_steps_by_plan(
+            plan_id=generate_plan_request.plan_id
+        )
+
+        # Log successful plan generation
+        track_event_if_configured(
+            "PlanGenerated",
+            {
+                "status": f"Plan generation completed for plan ID: {generate_plan_request.plan_id}",
+                "plan_id": generate_plan_request.plan_id,
+                "session_id": plan.session_id,
+                "steps_created": len(steps),
+            },
+        )
+
+        if client:
+            try:
+                client.close()
+            except Exception as e:
+                logging.error(f"Error closing AIProjectClient: {e}")
+
+        return {
+            "status": "Plan generation completed successfully",
+            "plan_id": generate_plan_request.plan_id,
+            "steps_created": len(steps),
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        track_event_if_configured(
+            "GeneratePlanError",
+            {
+                "plan_id": generate_plan_request.plan_id,
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=400, detail=f"Error generating plan: {e}")
 
 
 @app.post("/api/human_feedback")
@@ -588,12 +765,26 @@ async def human_clarification_endpoint(
         track_event_if_configured(
             "RAI failed",
             {
-                "status": "Clarification is not received",
+                "status": "Clarification rejected - RAI validation failed",
                 "description": human_clarification.human_clarification,
                 "session_id": human_clarification.session_id,
             },
         )
-        raise HTTPException(status_code=400, detail="Invalida Clarification")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "RAI_VALIDATION_FAILED",
+                "message": "Clarification Safety Check Failed",
+                "description": "Your clarification contains content that doesn't meet our safety guidelines. Please provide a more appropriate clarification.",
+                "suggestions": [
+                    "Use clear and professional language",
+                    "Avoid potentially harmful or inappropriate content",
+                    "Focus on providing constructive feedback or clarification",
+                    "Ensure your message complies with content policies",
+                ],
+                "user_action": "Please revise your clarification and try again",
+            },
+        )
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
