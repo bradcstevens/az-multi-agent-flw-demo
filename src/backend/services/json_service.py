@@ -1,5 +1,7 @@
+import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
@@ -34,16 +36,15 @@ class JsonService:
             required_fields = [
                 "name",
                 "status",
-                "created",
-                "created_by",
             ]
             for field in required_fields:
                 if field not in json_data:
                     raise ValueError(f"Missing required field: {field}")
 
-            # Generate unique IDs
+            # Generate unique IDs and timestamps
             unique_id = str(uuid.uuid4())
             unique_team_id = str(uuid.uuid4())
+            current_timestamp = datetime.now(timezone.utc).isoformat()
 
             # Validate agents array exists and is not empty
             if "agents" not in json_data or not isinstance(json_data["agents"], list):
@@ -83,8 +84,8 @@ class JsonService:
                 team_id=unique_team_id,  # Use generated GUID
                 name=json_data["name"],
                 status=json_data["status"],
-                created=json_data["created"],
-                created_by=json_data["created_by"],
+                created=current_timestamp,  # Use generated timestamp
+                created_by=user_id,  # Use user_id who uploaded the config
                 agents=agents,
                 description=json_data.get("description", ""),
                 logo=json_data.get("logo", ""),
@@ -151,10 +152,11 @@ class JsonService:
             # Convert to dictionary for storage
             config_dict = team_config.model_dump()
 
-            # Save to memory store
-            await self.memory_store.upsert_async(
-                f"team_config_{team_config.user_id}", config_dict
-            )
+            # Add the full JSON string for storage (with proper datetime serialization)
+            config_dict["json_data"] = json.dumps(config_dict, indent=2, default=str)
+
+            # Save to memory store using the config ID as the key
+            await self.memory_store.upsert_async(team_config.id, config_dict)
 
             self.logger.info(
                 "Successfully saved team configuration with ID: %s", team_config.id
@@ -179,16 +181,22 @@ class JsonService:
             TeamConfiguration object or None if not found
         """
         try:
-            # Query from memory store
-            configs = await self.memory_store.query_items(
-                f"team_config_{user_id}", limit=1000
-            )
+            # Get the specific configuration by its ID
+            config_dict = await self.memory_store.get_async(config_id)
 
-            for config_dict in configs:
-                if config_dict.get("id") == config_id:
-                    return TeamConfiguration.model_validate(config_dict)
+            if config_dict is None:
+                return None
 
-            return None
+            # Verify the configuration belongs to the user
+            if config_dict.get("user_id") != user_id:
+                self.logger.warning(
+                    "Access denied: config %s does not belong to user %s",
+                    config_id,
+                    user_id,
+                )
+                return None
+
+            return TeamConfiguration.model_validate(config_dict)
 
         except (KeyError, TypeError, ValueError) as e:
             self.logger.error("Error retrieving team configuration: %s", str(e))
@@ -207,9 +215,14 @@ class JsonService:
             List of TeamConfiguration objects
         """
         try:
-            # Query from memory store
-            configs = await self.memory_store.query_items(
-                f"team_config_{user_id}", limit=1000
+            # Query configurations using SQL with parameters
+            query = "SELECT * FROM c WHERE c.user_id=@user_id"
+            parameters = [
+                {"name": "@user_id", "value": user_id},
+            ]
+
+            configs = await self.memory_store.query_items_with_parameters(
+                query, parameters, limit=1000
             )
 
             team_configs = []
@@ -241,33 +254,26 @@ class JsonService:
             True if deleted successfully, False if not found
         """
         try:
-            # Get all configurations to find the one to delete
-            configs = await self.memory_store.query_items(
-                f"team_config_{user_id}", limit=1000
-            )
+            # First, verify the configuration exists and belongs to the user
+            config_dict = await self.memory_store.get_async(config_id)
 
-            # Find the configuration to delete
-            config_to_delete = None
-            remaining_configs = []
-
-            for config_dict in configs:
-                if config_dict.get("id") == config_id:
-                    config_to_delete = config_dict
-                else:
-                    remaining_configs.append(config_dict)
-
-            if config_to_delete is None:
+            if config_dict is None:
                 self.logger.warning(
                     "Team configuration not found for deletion: %s", config_id
                 )
                 return False
 
-            # Clear the collection
-            await self.memory_store.delete_collection_async(f"team_config_{user_id}")
+            # Verify the configuration belongs to the user
+            if config_dict.get("user_id") != user_id:
+                self.logger.warning(
+                    "Access denied: cannot delete config %s for user %s",
+                    config_id,
+                    user_id,
+                )
+                return False
 
-            # Re-add remaining configurations
-            for config in remaining_configs:
-                await self.memory_store.upsert_async(f"team_config_{user_id}", config)
+            # Delete the configuration
+            await self.memory_store.delete_async(config_id)
 
             self.logger.info("Successfully deleted team configuration: %s", config_id)
             return True
