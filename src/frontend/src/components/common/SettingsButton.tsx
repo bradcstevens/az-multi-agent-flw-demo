@@ -42,6 +42,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
   const [loading, setLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [tempSelectedTeam, setTempSelectedTeam] = useState<TeamConfig | null>(null);
 
   const loadTeams = async () => {
@@ -67,8 +68,12 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     if (open) {
       await loadTeams();
       setTempSelectedTeam(selectedTeam || null);
+      setError(null);
+      setUploadMessage(null);
     } else {
       setTempSelectedTeam(null);
+      setError(null);
+      setUploadMessage(null);
     }
   };
 
@@ -95,27 +100,37 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     console.log('SettingsButton: Starting file upload for:', file.name);
     setUploadLoading(true);
     setError(null);
+    setUploadMessage('Uploading and validating team configuration...');
 
     try {
       const result = await TeamService.uploadCustomTeam(file);
       console.log('SettingsButton: Upload result:', result);
+      
       if (result.success) {
         console.log('SettingsButton: Upload successful, reloading teams...');
+        setUploadMessage('Team uploaded successfully! Refreshing teams...');
         // Reload teams to include the new custom team
         await loadTeams();
         console.log('SettingsButton: Teams reloaded after upload');
+        setUploadMessage(null);
         // Notify parent component about the upload
         if (onTeamUpload) {
           console.log('SettingsButton: Notifying parent about upload...');
           await onTeamUpload();
         }
+      } else if (result.raiError) {
+        console.error('SettingsButton: Upload failed due to RAI validation:', result.raiError);
+        setError('Upload failed: Team configuration contains inappropriate content.');
+        setUploadMessage(null);
       } else {
         console.error('SettingsButton: Upload failed:', result.error);
         setError(result.error || 'Failed to upload team configuration');
+        setUploadMessage(null);
       }
     } catch (err: any) {
       console.error('SettingsButton: Upload exception:', err);
       setError(err.message || 'Failed to upload team configuration');
+      setUploadMessage(null);
     } finally {
       setUploadLoading(false);
       // Reset the input
@@ -308,8 +323,32 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
         <DialogContent style={{ width: '100%', padding: '0' }}>
           <DialogBody style={{ width: '100%', padding: '16px 24px', display: 'block' }}>
             {error && (
-              <div style={{ color: 'red', marginBottom: '16px' }}>
+              <div style={{ 
+                color: '#d13438', 
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: '#fdf2f2',
+                border: '1px solid #f5c6cb',
+                borderRadius: '4px'
+              }}>
                 <Text>{error}</Text>
+              </div>
+            )}
+
+            {uploadMessage && (
+              <div style={{ 
+                color: '#107c10', 
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: '#f3f9f3',
+                border: '1px solid #c6e7c6',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Spinner size="extra-small" />
+                <Text>{uploadMessage}</Text>
               </div>
             )}
 

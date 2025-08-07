@@ -5,7 +5,7 @@ export class TeamService {
     /**
      * Upload a custom team configuration
      */
-    static async uploadCustomTeam(teamFile: File): Promise<{ success: boolean; team?: TeamConfig; error?: string }> {
+    static async uploadCustomTeam(teamFile: File): Promise<{ success: boolean; team?: TeamConfig; error?: string; raiError?: any }> {
         try {
             console.log('TeamService: Starting team upload for file:', teamFile.name);
             const formData = new FormData();
@@ -23,9 +23,31 @@ export class TeamService {
         } catch (error: any) {
             console.error('TeamService: Upload failed:', error);
             console.error('TeamService: Upload error details:', error.response?.data);
+            
+            // Check if this is an RAI validation error
+            const errorDetail = error.response?.data?.detail || error.response?.data;
+            
+            // If the error message contains "inappropriate content", treat it as RAI error
+            if (typeof errorDetail === 'string' && errorDetail.includes('inappropriate content')) {
+                return {
+                    success: false,
+                    raiError: {
+                        error_type: 'RAI_VALIDATION_FAILED',
+                        message: errorDetail,
+                        description: errorDetail
+                    }
+                };
+            }
+            
+            // Get error message from the response
+            let errorMessage = error.message || 'Failed to upload team configuration';
+            if (error.response?.data?.detail) {
+                errorMessage = error.response.data.detail;
+            }
+            
             return {
                 success: false,
-                error: error.message || 'Failed to upload team configuration'
+                error: errorMessage
             };
         }
     }

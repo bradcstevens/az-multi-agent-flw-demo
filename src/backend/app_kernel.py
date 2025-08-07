@@ -42,7 +42,7 @@ from models.messages_kernel import (
 from services.json_service import JsonService
 
 # Updated import for KernelArguments
-from utils_kernel import initialize_runtime_and_context, rai_success
+from utils_kernel import initialize_runtime_and_context, rai_success, rai_validate_team_config
 
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
@@ -1475,6 +1475,34 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
             raise HTTPException(
                 status_code=400, detail=f"Invalid JSON format: {str(e)}"
             )
+
+        # Validate content with RAI before processing
+        rai_valid, rai_error = await rai_validate_team_config(json_data)
+        if not rai_valid:
+            # Track RAI validation failure
+            track_event_if_configured(
+                "Team configuration RAI validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "reason": rai_error,
+                },
+            )
+            raise HTTPException(
+                status_code=400, 
+                detail=rai_error
+            )
+        
+        # Track successful RAI validation
+        track_event_if_configured(
+            "Team configuration RAI validation passed",
+            {
+                "status": "passed",
+                "user_id": user_id,
+                "filename": file.filename,
+            },
+        )
 
         # Initialize memory store and service
         kernel, memory_store = await initialize_runtime_and_context("", user_id)

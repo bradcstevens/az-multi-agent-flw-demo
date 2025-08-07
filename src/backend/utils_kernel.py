@@ -293,3 +293,68 @@ async def rai_success(description: str, is_task_creation: bool) -> bool:
         logging.error(f"Error in RAI check: {str(e)}")
         # Default to blocking the operation if RAI check fails for safety
         return False
+
+
+async def rai_validate_team_config(team_config_json: dict) -> tuple[bool, str]:
+    """
+    Validates team configuration JSON content for RAI compliance.
+    
+    Args:
+        team_config_json: The team configuration JSON data to validate
+        
+    Returns:
+        Tuple of (is_valid, error_message)
+        - is_valid: True if content passes RAI checks, False otherwise
+        - error_message: Simple error message if validation fails
+    """
+    try:
+        # Extract all text content from the team configuration
+        text_content = []
+        
+        # Extract team name and description
+        if "name" in team_config_json:
+            text_content.append(team_config_json["name"])
+        if "description" in team_config_json:
+            text_content.append(team_config_json["description"])
+        
+        # Extract agent information
+        if "agents" in team_config_json:
+            for agent in team_config_json["agents"]:
+                if isinstance(agent, dict):
+                    if "name" in agent:
+                        text_content.append(agent["name"])
+                    if "description" in agent:
+                        text_content.append(agent["description"])
+                    if "role" in agent:
+                        text_content.append(agent["role"])
+                    if "capabilities" in agent and isinstance(agent["capabilities"], list):
+                        text_content.extend(agent["capabilities"])
+        
+        # Extract starting tasks
+        if "starting_tasks" in team_config_json:
+            for task in team_config_json["starting_tasks"]:
+                if isinstance(task, str):
+                    text_content.append(task)
+                elif isinstance(task, dict):
+                    if "name" in task:
+                        text_content.append(task["name"])
+                    if "prompt" in task:
+                        text_content.append(task["prompt"])
+        
+        # Combine all text content for validation
+        combined_content = " ".join(text_content)
+        
+        if not combined_content.strip():
+            return False, "Team configuration contains no readable text content"
+        
+        # Use existing RAI validation function
+        rai_result = await rai_success(combined_content, False)
+        
+        if not rai_result:
+            return False, "Team configuration contains inappropriate content and cannot be uploaded."
+        
+        return True, ""
+        
+    except Exception as e:
+        logging.error(f"Error validating team configuration with RAI: {str(e)}")
+        return False, "Unable to validate team configuration content. Please try again."
