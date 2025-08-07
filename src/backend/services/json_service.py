@@ -42,7 +42,6 @@ class JsonService:
                     raise ValueError(f"Missing required field: {field}")
 
             # Generate unique IDs and timestamps
-            unique_id = str(uuid.uuid4())
             unique_team_id = str(uuid.uuid4())
             current_timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -80,7 +79,7 @@ class JsonService:
 
             # Create team configuration
             team_config = TeamConfiguration(
-                id=unique_id,  # Use generated GUID
+                id=unique_team_id,  # Use generated GUID
                 team_id=unique_team_id,  # Use generated GUID
                 name=json_data["name"],
                 status=json_data["status"],
@@ -216,7 +215,7 @@ class JsonService:
         """
         try:
             # Query configurations using SQL with parameters
-            query = "SELECT * FROM c WHERE c.user_id=@user_id"
+            query = "SELECT * FROM memory WHERE memory.user_id=@user_id"
             parameters = [
                 {"name": "@user_id", "value": user_id},
             ]
