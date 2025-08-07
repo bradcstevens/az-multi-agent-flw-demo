@@ -73,7 +73,13 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 if (response.plan_id && response.plan_id !== null) {
                     showToast("Plan created!", "success");
                     dismissToast(id);
-                    navigate(`/plan/${response.plan_id}/create`);
+                    
+                    // Navigate with team ID if a team is selected
+                    const navPath = selectedTeam 
+                        ? `/plan/${response.plan_id}/create/${selectedTeam.team_id}`
+                        : `/plan/${response.plan_id}/create`;
+                    console.log('HomeInput: Navigating to:', navPath, 'with team:', selectedTeam?.name);
+                    navigate(navPath);
                 } else {
                     showToast("Failed to create plan", "error");
                     dismissToast(id);
@@ -133,12 +139,26 @@ const HomeInput: React.FC<HomeInputProps> = ({
 
     // Convert team starting_tasks to QuickTask format or use default
     const tasksToDisplay: QuickTask[] = selectedTeam ? 
-        selectedTeam.starting_tasks.map((task, index) => ({
-            id: `team-task-${index}`,
-            title: task,
-            description: task,
-            icon: quickTasks[index % quickTasks.length]?.icon || quickTasks[0].icon
-        })) : quickTasks;
+        selectedTeam.starting_tasks.map((task, index) => {
+            // Handle both string tasks and StartingTask objects
+            if (typeof task === 'string') {
+                return {
+                    id: `team-task-${index}`,
+                    title: task,
+                    description: task,
+                    icon: quickTasks[index % quickTasks.length]?.icon || quickTasks[0].icon
+                };
+            } else {
+                // Handle StartingTask objects
+                const startingTask = task as any; // Type assertion for now
+                return {
+                    id: startingTask.id || `team-task-${index}`,
+                    title: startingTask.name || startingTask.prompt || 'Task',
+                    description: startingTask.prompt || startingTask.name || 'Task description',
+                    icon: startingTask.logo || quickTasks[index % quickTasks.length]?.icon || quickTasks[0].icon
+                };
+            }
+        }) : quickTasks;
 
     return (
         <div className="home-input-container">
@@ -146,20 +166,6 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 <div className="home-input-center-content">
                     <div className="home-input-title-wrapper">
                         <Title2>How can I help?</Title2>
-                        {selectedTeam && (
-                            <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '8px', 
-                                marginTop: '8px',
-                                justifyContent: 'center'
-                            }}>
-                                <span style={{ fontSize: '20px' }}>{selectedTeam.logo}</span>
-                                <Body1Strong style={{ color: '#666' }}>
-                                    {selectedTeam.name}
-                                </Body1Strong>
-                            </div>
-                        )}
                     </div>
 
                     {/* Show RAI error if present */}

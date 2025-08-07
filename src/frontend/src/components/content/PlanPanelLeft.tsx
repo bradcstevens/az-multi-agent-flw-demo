@@ -35,6 +35,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   reloadTasks, 
   restReload, 
   onTeamSelect, 
+  onTeamUpload,
   selectedTeam: parentSelectedTeam 
 }) => {
   const { dispatchToast } = useToastController("toast");
@@ -155,6 +156,18 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
           <Tooltip content="New task" relationship={"label"} />
         </PanelLeftToolbar>
 
+        {/* Team Display Section */}
+        {selectedTeam && (
+          <div style={{ 
+            padding: '8px 16px',
+            textAlign: 'left'
+          }}>
+            <Body1Strong style={{ color: 'white', fontSize: '14px' }}>
+              {selectedTeam.name}
+            </Body1Strong>
+          </div>
+        )}
+
         <br />
         <div
           className="tab tab-new-task"
@@ -188,6 +201,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
             {/* Settings Button on top */}
             <SettingsButton
               onTeamSelect={handleTeamSelect}
+              onTeamUpload={onTeamUpload}
               selectedTeam={selectedTeam}
             />
             {/* User Card below */}

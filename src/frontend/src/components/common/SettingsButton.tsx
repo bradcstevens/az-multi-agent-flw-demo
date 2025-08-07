@@ -28,11 +28,13 @@ import { TeamService } from '../../services/TeamService';
 
 interface SettingsButtonProps {
   onTeamSelect?: (team: TeamConfig) => void;
+  onTeamUpload?: () => Promise<void>;
   selectedTeam?: TeamConfig | null;
 }
 
 const SettingsButton: React.FC<SettingsButtonProps> = ({
   onTeamSelect,
+  onTeamUpload,
   selectedTeam,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -46,10 +48,14 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     setLoading(true);
     setError(null);
     try {
+      console.log('SettingsButton: Loading teams...');
       // Get all teams from the API (no separation between default and user teams)
       const teamsData = await TeamService.getUserTeams();
+      console.log('SettingsButton: Teams loaded:', teamsData);
+      console.log('SettingsButton: Number of teams:', teamsData.length);
       setTeams(teamsData);
     } catch (err: any) {
+      console.error('SettingsButton: Error loading teams:', err);
       setError(err.message || 'Failed to load teams');
     } finally {
       setLoading(false);
@@ -86,18 +92,29 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    console.log('SettingsButton: Starting file upload for:', file.name);
     setUploadLoading(true);
     setError(null);
 
     try {
       const result = await TeamService.uploadCustomTeam(file);
+      console.log('SettingsButton: Upload result:', result);
       if (result.success) {
+        console.log('SettingsButton: Upload successful, reloading teams...');
         // Reload teams to include the new custom team
         await loadTeams();
+        console.log('SettingsButton: Teams reloaded after upload');
+        // Notify parent component about the upload
+        if (onTeamUpload) {
+          console.log('SettingsButton: Notifying parent about upload...');
+          await onTeamUpload();
+        }
       } else {
+        console.error('SettingsButton: Upload failed:', result.error);
         setError(result.error || 'Failed to upload team configuration');
       }
     } catch (err: any) {
+      console.error('SettingsButton: Upload exception:', err);
       setError(err.message || 'Failed to upload team configuration');
     } finally {
       setUploadLoading(false);

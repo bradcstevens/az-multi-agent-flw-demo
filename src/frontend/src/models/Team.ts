@@ -6,6 +6,15 @@ export interface Agent {
     role?: string;
 }
 
+export interface StartingTask {
+    id: string;
+    name: string;
+    prompt: string;
+    created: string;
+    creator: string;
+    logo: string;
+}
+
 export interface Team {
     id: string;
     name: string;
@@ -27,7 +36,7 @@ export interface TeamConfig {
     logo: string;
     plan: string;
     agents: Agent[];
-    starting_tasks: string[];
+    starting_tasks: (string | StartingTask)[];
 }
 
 export interface TeamUploadResponse {

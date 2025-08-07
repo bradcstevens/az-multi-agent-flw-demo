@@ -5,5 +5,6 @@ export interface PlanPanelLefProps {
     onNewTaskButton: () => void;
     restReload?: () => void;
     onTeamSelect?: (team: TeamConfig) => void;
+    onTeamUpload?: () => Promise<void>;
     selectedTeam?: TeamConfig | null;
 }
