@@ -81,7 +81,9 @@ frontend_url = Config.FRONTEND_SITE_NAME
 # Add this near the top of your app.py, after initializing the app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url],
+    allow_origins=[
+        frontend_url
+    ],  # Allow all origins for development; restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -202,8 +204,8 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
                 "Remove any potentially harmful, inappropriate, or unsafe content",
                 "Use more professional and constructive language",
                 "Focus on legitimate business or educational objectives",
-                "Ensure your request complies with content policies"
-            ]
+                "Ensure your request complies with content policies",
+            ],
         }
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -287,9 +289,7 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
                 r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg
             )
             if match:
-                error_msg = (
-                    f"Rate limit is exceeded. Try again in {match.group(1)} seconds."
-                )
+                error_msg = "Application temporarily unavailable due to quota limits. Please try again later."
 
         track_event_if_configured(
             "InputTaskError",
@@ -308,7 +308,7 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
 async def create_plan_endpoint(input_task: InputTask, request: Request):
     """
     Create a new plan without full processing.
-    
+
     ---
     tags:
       - Plans
@@ -365,19 +365,19 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
             },
         )
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail={
                 "error_type": "RAI_VALIDATION_FAILED",
                 "message": "Content Safety Check Failed",
                 "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
                 "suggestions": [
                     "Remove any potentially harmful, inappropriate, or unsafe content",
-                    "Use more professional and constructive language", 
+                    "Use more professional and constructive language",
                     "Focus on legitimate business or educational objectives",
-                    "Ensure your request complies with content policies"
+                    "Ensure your request complies with content policies",
                 ],
-                "user_action": "Please revise your request and try again"
-            }
+                "user_action": "Please revise your request and try again",
+            },
         )
 
     # Get authenticated user
@@ -406,7 +406,7 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
             user_id=user_id,
             initial_goal=input_task.description,
             overall_status=PlanStatus.in_progress,
-            source=AgentType.PLANNER.value
+            source=AgentType.PLANNER.value,
         )
 
         # Save the plan to the database
@@ -442,10 +442,12 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
 
 
 @app.post("/api/generate_plan")
-async def generate_plan_endpoint(generate_plan_request: GeneratePlanRequest, request: Request):
+async def generate_plan_endpoint(
+    generate_plan_request: GeneratePlanRequest, request: Request
+):
     """
     Generate plan steps for an existing plan using the planner agent.
-    
+
     ---
     tags:
       - Plans
@@ -511,11 +513,17 @@ async def generate_plan_endpoint(generate_plan_request: GeneratePlanRequest, req
         kernel, memory_store = await initialize_runtime_and_context("", user_id)
 
         # Get the existing plan
-        plan = await memory_store.get_plan_by_plan_id(plan_id=generate_plan_request.plan_id)
+        plan = await memory_store.get_plan_by_plan_id(
+            plan_id=generate_plan_request.plan_id
+        )
         if not plan:
             track_event_if_configured(
                 "GeneratePlanNotFound",
-                {"status_code": 404, "detail": "Plan not found", "plan_id": generate_plan_request.plan_id}
+                {
+                    "status_code": 404,
+                    "detail": "Plan not found",
+                    "plan_id": generate_plan_request.plan_id,
+                },
             )
             raise HTTPException(status_code=404, detail="Plan not found")
 
@@ -538,16 +546,19 @@ async def generate_plan_endpoint(generate_plan_request: GeneratePlanRequest, req
 
         # Create an InputTask from the plan's initial goal
         input_task = InputTask(
-            session_id=plan.session_id,
-            description=plan.initial_goal
+            session_id=plan.session_id, description=plan.initial_goal
         )
 
         # Use the group chat manager to generate the plan steps
         await group_chat_manager.handle_input_task(input_task)
 
         # Get the updated plan with steps
-        updated_plan = await memory_store.get_plan_by_plan_id(plan_id=generate_plan_request.plan_id)
-        steps = await memory_store.get_steps_by_plan(plan_id=generate_plan_request.plan_id)
+        updated_plan = await memory_store.get_plan_by_plan_id(
+            plan_id=generate_plan_request.plan_id
+        )
+        steps = await memory_store.get_steps_by_plan(
+            plan_id=generate_plan_request.plan_id
+        )
 
         # Log successful plan generation
         track_event_if_configured(
@@ -760,7 +771,7 @@ async def human_clarification_endpoint(
             },
         )
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail={
                 "error_type": "RAI_VALIDATION_FAILED",
                 "message": "Clarification Safety Check Failed",
@@ -769,10 +780,10 @@ async def human_clarification_endpoint(
                     "Use clear and professional language",
                     "Avoid potentially harmful or inappropriate content",
                     "Focus on providing constructive feedback or clarification",
-                    "Ensure your message complies with content policies"
+                    "Ensure your message complies with content policies",
                 ],
-                "user_action": "Please revise your clarification and try again"
-            }
+                "user_action": "Please revise your clarification and try again",
+            },
         )
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)

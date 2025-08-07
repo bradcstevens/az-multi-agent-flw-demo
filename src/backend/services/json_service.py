@@ -1,15 +1,19 @@
+import json
 import logging
+import uuid
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
+from context.cosmos_memory_kernel import CosmosMemoryContext
 
 
 class JsonService:
     """Service for handling JSON team configuration operations."""
 
-    def __init__(self, memory_store):
-        """Initialize with memory store."""
-        self.memory_store = memory_store
+    def __init__(self, memory_context: CosmosMemoryContext):
+        """Initialize with memory context."""
+        self.memory_context = memory_context
         self.logger = logging.getLogger(__name__)
 
     async def validate_and_parse_team_config(
@@ -29,18 +33,18 @@ class JsonService:
             ValueError: If JSON structure is invalid
         """
         try:
-            # Validate required top-level fields
+            # Validate required top-level fields (id and team_id will be generated)
             required_fields = [
-                "id",
-                "team_id",
                 "name",
                 "status",
-                "created",
-                "created_by",
             ]
             for field in required_fields:
                 if field not in json_data:
                     raise ValueError(f"Missing required field: {field}")
+
+            # Generate unique IDs and timestamps
+            unique_team_id = str(uuid.uuid4())
+            current_timestamp = datetime.now(timezone.utc).isoformat()
 
             # Validate agents array exists and is not empty
             if "agents" not in json_data or not isinstance(json_data["agents"], list):
@@ -76,11 +80,12 @@ class JsonService:
 
             # Create team configuration
             team_config = TeamConfiguration(
-                team_id=json_data["team_id"],
+                id=unique_team_id,  # Use generated GUID
+                team_id=unique_team_id,  # Use generated GUID
                 name=json_data["name"],
                 status=json_data["status"],
-                created=json_data["created"],
-                created_by=json_data["created_by"],
+                created=current_timestamp,  # Use generated timestamp
+                created_by=user_id,  # Use user_id who uploaded the config
                 agents=agents,
                 description=json_data.get("description", ""),
                 logo=json_data.get("logo", ""),
@@ -90,7 +95,9 @@ class JsonService:
             )
 
             self.logger.info(
-                "Successfully validated team configuration: %s", team_config.team_id
+                "Successfully validated team configuration: %s (ID: %s)",
+                team_config.team_id,
+                team_config.id,
             )
             return team_config
 
@@ -142,13 +149,8 @@ class JsonService:
             The unique ID of the saved configuration
         """
         try:
-            # Convert to dictionary for storage
-            config_dict = team_config.model_dump()
-
-            # Save to memory store
-            await self.memory_store.upsert_async(
-                f"team_config_{team_config.user_id}", config_dict
-            )
+            # Use the specific add_team method from cosmos memory context
+            await self.memory_context.add_team(team_config)
 
             self.logger.info(
                 "Successfully saved team configuration with ID: %s", team_config.id
@@ -173,16 +175,22 @@ class JsonService:
             TeamConfiguration object or None if not found
         """
         try:
-            # Query from memory store
-            configs = await self.memory_store.query_items(
-                f"team_config_{user_id}", limit=1000
-            )
+            # Get the specific configuration using the team-specific method
+            team_config = await self.memory_context.get_team_by_id(config_id)
 
-            for config_dict in configs:
-                if config_dict.get("id") == config_id:
-                    return TeamConfiguration.model_validate(config_dict)
+            if team_config is None:
+                return None
 
-            return None
+            # Verify the configuration belongs to the user
+            if team_config.user_id != user_id:
+                self.logger.warning(
+                    "Access denied: config %s does not belong to user %s",
+                    config_id,
+                    user_id,
+                )
+                return None
+
+            return team_config
 
         except (KeyError, TypeError, ValueError) as e:
             self.logger.error("Error retrieving team configuration: %s", str(e))
@@ -201,22 +209,8 @@ class JsonService:
             List of TeamConfiguration objects
         """
         try:
-            # Query from memory store
-            configs = await self.memory_store.query_items(
-                f"team_config_{user_id}", limit=1000
-            )
-
-            team_configs = []
-            for config_dict in configs:
-                try:
-                    team_config = TeamConfiguration.model_validate(config_dict)
-                    team_configs.append(team_config)
-                except (ValueError, TypeError) as e:
-                    self.logger.warning(
-                        "Failed to parse team configuration: %s", str(e)
-                    )
-                    continue
-
+            # Use the specific get_all_teams_by_user method
+            team_configs = await self.memory_context.get_all_teams_by_user(user_id)
             return team_configs
 
         except (KeyError, TypeError, ValueError) as e:
@@ -235,36 +229,33 @@ class JsonService:
             True if deleted successfully, False if not found
         """
         try:
-            # Get all configurations to find the one to delete
-            configs = await self.memory_store.query_items(
-                f"team_config_{user_id}", limit=1000
-            )
+            # First, verify the configuration exists and belongs to the user
+            team_config = await self.memory_context.get_team_by_id(config_id)
 
-            # Find the configuration to delete
-            config_to_delete = None
-            remaining_configs = []
-
-            for config_dict in configs:
-                if config_dict.get("id") == config_id:
-                    config_to_delete = config_dict
-                else:
-                    remaining_configs.append(config_dict)
-
-            if config_to_delete is None:
+            if team_config is None:
                 self.logger.warning(
                     "Team configuration not found for deletion: %s", config_id
                 )
                 return False
 
-            # Clear the collection
-            await self.memory_store.delete_collection_async(f"team_config_{user_id}")
+            # Verify the configuration belongs to the user
+            if team_config.user_id != user_id:
+                self.logger.warning(
+                    "Access denied: cannot delete config %s for user %s",
+                    config_id,
+                    user_id,
+                )
+                return False
 
-            # Re-add remaining configurations
-            for config in remaining_configs:
-                await self.memory_store.upsert_async(f"team_config_{user_id}", config)
+            # Delete the configuration using the specific delete_team_by_id method
+            success = await self.memory_context.delete_team_by_id(config_id)
 
-            self.logger.info("Successfully deleted team configuration: %s", config_id)
-            return True
+            if success:
+                self.logger.info(
+                    "Successfully deleted team configuration: %s", config_id
+                )
+
+            return success
 
         except (KeyError, TypeError, ValueError) as e:
             self.logger.error("Error deleting team configuration: %s", str(e))
