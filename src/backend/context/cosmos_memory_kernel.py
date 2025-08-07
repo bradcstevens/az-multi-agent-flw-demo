@@ -17,7 +17,14 @@ from semantic_kernel.contents import ChatMessageContent, ChatHistory, AuthorRole
 
 # Import the AppConfig instance
 from app_config import config
-from models.messages_kernel import BaseDataModel, Plan, Session, Step, AgentMessage
+from models.messages_kernel import (
+    BaseDataModel,
+    Plan,
+    Session,
+    Step,
+    AgentMessage,
+    TeamConfiguration,
+)
 
 
 # Add custom JSON encoder class for datetime objects
@@ -38,6 +45,7 @@ class CosmosMemoryContext(MemoryStoreBase):
         "plan": Plan,
         "step": Step,
         "agent_message": AgentMessage,
+        "team_config": TeamConfiguration,
         # Messages are handled separately
     }
 
@@ -167,65 +175,6 @@ class CosmosMemoryContext(MemoryStoreBase):
         except Exception as e:
             logging.exception(f"Failed to retrieve item from Cosmos DB: {e}")
             return None
-
-    async def query_items_with_parameters(
-        self, query: str, parameters: List[Dict[str, Any]], limit: int = 1000
-    ) -> List[Dict[str, Any]]:
-        """Query items from Cosmos DB with parameters and return raw dictionaries."""
-        await self.ensure_initialized()
-
-        try:
-            items = self._container.query_items(
-                query=query, 
-                parameters=parameters,
-                enable_cross_partition_query=True
-            )
-            result_list = []
-            count = 0
-            async for item in items:
-                if count >= limit:
-                    break
-                result_list.append(item)
-                count += 1
-            return result_list
-        except Exception as e:
-            logging.exception(f"Failed to query items from Cosmos DB: {e}")
-            return []
-
-    async def get_async(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get an item by its key/ID."""
-        await self.ensure_initialized()
-        
-        try:
-            # Query by ID across all partitions since we don't know the partition key
-            query = "SELECT * FROM c WHERE c.id=@id"
-            parameters = [{"name": "@id", "value": key}]
-            
-            items = self._container.query_items(
-                query=query, 
-                parameters=parameters,
-                enable_cross_partition_query=True
-            )
-            
-            async for item in items:
-                return item
-            return None
-        except Exception as e:
-            logging.exception(f"Failed to get item from Cosmos DB: {e}")
-            return None
-
-    async def delete_async(self, key: str) -> None:
-        """Delete an item by its key/ID."""
-        await self.ensure_initialized()
-        
-        try:
-            # First get the item to find its partition key
-            item = await self.get_async(key)
-            if item:
-                partition_key = item.get("session_id", item.get("user_id", key))
-                await self._container.delete_item(item=key, partition_key=partition_key)
-        except Exception as e:
-            logging.exception(f"Failed to delete item from Cosmos DB: {e}")
 
     async def query_items(
         self,
@@ -399,6 +348,131 @@ class CosmosMemoryContext(MemoryStoreBase):
         ]
         messages = await self.query_items(query, parameters, AgentMessage)
         return messages
+
+    async def add_team(self, team: TeamConfiguration) -> None:
+        """Add a team configuration to Cosmos DB.
+
+        Args:
+            team: The TeamConfiguration to add
+        """
+        await self.add_item(team)
+
+    async def update_team(self, team: TeamConfiguration) -> None:
+        """Update an existing team configuration in Cosmos DB.
+
+        Args:
+            team: The TeamConfiguration to update
+        """
+        await self.update_item(team)
+
+    async def get_team(self, team_id: str) -> Optional[TeamConfiguration]:
+        """Retrieve a specific team configuration by team_id.
+
+        Args:
+            team_id: The team_id of the team configuration to retrieve
+
+        Returns:
+            TeamConfiguration object or None if not found
+        """
+        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type"
+        parameters = [
+            {"name": "@team_id", "value": team_id},
+            {"name": "@data_type", "value": "team_config"},
+        ]
+        teams = await self.query_items(query, parameters, TeamConfiguration)
+        return teams[0] if teams else None
+
+    async def get_team_by_id(self, id: str) -> Optional[TeamConfiguration]:
+        """Retrieve a specific team configuration by its document id.
+
+        Args:
+            id: The document id of the team configuration to retrieve
+
+        Returns:
+            TeamConfiguration object or None if not found
+        """
+        query = "SELECT * FROM c WHERE c.id=@id AND c.data_type=@data_type"
+        parameters = [
+            {"name": "@id", "value": id},
+            {"name": "@data_type", "value": "team_config"},
+        ]
+        teams = await self.query_items(query, parameters, TeamConfiguration)
+        return teams[0] if teams else None
+
+    async def get_all_teams_by_user(self, user_id: str) -> List[TeamConfiguration]:
+        """Retrieve all team configurations for a specific user.
+
+        Args:
+            user_id: The user_id to get team configurations for
+
+        Returns:
+            List of TeamConfiguration objects
+        """
+        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type ORDER BY c.created DESC"
+        parameters = [
+            {"name": "@user_id", "value": user_id},
+            {"name": "@data_type", "value": "team_config"},
+        ]
+        teams = await self.query_items(query, parameters, TeamConfiguration)
+        return teams
+
+    async def delete_team(self, team_id: str) -> bool:
+        """Delete a team configuration by team_id.
+
+        Args:
+            team_id: The team_id of the team configuration to delete
+
+        Returns:
+            True if team was found and deleted, False otherwise
+        """
+        await self.ensure_initialized()
+
+        try:
+            # First find the team to get its document id and partition key
+            team = await self.get_team(team_id)
+            if team:
+                # Use the session_id as partition key, or fall back to user_id if no session_id
+                partition_key = (
+                    team.session_id
+                    if hasattr(team, "session_id") and team.session_id
+                    else team.user_id
+                )
+                await self._container.delete_item(
+                    item=team.id, partition_key=partition_key
+                )
+                return True
+            return False
+        except Exception as e:
+            logging.exception(f"Failed to delete team from Cosmos DB: {e}")
+            return False
+
+    async def delete_team_by_id(self, id: str) -> bool:
+        """Delete a team configuration by its document id.
+
+        Args:
+            id: The document id of the team configuration to delete
+
+        Returns:
+            True if team was found and deleted, False otherwise
+        """
+        await self.ensure_initialized()
+
+        try:
+            # First find the team to get its partition key
+            team = await self.get_team_by_id(id)
+            if team:
+                # Use the session_id as partition key, or fall back to user_id if no session_id
+                partition_key = (
+                    team.session_id
+                    if hasattr(team, "session_id") and team.session_id
+                    else team.user_id
+                )
+                await self._container.delete_item(item=id, partition_key=partition_key)
+                return True
+            return False
+        except Exception as e:
+            logging.exception(f"Failed to delete team from Cosmos DB: {e}")
+            return False
 
     async def add_message(self, message: ChatMessageContent) -> None:
         """Add a message to the memory and save to Cosmos DB."""
