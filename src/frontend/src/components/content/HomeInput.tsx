@@ -4,6 +4,22 @@ import {
     Caption1,
     Title2,
 } from "@fluentui/react-components";
+import {
+    Desktop20Regular,
+    BookmarkMultiple20Regular,
+    Search20Regular,
+    Wrench20Regular,
+    Person20Regular,
+    Building20Regular,
+    Document20Regular,
+    Database20Regular,
+    Code20Regular,
+    Play20Regular,
+    Shield20Regular,
+    Globe20Regular,
+    Clipboard20Regular,
+    WindowConsole20Regular,
+} from '@fluentui/react-icons';
 import React, { useRef, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -11,7 +27,7 @@ import "./../../styles/Chat.css";
 import "../../styles/prism-material-oceanic.css";
 import "./../../styles/HomeInput.css";
 
-import { HomeInputProps, quickTasks, QuickTask } from "../../models/homeInput";
+import { HomeInputProps, QuickTask } from "../../models/homeInput";
 import { TeamConfig } from "../../models/Team";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
@@ -21,6 +37,40 @@ import ChatInput from "@/coral/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
 import PromptCard from "@/coral/components/PromptCard";
 import { Send } from "@/coral/imports/bundleicons";
+
+// Icon mapping function to convert string icons to FluentUI icons
+const getIconFromString = (iconString: string | React.ReactNode): React.ReactNode => {
+  // If it's already a React node, return it
+  if (typeof iconString !== 'string') {
+    return iconString;
+  }
+  
+  const iconMap: Record<string, React.ReactNode> = {
+    // Task/Logo icons
+    'Wrench': <Wrench20Regular />,
+    'TestTube': <Clipboard20Regular />, // Fallback since TestTube20Regular doesn't exist
+    'Terminal': <WindowConsole20Regular />,
+    'MonitorCog': <Desktop20Regular />,
+    'BookMarked': <BookmarkMultiple20Regular />,
+    'Search': <Search20Regular />,
+    'Robot': <Person20Regular />, // Fallback since Robot20Regular doesn't exist
+    'Code': <Code20Regular />,
+    'Play': <Play20Regular />,
+    'Shield': <Shield20Regular />,
+    'Globe': <Globe20Regular />,
+    'Person': <Person20Regular />,
+    'Database': <Database20Regular />,
+    'Document': <Document20Regular />,
+    'Building': <Building20Regular />,
+    'Desktop': <Desktop20Regular />,
+    
+    // Default fallback
+    '📋': <Clipboard20Regular />,
+    'default': <Clipboard20Regular />,
+  };
+  
+  return iconMap[iconString] || iconMap['default'] || <Clipboard20Regular />;
+};
 
 const HomeInput: React.FC<HomeInputProps> = ({
     onInputSubmit,
@@ -137,8 +187,8 @@ const HomeInput: React.FC<HomeInputProps> = ({
         }
     }, [input]);
 
-    // Convert team starting_tasks to QuickTask format or use default
-    const tasksToDisplay: QuickTask[] = selectedTeam ? 
+    // Convert team starting_tasks to QuickTask format
+    const tasksToDisplay: QuickTask[] = selectedTeam && selectedTeam.starting_tasks ? 
         selectedTeam.starting_tasks.map((task, index) => {
             // Handle both string tasks and StartingTask objects
             if (typeof task === 'string') {
@@ -146,7 +196,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     id: `team-task-${index}`,
                     title: task,
                     description: task,
-                    icon: quickTasks[index % quickTasks.length]?.icon || quickTasks[0].icon
+                    icon: getIconFromString("📋")
                 };
             } else {
                 // Handle StartingTask objects
@@ -155,10 +205,10 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     id: startingTask.id || `team-task-${index}`,
                     title: startingTask.name || startingTask.prompt || 'Task',
                     description: startingTask.prompt || startingTask.name || 'Task description',
-                    icon: startingTask.logo || quickTasks[index % quickTasks.length]?.icon || quickTasks[0].icon
+                    icon: getIconFromString(startingTask.logo || "📋")
                 };
             }
-        }) : quickTasks;
+        }) : [];
 
     return (
         <div className="home-input-container">
@@ -202,22 +252,44 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     <InlineToaster />
 
                     <div className="home-input-quick-tasks-section">
-                        <div className="home-input-quick-tasks-header">
-                            <Body1Strong>Quick tasks</Body1Strong>
-                        </div>
+                        {tasksToDisplay.length > 0 && (
+                            <>
+                                <div className="home-input-quick-tasks-header">
+                                    <Body1Strong>Quick tasks</Body1Strong>
+                                </div>
 
-                        <div className="home-input-quick-tasks">
-                            {tasksToDisplay.map((task) => (
-                                <PromptCard
-                                    key={task.id}
-                                    title={task.title}
-                                    icon={task.icon}
-                                    description={task.description}
-                                    onClick={() => handleQuickTaskClick(task)}
-                                    disabled={submitting}
-                                />
-                            ))}
-                        </div>
+                                <div className="home-input-quick-tasks">
+                                    {tasksToDisplay.map((task) => (
+                                        <PromptCard
+                                            key={task.id}
+                                            title={task.title}
+                                            icon={task.icon}
+                                            description={task.description}
+                                            onClick={() => handleQuickTaskClick(task)}
+                                            disabled={submitting}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                        {tasksToDisplay.length === 0 && selectedTeam && (
+                            <div style={{ 
+                                textAlign: 'center', 
+                                padding: '32px 16px',
+                                color: '#666'
+                            }}>
+                                <Caption1>No starting tasks available for this team</Caption1>
+                            </div>
+                        )}
+                        {!selectedTeam && (
+                            <div style={{ 
+                                textAlign: 'center', 
+                                padding: '32px 16px',
+                                color: '#666'
+                            }}>
+                                <Caption1>Select a team to see available tasks</Caption1>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

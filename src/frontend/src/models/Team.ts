@@ -1,7 +1,13 @@
 export interface Agent {
-    id: string;
+    input_key: string;
+    type: string;
     name: string;
-    description: string;
+    system_message?: string;
+    description?: string;
+    icon?: string;
+    index_name?: string;
+    // Legacy fields for backward compatibility
+    id?: string;
     capabilities?: string[];
     role?: string;
 }
@@ -25,18 +31,20 @@ export interface Team {
     category?: string;
 }
 
-// Backend-compatible Team model
+// Backend-compatible Team model that matches uploaded JSON structure
 export interface TeamConfig {
+    id: string;
     team_id: string;
     name: string;
     description: string;
-    status: string;
+    status: 'visible' | 'hidden';
+    protected?: boolean;
     created: string;
     created_by: string;
     logo: string;
     plan: string;
     agents: Agent[];
-    starting_tasks: (string | StartingTask)[];
+    starting_tasks: StartingTask[];
 }
 
 export interface TeamUploadResponse {

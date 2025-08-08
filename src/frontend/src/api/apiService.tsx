@@ -9,6 +9,7 @@ import {
     Step,
     StepStatus,
     AgentType,
+    AgentTypeString,
     PlanMessage
 } from '../models';
 
@@ -468,7 +469,7 @@ export class APIService {
      * @param agentType Agent type to filter by
      * @returns Array of steps for the specified agent
      */
-    getStepsForAgent(plan: PlanWithSteps, agentType: AgentType): Step[] {
+    getStepsForAgent(plan: PlanWithSteps, agentType: AgentTypeString): Step[] {
         return plan.steps.filter(step => step.agent === agentType);
     }
 
