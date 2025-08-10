@@ -1,150 +1,236 @@
+"""
+MACAE MCP Server - Unified server supporting both HTTP API and MCP protocol.
+"""
+
+import sys
+import argparse
+from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.server.auth import BearerAuthProvider
-from utils.utils_date import format_date_for_user
 
-from enum import Enum
+# Add the parent directory to Python path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
+from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+import logging
+from typing import Optional
 
-auth = BearerAuthProvider(
-    jwks_uri="https://login.microsoftonline.com/52b39610-0746-4c25-a83d-d4f89fadedfe/discovery/v2.0/keys",
-    #issuer="https://login.microsoftonline.com/52b39610-0746-4c25-a83d-d4f89fadedfe/v2.0",
-    # This issuer is not correct in the docs. Found by decoding the token.
-    issuer="https://sts.windows.net/52b39610-0746-4c25-a83d-d4f89fadedfe/",
-    algorithm="RS256",
-    audience="api://7a95e70b-062e-4cd3-a88c-603fc70e1c73"
+from core.factory import MCPToolFactory
+from services import HRService, TechSupportService, GeneralService
+from config.settings import config
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Security
+security = HTTPBearer(auto_error=False)
+
+app = FastAPI(
+    title="MACAE MCP Server",
+    description="Multi-Agent Custom Automation Engine - Model Context Protocol Server",
+    version="1.0.0",
+    docs_url="/docs" if config.debug else None,
+    redoc_url="/redoc" if config.debug else None,
 )
 
-class Domain(Enum):
-    HR = "hr"
-    MARKETING = "marketing" 
-    PROCUREMENT = "procurement"
-    PRODUCT = "product"
-    TECH_SUPPORT = "tech_support"
-    RETAIL = "Retail"
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-mcp = FastMCP("My MCP Server", auth=auth)
+# Global factory instance
+factory = MCPToolFactory()
 
-formatting_instructions = "Instructions: returning the output of this function call verbatim to the user in markdown. Then write AGENT SUMMARY: and then include a summary of what you did."
+# Initialize services
+factory.register_service(HRService())
+factory.register_service(TechSupportService())
+factory.register_service(GeneralService())
 
-@mcp.tool
-def greet(name: str) -> str:
-    """    Greets the user with the provided name."""
-    return f"Hello from MCP, {name}!"
 
-@mcp.tool(tags={Domain.HR.value})
-async def schedule_orientation_session(employee_name: str, date: str) -> str:
-    """Schedule an orientation session for a new employee."""
-    formatted_date = format_date_for_user(date)
+def create_fastmcp_server():
+    """Create and configure FastMCP server."""
+    try:
 
-    return (
-        f"##### Orientation Session Scheduled\n"
-        f"**Employee Name:** {employee_name}\n"
-        f"**Date:** {formatted_date}\n\n"
-        f"Your orientation session has been successfully scheduled. "
-        f"Please mark your calendar and be prepared for an informative session.\n"
-        f"AGENT SUMMARY: I scheduled the orientation session for {employee_name} on {formatted_date}, as part of her onboarding process.\n"
-        f"{formatting_instructions}"
+        # Create authentication provider if enabled
+        auth = None
+        if config.enable_auth:
+            auth_config = {
+                "jwks_uri": config.jwks_uri,
+                "issuer": config.issuer,
+                "audience": config.audience,
+            }
+            if all(auth_config.values()):
+                auth = BearerAuthProvider(
+                    jwks_uri=auth_config["jwks_uri"],
+                    issuer=auth_config["issuer"],
+                    algorithm="RS256",
+                    audience=auth_config["audience"],
+                )
+
+        # Create MCP server
+        mcp_server = factory.create_mcp_server(name=config.server_name, auth=auth)
+
+        logger.info("✅ FastMCP server created successfully")
+        return mcp_server
+
+    except ImportError:
+        logger.warning("⚠️  FastMCP not available. Install with: pip install fastmcp")
+        return None
+
+
+# Create FastMCP server instance for fastmcp run command
+mcp = create_fastmcp_server()
+
+
+async def verify_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+):
+    """Verify authentication token if auth is enabled."""
+    if not config.enable_auth:
+        return None
+
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    # Here you would verify the JWT token
+    # For now, we'll just check if a token is present
+    token = credentials.credentials
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return token
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Log server info on startup."""
+    global factory
+
+    # Log server info
+    summary = factory.get_tool_summary()
+    logger.info(f"🚀 {config.server_name} initialized")
+    logger.info(f"📊 Total services: {summary['total_services']}")
+    logger.info(f"🔧 Total tools: {summary['total_tools']}")
+    logger.info(f"🔐 Authentication: {'Enabled' if config.enable_auth else 'Disabled'}")
+
+    for domain, info in summary["services"].items():
+        logger.info(
+            f"   📁 {domain}: {info['tool_count']} tools ({info['class_name']})"
+        )
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {"message": "MACAE MCP Server", "version": "1.0.0", "status": "running"}
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "timestamp": "2024-01-01T00:00:00Z"}
+
+
+@app.get("/tools")
+async def get_tools(token: Optional[str] = Depends(verify_token)):
+    """Get available tools summary."""
+    return factory.get_tool_summary()
+
+
+@app.get("/tools/{domain}")
+async def get_tools_by_domain(
+    domain: str, token: Optional[str] = Depends(verify_token)
+):
+    """Get tools for a specific domain."""
+    try:
+        from core.factory import Domain
+
+        domain_enum = Domain(domain.lower())
+        service = factory.get_services_by_domain(domain_enum)
+
+        if not service:
+            raise HTTPException(status_code=404, detail=f"Domain {domain} not found")
+
+        return {
+            "domain": domain,
+            "tool_count": service.tool_count,
+            "service_class": service.__class__.__name__,
+        }
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid domain: {domain}")
+
+
+def run_http_server():
+    """Run the HTTP API server."""
+    logger.info(f"🌐 Starting HTTP API server on {config.host}:9000")
+    uvicorn.run(
+        "mcp_server:app",
+        host=config.host,
+        port=9000,
+        reload=config.debug,
+        log_level="info" if config.debug else "warning",
     )
 
-@mcp.tool(tags={Domain.HR.value})
-async def assign_mentor(employee_name: str) -> str:
-    """Assign a mentor to a new employee."""
-    return (
-        f"##### Mentor Assigned\n"
-        f"**Employee Name:** {employee_name}\n\n"
-        f"A mentor has been assigned to you. They will guide you through your onboarding process and help you settle into your new role.\n"
-        f"{formatting_instructions}"
-    )
 
-@mcp.tool(tags={Domain.HR.value})
-async def register_for_benefits(employee_name: str) -> str:
-    """Register a new employee for benefits."""
-    return (
-        f"##### Benefits Registration\n"
-        f"**Employee Name:** {employee_name}\n\n"
-        f"You have been successfully registered for benefits. "
-        f"Please review your benefits package and reach out if you have any questions.\n"
-        f"{formatting_instructions}"
-    )
-    
-@mcp.tool(tags={Domain.HR.value})
-async def provide_employee_handbook(employee_name: str) -> str:
-    """Provide the employee handbook to a new employee."""
-    return (
-        f"##### Employee Handbook Provided\n"
-        f"**Employee Name:** {employee_name}\n\n"
-        f"The employee handbook has been provided to you. "
-        f"Please review it to familiarize yourself with company policies and procedures.\n"
-        f"{formatting_instructions}"
-    )
-    
-@mcp.tool(tags={Domain.HR.value})
-async def initiate_background_check(employee_name: str) -> str:
-    """Initiate a background check for a new employee."""
-    return (
-        f"##### Background Check Initiated\n"
-        f"**Employee Name:** {employee_name}\n\n"
-        f"A background check has been initiated for {employee_name}. "
-        f"You will be notified once the check is complete.\n"
-        f"{formatting_instructions}"
-    )
-    
-@mcp.tool(tags={Domain.HR.value})
-async def request_id_card(employee_name: str) -> str:
-    """Request an ID card for a new employee."""
-    return (
-        f"##### ID Card Request\n"
-        f"**Employee Name:** {employee_name}\n\n"
-        f"Your request for an ID card has been successfully submitted. "
-        f"Please allow 3-5 business days for processing. You will be notified once your ID card is ready for pickup.\n"
-        f"{formatting_instructions}"
-    )
+def run_mcp_server():
+    """Run the FastMCP protocol server."""
+    global mcp
+    if mcp:
+        logger.info(f"🤖 Starting FastMCP server on {config.host}:9000")
+        mcp.run()
+    else:
+        logger.error("❌ Cannot start FastMCP server - fastmcp not available")
 
-@mcp.tool(tags={Domain.HR.value})
-async def set_up_payroll(employee_name: str) -> str:
-    """Set up payroll for a new employee."""
-    return (
-        f"##### Payroll Setup\n"
-        f"**Employee Name:** {employee_name}\n\n"
-        f"Your payroll has been successfully set up. "
-        f"Please review your payroll details and ensure everything is correct.\n"
-        f"{formatting_instructions}"
-    )
 
-@mcp.tool(tags={Domain.TECH_SUPPORT.value})
-async def send_welcome_email(employee_name: str, email_address: str) -> str:
-    """Send a welcome email to a new employee as part of onboarding."""
-    return (
-        f"##### Welcome Email Sent\n"
-        f"**Employee Name:** {employee_name}\n"
-        f"**Email Address:** {email_address}\n\n"
-        f"A welcome email has been successfully sent to {employee_name} at {email_address}.\n"
-        f"{formatting_instructions}"
+def main():
+    """Main entry point with argument parsing."""
+    parser = argparse.ArgumentParser(description="MACAE MCP Server")
+    parser.add_argument(
+        "--mode",
+        choices=["http", "mcp"],
+        default="http",
+        help="Server mode: 'http' for HTTP API, 'mcp' for FastMCP protocol (default: http)",
     )
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("--no-auth", action="store_true", help="Disable authentication")
 
-@mcp.tool(tags={Domain.TECH_SUPPORT.value})
-async def set_up_office_365_account(employee_name: str, email_address: str) -> str:
-    """Set up an Office 365 account for an employee."""
-    return (
-        f"##### Office 365 Account Setup\n"
-        f"**Employee Name:** {employee_name}\n"
-        f"**Email Address:** {email_address}\n\n"
-        f"An Office 365 account has been successfully set up for {employee_name} at {email_address}.\n"
-        f"{formatting_instructions}"
-    )
+    args = parser.parse_args()
 
-@mcp.tool(tags={Domain.TECH_SUPPORT.value})
-async def configure_laptop(employee_name: str, laptop_model: str) -> str:
-    """Configure a laptop for a new employee."""
-    return (
-        f"##### Laptop Configuration\n"
-        f"**Employee Name:** {employee_name}\n"
-        f"**Laptop Model:** {laptop_model}\n\n"
-        f"The laptop {laptop_model} has been successfully configured for {employee_name}.\n"
-        f"{formatting_instructions}"
-    )
+    # Override config with command line arguments
+    if args.debug:
+        import os
+
+        os.environ["MCP_DEBUG"] = "true"
+        config.debug = True
+
+    if args.no_auth:
+        import os
+
+        os.environ["MCP_ENABLE_AUTH"] = "false"
+        config.enable_auth = False
+
+    # Print startup info
+    print(f"🚀 Starting MACAE MCP Server")
+    print(f"📋 Mode: {args.mode.upper()}")
+    print(f"🔧 Debug: {config.debug}")
+    print(f"🔐 Auth: {'Enabled' if config.enable_auth else 'Disabled'}")
+    print(f"🌐 Port: 9000")
+    print("-" * 50)
+
+    # Run appropriate server
+    if args.mode == "http":
+        run_http_server()
+    else:
+        run_mcp_server()
+
 
 if __name__ == "__main__":
-    mcp.run()
-
-# Start as http server: fastmcp run my_mcp_server.py -t streamable-http -l DEBUG
+    main()
