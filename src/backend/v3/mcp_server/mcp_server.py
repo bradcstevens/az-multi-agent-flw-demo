@@ -1,5 +1,5 @@
 """
-MACAE MCP Server - Unified server supporting both HTTP API and MCP protocol.
+MACAE MCP Server - FastMCP server with organized tools and services.
 """
 
 import sys
@@ -7,14 +7,6 @@ import argparse
 from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.server.auth import BearerAuthProvider
-
-# Add the parent directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-
-from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 import logging
 from typing import Optional
 
@@ -25,26 +17,6 @@ from config.settings import config
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Security
-security = HTTPBearer(auto_error=False)
-
-app = FastAPI(
-    title="MACAE MCP Server",
-    description="Multi-Agent Custom Automation Engine - Model Context Protocol Server",
-    version="1.0.0",
-    docs_url="/docs" if config.debug else None,
-    redoc_url="/redoc" if config.debug else None,
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Global factory instance
 factory = MCPToolFactory()
@@ -58,7 +30,6 @@ factory.register_service(GeneralService())
 def create_fastmcp_server():
     """Create and configure FastMCP server."""
     try:
-
         # Create authentication provider if enabled
         auth = None
         if config.enable_auth:
@@ -90,31 +61,12 @@ def create_fastmcp_server():
 mcp = create_fastmcp_server()
 
 
-async def verify_token(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-):
-    """Verify authentication token if auth is enabled."""
-    if not config.enable_auth:
-        return None
+def log_server_info():
+    """Log server initialization info."""
+    if not mcp:
+        logger.error("❌ FastMCP server not available")
+        return
 
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    # Here you would verify the JWT token
-    # For now, we'll just check if a token is present
-    token = credentials.credentials
-    if not token:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    return token
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Log server info on startup."""
-    global factory
-
-    # Log server info
     summary = factory.get_tool_summary()
     logger.info(f"🚀 {config.server_name} initialized")
     logger.info(f"📊 Total services: {summary['total_services']}")
@@ -127,77 +79,47 @@ async def startup_event():
         )
 
 
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    return {"message": "MACAE MCP Server", "version": "1.0.0", "status": "running"}
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "timestamp": "2024-01-01T00:00:00Z"}
-
-
-@app.get("/tools")
-async def get_tools(token: Optional[str] = Depends(verify_token)):
-    """Get available tools summary."""
-    return factory.get_tool_summary()
-
-
-@app.get("/tools/{domain}")
-async def get_tools_by_domain(
-    domain: str, token: Optional[str] = Depends(verify_token)
+def run_server(
+    transport: str = "stdio", host: str = "127.0.0.1", port: int = 9000, **kwargs
 ):
-    """Get tools for a specific domain."""
-    try:
-        from core.factory import Domain
+    """Run the FastMCP server with specified transport."""
+    if not mcp:
+        logger.error("❌ Cannot start FastMCP server - not available")
+        return
 
-        domain_enum = Domain(domain.lower())
-        service = factory.get_services_by_domain(domain_enum)
+    log_server_info()
 
-        if not service:
-            raise HTTPException(status_code=404, detail=f"Domain {domain} not found")
-
-        return {
-            "domain": domain,
-            "tool_count": service.tool_count,
-            "service_class": service.__class__.__name__,
-        }
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid domain: {domain}")
-
-
-def run_http_server():
-    """Run the HTTP API server."""
-    logger.info(f"🌐 Starting HTTP API server on {config.host}:9000")
-    uvicorn.run(
-        "mcp_server:app",
-        host=config.host,
-        port=9000,
-        reload=config.debug,
-        log_level="info" if config.debug else "warning",
-    )
-
-
-def run_mcp_server():
-    """Run the FastMCP protocol server."""
-    global mcp
-    if mcp:
-        logger.info(f"🤖 Starting FastMCP server on {config.host}:9000")
-        mcp.run()
+    logger.info(f"🤖 Starting FastMCP server with {transport} transport")
+    if transport in ["http", "streamable-http", "sse"]:
+        logger.info(f"🌐 Server will be available at: http://{host}:{port}/mcp/")
+        mcp.run(transport=transport, host=host, port=port, **kwargs)
     else:
-        logger.error("❌ Cannot start FastMCP server - fastmcp not available")
+        # For STDIO transport, only pass kwargs that are supported
+        stdio_kwargs = {k: v for k, v in kwargs.items() if k not in ["log_level"]}
+        mcp.run(transport=transport, **stdio_kwargs)
 
 
 def main():
     """Main entry point with argument parsing."""
     parser = argparse.ArgumentParser(description="MACAE MCP Server")
     parser.add_argument(
-        "--mode",
-        choices=["http", "mcp"],
-        default="http",
-        help="Server mode: 'http' for HTTP API, 'mcp' for FastMCP protocol (default: http)",
+        "--transport",
+        "-t",
+        choices=["stdio", "http", "streamable-http", "sse"],
+        default="stdio",
+        help="Transport protocol (default: stdio)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to for HTTP transport (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        "-p",
+        type=int,
+        default=9000,
+        help="Port to bind to for HTTP transport (default: 9000)",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("--no-auth", action="store_true", help="Disable authentication")
@@ -219,17 +141,21 @@ def main():
 
     # Print startup info
     print(f"🚀 Starting MACAE MCP Server")
-    print(f"📋 Mode: {args.mode.upper()}")
+    print(f"📋 Transport: {args.transport.upper()}")
     print(f"🔧 Debug: {config.debug}")
     print(f"🔐 Auth: {'Enabled' if config.enable_auth else 'Disabled'}")
-    print(f"🌐 Port: 9000")
+    if args.transport in ["http", "streamable-http", "sse"]:
+        print(f"🌐 Host: {args.host}")
+        print(f"🌐 Port: {args.port}")
     print("-" * 50)
 
-    # Run appropriate server
-    if args.mode == "http":
-        run_http_server()
-    else:
-        run_mcp_server()
+    # Run the server
+    run_server(
+        transport=args.transport,
+        host=args.host,
+        port=args.port,
+        log_level="debug" if args.debug else "info",
+    )
 
 
 if __name__ == "__main__":
