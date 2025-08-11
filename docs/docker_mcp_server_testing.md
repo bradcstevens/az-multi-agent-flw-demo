@@ -5,6 +5,7 @@ This document provides comprehensive steps to test the MACAE MCP Server deployed
 ## Prerequisites
 
 - Docker installed and running
+- Git repository cloned locally
 - Basic understanding of MCP (Model Context Protocol)
 - curl or similar HTTP client tool
 
