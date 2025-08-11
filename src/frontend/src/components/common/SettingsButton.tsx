@@ -26,17 +26,17 @@ import {
   Search20Regular,
   Desktop20Regular,
   BookmarkMultiple20Regular,
-  Wrench20Regular,
   Person20Regular,
   Building20Regular,
   Document20Regular,
   Database20Regular,
-  Code20Regular,
   Play20Regular,
   Shield20Regular,
   Globe20Regular,
   Clipboard20Regular,
   WindowConsole20Regular,
+  Code20Regular,
+  Wrench20Regular,
 } from '@fluentui/react-icons';
 import { TeamConfig } from '../../models/Team';
 import { TeamService } from '../../services/TeamService';
@@ -72,7 +72,7 @@ const getIconFromString = (iconString: string): React.ReactNode => {
 };
 
 interface SettingsButtonProps {
-  onTeamSelect?: (team: TeamConfig) => void;
+  onTeamSelect?: (team: TeamConfig | null) => void;
   onTeamUpload?: () => Promise<void>;
   selectedTeam?: TeamConfig | null;
 }
@@ -90,19 +90,18 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [tempSelectedTeam, setTempSelectedTeam] = useState<TeamConfig | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<TeamConfig | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const loadTeams = async () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('SettingsButton: Loading teams...');
       // Get all teams from the API (no separation between default and user teams)
       const teamsData = await TeamService.getUserTeams();
-      console.log('SettingsButton: Teams loaded:', teamsData);
-      console.log('SettingsButton: Number of teams:', teamsData.length);
       setTeams(teamsData);
     } catch (err: any) {
-      console.error('SettingsButton: Error loading teams:', err);
       setError(err.message || 'Failed to load teams');
     } finally {
       setLoading(false);
@@ -123,10 +122,6 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
       setUploadMessage(null);
       setSearchQuery(''); // Clear search when closing
     }
-  };
-
-  const handleTeamCardClick = (team: TeamConfig) => {
-    setTempSelectedTeam(team);
   };
 
   const handleContinue = () => {
@@ -164,15 +159,6 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
 
     if (!data.description || typeof data.description !== 'string' || data.description.trim() === '') {
       errors.push('Team description is required and cannot be empty');
-    }
-
-    // Required ID fields
-    if (!data.id || typeof data.id !== 'string' || data.id.trim() === '') {
-      errors.push('Team id is required and cannot be empty');
-    }
-
-    if (!data.team_id || typeof data.team_id !== 'string' || data.team_id.trim() === '') {
-      errors.push('Team team_id is required and cannot be empty');
     }
 
     // Additional required fields with defaults
@@ -271,7 +257,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     }
 
     // Optional root level fields validation
-    const stringFields = ['team_id', 'status', 'logo', 'plan'];
+    const stringFields = ['status', 'logo', 'plan'];
     stringFields.forEach(field => {
       if (data[field] !== undefined && typeof data[field] !== 'string') {
         errors.push(`${field} must be a string if provided`);
@@ -289,7 +275,6 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('SettingsButton: Starting file upload for:', file.name);
     setUploadLoading(true);
     setError(null);
     setUploadMessage('Reading and validating team configuration...');
@@ -321,31 +306,28 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
 
       setUploadMessage('Uploading team configuration...');
       const result = await TeamService.uploadCustomTeam(file);
-      console.log('SettingsButton: Upload result:', result);
       
       if (result.success) {
-        console.log('SettingsButton: Upload successful, reloading teams...');
-        setUploadMessage('Team uploaded successfully! Refreshing teams...');
-        // Reload teams to include the new custom team
-        await loadTeams();
-        console.log('SettingsButton: Teams reloaded after upload');
+        setUploadMessage('Team uploaded successfully!');
+        
+        // Add the new team to the existing list instead of full refresh
+        if (result.team) {
+          setTeams(currentTeams => [...currentTeams, result.team!]);
+        }
+        
         setUploadMessage(null);
         // Notify parent component about the upload
         if (onTeamUpload) {
-          console.log('SettingsButton: Notifying parent about upload...');
           await onTeamUpload();
         }
       } else if (result.raiError) {
-        console.error('SettingsButton: Upload failed due to RAI validation:', result.raiError);
         setError('Upload failed: Team configuration contains inappropriate content.');
         setUploadMessage(null);
       } else {
-        console.error('SettingsButton: Upload failed:', result.error);
         setError(result.error || 'Failed to upload team configuration');
         setUploadMessage(null);
       }
     } catch (err: any) {
-      console.error('SettingsButton: Upload exception:', err);
       setError(err.message || 'Failed to upload team configuration');
       setUploadMessage(null);
     } finally {
@@ -355,17 +337,82 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     }
   };
 
-  const handleDeleteTeam = async (teamId: string, event: React.MouseEvent) => {
+  const handleDeleteTeam = (team: TeamConfig, event: React.MouseEvent) => {
     event.stopPropagation();
+    setTeamToDelete(team);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleTeamSelect = (team: TeamConfig) => {
+    setTempSelectedTeam(team);
+    onTeamSelect?.(team);
+  };
+
+  const confirmDeleteTeam = async () => {
+    if (!teamToDelete || deleteLoading) return;
+    
+    // Check if team is protected
+    if (teamToDelete.protected) {
+      setError('This team is protected and cannot be deleted.');
+      setDeleteConfirmOpen(false);
+      setTeamToDelete(null);
+      return;
+    }
+    
+    setDeleteLoading(true);
+    
     try {
-      const success = await TeamService.deleteTeam(teamId);
+      // Attempt to delete the team
+      const success = await TeamService.deleteTeam(teamToDelete.id);
+      
       if (success) {
+        // Close dialog and clear states immediately
+        setDeleteConfirmOpen(false);
+        setTeamToDelete(null);
+        setDeleteLoading(false);
+        
+        // If the deleted team was currently selected, clear the selection
+        if (tempSelectedTeam?.team_id === teamToDelete.team_id) {
+          setTempSelectedTeam(null);
+          // Also clear it from the parent component if it was the active selection
+          if (selectedTeam?.team_id === teamToDelete.team_id) {
+            onTeamSelect?.(null);
+          }
+        }
+        
+        // Update the teams list immediately by filtering out the deleted team
+        setTeams(currentTeams => currentTeams.filter(team => team.id !== teamToDelete.id));
+        
+        // Then reload from server to ensure consistency
         await loadTeams();
+        
       } else {
-        setError('Failed to delete team');
+        setError('Failed to delete team configuration. The server rejected the deletion request.');
+        setDeleteConfirmOpen(false);
+        setTeamToDelete(null);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to delete team');
+      
+      // Provide more specific error messages based on the error type
+      let errorMessage = 'Failed to delete team configuration. Please try again.';
+      
+      if (err.response?.status === 404) {
+        errorMessage = 'Team not found. It may have already been deleted.';
+      } else if (err.response?.status === 403) {
+        errorMessage = 'You do not have permission to delete this team.';
+      } else if (err.response?.status === 409) {
+        errorMessage = 'Cannot delete team because it is currently in use.';
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.message) {
+        errorMessage = `Delete failed: ${err.message}`;
+      }
+      
+      setError(errorMessage);
+      setDeleteConfirmOpen(false);
+      setTeamToDelete(null);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -375,23 +422,21 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
     return (
       <Card
         style={{
-          cursor: 'pointer',
-          border: isSelected ? '2px solid #6264a7' : '1px solid #e1e1e1',
+          border: isSelected ? '2px solid var(--colorBrandBackground)' : '1px solid var(--colorNeutralStroke1)',
           borderRadius: '8px',
           position: 'relative',
           transition: 'all 0.2s ease',
-          backgroundColor: isSelected ? '#f0f0ff' : 'white',
+          backgroundColor: isSelected ? 'var(--colorBrandBackground2)' : 'var(--colorNeutralBackground1)',
           padding: '12px',
           width: '100%',
           boxSizing: 'border-box',
           display: 'block',
         }}
-        onClick={() => handleTeamCardClick(team)}
       >
         {/* Team Icon and Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
           <div style={{
-            backgroundColor: '#f8f9fa',
+            backgroundColor: 'var(--colorNeutralBackground3)',
             borderRadius: '4px',
             padding: '4px',
             width: '35px',
@@ -411,7 +456,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
               fontWeight: '600', 
               fontSize: '16px',
               margin: 0,
-              color: '#333'
+              color: 'var(--colorNeutralForeground1)'
             }}>
               {team.name}
             </Body1>
@@ -433,18 +478,33 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
             </div>
           )}
 
-          {/* Delete Button for Custom Teams */}
-          {isCustom && !isSelected && (
-            <Tooltip content="Delete custom team" relationship="label">
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {!isSelected && (
+              <Tooltip content="Select this team" relationship="label">
+                <Button
+                  appearance="primary"
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTeamSelect(team);
+                  }}
+                >
+                  Select
+                </Button>
+              </Tooltip>
+            )}
+            
+            <Tooltip content="Delete team" relationship="label">
               <Button
                 icon={<Delete20Regular />}
                 appearance="subtle"
                 size="small"
-                onClick={(e) => handleDeleteTeam(team.team_id, e)}
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
+                onClick={(e) => handleDeleteTeam(team, e)}
+                style={{ color: '#d13438' }}
               />
             </Tooltip>
-          )}
+          </div>
         </div>
 
         {/* Description */}
@@ -495,6 +555,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(event, data) => handleOpenChange(data.open)}>
       <DialogTrigger disableButtonEnhancement>
         <Tooltip content="Team Settings" relationship="label">
@@ -589,7 +650,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
                 Upload Requirements:
               </Text>
               <Text size={200} style={{ display: 'block', lineHeight: '1.4', color: 'inherit' }}>
-                • JSON file must contain: <strong>id</strong>, <strong>team_id</strong>, <strong>name</strong>, and <strong>description</strong><br/>
+                • JSON file must contain: <strong>name</strong> and <strong>description</strong><br/>
                 • At least one agent with <strong>name</strong>, <strong>type</strong>, and <strong>input_key</strong><br/>
                 • Starting tasks are optional but must have <strong>name</strong> and <strong>prompt</strong> if included<br/>
                 • All text fields cannot be empty
@@ -672,6 +733,69 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
         </DialogActions>
       </DialogSurface>
     </Dialog>
+
+    {/* Delete Confirmation Dialog */}
+    <Dialog open={deleteConfirmOpen} onOpenChange={(event, data) => setDeleteConfirmOpen(data.open)}>
+      <DialogSurface>
+        <DialogContent style={{ 
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%'
+        }}>
+          <DialogBody style={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%'
+          }}>
+            <DialogTitle>⚠️ Delete Team Configuration</DialogTitle>
+            <div style={{ marginTop: '16px', marginBottom: '20px' }}>
+              <Text style={{ display: 'block', marginBottom: '16px' }}>
+                Are you sure you want to delete <strong>"{teamToDelete?.name}"</strong>?
+              </Text>
+              <div style={{ 
+                padding: '16px', 
+                backgroundColor: '#fff4e6', 
+                border: '1px solid #ffb84d', 
+                borderRadius: '6px'
+              }}>
+                <Text weight="semibold" style={{ 
+                  color: '#d83b01', 
+                  display: 'block', 
+                  marginBottom: '8px'
+                }}>
+                  Important Notice:
+                </Text>
+                <Text style={{ lineHeight: '1.4', color: '#323130' }}>
+                  This team configuration and its agents are shared across all users in the system. 
+                  Deleting this team will permanently remove it for everyone, and this action cannot be undone.
+                </Text>
+              </div>
+            </div>
+          </DialogBody>
+          <DialogActions>
+            <Button 
+              appearance="secondary" 
+              disabled={deleteLoading}
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setTeamToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              appearance="primary" 
+              disabled={deleteLoading}
+              style={{ backgroundColor: '#d13438', color: 'white' }}
+              onClick={confirmDeleteTeam}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete for Everyone'}
+            </Button>
+          </DialogActions>
+        </DialogContent>
+      </DialogSurface>
+    </Dialog>
+    </>
   );
 };
 

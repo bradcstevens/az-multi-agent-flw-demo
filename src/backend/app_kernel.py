@@ -40,6 +40,7 @@ from models.messages_kernel import (
     TeamConfiguration,
 )
 from services.json_service import JsonService
+from services.model_validation_service import ModelValidationService
 
 # Updated import for KernelArguments
 from utils_kernel import initialize_runtime_and_context, rai_success, rai_validate_team_config
@@ -1504,6 +1505,42 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
             },
         )
 
+        # Validate model deployments
+        model_validator = ModelValidationService()
+        models_valid, missing_models = await model_validator.validate_team_models(json_data)
+        
+        if not models_valid:
+            error_message = (
+                f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
+                f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
+            )
+            
+            # Track model validation failure
+            track_event_if_configured(
+                "Team configuration model validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "missing_models": missing_models,
+                },
+            )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error_message
+            )
+        
+        # Track successful model validation
+        track_event_if_configured(
+            "Team configuration model validation passed",
+            {
+                "status": "passed",
+                "user_id": user_id,
+                "filename": file.filename,
+            },
+        )
+
         # Initialize memory store and service
         kernel, memory_store = await initialize_runtime_and_context("", user_id)
         json_service = JsonService(memory_store)
@@ -1781,6 +1818,43 @@ async def delete_team_config_endpoint(config_id: str, request: Request):
         raise
     except Exception as e:
         logging.error(f"Error deleting team configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app.get("/api/model_deployments")
+async def get_model_deployments_endpoint(request: Request):
+    """
+    Get information about available model deployments for debugging/validation.
+    
+    ---
+    tags:
+      - Model Validation
+    responses:
+      200:
+        description: List of available model deployments
+      401:
+        description: Missing or invalid user information
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    try:
+        model_validator = ModelValidationService()
+        deployments = await model_validator.list_model_deployments()
+        summary = await model_validator.get_deployment_status_summary()
+        
+        return {
+            "deployments": deployments,
+            "summary": summary
+        }
+        
+    except Exception as e:
+        logging.error(f"Error retrieving model deployments: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 
