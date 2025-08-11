@@ -32,7 +32,7 @@ class Config:
     @staticmethod
     def GetAzureCredentials():
         """Get Azure credentials using the AppConfig implementation."""
-        return get_azure_credential()
+        return get_azure_credential(config.AZURE_CLIENT_ID)
 
     @staticmethod
     def GetCosmosDatabaseClient():

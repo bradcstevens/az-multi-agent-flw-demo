@@ -30,13 +30,20 @@ param solutionUniqueText string = take(uniqueString(subscription().id, resourceG
   'westeurope'
   'uksouth'
 ])
-param location string = 'australiaeast'
+param location string
 
 // Restricting deployment to only supported Azure OpenAI regions validated with GPT-4o model
 @allowed(['australiaeast', 'eastus2', 'francecentral', 'japaneast', 'norwayeast', 'swedencentral', 'uksouth', 'westus'])
-@metadata({ azd: { type: 'location' } })
+@metadata({
+  azd : {
+    type: 'location'
+    usageName : [
+      'OpenAI.GlobalStandard.gpt-4o, 150'
+    ]
+  }
+})
 @description('Optional. Location for all AI service resources. This should be one of the supported Azure AI Service locations.')
-param azureAiServiceLocation string = 'australiaeast'
+param azureAiServiceLocation string
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags resourceInput<'Microsoft.Resources/resourceGroups@2025-04-01'>.tags = {}
@@ -62,13 +69,13 @@ param virtualMachineAdminUsername string = take(newGuid(), 20)
 param virtualMachineAdminPassword string = newGuid()
 
 @description('Optional. The Container Registry hostname where the docker images for the backend are located.')
-param backendContainerRegistryHostname string = 'biabcontainerreg.azurecr.io'
+param backendContainerRegistryHostname string = 'macaer.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the backend.')
 param backendContainerImageName string = 'macaebackend'
 
 @description('Optional. The Container Image Tag to deploy on the backend.')
-param backendContainerImageTag string = 'latest_2025-07-22_895'
+param backendContainerImageTag string = 'dev'
 
 @description('Optional. The Container Registry hostname where the docker images for the frontend are located.')
 param frontendContainerRegistryHostname string = 'biabcontainerreg.azurecr.io'
@@ -77,7 +84,7 @@ param frontendContainerRegistryHostname string = 'biabcontainerreg.azurecr.io'
 param frontendContainerImageName string = 'macaefrontend'
 
 @description('Optional. The Container Image Tag to deploy on the frontend.')
-param frontendContainerImageTag string = 'latest_2025-07-22_895'
+param frontendContainerImageTag string = 'latest'
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
@@ -1038,6 +1045,10 @@ var cosmosDbResourceName = 'cosmos-${solutionSuffix}'
 var cosmosDbDatabaseName = 'macae'
 var cosmosDbDatabaseMemoryContainerName = 'memory'
 
+resource sqlContributorRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2024-11-15' existing = {
+  name: '${cosmosDbResourceName}/00000000-0000-0000-0000-000000000002'
+}
+
 //TODO: update to latest version of AVM module
 module cosmosDb 'br/public:avm/res/document-db/database-account:0.15.0' = {
   name: take('avm.res.document-db.database-account.${cosmosDbResourceName}', 64)
@@ -1062,16 +1073,22 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.15.0' = {
         ]
       }
     ]
-    dataPlaneRoleDefinitions: [
+    // dataPlaneRoleDefinitions: [
+    //   {
+    //     // Cosmos DB Built-in Data Contributor: https://docs.azure.cn/en-us/cosmos-db/nosql/security/reference-data-plane-roles#cosmos-db-built-in-data-contributor
+    //     roleName: 'Cosmos DB SQL Data Contributor'
+    //     dataActions: [
+    //       'Microsoft.DocumentDB/databaseAccounts/readMetadata'
+    //       'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
+    //       'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
+    //     ]
+    //     assignments: [{ principalId: userAssignedIdentity.outputs.principalId }]
+    //   }
+    // ]
+    dataPlaneRoleAssignments: [
       {
-        // Cosmos DB Built-in Data Contributor: https://docs.azure.cn/en-us/cosmos-db/nosql/security/reference-data-plane-roles#cosmos-db-built-in-data-contributor
-        roleName: 'Cosmos DB SQL Data Contributor'
-        dataActions: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
-        ]
-        assignments: [{ principalId: userAssignedIdentity.outputs.principalId }]
+        principalId: userAssignedIdentity.outputs.principalId
+        roleDefinitionId: sqlContributorRoleDefinition.id
       }
     ]
     // WAF aligned configuration for Monitoring
@@ -1330,6 +1347,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           {
             name: 'AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME'
             value: aiFoundryAiServicesModelDeployment.name
+          }
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: userAssignedIdentity.outputs.clientId // NOTE: This is the client ID of the managed identity, not the Entra application, and is needed for the App Service to access the Cosmos DB account.
           }
         ]
       }
