@@ -1,4 +1,4 @@
-import { AgentType, AgentTypeString, StepStatus, PlanStatus } from './enums';
+import { AgentType, StepStatus, PlanStatus } from './enums';
 
 /**
  * Message roles compatible with Semantic Kernel
@@ -37,7 +37,7 @@ export interface ApprovalRequest {
     /** Action to be performed */
     action: string;
     /** Agent assigned to this step */
-    agent: AgentTypeString;
+    agent: AgentType;
 }
 
 /**
@@ -83,7 +83,7 @@ export interface ActionRequest {
     /** Action to be performed */
     action: string;
     /** Agent assigned to this step */
-    agent: AgentTypeString;
+    agent: AgentType;
 }
 
 /**
