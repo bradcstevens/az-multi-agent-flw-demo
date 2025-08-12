@@ -317,27 +317,28 @@ async def rai_validate_team_config(team_config_json: dict) -> tuple[bool, str]:
         if "description" in team_config_json:
             text_content.append(team_config_json["description"])
         
-        # Extract agent information
+        # Extract agent information (based on actual schema)
         if "agents" in team_config_json:
             for agent in team_config_json["agents"]:
                 if isinstance(agent, dict):
+                    # Agent name
                     if "name" in agent:
                         text_content.append(agent["name"])
+                    # Agent description
                     if "description" in agent:
                         text_content.append(agent["description"])
-                    if "role" in agent:
-                        text_content.append(agent["role"])
-                    if "capabilities" in agent and isinstance(agent["capabilities"], list):
-                        text_content.extend(agent["capabilities"])
+                    # Agent system message (main field for instructions)
+                    if "system_message" in agent:
+                        text_content.append(agent["system_message"])
         
-        # Extract starting tasks
+        # Extract starting tasks (based on actual schema)
         if "starting_tasks" in team_config_json:
             for task in team_config_json["starting_tasks"]:
-                if isinstance(task, str):
-                    text_content.append(task)
-                elif isinstance(task, dict):
+                if isinstance(task, dict):
+                    # Task name
                     if "name" in task:
                         text_content.append(task["name"])
+                    # Task prompt (main field for task description)
                     if "prompt" in task:
                         text_content.append(task["prompt"])
         

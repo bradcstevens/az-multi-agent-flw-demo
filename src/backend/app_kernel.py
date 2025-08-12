@@ -41,6 +41,8 @@ from models.messages_kernel import (
 )
 from services.json_service import JsonService
 from services.model_validation_service import ModelValidationService
+from services.search_validation_service import SearchValidationService
+from services.foundry_agent_service import FoundryAgentService
 
 # Updated import for KernelArguments
 from utils_kernel import initialize_runtime_and_context, rai_success, rai_validate_team_config
@@ -1541,6 +1543,42 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
             },
         )
 
+        # Validate search indexes
+        search_validator = SearchValidationService()
+        search_valid, search_errors = await search_validator.validate_team_search_indexes(json_data)
+        
+        if not search_valid:
+            error_message = (
+                f"Search index validation failed:\n\n{chr(10).join([f'• {error}' for error in search_errors])}\n\n"
+                f"Please ensure all referenced search indexes exist in your Azure AI Search service."
+            )
+            
+            # Track search validation failure
+            track_event_if_configured(
+                "Team configuration search validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "search_errors": search_errors,
+                },
+            )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error_message
+            )
+        
+        # Track successful search validation
+        track_event_if_configured(
+            "Team configuration search validation passed",
+            {
+                "status": "passed",
+                "user_id": user_id,
+                "filename": file.filename,
+            },
+        )
+
         # Initialize memory store and service
         kernel, memory_store = await initialize_runtime_and_context("", user_id)
         json_service = JsonService(memory_store)
@@ -1588,6 +1626,160 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
     except Exception as e:
         # Log and return generic error for unexpected exceptions
         logging.error(f"Unexpected error uploading team configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app.post("/api/upload_scenarios")
+async def upload_scenarios_endpoint(request: Request, file: UploadFile = File(...)):
+    """
+    Upload scenario data and create agents in Azure AI Foundry.
+
+    This endpoint processes a JSON file containing scenario definitions with agents,
+    validates the content using RAI checks, and creates the agents in Azure AI Foundry.
+
+    ---
+    tags:
+      - Scenarios
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+      - name: file
+        in: formData
+        type: file
+        required: true
+        description: JSON file containing scenario data with agents
+    responses:
+      200:
+        description: Scenarios processed and agents created successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+            message:
+              type: string
+            results:
+              type: object
+              properties:
+                total_agents:
+                  type: integer
+                created_count:
+                  type: integer
+                failed_count:
+                  type: integer
+                created_agents:
+                  type: array
+                failed_agents:
+                  type: array
+      400:
+        description: Invalid request, file format, or RAI validation failure
+      401:
+        description: Missing or invalid user information
+      500:
+        description: Internal server error
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    # Validate file is provided and is JSON
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    if not file.filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="File must be a JSON file")
+
+    try:
+        # Read and parse JSON content
+        content = await file.read()
+        try:
+            scenario_data = json.loads(content.decode("utf-8"))
+        except json.JSONDecodeError as e:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid JSON format: {str(e)}"
+            )
+
+        # Validate JSON structure
+        if not isinstance(scenario_data, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON must contain a valid object"
+            )
+
+        if "scenarios" not in scenario_data:
+            raise HTTPException(
+                status_code=400, detail="JSON must contain a 'scenarios' array"
+            )
+
+        if not isinstance(scenario_data["scenarios"], list):
+            raise HTTPException(
+                status_code=400, detail="'scenarios' must be an array"
+            )
+
+        if not scenario_data["scenarios"]:
+            raise HTTPException(
+                status_code=400, detail="At least one scenario must be provided"
+            )
+
+        # Initialize the Foundry Agent Service
+        foundry_service = FoundryAgentService()
+
+        # Process scenarios and create agents in Foundry
+        success, message, results = await foundry_service.create_agents_from_scenarios(scenario_data)
+
+        # Track the event
+        track_event_if_configured(
+            "Scenario upload and agent creation",
+            {
+                "status": "success" if success else "partial_failure",
+                "user_id": user_id,
+                "filename": file.filename,
+                "total_agents": results.get("total_agents", 0),
+                "created_count": results.get("created_count", 0),
+                "failed_count": results.get("failed_count", 0),
+            },
+        )
+
+        if success:
+            return {
+                "status": "success",
+                "message": message,
+                "results": results
+            }
+        else:
+            # Partial failure or complete failure
+            if results.get("created_count", 0) > 0:
+                # Some agents were created successfully
+                return {
+                    "status": "partial_success",
+                    "message": message,
+                    "results": results
+                }
+            else:
+                # Complete failure
+                raise HTTPException(status_code=400, detail=message)
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log and return generic error for unexpected exceptions
+        logging.error(f"Unexpected error processing scenarios: {str(e)}")
+        track_event_if_configured(
+            "Scenario upload failed",
+            {
+                "status": "error",
+                "user_id": user_id,
+                "filename": file.filename,
+                "error": str(e),
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 
@@ -1855,6 +2047,41 @@ async def get_model_deployments_endpoint(request: Request):
         
     except Exception as e:
         logging.error(f"Error retrieving model deployments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app.get("/api/search_indexes")
+async def get_search_indexes_endpoint(request: Request):
+    """
+    Get information about available search indexes for debugging/validation.
+    
+    ---
+    tags:
+      - Search Validation
+    responses:
+      200:
+        description: List of available search indexes
+      401:
+        description: Missing or invalid user information
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    try:
+        search_validator = SearchValidationService()
+        summary = await search_validator.get_search_index_summary()
+        
+        return {
+            "search_summary": summary
+        }
+        
+    except Exception as e:
+        logging.error(f"Error retrieving search indexes: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 

@@ -5,7 +5,7 @@ export class TeamService {
     /**
      * Upload a custom team configuration
      */
-    static async uploadCustomTeam(teamFile: File): Promise<{ success: boolean; team?: TeamConfig; error?: string; raiError?: any }> {
+    static async uploadCustomTeam(teamFile: File): Promise<{ success: boolean; team?: TeamConfig; error?: string; raiError?: any; searchError?: any }> {
         try {
             const formData = new FormData();
             formData.append('file', teamFile);
@@ -27,6 +27,18 @@ export class TeamService {
                     success: false,
                     raiError: {
                         error_type: 'RAI_VALIDATION_FAILED',
+                        message: errorDetail,
+                        description: errorDetail
+                    }
+                };
+            }
+            
+            // If the error message contains "Search index validation failed", treat it as search error
+            if (typeof errorDetail === 'string' && errorDetail.includes('Search index validation failed')) {
+                return {
+                    success: false,
+                    searchError: {
+                        error_type: 'SEARCH_VALIDATION_FAILED',
                         message: errorDetail,
                         description: errorDetail
                     }

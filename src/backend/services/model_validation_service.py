@@ -87,6 +87,81 @@ class ModelValidationService:
             logging.error(f"Error listing model deployments: {e}")
             return []
     
+    def extract_models_from_agent(self, agent: Dict[str, Any]) -> set:
+        """
+        Extract all possible model references from a single agent configuration
+        
+        Args:
+            agent: Single agent configuration dictionary
+            
+        Returns:
+            Set of model names found in the agent
+        """
+        models = set()
+        
+        # 1. Direct deployment_name field (primary field for all agents)
+        if agent.get("deployment_name"):
+            models.add(agent["deployment_name"].lower())
+        
+        # 2. Legacy model field (for backwards compatibility)
+        if agent.get("model"):
+            models.add(agent["model"].lower())
+        
+        # 3. Config section models
+        config = agent.get("config", {})
+        if isinstance(config, dict):
+            # Common model fields in config
+            model_fields = ["model", "deployment_name", "engine"]
+            for field in model_fields:
+                if config.get(field):
+                    models.add(config[field].lower())
+        
+        # 4. Advanced: Parse instructions for model references (if needed for legacy configs)
+        instructions = agent.get("instructions", "") or agent.get("system_message", "")
+        if instructions:
+            models.update(self.extract_models_from_text(instructions))
+        
+        return models
+    
+    def extract_models_from_text(self, text: str) -> set:
+        """
+        Extract model names from text using pattern matching
+        
+        Args:
+            text: Text to search for model references
+            
+        Returns:
+            Set of model names found in text
+        """
+        import re
+        models = set()
+        text_lower = text.lower()
+        
+        # Common model patterns
+        model_patterns = [
+            r'gpt-4o(?:-\w+)?',
+            r'gpt-4(?:-\w+)?',
+            r'gpt-35-turbo(?:-\w+)?',
+            r'gpt-3\.5-turbo(?:-\w+)?',
+            r'claude-3(?:-\w+)?',
+            r'claude-2(?:-\w+)?',
+            r'gemini-pro(?:-\w+)?',
+            r'mistral-\w+',
+            r'llama-?\d+(?:-\w+)?',
+            r'text-davinci-\d+',
+            r'text-embedding-\w+',
+            r'ada-\d+',
+            r'babbage-\d+',
+            r'curie-\d+',
+            r'davinci-\d+',
+        ]
+        
+        for pattern in model_patterns:
+            matches = re.findall(pattern, text_lower)
+            models.update(matches)
+        
+        return models
+    
     async def validate_team_models(self, team_config: Dict[str, Any]) -> Tuple[bool, List[str]]:
         """
         Validate that all models required by agents in the team config are deployed
@@ -107,26 +182,12 @@ class ModelValidationService:
             agents = team_config.get("agents", [])
             
             for agent in agents:
-                # Check for model in agent configuration
-                model = agent.get("model")
-                if model:
-                    required_models.add(model.lower())
-                
-                # Check for model in agent settings/config
-                agent_config = agent.get("config", {})
-                if isinstance(agent_config, dict):
-                    config_model = agent_config.get("model") or agent_config.get("deployment_name")
-                    if config_model:
-                        required_models.add(config_model.lower())
-                
-                # Check for model in instructions or other fields that might contain model references
-                instructions = agent.get("instructions", "")
-                if "gpt-4o" in instructions.lower():
-                    required_models.add("gpt-4o")
-                elif "gpt-4" in instructions.lower():
-                    required_models.add("gpt-4")
-                elif "gpt-35-turbo" in instructions.lower():
-                    required_models.add("gpt-35-turbo")
+                agent_models = self.extract_models_from_agent(agent)
+                required_models.update(agent_models)
+            
+            # Also check team-level model configurations
+            team_level_models = self.extract_team_level_models(team_config)
+            required_models.update(team_level_models)
             
             # If no specific models found, assume default model is required
             if not required_models:
@@ -180,3 +241,37 @@ class ModelValidationService:
         except Exception as e:
             logging.error(f"Error getting deployment summary: {e}")
             return {"error": str(e)}
+    
+    def extract_team_level_models(self, team_config: Dict[str, Any]) -> set:
+        """
+        Extract model references from team-level configuration
+        
+        Args:
+            team_config: The team configuration dictionary
+            
+        Returns:
+            Set of model names found at team level
+        """
+        models = set()
+        
+        # Team-level model configurations
+        team_model_fields = ["default_model", "model", "llm_model"]
+        for field in team_model_fields:
+            if team_config.get(field):
+                models.add(team_config[field].lower())
+        
+        # Check team settings
+        settings = team_config.get("settings", {})
+        if isinstance(settings, dict):
+            for field in ["model", "deployment_name"]:
+                if settings.get(field):
+                    models.add(settings[field].lower())
+        
+        # Check environment configurations
+        env_config = team_config.get("environment", {})
+        if isinstance(env_config, dict):
+            for field in ["model", "openai_deployment"]:
+                if env_config.get(field):
+                    models.add(env_config[field].lower())
+        
+        return models
