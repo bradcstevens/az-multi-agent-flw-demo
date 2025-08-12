@@ -1045,10 +1045,6 @@ var cosmosDbResourceName = 'cosmos-${solutionSuffix}'
 var cosmosDbDatabaseName = 'macae'
 var cosmosDbDatabaseMemoryContainerName = 'memory'
 
-resource sqlContributorRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2024-11-15' existing = {
-  name: '${cosmosDbResourceName}/00000000-0000-0000-0000-000000000002'
-}
-
 //TODO: update to latest version of AVM module
 module cosmosDb 'br/public:avm/res/document-db/database-account:0.15.0' = {
   name: take('avm.res.document-db.database-account.${cosmosDbResourceName}', 64)
@@ -1073,22 +1069,16 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.15.0' = {
         ]
       }
     ]
-    // dataPlaneRoleDefinitions: [
-    //   {
-    //     // Cosmos DB Built-in Data Contributor: https://docs.azure.cn/en-us/cosmos-db/nosql/security/reference-data-plane-roles#cosmos-db-built-in-data-contributor
-    //     roleName: 'Cosmos DB SQL Data Contributor'
-    //     dataActions: [
-    //       'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-    //       'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
-    //       'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
-    //     ]
-    //     assignments: [{ principalId: userAssignedIdentity.outputs.principalId }]
-    //   }
-    // ]
-    dataPlaneRoleAssignments: [
+    dataPlaneRoleDefinitions: [
       {
-        principalId: userAssignedIdentity.outputs.principalId
-        roleDefinitionId: sqlContributorRoleDefinition.id
+        // Cosmos DB Built-in Data Contributor: https://docs.azure.cn/en-us/cosmos-db/nosql/security/reference-data-plane-roles#cosmos-db-built-in-data-contributor
+        roleName: 'Cosmos DB SQL Data Contributor'
+        dataActions: [
+          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
+          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
+          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
+        ]
+        assignments: [{ principalId: userAssignedIdentity.outputs.principalId }]
       }
     ]
     // WAF aligned configuration for Monitoring
