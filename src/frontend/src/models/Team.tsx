@@ -6,11 +6,12 @@ export interface Agent {
     description?: string;
     icon?: string;
     index_name?: string;
-    // Legacy fields for backward compatibility
+    deployment_name?:string;
     id?: string;
     capabilities?: string[];
     role?: string;
 }
+
 
 export interface StartingTask {
     id: string;

@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-aiohttp
 
 azure-cosmos
 azure-monitor-opentelemetry
