@@ -18,6 +18,7 @@ class Domain(Enum):
     TECH_SUPPORT = "tech_support"
     RETAIL = "retail"
     GENERAL = "general"
+    DATA = "data"
 
 
 class MCPToolBase(ABC):

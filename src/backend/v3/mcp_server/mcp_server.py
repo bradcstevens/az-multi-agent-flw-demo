@@ -11,7 +11,7 @@ import logging
 from typing import Optional
 
 from core.factory import MCPToolFactory
-from services import HRService, TechSupportService, GeneralService
+from services import HRService, TechSupportService, GeneralService, DataToolService
 from config.settings import config
 
 # Setup logging
@@ -25,6 +25,9 @@ factory = MCPToolFactory()
 factory.register_service(HRService())
 factory.register_service(TechSupportService())
 factory.register_service(GeneralService())
+
+# Register DataToolService with the dataset path
+factory.register_service(DataToolService(dataset_path="data/datasets"))
 
 
 def create_fastmcp_server():
