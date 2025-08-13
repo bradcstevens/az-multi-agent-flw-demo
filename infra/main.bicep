@@ -17,7 +17,7 @@ param solutionName string = 'macae'
 param solutionUniqueText string = take(uniqueString(subscription().id, resourceGroup().name, solutionName), 5)
 
 @metadata({ azd: { type: 'location' } })
-@description('Optional. Azure region for all services. Regions are restricted to guarantee compatibility with paired regions and replica locations for data redundancy and failover scenarios based on articles [Azure regions list](https://learn.microsoft.com/azure/reliability/regions-list) and [Azure Database for MySQL Flexible Server - Azure Regions](https://learn.microsoft.com/azure/mysql/flexible-server/overview#azure-regions).')
+@description('Required. Azure region for all services. Regions are restricted to guarantee compatibility with paired regions and replica locations for data redundancy and failover scenarios based on articles [Azure regions list](https://learn.microsoft.com/azure/reliability/regions-list) and [Azure Database for MySQL Flexible Server - Azure Regions](https://learn.microsoft.com/azure/mysql/flexible-server/overview#azure-regions).')
 @allowed([
   'australiaeast'
   'centralus'
@@ -30,13 +30,20 @@ param solutionUniqueText string = take(uniqueString(subscription().id, resourceG
   'westeurope'
   'uksouth'
 ])
-param location string = 'australiaeast'
+param location string
 
 // Restricting deployment to only supported Azure OpenAI regions validated with GPT-4o model
 @allowed(['australiaeast', 'eastus2', 'francecentral', 'japaneast', 'norwayeast', 'swedencentral', 'uksouth', 'westus'])
-@metadata({ azd: { type: 'location' } })
+@metadata({
+  azd : {
+    type: 'location'
+    usageName : [
+      'OpenAI.GlobalStandard.gpt-4o, 150'
+    ]
+  }
+})
 @description('Optional. Location for all AI service resources. This should be one of the supported Azure AI Service locations.')
-param azureAiServiceLocation string = 'australiaeast'
+param azureAiServiceLocation string
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags resourceInput<'Microsoft.Resources/resourceGroups@2025-04-01'>.tags = {}
@@ -86,7 +93,15 @@ param enableTelemetry bool = true
 // Variables      //
 // ============== //
 
-var solutionSuffix = '${solutionName}${solutionUniqueText}'
+var solutionSuffix = toLower(trim(replace(
+  replace(
+    replace(replace(replace(replace('${solutionName}${solutionUniqueText}', '-', ''), '_', ''), '.', ''), '/', ''),
+    ' ',
+    ''
+  ),
+  '*',
+  ''
+)))
 
 // Region pairs list based on article in [Azure regions list](https://learn.microsoft.com/azure/reliability/regions-list)
 // var azureRegionPairs = {
@@ -1330,6 +1345,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           {
             name: 'AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME'
             value: aiFoundryAiServicesModelDeployment.name
+          }
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: userAssignedIdentity.outputs.clientId // NOTE: This is the client ID of the managed identity, not the Entra application, and is needed for the App Service to access the Cosmos DB account.
           }
         ]
       }
