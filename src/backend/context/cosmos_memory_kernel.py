@@ -92,14 +92,14 @@ class CosmosMemoryContext(MemoryStoreBase):
                 id=self._cosmos_container,
                 partition_key=PartitionKey(path="/session_id"),
             )
+            # Only set initialized flag if we successfully got a container
+            self._initialized.set()
         except Exception as e:
             logging.error(
                 f"Failed to initialize CosmosDB container: {e}. Continuing without CosmosDB for testing."
             )
-            # Do not raise to prevent test failures
+            # Do not set initialized flag if initialization failed
             self._container = None
-
-        self._initialized.set()
 
     # Helper method for awaiting initialization
     async def ensure_initialized(self):
@@ -110,8 +110,10 @@ class CosmosMemoryContext(MemoryStoreBase):
 
         # If after initialization the container is still None, that means initialization failed
         if self._container is None:
-            # Re-attempt initialization once in case the previous attempt failed
+            # Re-attempt initialization with a small delay for credential refresh
             try:
+                import asyncio
+                await asyncio.sleep(0.5)  # Small delay for credential refresh
                 await self.initialize()
             except Exception as e:
                 logging.error(f"Re-initialization attempt failed: {e}")
@@ -129,6 +131,10 @@ class CosmosMemoryContext(MemoryStoreBase):
         try:
             # Convert the model to a dict
             document = item.model_dump()
+
+            # Ensure all documents have session_id for consistent partitioning
+            if "session_id" not in document:
+                document["session_id"] = self.session_id
 
             # Handle datetime objects by converting them to ISO format strings
             for key, value in list(document.items()):
@@ -461,14 +467,46 @@ class CosmosMemoryContext(MemoryStoreBase):
             # First find the team to get its partition key
             team = await self.get_team_by_id(id)
             if team:
-                # Use the session_id as partition key, or fall back to user_id if no session_id
-                partition_key = (
-                    team.session_id
-                    if hasattr(team, "session_id") and team.session_id
-                    else team.user_id
-                )
-                await self._container.delete_item(item=id, partition_key=partition_key)
-                return True
+                # Debug logging
+                logging.info(f"Attempting to delete team {id}")
+                logging.info(f"Team user_id: {team.user_id}")
+                logging.info(f"Team session_id: {getattr(team, 'session_id', 'NOT_SET')}")
+                
+                # Try different partition key strategies
+                partition_keys_to_try = []
+                
+                # Strategy 1: Use session_id if it exists
+                if hasattr(team, "session_id") and team.session_id:
+                    partition_keys_to_try.append(team.session_id)
+                    logging.info(f"Will try session_id: {team.session_id}")
+                
+                # Strategy 2: Use user_id as fallback
+                if team.user_id:
+                    partition_keys_to_try.append(team.user_id)
+                    logging.info(f"Will try user_id: {team.user_id}")
+                
+                # Strategy 3: Use current context session_id
+                if self.session_id:
+                    partition_keys_to_try.append(self.session_id)
+                    logging.info(f"Will try context session_id: {self.session_id}")
+                
+                # Strategy 4: Try null/empty partition key (for documents created without session_id)
+                partition_keys_to_try.extend([None, ""])
+                logging.info("Will try null and empty partition keys")
+                
+                # Try each partition key until one works
+                for partition_key in partition_keys_to_try:
+                    try:
+                        logging.info(f"Attempting delete with partition key: {partition_key}")
+                        await self._container.delete_item(item=id, partition_key=partition_key)
+                        logging.info(f"Successfully deleted team {id} with partition key: {partition_key}")
+                        return True
+                    except Exception as e:
+                        logging.warning(f"Delete failed with partition key {partition_key}: {str(e)}")
+                        continue
+                
+                logging.error(f"All partition key strategies failed for team {id}")
+                return False
             return False
         except Exception as e:
             logging.exception(f"Failed to delete team from Cosmos DB: {e}")

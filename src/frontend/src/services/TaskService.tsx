@@ -200,16 +200,19 @@ export class TaskService {
   /**
    * Create a new plan with RAI validation
    * @param description Task description
+   * @param teamId Optional team ID to use for this plan
    * @returns Promise with the response containing plan ID and status
    */
   static async createPlan(
-    description: string
+    description: string,
+    teamId?: string
   ): Promise<{ plan_id: string; status: string; session_id: string }> {
     const sessionId = this.generateSessionId();
 
     const inputTask: InputTask = {
       session_id: sessionId,
       description: description,
+      team_id: teamId,
     };
 
     try {

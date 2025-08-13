@@ -1,0 +1,94 @@
+{
+  "scenarios": [
+    {
+      "name": "Customer Support Automation",
+      "description": "Automated customer support scenario with multiple specialized agents",
+      "agents": [
+        {
+          "name": "Support Triage Agent",
+          "description": "First-line support agent that categorizes and routes customer inquiries",
+          "instructions": "You are a customer support triage agent. Your role is to analyze incoming customer inquiries, categorize them by urgency and type, and route them to the appropriate specialist. Always be polite, helpful, and ensure customers feel heard.",
+          "deployment_name": "gpt-4o",
+          "type": "support_triage",
+          "tools": [
+            {
+              "type": "function",
+              "function": {
+                "name": "categorize_inquiry",
+                "description": "Categorize customer inquiry by type and urgency"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Technical Support Agent",
+          "description": "Specialized agent for handling technical issues and troubleshooting",
+          "instructions": "You are a technical support specialist. Help customers resolve technical issues with detailed, step-by-step guidance. Ask clarifying questions when needed and provide clear explanations.",
+          "deployment_name": "gpt-4o",
+          "type": "technical_support",
+          "tools": [
+            {
+              "type": "function",
+              "function": {
+                "name": "check_system_status",
+                "description": "Check system status and known issues"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Billing Support Agent",
+          "description": "Agent specialized in handling billing inquiries and account management",
+          "instructions": "You are a billing support specialist. Help customers with billing questions, payment issues, and account management. Always verify customer identity before discussing account details.",
+          "deployment_name": "gpt-35-turbo",
+          "type": "billing_support"
+        }
+      ]
+    },
+    {
+      "name": "E-commerce Order Processing",
+      "description": "Automated order processing and fulfillment scenario",
+      "agents": [
+        {
+          "name": "Order Validation Agent",
+          "description": "Validates incoming orders for completeness and accuracy",
+          "instructions": "You are an order validation agent. Review incoming orders to ensure all required information is present, validate payment details, and check inventory availability.",
+          "deployment_name": "gpt-4o",
+          "type": "order_validation",
+          "tools": [
+            {
+              "type": "function",
+              "function": {
+                "name": "validate_payment",
+                "description": "Validate payment information and process authorization"
+              }
+            },
+            {
+              "type": "function",
+              "function": {
+                "name": "check_inventory",
+                "description": "Check product availability and inventory levels"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fulfillment Coordinator",
+          "description": "Coordinates order fulfillment and shipping arrangements",
+          "instructions": "You are a fulfillment coordinator. Once orders are validated, coordinate with warehouses, arrange shipping, and provide tracking information to customers.",
+          "deployment_name": "gpt-35-turbo",
+          "type": "fulfillment",
+          "tools": [
+            {
+              "type": "function",
+              "function": {
+                "name": "arrange_shipping",
+                "description": "Arrange shipping and generate tracking numbers"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

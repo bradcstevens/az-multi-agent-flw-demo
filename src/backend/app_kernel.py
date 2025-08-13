@@ -39,11 +39,20 @@ from models.messages_kernel import (
     TeamConfiguration,
 )
 from services.json_service import JsonService
+from services.model_validation_service import ModelValidationService
+from services.search_validation_service import SearchValidationService
+
 
 # Updated import for KernelArguments
-from utils_kernel import initialize_runtime_and_context, rai_success
+from utils_kernel import (
+    initialize_runtime_and_context,
+    rai_success,
+    rai_validate_team_config,
+)
+
 from v3.orchestration.manager import OnboardingOrchestrationManager
 from v3.scenarios.onboarding_cases import MagenticScenarios
+from v3.api.router import api_v3
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
 connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
@@ -91,6 +100,8 @@ app.add_middleware(
 
 # Configure health check
 app.add_middleware(HealthCheckMiddleware, password="", checks={})
+# v3 endpoints
+app.include_router(api_v3)
 logging.info("Added health check middleware")
 
 
@@ -1597,6 +1608,101 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
                 status_code=400, detail=f"Invalid JSON format: {str(e)}"
             )
 
+        # Validate content with RAI before processing
+        rai_valid, rai_error = await rai_validate_team_config(json_data)
+        if not rai_valid:
+            # Track RAI validation failure
+            track_event_if_configured(
+                "Team configuration RAI validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "reason": rai_error,
+                },
+            )
+            raise HTTPException(status_code=400, detail=rai_error)
+
+        # Track successful RAI validation
+        track_event_if_configured(
+            "Team configuration RAI validation passed",
+            {
+                "status": "passed",
+                "user_id": user_id,
+                "filename": file.filename,
+            },
+        )
+
+        # Validate model deployments
+        model_validator = ModelValidationService()
+        models_valid, missing_models = await model_validator.validate_team_models(
+            json_data
+        )
+
+        if not models_valid:
+            error_message = (
+                f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
+                f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
+            )
+
+            # Track model validation failure
+            track_event_if_configured(
+                "Team configuration model validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "missing_models": missing_models,
+                },
+            )
+
+            raise HTTPException(status_code=400, detail=error_message)
+
+        # Track successful model validation
+        track_event_if_configured(
+            "Team configuration model validation passed",
+            {
+                "status": "passed",
+                "user_id": user_id,
+                "filename": file.filename,
+            },
+        )
+
+        # Validate search indexes
+        search_validator = SearchValidationService()
+        search_valid, search_errors = (
+            await search_validator.validate_team_search_indexes(json_data)
+        )
+
+        if not search_valid:
+            error_message = (
+                f"Search index validation failed:\n\n{chr(10).join([f'• {error}' for error in search_errors])}\n\n"
+                f"Please ensure all referenced search indexes exist in your Azure AI Search service."
+            )
+
+            # Track search validation failure
+            track_event_if_configured(
+                "Team configuration search validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "search_errors": search_errors,
+                },
+            )
+
+            raise HTTPException(status_code=400, detail=error_message)
+
+        # Track successful search validation
+        track_event_if_configured(
+            "Team configuration search validation passed",
+            {
+                "status": "passed",
+                "user_id": user_id,
+                "filename": file.filename,
+            },
+        )
+
         # Initialize memory store and service
         kernel, memory_store = await initialize_runtime_and_context("", user_id)
         json_service = JsonService(memory_store)
@@ -1874,6 +1980,73 @@ async def delete_team_config_endpoint(config_id: str, request: Request):
         raise
     except Exception as e:
         logging.error(f"Error deleting team configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app.get("/api/model_deployments")
+async def get_model_deployments_endpoint(request: Request):
+    """
+    Get information about available model deployments for debugging/validation.
+
+    ---
+    tags:
+      - Model Validation
+    responses:
+      200:
+        description: List of available model deployments
+      401:
+        description: Missing or invalid user information
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    try:
+        model_validator = ModelValidationService()
+        deployments = await model_validator.list_model_deployments()
+        summary = await model_validator.get_deployment_status_summary()
+
+        return {"deployments": deployments, "summary": summary}
+
+    except Exception as e:
+        logging.error(f"Error retrieving model deployments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app.get("/api/search_indexes")
+async def get_search_indexes_endpoint(request: Request):
+    """
+    Get information about available search indexes for debugging/validation.
+
+    ---
+    tags:
+      - Search Validation
+    responses:
+      200:
+        description: List of available search indexes
+      401:
+        description: Missing or invalid user information
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    try:
+        search_validator = SearchValidationService()
+        summary = await search_validator.get_search_index_summary()
+
+        return {"search_summary": summary}
+
+    except Exception as e:
+        logging.error(f"Error retrieving search indexes: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 

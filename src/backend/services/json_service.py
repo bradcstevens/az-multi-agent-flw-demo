@@ -238,15 +238,7 @@ class JsonService:
                 )
                 return False
 
-            # Verify the configuration belongs to the user
-            if team_config.user_id != user_id:
-                self.logger.warning(
-                    "Access denied: cannot delete config %s for user %s",
-                    config_id,
-                    user_id,
-                )
-                return False
-
+            
             # Delete the configuration using the specific delete_team_by_id method
             success = await self.memory_context.delete_team_by_id(config_id)
 

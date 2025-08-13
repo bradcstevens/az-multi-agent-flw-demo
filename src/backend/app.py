@@ -16,7 +16,7 @@ from azure.monitor.opentelemetry import configure_azure_monitor
 from config_kernel import Config
 from dateutil import parser
 from event_utils import track_event_if_configured
-from v3.api.router import v3 as api_v3
+from v3.api.router import api_v3
 
 # FastAPI imports
 from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
