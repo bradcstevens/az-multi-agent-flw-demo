@@ -1,20 +1,46 @@
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+import aiohttp
+from azure.core.credentials import AzureKeyCredential
+from azure.core.exceptions import (
+    ClientAuthenticationError,
+    HttpResponseError,
+    ResourceNotFoundError,
+)
+from azure.identity import DefaultAzureCredential
+from azure.search.documents.indexes import SearchIndexClient
 
 from models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
 from context.cosmos_memory_kernel import CosmosMemoryContext
+from helpers.azure_credential_utils import get_azure_credential
 
 
 class JsonService:
     """Service for handling JSON team configuration operations."""
 
-    def __init__(self, memory_context: CosmosMemoryContext):
-        """Initialize with memory context."""
+    def __init__(self, memory_context: Optional[CosmosMemoryContext] = None):
+        """Initialize with optional memory context."""
         self.memory_context = memory_context
         self.logger = logging.getLogger(__name__)
+
+        # Search validation configuration
+        self.search_endpoint = os.getenv("AZURE_SEARCH_ENDPOINT")
+        self.search_key = os.getenv("AZURE_SEARCH_KEY")
+        if self.search_key:
+            self.search_credential = AzureKeyCredential(self.search_key)
+        else:
+            self.search_credential = DefaultAzureCredential()
+
+        # Model validation configuration
+        self.subscription_id = os.getenv("AZURE_AI_SUBSCRIPTION_ID")
+        self.resource_group = os.getenv("AZURE_AI_RESOURCE_GROUP")
+        self.project_name = os.getenv("AZURE_AI_PROJECT_NAME")
+        self.project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
 
     async def validate_and_parse_team_config(
         self, json_data: Dict[str, Any], user_id: str
@@ -238,7 +264,6 @@ class JsonService:
                 )
                 return False
 
-            
             # Delete the configuration using the specific delete_team_by_id method
             success = await self.memory_context.delete_team_by_id(config_id)
 
@@ -252,3 +277,333 @@ class JsonService:
         except (KeyError, TypeError, ValueError) as e:
             self.logger.error("Error deleting team configuration: %s", str(e))
             return False
+
+    # -----------------------
+    # Model validation methods
+    # -----------------------
+
+    async def get_access_token(self) -> str:
+        """Get Azure access token for API calls."""
+        try:
+            credential = get_azure_credential()
+            token = credential.get_token("https://management.azure.com/.default")
+            return token.token
+        except Exception as e:
+            self.logger.error(f"Failed to get access token: {e}")
+            raise
+
+    async def list_model_deployments(self) -> List[Dict[str, Any]]:
+        """
+        List all model deployments in the Azure AI project using the REST API.
+        """
+        if not all([self.subscription_id, self.resource_group, self.project_name]):
+            self.logger.error("Azure AI project configuration is incomplete")
+            return []
+
+        try:
+            token = await self.get_access_token()
+
+            url = (
+                f"https://management.azure.com/subscriptions/{self.subscription_id}/"
+                f"resourceGroups/{self.resource_group}/providers/Microsoft.MachineLearningServices/"
+                f"workspaces/{self.project_name}/onlineEndpoints"
+            )
+
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+            params = {"api-version": "2024-10-01"}
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        deployments = data.get("value", [])
+                        deployment_info: List[Dict[str, Any]] = []
+                        for deployment in deployments:
+                            deployment_info.append(
+                                {
+                                    "name": deployment.get("name"),
+                                    "model": deployment.get("properties", {}).get(
+                                        "model", {}
+                                    ),
+                                    "status": deployment.get("properties", {}).get(
+                                        "provisioningState"
+                                    ),
+                                    "endpoint_uri": deployment.get(
+                                        "properties", {}
+                                    ).get("scoringUri"),
+                                }
+                            )
+                        return deployment_info
+                    else:
+                        error_text = await response.text()
+                        self.logger.error(
+                            f"Failed to list deployments. Status: {response.status}, Error: {error_text}"
+                        )
+                        return []
+        except Exception as e:
+            self.logger.error(f"Error listing model deployments: {e}")
+            return []
+
+    def extract_models_from_agent(self, agent: Dict[str, Any]) -> set:
+        """
+        Extract all possible model references from a single agent configuration.
+        """
+        models = set()
+
+        if agent.get("deployment_name"):
+            models.add(str(agent["deployment_name"]).lower())
+
+        if agent.get("model"):
+            models.add(str(agent["model"]).lower())
+
+        config = agent.get("config", {})
+        if isinstance(config, dict):
+            for field in ["model", "deployment_name", "engine"]:
+                if config.get(field):
+                    models.add(str(config[field]).lower())
+
+        instructions = agent.get("instructions", "") or agent.get("system_message", "")
+        if instructions:
+            models.update(self.extract_models_from_text(str(instructions)))
+
+        return models
+
+    def extract_models_from_text(self, text: str) -> set:
+        """Extract model names from text using pattern matching."""
+        import re
+
+        models = set()
+        text_lower = text.lower()
+        model_patterns = [
+            r"gpt-4o(?:-\w+)?",
+            r"gpt-4(?:-\w+)?",
+            r"gpt-35-turbo(?:-\w+)?",
+            r"gpt-3\.5-turbo(?:-\w+)?",
+            r"claude-3(?:-\w+)?",
+            r"claude-2(?:-\w+)?",
+            r"gemini-pro(?:-\w+)?",
+            r"mistral-\w+",
+            r"llama-?\d+(?:-\w+)?",
+            r"text-davinci-\d+",
+            r"text-embedding-\w+",
+            r"ada-\d+",
+            r"babbage-\d+",
+            r"curie-\d+",
+            r"davinci-\d+",
+        ]
+
+        for pattern in model_patterns:
+            matches = re.findall(pattern, text_lower)
+            models.update(matches)
+
+        return models
+
+    async def validate_team_models(
+        self, team_config: Dict[str, Any]
+    ) -> Tuple[bool, List[str]]:
+        """Validate that all models required by agents in the team config are deployed."""
+        try:
+            deployments = await self.list_model_deployments()
+            available_models = [
+                d.get("name", "").lower()
+                for d in deployments
+                if d.get("status") == "Succeeded"
+            ]
+
+            required_models: set = set()
+            agents = team_config.get("agents", [])
+            for agent in agents:
+                if isinstance(agent, dict):
+                    required_models.update(self.extract_models_from_agent(agent))
+
+            team_level_models = self.extract_team_level_models(team_config)
+            required_models.update(team_level_models)
+
+            if not required_models:
+                default_model = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
+                required_models.add(default_model.lower())
+
+            missing_models: List[str] = []
+            for model in required_models:
+                if model not in available_models:
+                    missing_models.append(model)
+
+            is_valid = len(missing_models) == 0
+            if not is_valid:
+                self.logger.warning(f"Missing model deployments: {missing_models}")
+                self.logger.info(f"Available deployments: {available_models}")
+            return is_valid, missing_models
+        except Exception as e:
+            self.logger.error(f"Error validating team models: {e}")
+            return True, []
+
+    async def get_deployment_status_summary(self) -> Dict[str, Any]:
+        """Get a summary of deployment status for debugging/monitoring."""
+        try:
+            deployments = await self.list_model_deployments()
+            summary: Dict[str, Any] = {
+                "total_deployments": len(deployments),
+                "successful_deployments": [],
+                "failed_deployments": [],
+                "pending_deployments": [],
+            }
+            for deployment in deployments:
+                name = deployment.get("name", "unknown")
+                status = deployment.get("status", "unknown")
+                if status == "Succeeded":
+                    summary["successful_deployments"].append(name)
+                elif status in ["Failed", "Canceled"]:
+                    summary["failed_deployments"].append(name)
+                else:
+                    summary["pending_deployments"].append(name)
+            return summary
+        except Exception as e:
+            self.logger.error(f"Error getting deployment summary: {e}")
+            return {"error": str(e)}
+
+    def extract_team_level_models(self, team_config: Dict[str, Any]) -> set:
+        """Extract model references from team-level configuration."""
+        models = set()
+        for field in ["default_model", "model", "llm_model"]:
+            if team_config.get(field):
+                models.add(str(team_config[field]).lower())
+        settings = team_config.get("settings", {})
+        if isinstance(settings, dict):
+            for field in ["model", "deployment_name"]:
+                if settings.get(field):
+                    models.add(str(settings[field]).lower())
+        env_config = team_config.get("environment", {})
+        if isinstance(env_config, dict):
+            for field in ["model", "openai_deployment"]:
+                if env_config.get(field):
+                    models.add(str(env_config[field]).lower())
+        return models
+
+    # -----------------------
+    # Search validation methods
+    # -----------------------
+
+    async def validate_team_search_indexes(
+        self, team_config: Dict[str, Any]
+    ) -> Tuple[bool, List[str]]:
+        """
+        Validate that all search indexes referenced in the team config exist.
+        Only validates if there are actually search indexes/RAG agents in the config.
+        """
+        try:
+            index_names = self.extract_index_names(team_config)
+            has_rag_agents = self.has_rag_or_search_agents(team_config)
+
+            if not index_names and not has_rag_agents:
+                self.logger.info(
+                    "No search indexes or RAG agents found in team config - skipping search validation"
+                )
+                return True, []
+
+            if not self.search_endpoint:
+                if index_names or has_rag_agents:
+                    error_msg = "Team configuration references search indexes but no Azure Search endpoint is configured"
+                    self.logger.warning(error_msg)
+                    return False, [error_msg]
+                else:
+                    return True, []
+
+            if not index_names:
+                self.logger.info(
+                    "RAG agents found but no specific search indexes specified"
+                )
+                return True, []
+
+            validation_errors: List[str] = []
+            unique_indexes = set(index_names)
+            self.logger.info(
+                f"Validating {len(unique_indexes)} search indexes: {list(unique_indexes)}"
+            )
+            for index_name in unique_indexes:
+                is_valid, error_message = await self.validate_single_index(index_name)
+                if not is_valid:
+                    validation_errors.append(error_message)
+            return len(validation_errors) == 0, validation_errors
+        except Exception as e:
+            self.logger.error(f"Error validating search indexes: {str(e)}")
+            return False, [f"Search index validation error: {str(e)}"]
+
+    def extract_index_names(self, team_config: Dict[str, Any]) -> List[str]:
+        """Extract all index names from RAG agents in the team configuration."""
+        index_names: List[str] = []
+        agents = team_config.get("agents", [])
+        for agent in agents:
+            if isinstance(agent, dict):
+                agent_type = str(agent.get("type", "")).strip().lower()
+                if agent_type == "rag":
+                    index_name = agent.get("index_name")
+                    if index_name and str(index_name).strip():
+                        index_names.append(str(index_name).strip())
+        return list(set(index_names))
+
+    def has_rag_or_search_agents(self, team_config: Dict[str, Any]) -> bool:
+        """Check if the team configuration contains RAG agents."""
+        agents = team_config.get("agents", [])
+        for agent in agents:
+            if isinstance(agent, dict):
+                agent_type = str(agent.get("type", "")).strip().lower()
+                if agent_type == "rag":
+                    return True
+        return False
+
+    async def validate_single_index(self, index_name: str) -> Tuple[bool, str]:
+        """Validate that a single search index exists and is accessible."""
+        try:
+            index_client = SearchIndexClient(
+                endpoint=self.search_endpoint, credential=self.search_credential
+            )
+            index = index_client.get_index(index_name)
+            if index:
+                self.logger.info(f"Search index '{index_name}' found and accessible")
+                return True, ""
+            else:
+                error_msg = f"Search index '{index_name}' exists but may not be properly configured"
+                self.logger.warning(error_msg)
+                return False, error_msg
+        except ResourceNotFoundError:
+            error_msg = f"Search index '{index_name}' does not exist"
+            self.logger.error(error_msg)
+            return False, error_msg
+        except ClientAuthenticationError as e:
+            error_msg = (
+                f"Authentication failed for search index '{index_name}': {str(e)}"
+            )
+            self.logger.error(error_msg)
+            return False, error_msg
+        except HttpResponseError as e:
+            error_msg = f"Error accessing search index '{index_name}': {str(e)}"
+            self.logger.error(error_msg)
+            return False, error_msg
+        except Exception as e:
+            error_msg = (
+                f"Unexpected error validating search index '{index_name}': {str(e)}"
+            )
+            self.logger.error(error_msg)
+            return False, error_msg
+
+    async def get_search_index_summary(self) -> Dict[str, Any]:
+        """Get a summary of available search indexes for debugging/monitoring."""
+        try:
+            if not self.search_endpoint:
+                return {"error": "No Azure Search endpoint configured"}
+            index_client = SearchIndexClient(
+                endpoint=self.search_endpoint, credential=self.search_credential
+            )
+            indexes = list(index_client.list_indexes())
+            summary = {
+                "search_endpoint": self.search_endpoint,
+                "total_indexes": len(indexes),
+                "available_indexes": [index.name for index in indexes],
+            }
+            return summary
+        except Exception as e:
+            self.logger.error(f"Error getting search index summary: {e}")
+            return {"error": str(e)}
