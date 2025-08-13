@@ -48,8 +48,6 @@ from utils_kernel import (
     rai_validate_team_config,
 )
 
-from v3.orchestration.manager import OnboardingOrchestrationManager
-from v3.scenarios.onboarding_cases import MagenticScenarios
 from v3.api.router import api_v3
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
