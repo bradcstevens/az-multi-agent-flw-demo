@@ -74,7 +74,7 @@ The files for the dev container are located in `/.devcontainer/` folder.
 
    - You can use the Bicep extension for VSCode (Right-click the `.bicep` file, then select "Show deployment plane") or use the Azure CLI:
      ```bash
-     az deployment group create -g <resource-group-name> -f deploy/macae-dev.bicep --query 'properties.outputs'
+     az deployment group create -g <resource-group-name> -f infra/main.bicep --query 'properties.outputs'
      ```
    - **Note**: You will be prompted for a `principalId`, which is the ObjectID of your user in Entra ID. To find it, use the Azure Portal or run:
      ```bash

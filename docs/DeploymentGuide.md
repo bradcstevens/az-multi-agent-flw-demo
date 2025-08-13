@@ -287,7 +287,7 @@ The files for the dev container are located in `/.devcontainer/` folder.
 
    - You can use the Bicep extension for VSCode (Right-click the `.bicep` file, then select "Show  deployment plan") or use the Azure CLI:
      ```bash
-     az deployment group create -g <resource-group-name> -f deploy/macae-dev.bicep --query 'properties.outputs'
+     az deployment group create -g <resource-group-name> -f infra/main.bicep --query 'properties.outputs'
      ```
    - **Note**: You will be prompted for a `principalId`, which is the ObjectID of your user in Entra ID. To find it, use the Azure Portal or run:
 
@@ -321,6 +321,10 @@ The files for the dev container are located in `/.devcontainer/` folder.
 5. **Create a `.env` file:**
 
    - Navigate to the `src\backend` folder and create a `.env` file based on the provided `.env.sample` file.
+   - Update the `.env` file with the required values from your Azure resource group in Azure Portal App Service environment variables.
+   - Alternatively, if resources were
+   provisioned using `azd provision` or `azd up`, a `.env` file is automatically generated in the `.azure/<env-name>/.env`
+   file. To get your `<env-name>` run `azd env list` to see which env is default.
 
 6. **Fill in the `.env` file:**
 
