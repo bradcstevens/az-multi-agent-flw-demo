@@ -42,8 +42,22 @@ param location string
     ]
   }
 })
-@description('Optional. Location for all AI service resources. This should be one of the supported Azure AI Service locations.')
-param azureAiServiceLocation string
+@description('Required. Location for all AI service resources. This should be one of the supported Azure AI Service locations.')
+param aiDeploymentsLocation string
+
+@minLength(1)
+@description('Optional. Name of the GPT model to deploy:')
+param gptModelName string = 'gpt-4o'
+
+@description('Optional. Version of the GPT model to deploy. Defaults to 2024-08-06.')
+param gptModelVersion string = '2024-08-06'
+
+@minLength(1)
+@description('Optional. GPT model deployment type. Defaults to GlobalStandard.')
+param modelDeploymentType string = 'GlobalStandard'
+
+@description('Optional. AI model deployment token capacity. Defaults to 150 for optimal performance.')
+param gptModelCapacity int = 150
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags resourceInput<'Microsoft.Resources/resourceGroups@2025-04-01'>.tags = {}
@@ -910,12 +924,11 @@ var aiFoundryAiServicesAiProjectResourceName = 'proj-${solutionSuffix}'
 var aiFoundryAIservicesEnabled = true
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
-  name: 'gpt-4o'
-  version: '2024-08-06'
+  name: gptModelName
+  version: gptModelVersion
   sku: {
-    name: 'GlobalStandard'
-    //Currently the capacity is set to 140 for optimal performance.
-    capacity: 140
+    name: modelDeploymentType
+    capacity: gptModelCapacity
   }
   raiPolicyName: 'Microsoft.Default'
 }
@@ -925,7 +938,7 @@ module aiFoundryAiServices 'modules/ai-services.bicep' = if (aiFoundryAIservices
   name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
-    location: azureAiServiceLocation
+    location: aiDeploymentsLocation
     tags: tags
     projectName: aiFoundryAiServicesAiProjectResourceName
     projectDescription: 'AI Foundry Project'
