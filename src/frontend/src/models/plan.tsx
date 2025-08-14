@@ -1,4 +1,4 @@
-import { AgentType, AgentTypeString, PlanStatus, StepStatus, HumanFeedbackStatus } from './enums';
+import { AgentType, PlanStatus, StepStatus, HumanFeedbackStatus } from './enums';
 
 /**
  * Base interface with common fields
@@ -49,7 +49,7 @@ export interface Step extends BaseModel {
     /** Action to be performed */
     action: string;
     /** Agent assigned to this step */
-    agent: AgentTypeString;
+    agent: AgentType;
     /** Current status of the step */
     status: StepStatus;
     /** Optional reply from the agent */
@@ -107,7 +107,7 @@ export interface PlanWithSteps extends Plan {
  */
 export interface ProcessedPlanData {
     plan: PlanWithSteps;
-    agents: AgentTypeString[];
+    agents: AgentType[];
     steps: Step[];
     hasClarificationRequest: boolean;
     hasClarificationResponse: boolean;

@@ -17,12 +17,12 @@ export enum AgentType {
     TECH_SUPPORT = "Tech_Support_Agent",
     GROUP_CHAT_MANAGER = "Group_Chat_Manager",
     PLANNER = "Planner_Agent",
-    
+
     // Common uploadable agent types
     MAGENTIC_ONE = "MagenticOne",
     CUSTOM = "Custom",
     RAG = "RAG",
-    
+
     // Specific agent names (can be any name with any type)
     CODER = "Coder",
     EXECUTOR = "Executor",
@@ -32,10 +32,6 @@ export enum AgentType {
     MAINTENANCE_KB_AGENT = "MaintanceKBAgent",
 }
 
-/**
- * Type representing any agent type - either from the enum or a custom string
- */
-export type AgentTypeString = AgentType | string;
 
 /**
  * Utility functions for working with agent types
@@ -44,15 +40,15 @@ export class AgentTypeUtils {
     /**
      * Get display name for an agent type
      */
-    static getDisplayName(agentType: AgentTypeString): string {
+    static getDisplayName(agentType: AgentType): string {
         // Convert to string first
         const typeStr = String(agentType);
-        
+
         // Handle specific formatting for known patterns
         if (typeStr.includes('_Agent')) {
             return typeStr.replace('_Agent', '').replace('_', ' ');
         }
-        
+
         // Handle camelCase and PascalCase names
         return typeStr.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
     }
@@ -60,30 +56,30 @@ export class AgentTypeUtils {
     /**
      * Check if an agent type is a known/default type
      */
-    static isKnownType(agentType: AgentTypeString): boolean {
-        return Object.values(AgentType).includes(agentType as AgentType);
+    static isKnownType(agentType: AgentType): boolean {
+        return Object.values(AgentType).includes(agentType);
     }
 
     /**
      * Get agent type from string, with fallback to the original string
      */
-    static fromString(type: string): AgentTypeString {
+    static fromString(type: string): AgentType {
         // First check if it's a known enum value
         const enumValue = Object.values(AgentType).find(value => value === type);
         if (enumValue) {
             return enumValue;
         }
-        
+
         // Return the custom type as-is
-        return type;
+        return AgentType.CUSTOM;
     }
 
     /**
      * Get agent type category
      */
-    static getAgentCategory(agentType: AgentTypeString): 'system' | 'magentic-one' | 'custom' | 'rag' | 'unknown' {
+    static getAgentCategory(agentType: AgentType): 'system' | 'magentic-one' | 'custom' | 'rag' | 'unknown' {
         const typeStr = String(agentType);
-        
+
         // System/Legacy agents
         if ([
             'Human_Agent', 'Hr_Agent', 'Marketing_Agent', 'Procurement_Agent',
@@ -92,39 +88,39 @@ export class AgentTypeUtils {
         ].includes(typeStr)) {
             return 'system';
         }
-        
+
         // MagenticOne framework agents
         if (typeStr === 'MagenticOne' || [
             'Coder', 'Executor', 'FileSurfer', 'WebSurfer'
         ].includes(typeStr)) {
             return 'magentic-one';
         }
-        
+
         // RAG agents
         if (typeStr === 'RAG' || typeStr.toLowerCase().includes('rag') || typeStr.toLowerCase().includes('kb')) {
             return 'rag';
         }
-        
+
         // Custom agents
         if (typeStr === 'Custom') {
             return 'custom';
         }
-        
+
         return 'unknown';
     }
 
     /**
      * Get icon for agent type based on category and name
      */
-    static getAgentIcon(agentType: AgentTypeString, providedIcon?: string): string {
+    static getAgentIcon(agentType: AgentType, providedIcon?: string): string {
         // If icon is explicitly provided, use it
         if (providedIcon && providedIcon.trim()) {
             return providedIcon;
         }
-        
+
         const category = this.getAgentCategory(agentType);
         const typeStr = String(agentType);
-        
+
         // Specific agent name mappings
         const iconMap: Record<string, string> = {
             'Coder': 'Terminal',
@@ -134,11 +130,11 @@ export class AgentTypeUtils {
             'SensorSentinel': 'BookMarked',
             'MaintanceKBAgent': 'Search',
         };
-        
+
         if (iconMap[typeStr]) {
             return iconMap[typeStr];
         }
-        
+
         // Category-based defaults
         switch (category) {
             case 'system':
@@ -159,25 +155,25 @@ export class AgentTypeUtils {
      */
     static validateAgent(agent: any): { isValid: boolean; errors: string[] } {
         const errors: string[] = [];
-        
+
         if (!agent || typeof agent !== 'object') {
             errors.push('Agent must be a valid object');
             return { isValid: false, errors };
         }
-        
+
         // Required fields
         if (!agent.input_key || typeof agent.input_key !== 'string' || agent.input_key.trim() === '') {
             errors.push('Agent input_key is required and cannot be empty');
         }
-        
+
         if (!agent.type || typeof agent.type !== 'string' || agent.type.trim() === '') {
             errors.push('Agent type is required and cannot be empty');
         }
-        
+
         if (!agent.name || typeof agent.name !== 'string' || agent.name.trim() === '') {
             errors.push('Agent name is required and cannot be empty');
         }
-        
+
         // Optional fields validation
         const optionalStringFields = ['system_message', 'description', 'icon', 'index_name'];
         optionalStringFields.forEach(field => {
@@ -185,19 +181,19 @@ export class AgentTypeUtils {
                 errors.push(`Agent ${field} must be a string if provided`);
             }
         });
-        
+
         // Special validation for RAG agents
         if (agent.type === 'RAG' && (!agent.index_name || agent.index_name.trim() === '')) {
             errors.push('RAG agents must have a valid index_name specified');
         }
-        
+
         return { isValid: errors.length === 0, errors };
     }
 
     /**
      * Get all available agent types (both enum and common custom types)
      */
-    static getAllAvailableTypes(): AgentTypeString[] {
+    static getAllAvailableTypes(): AgentType[] {
         return [
             ...Object.values(AgentType),
             // Add other common types that might come from JSON uploads

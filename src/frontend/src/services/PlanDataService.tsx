@@ -2,7 +2,6 @@ import {
   PlanWithSteps,
   Step,
   AgentType,
-  AgentTypeString,
   ProcessedPlanData,
   PlanMessage,
 } from "@/models";
@@ -44,7 +43,7 @@ export class PlanDataService {
     messages: PlanMessage[]
   ): ProcessedPlanData {
     // Extract unique agents from steps
-    const uniqueAgents = new Set<AgentTypeString>();
+    const uniqueAgents = new Set<AgentType>();
     plan.steps.forEach((step) => {
       if (step.agent) {
         uniqueAgents.add(step.agent);
@@ -86,7 +85,7 @@ export class PlanDataService {
    * @param agentType Agent type to filter by
    * @returns Array of steps for the specified agent
    */
-  static getStepsForAgent(plan: PlanWithSteps, agentType: AgentTypeString): Step[] {
+  static getStepsForAgent(plan: PlanWithSteps, agentType: AgentType): Step[] {
     return apiService.getStepsForAgent(plan, agentType);
   }
 
