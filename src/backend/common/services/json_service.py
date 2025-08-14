@@ -15,9 +15,13 @@ from azure.core.exceptions import (
 from azure.identity import DefaultAzureCredential
 from azure.search.documents.indexes import SearchIndexClient
 
-from models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
+from common.models.messages_kernel import (
+    TeamConfiguration,
+    TeamAgent,
+    StartingTask,
+)
 from context.cosmos_memory_kernel import CosmosMemoryContext
-from helpers.azure_credential_utils import get_azure_credential
+from common.auth.azure_credential_utils import get_azure_credential
 
 
 class JsonService:

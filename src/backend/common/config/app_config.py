@@ -5,7 +5,7 @@ from typing import Optional
 
 from azure.ai.projects.aio import AIProjectClient
 from azure.cosmos.aio import CosmosClient
-from helpers.azure_credential_utils import get_azure_credential
+from common.auth.azure_credential_utils import get_azure_credential
 from dotenv import load_dotenv
 from semantic_kernel.kernel import Kernel
 
@@ -159,7 +159,9 @@ class AppConfig:
                 )
 
             endpoint = self.AZURE_AI_AGENT_ENDPOINT
-            self._ai_project_client = AIProjectClient(endpoint=endpoint, credential=credential)
+            self._ai_project_client = AIProjectClient(
+                endpoint=endpoint, credential=credential
+            )
 
             return self._ai_project_client
         except Exception as exc:

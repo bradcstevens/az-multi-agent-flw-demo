@@ -14,7 +14,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from context.cosmos_memory_kernel import CosmosMemoryContext
-from models.messages_kernel import TeamConfiguration, TeamAgent, StartingTask
+from common.models.messages_kernel import (
+    TeamConfiguration,
+    TeamAgent,
+    StartingTask,
+)
 
 
 async def test_team_specific_methods():

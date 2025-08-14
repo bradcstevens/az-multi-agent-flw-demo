@@ -1,13 +1,18 @@
 import logging
 from abc import abstractmethod
-from typing import (Any, List, Mapping, Optional)
+from typing import Any, List, Mapping, Optional
 
 # Import the new AppConfig instance
-from app_config import config
+from common.config.app_config import config
 from context.cosmos_memory_kernel import CosmosMemoryContext
-from event_utils import track_event_if_configured
-from models.messages_kernel import (ActionRequest, ActionResponse,
-                                    AgentMessage, Step, StepStatus)
+from common.utils.event_utils import track_event_if_configured
+from common.models.messages_kernel import (
+    ActionRequest,
+    ActionResponse,
+    AgentMessage,
+    Step,
+    StepStatus,
+)
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 from semantic_kernel.functions import KernelFunction
 

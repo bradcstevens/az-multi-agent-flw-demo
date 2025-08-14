@@ -10,12 +10,11 @@ import uuid
 from typing import Dict, List, Optional
 
 # Semantic Kernel imports
-from app_config import config
+from common.config.app_config import config
 from auth.auth_utils import get_authenticated_user_details
 from azure.monitor.opentelemetry import configure_azure_monitor
-from config_kernel import Config
 from dateutil import parser
-from event_utils import track_event_if_configured
+from common.utils.event_utils import track_event_if_configured
 
 # FastAPI imports
 from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
@@ -24,7 +23,7 @@ from kernel_agents.agent_factory import AgentFactory
 
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
-from models.messages_kernel import (
+from common.models.messages_kernel import (
     AgentMessage,
     AgentType,
     GeneratePlanRequest,
@@ -38,11 +37,11 @@ from models.messages_kernel import (
     UserLanguage,
     TeamConfiguration,
 )
-from services.json_service import JsonService
+from common.services.json_service import JsonService
 
 
 # Updated import for KernelArguments
-from utils_kernel import (
+from common.utils.utils_kernel import (
     initialize_runtime_and_context,
     rai_success,
     rai_validate_team_config,
@@ -81,7 +80,7 @@ logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").setLevel(
 # Initialize the FastAPI app
 app = FastAPI()
 
-frontend_url = Config.FRONTEND_SITE_NAME
+frontend_url = config.FRONTEND_SITE_NAME
 
 # Add this near the top of your app.py, after initializing the app
 app.add_middleware(

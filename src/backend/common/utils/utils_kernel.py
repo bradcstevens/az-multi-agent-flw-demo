@@ -10,11 +10,11 @@ import requests
 import semantic_kernel as sk
 
 # Import AppConfig from app_config
-from app_config import config
+from common.config.app_config import config
 from context.cosmos_memory_kernel import CosmosMemoryContext
 
 # Import the credential utility
-from helpers.azure_credential_utils import get_azure_credential
+from common.auth.azure_credential_utils import get_azure_credential
 
 # Import agent factory and the new AppConfig
 from kernel_agents.agent_factory import AgentFactory
@@ -26,7 +26,7 @@ from kernel_agents.planner_agent import PlannerAgent
 from kernel_agents.procurement_agent import ProcurementAgent
 from kernel_agents.product_agent import ProductAgent
 from kernel_agents.tech_support_agent import TechSupportAgent
-from models.messages_kernel import AgentType
+from common.models.messages_kernel import AgentType
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 
 logging.basicConfig(level=logging.INFO)
@@ -298,10 +298,10 @@ async def rai_success(description: str, is_task_creation: bool) -> bool:
 async def rai_validate_team_config(team_config_json: dict) -> tuple[bool, str]:
     """
     Validates team configuration JSON content for RAI compliance.
-    
+
     Args:
         team_config_json: The team configuration JSON data to validate
-        
+
     Returns:
         Tuple of (is_valid, error_message)
         - is_valid: True if content passes RAI checks, False otherwise
@@ -310,13 +310,13 @@ async def rai_validate_team_config(team_config_json: dict) -> tuple[bool, str]:
     try:
         # Extract all text content from the team configuration
         text_content = []
-        
+
         # Extract team name and description
         if "name" in team_config_json:
             text_content.append(team_config_json["name"])
         if "description" in team_config_json:
             text_content.append(team_config_json["description"])
-        
+
         # Extract agent information (based on actual schema)
         if "agents" in team_config_json:
             for agent in team_config_json["agents"]:
@@ -330,7 +330,7 @@ async def rai_validate_team_config(team_config_json: dict) -> tuple[bool, str]:
                     # Agent system message (main field for instructions)
                     if "system_message" in agent:
                         text_content.append(agent["system_message"])
-        
+
         # Extract starting tasks (based on actual schema)
         if "starting_tasks" in team_config_json:
             for task in team_config_json["starting_tasks"]:
@@ -341,21 +341,24 @@ async def rai_validate_team_config(team_config_json: dict) -> tuple[bool, str]:
                     # Task prompt (main field for task description)
                     if "prompt" in task:
                         text_content.append(task["prompt"])
-        
+
         # Combine all text content for validation
         combined_content = " ".join(text_content)
-        
+
         if not combined_content.strip():
             return False, "Team configuration contains no readable text content"
-        
+
         # Use existing RAI validation function
         rai_result = await rai_success(combined_content, False)
-        
+
         if not rai_result:
-            return False, "Team configuration contains inappropriate content and cannot be uploaded."
-        
+            return (
+                False,
+                "Team configuration contains inappropriate content and cannot be uploaded.",
+            )
+
         return True, ""
-        
+
     except Exception as e:
         logging.error(f"Error validating team configuration with RAI: {str(e)}")
         return False, "Unable to validate team configuration content. Please try again."

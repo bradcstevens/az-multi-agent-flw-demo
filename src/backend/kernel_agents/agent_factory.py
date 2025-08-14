@@ -5,13 +5,16 @@ import logging
 from typing import Any, Dict, Optional, Type
 
 # Import the new AppConfig instance
-from app_config import config
-from azure.ai.agents.models import (ResponseFormatJsonSchema,
-                                    ResponseFormatJsonSchemaType)
+from common.config.app_config import config
+from azure.ai.agents.models import (
+    ResponseFormatJsonSchema,
+    ResponseFormatJsonSchemaType,
+)
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from kernel_agents.agent_base import BaseAgent
 from kernel_agents.generic_agent import GenericAgent
 from kernel_agents.group_chat_manager import GroupChatManager
+
 # Import all specialized agent implementations
 from kernel_agents.hr_agent import HrAgent
 from kernel_agents.human_agent import HumanAgent
@@ -20,7 +23,8 @@ from kernel_agents.planner_agent import PlannerAgent  # Add PlannerAgent import
 from kernel_agents.procurement_agent import ProcurementAgent
 from kernel_agents.product_agent import ProductAgent
 from kernel_agents.tech_support_agent import TechSupportAgent
-from models.messages_kernel import AgentType, PlannerResponsePlan
+from common.models.messages_kernel import AgentType, PlannerResponsePlan
+
 # pylint:disable=E0611
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 

@@ -3,10 +3,12 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from azure.ai.agents.models import (ResponseFormatJsonSchema,
-                                    ResponseFormatJsonSchemaType)
+from azure.ai.agents.models import (
+    ResponseFormatJsonSchema,
+    ResponseFormatJsonSchemaType,
+)
 from context.cosmos_memory_kernel import CosmosMemoryContext
-from event_utils import track_event_if_configured
+from common.utils.event_utils import track_event_if_configured
 from kernel_agents.agent_base import BaseAgent
 from kernel_tools.generic_tools import GenericTools
 from kernel_tools.hr_tools import HrTools
@@ -14,7 +16,7 @@ from kernel_tools.marketing_tools import MarketingTools
 from kernel_tools.procurement_tools import ProcurementTools
 from kernel_tools.product_tools import ProductTools
 from kernel_tools.tech_support_tools import TechSupportTools
-from models.messages_kernel import (
+from common.models.messages_kernel import (
     AgentMessage,
     AgentType,
     HumanFeedbackStatus,

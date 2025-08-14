@@ -10,14 +10,14 @@ import numpy as np
 
 from azure.cosmos.partition_key import PartitionKey
 from azure.cosmos.aio import CosmosClient
-from helpers.azure_credential_utils import get_azure_credential
+from common.auth.azure_credential_utils import get_azure_credential
 from semantic_kernel.memory.memory_record import MemoryRecord
 from semantic_kernel.memory.memory_store_base import MemoryStoreBase
 from semantic_kernel.contents import ChatMessageContent, ChatHistory, AuthorRole
 
 # Import the AppConfig instance
-from app_config import config
-from models.messages_kernel import (
+from common.config.app_config import config
+from common.models.messages_kernel import (
     BaseDataModel,
     Plan,
     Session,
@@ -113,6 +113,7 @@ class CosmosMemoryContext(MemoryStoreBase):
             # Re-attempt initialization with a small delay for credential refresh
             try:
                 import asyncio
+
                 await asyncio.sleep(0.5)  # Small delay for credential refresh
                 await self.initialize()
             except Exception as e:
@@ -470,41 +471,51 @@ class CosmosMemoryContext(MemoryStoreBase):
                 # Debug logging
                 logging.info(f"Attempting to delete team {id}")
                 logging.info(f"Team user_id: {team.user_id}")
-                logging.info(f"Team session_id: {getattr(team, 'session_id', 'NOT_SET')}")
-                
+                logging.info(
+                    f"Team session_id: {getattr(team, 'session_id', 'NOT_SET')}"
+                )
+
                 # Try different partition key strategies
                 partition_keys_to_try = []
-                
+
                 # Strategy 1: Use session_id if it exists
                 if hasattr(team, "session_id") and team.session_id:
                     partition_keys_to_try.append(team.session_id)
                     logging.info(f"Will try session_id: {team.session_id}")
-                
+
                 # Strategy 2: Use user_id as fallback
                 if team.user_id:
                     partition_keys_to_try.append(team.user_id)
                     logging.info(f"Will try user_id: {team.user_id}")
-                
+
                 # Strategy 3: Use current context session_id
                 if self.session_id:
                     partition_keys_to_try.append(self.session_id)
                     logging.info(f"Will try context session_id: {self.session_id}")
-                
+
                 # Strategy 4: Try null/empty partition key (for documents created without session_id)
                 partition_keys_to_try.extend([None, ""])
                 logging.info("Will try null and empty partition keys")
-                
+
                 # Try each partition key until one works
                 for partition_key in partition_keys_to_try:
                     try:
-                        logging.info(f"Attempting delete with partition key: {partition_key}")
-                        await self._container.delete_item(item=id, partition_key=partition_key)
-                        logging.info(f"Successfully deleted team {id} with partition key: {partition_key}")
+                        logging.info(
+                            f"Attempting delete with partition key: {partition_key}"
+                        )
+                        await self._container.delete_item(
+                            item=id, partition_key=partition_key
+                        )
+                        logging.info(
+                            f"Successfully deleted team {id} with partition key: {partition_key}"
+                        )
                         return True
                     except Exception as e:
-                        logging.warning(f"Delete failed with partition key {partition_key}: {str(e)}")
+                        logging.warning(
+                            f"Delete failed with partition key {partition_key}: {str(e)}"
+                        )
                         continue
-                
+
                 logging.error(f"All partition key strategies failed for team {id}")
                 return False
             return False

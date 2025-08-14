@@ -2,11 +2,16 @@ import logging
 from typing import Dict, List, Optional
 
 from context.cosmos_memory_kernel import CosmosMemoryContext
-from event_utils import track_event_if_configured
+from common.utils.event_utils import track_event_if_configured
 from kernel_agents.agent_base import BaseAgent
-from models.messages_kernel import (AgentMessage, AgentType,
-                                    ApprovalRequest, HumanClarification,
-                                    HumanFeedback, StepStatus)
+from common.models.messages_kernel import (
+    AgentMessage,
+    AgentType,
+    ApprovalRequest,
+    HumanClarification,
+    HumanFeedback,
+    StepStatus,
+)
 from semantic_kernel.functions import KernelFunction
 
 

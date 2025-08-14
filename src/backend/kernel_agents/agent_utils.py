@@ -5,7 +5,7 @@ import semantic_kernel as sk
 from pydantic import BaseModel
 
 from context.cosmos_memory_kernel import CosmosMemoryContext
-from models.messages_kernel import Step
+from common.models.messages_kernel import Step
 
 common_agent_system_message = "If you do not have the information for the arguments of the function you need to call, do not call the function. Instead, respond back to the user requesting further information. You must not hallucinate or invent any of the information used as arguments in the function. For example, if you need to call a function that requires a delivery address, you must not generate 123 Example St. You must skip calling functions and return a clarification message along the lines of: Sorry, I'm missing some information I need to help you with that. Could you please provide the delivery address so I can do that for you?"
 
