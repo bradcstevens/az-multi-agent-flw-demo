@@ -20,7 +20,7 @@ The easiest way to run this accelerator is in a VS Code Dev Containers, which wi
 
 ## Detailed Development Container setup instructions
 
-The solution contains a [development container](https://code.visualstudio.com/docs/remote/containers) with all the required tooling to develop and deploy the accelerator. To deploy the Chat With Your Data accelerator using the provided development container you will also need:
+The solution contains a [development container](https://code.visualstudio.com/docs/remote/containers) with all the required tooling to develop and deploy the accelerator. To deploy the Multi Agent Solution accelerator using the provided development container you will also need:
 
 * [Visual Studio Code](https://code.visualstudio.com)
 * [Remote containers extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
@@ -124,8 +124,19 @@ The files for the dev container are located in `/.devcontainer/` folder.
      ```bash
      pip install -r requirements.txt
      ```
+     
+9. **Build the frontend (important):**
 
-10. **Run the application:**
+    - Before running the frontend server, you must build the frontend to generate the necessary `build/assets` directory.
+
+      From the `src/frontend` directory, run:
+
+      ```bash
+      npm install
+      npm run build
+      ```
+
+11. **Run the application:**
    - From the src/backend directory:
    ```bash
    python app_kernel.py
