@@ -1,3 +1,4 @@
+import json
 import locale
 from datetime import datetime
 import logging
@@ -17,8 +18,17 @@ def format_date_for_user(date_str: str, user_locale: Optional[str] = None) -> st
     """
     try:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        locale.setlocale(locale.LC_TIME, user_locale or '')
+        locale.setlocale(locale.LC_TIME, user_locale or "")
         return date_obj.strftime("%B %d, %Y")
     except Exception as e:
         logging.warning(f"Date formatting failed for '{date_str}': {e}")
         return date_str
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder for handling datetime objects."""
+
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)

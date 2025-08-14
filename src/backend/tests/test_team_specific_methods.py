@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for team-specific methods in CosmosMemoryContext
+Test script for
 """
 
 import asyncio
@@ -13,7 +13,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from context.cosmos_memory_kernel import CosmosMemoryContext
+
 from common.models.messages_kernel import (
     TeamConfiguration,
     TeamAgent,
@@ -26,9 +26,7 @@ async def test_team_specific_methods():
     print("=== Testing Team-Specific Methods ===\n")
 
     # Create test context (no initialization needed for testing)
-    memory_context = CosmosMemoryContext(
-        session_id="test-session-teams", user_id="test-user-teams"
-    )
+    memory_context = await DatabaseFactory.get_database()
 
     # Test data
     test_user_id = "test-user-123"

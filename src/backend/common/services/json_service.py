@@ -20,14 +20,15 @@ from common.models.messages_kernel import (
     TeamAgent,
     StartingTask,
 )
-from context.cosmos_memory_kernel import CosmosMemoryContext
+
 from common.auth.azure_credential_utils import get_azure_credential
+from common.database.database_base import DatabaseBase
 
 
 class JsonService:
     """Service for handling JSON team configuration operations."""
 
-    def __init__(self, memory_context: Optional[CosmosMemoryContext] = None):
+    def __init__(self, memory_context: Optional[DatabaseBase] = None):
         """Initialize with optional memory context."""
         self.memory_context = memory_context
         self.logger = logging.getLogger(__name__)
@@ -192,13 +193,13 @@ class JsonService:
             raise ValueError(f"Failed to save team configuration: {str(e)}") from e
 
     async def get_team_configuration(
-        self, config_id: str, user_id: str
+        self, team_id: str, user_id: str
     ) -> Optional[TeamConfiguration]:
         """
         Retrieve a team configuration by ID.
 
         Args:
-            config_id: Configuration ID to retrieve
+            team_id: Configuration ID to retrieve
             user_id: User ID for access control
 
         Returns:
@@ -206,7 +207,7 @@ class JsonService:
         """
         try:
             # Get the specific configuration using the team-specific method
-            team_config = await self.memory_context.get_team_by_id(config_id)
+            team_config = await self.memory_context.get_team_by_id(team_id)
 
             if team_config is None:
                 return None
@@ -215,7 +216,7 @@ class JsonService:
             if team_config.user_id != user_id:
                 self.logger.warning(
                     "Access denied: config %s does not belong to user %s",
-                    config_id,
+                    team_id,
                     user_id,
                 )
                 return None
@@ -247,12 +248,12 @@ class JsonService:
             self.logger.error("Error retrieving team configurations: %s", str(e))
             return []
 
-    async def delete_team_configuration(self, config_id: str, user_id: str) -> bool:
+    async def delete_team_configuration(self, team_id: str, user_id: str) -> bool:
         """
         Delete a team configuration by ID.
 
         Args:
-            config_id: Configuration ID to delete
+            team_id: Configuration ID to delete
             user_id: User ID for access control
 
         Returns:
@@ -260,21 +261,19 @@ class JsonService:
         """
         try:
             # First, verify the configuration exists and belongs to the user
-            team_config = await self.memory_context.get_team_by_id(config_id)
+            team_config = await self.memory_context.get_team_by_id(team_id)
 
             if team_config is None:
                 self.logger.warning(
-                    "Team configuration not found for deletion: %s", config_id
+                    "Team configuration not found for deletion: %s", team_id
                 )
                 return False
 
             # Delete the configuration using the specific delete_team_by_id method
-            success = await self.memory_context.delete_team_by_id(config_id)
+            success = await self.memory_context.delete_team_by_id(team_id)
 
             if success:
-                self.logger.info(
-                    "Successfully deleted team configuration: %s", config_id
-                )
+                self.logger.info("Successfully deleted team configuration: %s", team_id)
 
             return success
 

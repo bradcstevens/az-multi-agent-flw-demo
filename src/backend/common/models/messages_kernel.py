@@ -6,27 +6,6 @@ from typing import Any, Dict, List, Literal, Optional
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
 
 
-# Classes specifically for handling runtime interrupts
-class GetHumanInputMessage(KernelBaseModel):
-    """Message requesting input from a human."""
-
-    content: str
-
-
-class GroupChatMessage(KernelBaseModel):
-    """Message in a group chat."""
-
-    body: Any
-    source: str
-    session_id: str
-    target: str = ""
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-
-    def __str__(self):
-        content = self.body.content if hasattr(self.body, "content") else str(self.body)
-        return f"GroupChatMessage(source={self.source}, content={content})"
-
-
 class DataType(str, Enum):
     """Enumeration of possible data types for documents in the database."""
 
@@ -34,6 +13,7 @@ class DataType(str, Enum):
     plan = "plan"
     step = "step"
     message = "message"
+    team = "team"
 
 
 class AgentType(str, Enum):
@@ -96,53 +76,6 @@ class BaseDataModel(KernelBaseModel):
     timestamp: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
-
-
-# Basic message class for Semantic Kernel compatibility
-class ChatMessage(KernelBaseModel):
-    """Base class for chat messages in Semantic Kernel format."""
-
-    role: MessageRole
-    content: str
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-    def to_semantic_kernel_dict(self) -> Dict[str, Any]:
-        """Convert to format expected by Semantic Kernel."""
-        return {
-            "role": self.role.value,
-            "content": self.content,
-            "metadata": self.metadata,
-        }
-
-
-class StoredMessage(BaseDataModel):
-    """Message stored in the database with additional metadata."""
-
-    data_type: Literal["message"] = Field("message", Literal=True)
-    session_id: str
-    user_id: str
-    role: MessageRole
-    content: str
-    plan_id: Optional[str] = None
-    step_id: Optional[str] = None
-    source: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-    def to_chat_message(self) -> ChatMessage:
-        """Convert to ChatMessage format."""
-        return ChatMessage(
-            role=self.role,
-            content=self.content,
-            metadata={
-                "source": self.source,
-                "plan_id": self.plan_id,
-                "step_id": self.step_id,
-                "session_id": self.session_id,
-                "user_id": self.user_id,
-                "message_id": self.id,
-                **self.metadata,
-            },
-        )
 
 
 class AgentMessage(BaseDataModel):
@@ -242,8 +175,8 @@ class StartingTask(KernelBaseModel):
 class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""
 
-    data_type: Literal["team_config"] = Field("team_config", Literal=True)
     team_id: str
+    data_type: Literal["team_config"] = Field("team_config", Literal=True)
     name: str
     status: str
     created: str
@@ -304,6 +237,7 @@ class InputTask(KernelBaseModel):
 
     session_id: str
     description: str  # Initial goal
+    team_id: str
 
 
 class UserLanguage(KernelBaseModel):
@@ -374,105 +308,6 @@ class PlanStateUpdate(KernelBaseModel):
     overall_status: PlanStatus
 
 
-# Semantic Kernel chat message handler
-class SKChatHistory:
-    """Helper class to work with Semantic Kernel chat history."""
-
-    def __init__(self, memory_store):
-        """Initialize with a memory store."""
-        self.memory_store = memory_store
-
-    async def add_system_message(
-        self, session_id: str, user_id: str, content: str, **kwargs
-    ):
-        """Add a system message to the chat history."""
-        message = StoredMessage(
-            session_id=session_id,
-            user_id=user_id,
-            role=MessageRole.system,
-            content=content,
-            **kwargs,
-        )
-        await self._store_message(message)
-        return message
-
-    async def add_user_message(
-        self, session_id: str, user_id: str, content: str, **kwargs
-    ):
-        """Add a user message to the chat history."""
-        message = StoredMessage(
-            session_id=session_id,
-            user_id=user_id,
-            role=MessageRole.user,
-            content=content,
-            **kwargs,
-        )
-        await self._store_message(message)
-        return message
-
-    async def add_assistant_message(
-        self, session_id: str, user_id: str, content: str, **kwargs
-    ):
-        """Add an assistant message to the chat history."""
-        message = StoredMessage(
-            session_id=session_id,
-            user_id=user_id,
-            role=MessageRole.assistant,
-            content=content,
-            **kwargs,
-        )
-        await self._store_message(message)
-        return message
-
-    async def add_function_message(
-        self, session_id: str, user_id: str, content: str, **kwargs
-    ):
-        """Add a function result message to the chat history."""
-        message = StoredMessage(
-            session_id=session_id,
-            user_id=user_id,
-            role=MessageRole.function,
-            content=content,
-            **kwargs,
-        )
-        await self._store_message(message)
-        return message
-
-    async def _store_message(self, message: StoredMessage):
-        """Store a message in the memory store."""
-        # Convert to dictionary for storage
-        message_dict = message.model_dump()
-
-        # Use memory store to save the message
-        # This assumes your memory store has an upsert_async method that takes a collection name and data
-        await self.memory_store.upsert_async(
-            f"message_{message.session_id}", message_dict
-        )
-
-    async def get_chat_history(
-        self, session_id: str, limit: int = 100
-    ) -> List[ChatMessage]:
-        """Retrieve chat history for a session."""
-        # Query messages from the memory store
-        # This assumes your memory store has a method to query items
-        messages = await self.memory_store.query_items(
-            f"message_{session_id}", limit=limit
-        )
-
-        # Convert to ChatMessage objects
-        chat_messages = []
-        for msg_dict in messages:
-            msg = StoredMessage.model_validate(msg_dict)
-            chat_messages.append(msg.to_chat_message())
-
-        return chat_messages
-
-    async def clear_history(self, session_id: str):
-        """Clear chat history for a session."""
-        # This assumes your memory store has a method to delete a collection
-        await self.memory_store.delete_collection_async(f"message_{session_id}")
-
-
 # Define the expected structure of the LLM response
 class PlannerResponseStep(KernelBaseModel):
     action: str
@@ -484,36 +319,3 @@ class PlannerResponsePlan(KernelBaseModel):
     steps: List[PlannerResponseStep]
     summary_plan_and_steps: str
     human_clarification_request: Optional[str] = None
-
-
-# Helper class for Semantic Kernel function calling
-class SKFunctionRegistry:
-    """Helper class to register and execute functions in Semantic Kernel."""
-
-    def __init__(self, kernel):
-        """Initialize with a Semantic Kernel instance."""
-        self.kernel = kernel
-        self.functions = {}
-
-    def register_function(self, name: str, function_obj, description: str = None):
-        """Register a function with the kernel."""
-        self.functions[name] = {
-            "function": function_obj,
-            "description": description or "",
-        }
-
-        # Register with the kernel's function registry
-        # The exact implementation depends on Semantic Kernel's API
-        # This is a placeholder - adjust according to the actual SK API
-        if hasattr(self.kernel, "register_function"):
-            self.kernel.register_function(name, function_obj, description)
-
-    async def execute_function(self, name: str, **kwargs):
-        """Execute a registered function."""
-        if name not in self.functions:
-            raise ValueError(f"Function {name} not registered")
-
-        function_obj = self.functions[name]["function"]
-        # Execute the function
-        # This might vary based on SK's execution model
-        return await function_obj(**kwargs)

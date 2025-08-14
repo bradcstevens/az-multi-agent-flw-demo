@@ -12,12 +12,12 @@ from common.models.messages_kernel import (
 )
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import (
-    initialize_runtime_and_context,
     rai_success,
     rai_validate_team_config,
 )
 from common.services.json_service import JsonService
 from kernel_agents.agent_factory import AgentFactory
+from common.database.database_factory import DatabaseFactory
 from v3.models.orchestration_models import AgentType
 from common.config.app_config import config
 
@@ -119,9 +119,7 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
 
     try:
         # Initialize memory store
-        kernel, memory_store = await initialize_runtime_and_context(
-            input_task.session_id, user_id
-        )
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
 
         # Create a new Plan object
         plan = Plan(
@@ -233,7 +231,7 @@ async def generate_plan_endpoint(
 
     try:
         # Initialize memory store
-        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
 
         # Get the existing plan
         plan = await memory_store.get_plan_by_plan_id(
@@ -394,7 +392,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         )
 
         # Initialize memory store and service
-        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
         json_service = JsonService(memory_store)
 
         # Validate model deployments
@@ -457,7 +455,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
 
         # Save the configuration
         try:
-            config_id = await json_service.save_team_configuration(team_config)
+            team_id = await json_service.save_team_configuration(team_config)
         except ValueError as e:
             raise HTTPException(
                 status_code=500, detail=f"Failed to save configuration: {str(e)}"
@@ -467,7 +465,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
             "Team configuration uploaded",
             {
                 "status": "success",
-                "config_id": config_id,
+                "team_id": team_id,
                 "team_id": team_config.team_id,
                 "user_id": user_id,
                 "agents_count": len(team_config.agents),
@@ -477,7 +475,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
 
         return {
             "status": "success",
-            "config_id": config_id,
+            "team_id": team_id,
             "team_id": team_config.team_id,
             "name": team_config.name,
             "message": "Team configuration uploaded and saved successfully",
@@ -547,7 +545,7 @@ async def get_team_configs_endpoint(request: Request):
 
     try:
         # Initialize memory store and service
-        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
         json_service = JsonService(memory_store)
 
         # Retrieve all team configurations
@@ -563,8 +561,8 @@ async def get_team_configs_endpoint(request: Request):
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 
-@app_v3.get("/team_configs/{config_id}")
-async def get_team_config_by_id_endpoint(config_id: str, request: Request):
+@app_v3.get("/team_configs/{team_id}")
+async def get_team_config_by_id_endpoint(team_id: str, request: Request):
     """
     Retrieve a specific team configuration by ID.
 
@@ -572,7 +570,7 @@ async def get_team_config_by_id_endpoint(config_id: str, request: Request):
     tags:
       - Team Configuration
     parameters:
-      - name: config_id
+      - name: team_id
         in: path
         type: string
         required: true
@@ -625,11 +623,11 @@ async def get_team_config_by_id_endpoint(config_id: str, request: Request):
 
     try:
         # Initialize memory store and service
-        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
         json_service = JsonService(memory_store)
 
         # Retrieve the specific team configuration
-        team_config = await json_service.get_team_configuration(config_id, user_id)
+        team_config = await json_service.get_team_configuration(team_id, user_id)
 
         if team_config is None:
             raise HTTPException(status_code=404, detail="Team configuration not found")
@@ -645,8 +643,8 @@ async def get_team_config_by_id_endpoint(config_id: str, request: Request):
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 
-@app_v3.delete("/team_configs/{config_id}")
-async def delete_team_config_endpoint(config_id: str, request: Request):
+@app_v3.delete("/team_configs/{team_id}")
+async def delete_team_config_endpoint(team_id: str, request: Request):
     """
     Delete a team configuration by ID.
 
@@ -654,7 +652,7 @@ async def delete_team_config_endpoint(config_id: str, request: Request):
     tags:
       - Team Configuration
     parameters:
-      - name: config_id
+      - name: team_id
         in: path
         type: string
         required: true
@@ -674,7 +672,7 @@ async def delete_team_config_endpoint(config_id: str, request: Request):
               type: string
             message:
               type: string
-            config_id:
+            team_id:
               type: string
       401:
         description: Missing or invalid user information
@@ -691,11 +689,11 @@ async def delete_team_config_endpoint(config_id: str, request: Request):
 
     try:
         # Initialize memory store and service
-        kernel, memory_store = await initialize_runtime_and_context("", user_id)
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
         json_service = JsonService(memory_store)
 
         # Delete the team configuration
-        deleted = await json_service.delete_team_configuration(config_id, user_id)
+        deleted = await json_service.delete_team_configuration(team_id, user_id)
 
         if not deleted:
             raise HTTPException(status_code=404, detail="Team configuration not found")
@@ -703,13 +701,13 @@ async def delete_team_config_endpoint(config_id: str, request: Request):
         # Track the event
         track_event_if_configured(
             "Team configuration deleted",
-            {"status": "success", "config_id": config_id, "user_id": user_id},
+            {"status": "success", "team_id": team_id, "user_id": user_id},
         )
 
         return {
             "status": "success",
             "message": "Team configuration deleted successfully",
-            "config_id": config_id,
+            "team_id": team_id,
         }
 
     except HTTPException:

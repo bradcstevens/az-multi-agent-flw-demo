@@ -57,6 +57,12 @@ class AppConfig:
         self._cosmos_database = None
         self._ai_project_client = None
 
+    def get_azure_credentials(self):
+        """Retrieve Azure credentials, either from environment variables or managed identity."""
+        if self._azure_credentials is None:
+            self._azure_credentials = get_azure_credential()
+        return self._azure_credentials
+
     def _get_required(self, name: str, default: Optional[str] = None) -> str:
         """Get a required configuration value from environment variables.
 
@@ -105,31 +111,6 @@ class AppConfig:
             True if the environment variable exists and is set to 'true' or '1', False otherwise
         """
         return name in os.environ and os.environ[name].lower() in ["true", "1"]
-
-    def get_cosmos_database_client(self):
-        """Get a Cosmos DB client for the configured database.
-
-        Returns:
-            A Cosmos DB database client
-        """
-        try:
-            if self._cosmos_client is None:
-                self._cosmos_client = CosmosClient(
-                    self.COSMOSDB_ENDPOINT, credential=get_azure_credential()
-                )
-
-            if self._cosmos_database is None:
-                self._cosmos_database = self._cosmos_client.get_database_client(
-                    self.COSMOSDB_DATABASE
-                )
-
-            return self._cosmos_database
-        except Exception as exc:
-            logging.error(
-                "Failed to create CosmosDB client: %s. CosmosDB is required for this application.",
-                exc,
-            )
-            raise
 
     def create_kernel(self):
         """Creates a new Semantic Kernel instance.

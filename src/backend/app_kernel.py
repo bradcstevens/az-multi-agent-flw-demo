@@ -37,10 +37,10 @@ from common.models.messages_kernel import (
 
 # Updated import for KernelArguments
 from common.utils.utils_kernel import (
-    initialize_runtime_and_context,
     rai_success,
 )
 
+from common.database.database_factory import DatabaseFactory
 from v3.api.router import app_v3
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
@@ -223,9 +223,7 @@ async def input_task_endpoint(input_task: InputTask, request: Request):
     try:
         # Create all agents instead of just the planner agent
         # This ensures other agents are created first and the planner has access to them
-        kernel, memory_store = await initialize_runtime_and_context(
-            input_task.session_id, user_id
-        )
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
         client = None
         try:
             client = config.get_ai_project_client()
@@ -368,9 +366,7 @@ async def human_feedback_endpoint(human_feedback: HumanFeedback, request: Reques
         )
         raise HTTPException(status_code=400, detail="no user")
 
-    kernel, memory_store = await initialize_runtime_and_context(
-        human_feedback.session_id, user_id
-    )
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
 
     client = None
     try:
@@ -501,9 +497,7 @@ async def human_clarification_endpoint(
         )
         raise HTTPException(status_code=400, detail="no user")
 
-    kernel, memory_store = await initialize_runtime_and_context(
-        human_clarification.session_id, user_id
-    )
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
     client = None
     try:
         client = config.get_ai_project_client()
@@ -615,9 +609,7 @@ async def approve_step_endpoint(
         raise HTTPException(status_code=400, detail="no user")
 
     # Get the agents for this session
-    kernel, memory_store = await initialize_runtime_and_context(
-        human_feedback.session_id, user_id
-    )
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
     client = None
     try:
         client = config.get_ai_project_client()
@@ -733,10 +725,7 @@ async def get_plans(
         raise HTTPException(status_code=400, detail="no user")
 
     # Initialize memory context
-    kernel, memory_store = await initialize_runtime_and_context(
-        session_id or "", user_id
-    )
-
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
     if session_id:
         plan = await memory_store.get_plan_by_session(session_id=session_id)
         if not plan:
@@ -851,7 +840,7 @@ async def get_steps_by_plan(plan_id: str, request: Request) -> List[Step]:
         raise HTTPException(status_code=400, detail="no user")
 
     # Initialize memory context
-    kernel, memory_store = await initialize_runtime_and_context("", user_id)
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
     steps = await memory_store.get_steps_for_plan(plan_id=plan_id)
     return steps
 
@@ -917,173 +906,9 @@ async def get_agent_messages(session_id: str, request: Request) -> List[AgentMes
         raise HTTPException(status_code=400, detail="no user")
 
     # Initialize memory context
-    kernel, memory_store = await initialize_runtime_and_context(
-        session_id or "", user_id
-    )
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
     agent_messages = await memory_store.get_data_by_type("agent_message")
     return agent_messages
-
-
-@app.get("/api/agent_messages_by_plan/{plan_id}", response_model=List[AgentMessage])
-async def get_agent_messages_by_plan(
-    plan_id: str, request: Request
-) -> List[AgentMessage]:
-    """
-    Retrieve agent messages for a specific session.
-
-    ---
-    tags:
-      - Agent Messages
-    parameters:
-      - name: session_id
-        in: path
-        type: string
-        required: true
-        in: path
-        type: string
-        required: true
-        description: The ID of the session to retrieve agent messages for
-    responses:
-      200:
-        description: List of agent messages associated with the specified session
-        schema:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                description: Unique ID of the agent message
-              session_id:
-                type: string
-                description: Session ID associated with the message
-              plan_id:
-                type: string
-                description: Plan ID related to the agent message
-              content:
-                type: string
-                description: Content of the message
-              source:
-                type: string
-                description: Source of the message (e.g., agent type)
-              timestamp:
-                type: string
-                format: date-time
-                description: Timestamp of the message
-              step_id:
-                type: string
-                description: Optional step ID associated with the message
-      400:
-        description: Missing or invalid user information
-      404:
-        description: Agent messages not found
-    """
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
-    if not user_id:
-        track_event_if_configured(
-            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
-        )
-        raise HTTPException(status_code=400, detail="no user")
-
-    # Initialize memory context
-    kernel, memory_store = await initialize_runtime_and_context("", user_id)
-    agent_messages = await memory_store.get_data_by_type_and_plan_id("agent_message")
-    return agent_messages
-
-
-@app.delete("/api/messages")
-async def delete_all_messages(request: Request) -> Dict[str, str]:
-    """
-    Delete all messages across sessions.
-
-    ---
-    tags:
-      - Messages
-    responses:
-      200:
-        description: Confirmation of deletion
-        schema:
-          type: object
-          properties:
-            status:
-              type: string
-              description: Status message indicating all messages were deleted
-      400:
-        description: Missing or invalid user information
-    """
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
-    if not user_id:
-        track_event_if_configured(
-            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
-        )
-        raise HTTPException(status_code=400, detail="no user")
-
-    # Initialize memory context
-    kernel, memory_store = await initialize_runtime_and_context("", user_id)
-
-    await memory_store.delete_all_items("plan")
-    await memory_store.delete_all_items("session")
-    await memory_store.delete_all_items("step")
-    await memory_store.delete_all_items("agent_message")
-
-    # Clear the agent factory cache
-    AgentFactory.clear_cache()
-
-    return {"status": "All messages deleted"}
-
-
-@app.get("/api/messages")
-async def get_all_messages(request: Request):
-    """
-    Retrieve all messages across sessions.
-
-    ---
-    tags:
-      - Messages
-    responses:
-      200:
-        description: List of all messages across sessions
-        schema:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                description: Unique ID of the message
-              data_type:
-                type: string
-                description: Type of the message (e.g., session, step, plan, agent_message)
-              session_id:
-                type: string
-                description: Session ID associated with the message
-              user_id:
-                type: string
-                description: User ID associated with the message
-              content:
-                type: string
-                description: Content of the message
-              timestamp:
-                type: string
-                format: date-time
-                description: Timestamp of the message
-      400:
-        description: Missing or invalid user information
-    """
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
-    if not user_id:
-        track_event_if_configured(
-            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
-        )
-        raise HTTPException(status_code=400, detail="no user")
-
-    # Initialize memory context
-    kernel, memory_store = await initialize_runtime_and_context("", user_id)
-    message_list = await memory_store.get_all_items()
-    return message_list
 
 
 @app.get("/api/agent-tools")

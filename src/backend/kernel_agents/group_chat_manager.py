@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from context.cosmos_memory_kernel import CosmosMemoryContext
 from common.utils.event_utils import track_event_if_configured
 from kernel_agents.agent_base import BaseAgent
 from common.utils.utils_date import format_date_for_user
@@ -21,6 +20,8 @@ from common.models.messages_kernel import (
 # pylint: disable=E0611
 from semantic_kernel.functions.kernel_function import KernelFunction
 
+from common.database.database_base import DatabaseBase
+
 
 class GroupChatManager(BaseAgent):
     """GroupChatManager agent implementation using Semantic Kernel.
@@ -33,7 +34,7 @@ class GroupChatManager(BaseAgent):
         self,
         session_id: str,
         user_id: str,
-        memory_store: CosmosMemoryContext,
+        memory_store: Optional[DatabaseBase] = None,
         tools: Optional[List[KernelFunction]] = None,
         system_message: Optional[str] = None,
         agent_name: str = AgentType.GROUP_CHAT_MANAGER.value,

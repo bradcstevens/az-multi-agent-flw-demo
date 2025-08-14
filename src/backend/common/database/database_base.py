@@ -3,18 +3,12 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 
-from ..models.database_models import (
+from ..models.messages_kernel import (
     BaseDataModel,
-    SessionRecord,
-    PlanRecord,
-    StepRecord,
-    AgentMessageRecord,
-    MessageRecord,
-    TeamConfigurationRecord,
-    ThreadRecord,
-    AgentRecord,
-    MemoryRecord,
-    QueryResult,
+    Session,
+    Plan,
+    Step,
+    TeamConfiguration,
 )
 
 
@@ -66,143 +60,76 @@ class DatabaseBase(ABC):
 
     # Session Operations
     @abstractmethod
-    async def add_session(self, session: SessionRecord) -> None:
+    async def add_session(self, session: Session) -> None:
         """Add a session to the database."""
         pass
 
     @abstractmethod
-    async def get_session(self, session_id: str) -> Optional[SessionRecord]:
+    async def get_session(self, session_id: str) -> Optional[Session]:
         """Retrieve a session by session_id."""
         pass
 
     @abstractmethod
-    async def get_all_sessions(self) -> List[SessionRecord]:
+    async def get_all_sessions(self) -> List[Session]:
         """Retrieve all sessions for the user."""
         pass
 
     # Plan Operations
     @abstractmethod
-    async def add_plan(self, plan: PlanRecord) -> None:
+    async def add_plan(self, plan: Plan) -> None:
         """Add a plan to the database."""
         pass
 
     @abstractmethod
-    async def update_plan(self, plan: PlanRecord) -> None:
+    async def update_plan(self, plan: Plan) -> None:
         """Update a plan in the database."""
         pass
 
     @abstractmethod
-    async def get_plan_by_session(self, session_id: str) -> Optional[PlanRecord]:
+    async def get_plan_by_session(self, session_id: str) -> Optional[Plan]:
         """Retrieve a plan by session_id."""
         pass
 
     @abstractmethod
-    async def get_plan_by_plan_id(self, plan_id: str) -> Optional[PlanRecord]:
+    async def get_plan_by_plan_id(self, plan_id: str) -> Optional[Plan]:
         """Retrieve a plan by plan_id."""
         pass
 
     @abstractmethod
-    async def get_plan(self, plan_id: str) -> Optional[PlanRecord]:
+    async def get_plan(self, plan_id: str) -> Optional[Plan]:
         """Retrieve a plan by plan_id."""
         pass
 
     @abstractmethod
-    async def get_all_plans(self) -> List[PlanRecord]:
+    async def get_all_plans(self) -> List[Plan]:
         """Retrieve all plans for the user."""
         pass
 
     # Step Operations
     @abstractmethod
-    async def add_step(self, step: StepRecord) -> None:
+    async def add_step(self, step: Step) -> None:
         """Add a step to the database."""
         pass
 
     @abstractmethod
-    async def update_step(self, step: StepRecord) -> None:
+    async def update_step(self, step: Step) -> None:
         """Update a step in the database."""
         pass
 
     @abstractmethod
-    async def get_steps_by_plan(self, plan_id: str) -> List[StepRecord]:
+    async def get_steps_by_plan(self, plan_id: str) -> List[Step]:
         """Retrieve all steps for a plan."""
         pass
 
     @abstractmethod
-    async def get_step(self, step_id: str, session_id: str) -> Optional[StepRecord]:
+    async def get_step(self, step_id: str, session_id: str) -> Optional[Step]:
         """Retrieve a step by step_id and session_id."""
-        pass
-
-    # Message Operations
-    @abstractmethod
-    async def add_agent_message(self, message: AgentMessageRecord) -> None:
-        """Add an agent message to the database."""
-        pass
-
-    @abstractmethod
-    async def add_message(self, message: MessageRecord) -> None:
-        """Add a message to the database."""
-        pass
-
-    @abstractmethod
-    async def get_messages(self, session_id: str) -> List[MessageRecord]:
-        """Retrieve all messages for a session."""
-        pass
-
-    # Team Configuration Operations
-    @abstractmethod
-    async def add_team_configuration(self, config: TeamConfigurationRecord) -> None:
-        """Add a team configuration to the database."""
-        pass
-
-    @abstractmethod
-    async def get_team_configuration(
-        self, config_id: str, user_id: str
-    ) -> Optional[TeamConfigurationRecord]:
-        """Retrieve a team configuration by ID and user ID."""
-        pass
-
-    @abstractmethod
-    async def get_all_team_configurations(
-        self, user_id: str
-    ) -> List[TeamConfigurationRecord]:
-        """Retrieve all team configurations for a user."""
-        pass
-
-    @abstractmethod
-    async def delete_team_configuration(self, config_id: str, user_id: str) -> bool:
-        """Delete a team configuration by ID and user ID."""
-        pass
-
-    # Thread and Agent Operations
-    @abstractmethod
-    async def add_thread(self, thread: ThreadRecord) -> None:
-        """Add a thread record to the database."""
-        pass
-
-    @abstractmethod
-    async def get_thread_by_session(self, session_id: str) -> Optional[ThreadRecord]:
-        """Retrieve a thread by session_id."""
-        pass
-
-    @abstractmethod
-    async def add_agent_record(self, agent: AgentRecord) -> None:
-        """Add an agent record to the database."""
         pass
 
     # Data Management Operations
     @abstractmethod
     async def get_data_by_type(self, data_type: str) -> List[BaseDataModel]:
         """Retrieve all data of a specific type."""
-        pass
-
-    @abstractmethod
-    async def delete_all_messages(self, data_type: str) -> None:
-        """Delete all messages of a specific type."""
-        pass
-
-    @abstractmethod
-    async def delete_all_items(self, data_type: str) -> None:
-        """Delete all items of a specific type."""
         pass
 
     @abstractmethod
@@ -213,58 +140,6 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def get_all_items(self) -> List[Dict[str, Any]]:
         """Retrieve all items as dictionaries."""
-        pass
-
-    # Collection Management (for compatibility)
-    @abstractmethod
-    async def create_collection(self, collection_name: str) -> None:
-        """Create a collection."""
-        pass
-
-    @abstractmethod
-    async def get_collections(self) -> List[str]:
-        """Get all collection names."""
-        pass
-
-    @abstractmethod
-    async def does_collection_exist(self, collection_name: str) -> bool:
-        """Check if a collection exists."""
-        pass
-
-    @abstractmethod
-    async def delete_collection(self, collection_name: str) -> None:
-        """Delete a collection."""
-        pass
-
-    @abstractmethod
-    async def delete_collection_async(self, collection_name: str) -> None:
-        """Delete a collection asynchronously."""
-        pass
-
-    # Memory Store Operations (for compatibility with existing code)
-    @abstractmethod
-    async def upsert_async(self, collection_name: str, record: Dict[str, Any]) -> str:
-        """Upsert a record asynchronously."""
-        pass
-
-    @abstractmethod
-    async def upsert_memory_record(self, collection: str, record: MemoryRecord) -> str:
-        """Upsert a memory record."""
-        pass
-
-    @abstractmethod
-    async def remove_memory_record(self, collection: str, key: str) -> None:
-        """Remove a memory record."""
-        pass
-
-    @abstractmethod
-    async def remove(self, collection_name: str, key: str) -> None:
-        """Remove a record by key."""
-        pass
-
-    @abstractmethod
-    async def remove_batch(self, collection_name: str, keys: List[str]) -> None:
-        """Remove multiple records by keys."""
         pass
 
     # Context Manager Support
