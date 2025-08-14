@@ -43,7 +43,7 @@ param location string
   }
 })
 @description('Required. Location for all AI service resources. This should be one of the supported Azure AI Service locations.')
-param aiDeploymentsLocation string
+param azureAiServiceLocation string
 
 @minLength(1)
 @description('Optional. Name of the GPT model to deploy:')
@@ -53,8 +53,12 @@ param gptModelName string = 'gpt-4o'
 param gptModelVersion string = '2024-08-06'
 
 @minLength(1)
+@allowed([
+  'Standard'
+  'GlobalStandard'
+])
 @description('Optional. GPT model deployment type. Defaults to GlobalStandard.')
-param modelDeploymentType string = 'GlobalStandard'
+param gptModelDeploymentType string = 'GlobalStandard'
 
 @description('Optional. AI model deployment token capacity. Defaults to 150 for optimal performance.')
 param gptModelCapacity int = 150
@@ -927,7 +931,7 @@ var aiFoundryAiServicesModelDeployment = {
   name: gptModelName
   version: gptModelVersion
   sku: {
-    name: modelDeploymentType
+    name: gptModelDeploymentType
     capacity: gptModelCapacity
   }
   raiPolicyName: 'Microsoft.Default'
@@ -938,7 +942,7 @@ module aiFoundryAiServices 'modules/ai-services.bicep' = if (aiFoundryAIservices
   name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
-    location: aiDeploymentsLocation
+    location: azureAiServiceLocation
     tags: tags
     projectName: aiFoundryAiServicesAiProjectResourceName
     projectDescription: 'AI Foundry Project'
@@ -1169,7 +1173,7 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.11.2
           destination: 'log-analytics'
           logAnalyticsConfiguration: {
             customerId: logAnalyticsWorkspace!.outputs.logAnalyticsWorkspaceId
-            sharedKey: logAnalyticsWorkspace!.outputs.primarySharedKey
+            sharedKey: logAnalyticsWorkspace.outputs.primarySharedKey
           }
         }
       : null
