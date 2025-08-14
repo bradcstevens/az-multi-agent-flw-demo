@@ -153,7 +153,8 @@ When you start the deployment, most parameters will have **default values**, but
 | **GPT Model Capacity**          | Sets the GPT model capacity.                                 | 150        |
 | **Image Tag**                  | Docker image tag used for container deployments.                                    | latest            |
 | **Enable Telemetry**           | Enables telemetry for monitoring and diagnostics.                                    | true              |
-
+| **Existing Log Analytics Workspace**        | To reuse an existing Log Analytics Workspace ID instead of creating a new one.              | *(none)*          |
+| **Existing Azure AI Foundry Project**        | To reuse an existing Azure AI Foundry Project ID instead of creating a new one.              | *(none)*          |
 
 </details>
 
@@ -173,6 +174,14 @@ To adjust quota settings, follow these [steps](./AzureGPTQuotaSettings.md).
   <summary><b>Reusing an Existing Log Analytics Workspace</b></summary>
 
   Guide to get your [Existing Workspace ID](/docs/re-use-log-analytics.md)
+
+</details>
+
+<details>
+
+  <summary><b>Reusing an Existing Azure AI Foundry Project</b></summary>
+
+  Guide to get your [Existing Project ID](/docs/re-use-foundry-project.md)
 
 </details>
 
@@ -206,43 +215,9 @@ Once you've opened the project in [Codespaces](#github-codespaces), [Dev Contain
 
 5. Once the deployment has completed successfully, open the [Azure Portal](https://portal.azure.com/), go to the deployed resource group, find the App Service, and get the app URL from `Default domain`.
 
-6. If you are done trying out the application, you can delete the resources by running `azd down`.
+6. When Deployment is complete, follow steps in [Set Up Authentication in Azure App Service](../docs/azure_app_service_auth_setup.md) to add app authentication to your web app running on Azure App Service
 
-### Publishing Local Build Container to Azure Container Registry
-
-If you need to rebuild the source code and push the updated container to the deployed Azure Container Registry, follow these steps:
-
-1. Set the environment variable `USE_LOCAL_BUILD` to `True`:
-
-   - **Linux/macOS**:
-
-     ```bash
-     export USE_LOCAL_BUILD=True
-     ```
-
-   - **Windows (PowerShell)**:
-     ```powershell
-     $env:USE_LOCAL_BUILD = $true
-     ```
-
-2. Run the `az login` command
-
-   ```bash
-   az login
-   ```
-
-3. Run the `azd up` command again to rebuild and push the updated container:
-   ```bash
-   azd up
-   ```
-
-This will rebuild the source code, package it into a container, and push it to the Azure Container Registry associated with your deployment.
-
-This guide provides step-by-step instructions for deploying your application using Azure Container Registry (ACR) and Azure Container Apps.
-
-There are several ways to deploy the solution. You can deploy to run in Azure in one click, or manually, or you can deploy locally.
-
-When Deployment is complete, follow steps in [Set Up Authentication in Azure App Service](../docs/azure_app_service_auth_setup.md) to add app authentication to your web app running on Azure App Service
+7. If you are done trying out the application, you can delete the resources by running `azd down`.
 
 # Local setup
 

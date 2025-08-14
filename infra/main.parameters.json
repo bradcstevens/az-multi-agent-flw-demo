@@ -11,6 +11,18 @@
     "azureAiServiceLocation": {
       "value": "${AZURE_ENV_OPENAI_LOCATION}"
     },
+    "gptModelDeploymentType": {
+      "value": "${AZURE_ENV_MODEL_DEPLOYMENT_TYPE}"
+    },
+    "gptModelName": {
+      "value": "${AZURE_ENV_MODEL_NAME}"
+    },
+    "gptModelVersion": {
+      "value": "${AZURE_ENV_MODEL_VERSION}"
+    },
+    "gptModelCapacity": {
+      "value": "${AZURE_ENV_MODEL_CAPACITY}"
+    },
     "backendContainerImageTag": {
       "value": "${AZURE_ENV_IMAGE_TAG}"
     },
