@@ -67,13 +67,17 @@ class AppConfig:
         # Azure Search settings
         self.AZURE_SEARCH_ENDPOINT = self._get_optional("AZURE_SEARCH_ENDPOINT")
 
+        # Optional MCP server endpoint (for local MCP server or remote)
+        # Example: http://127.0.0.1:8000/mcp
+        self.MCP_SERVER_ENDPOINT = self._get_optional("MCP_SERVER_ENDPOINT")
+
         # Cached clients and resources
         self._azure_credentials = None
         self._cosmos_client = None
         self._cosmos_database = None
         self._ai_project_client = None
 
-    def get_azure_credential(cself, client_id=None):
+    def get_azure_credential(self, client_id=None):
         """
         Returns an Azure credential based on the application environment.
 
@@ -96,7 +100,7 @@ class AppConfig:
     def get_azure_credentials(self):
         """Retrieve Azure credentials, either from environment variables or managed identity."""
         if self._azure_credentials is None:
-            self._azure_credentials = get_azure_credential()
+            self._azure_credentials = self.get_azure_credential()
         return self._azure_credentials
 
     async def get_access_token(self) -> str:
@@ -168,7 +172,7 @@ class AppConfig:
             return self._ai_project_client
 
         try:
-            credential = get_azure_credential()
+            credential = self.get_azure_credential()
             if credential is None:
                 raise RuntimeError(
                     "Unable to acquire Azure credentials; ensure Managed Identity is configured"
