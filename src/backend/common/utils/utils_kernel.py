@@ -10,7 +10,6 @@ import requests
 import semantic_kernel as sk
 
 # Import the credential utility
-from common.auth.azure_credential_utils import get_azure_credential
 from common.config.app_config import config
 
 # Import agent factory and the new AppConfig

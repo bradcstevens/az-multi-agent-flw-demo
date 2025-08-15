@@ -4,8 +4,6 @@ Handles Azure OpenAI, MCP, and environment setup.
 """
 
 import os
-from dotenv import load_dotenv
-from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
 from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion,
     OpenAIChatPromptExecutionSettings,

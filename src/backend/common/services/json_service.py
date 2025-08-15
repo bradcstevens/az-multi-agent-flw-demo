@@ -21,7 +21,7 @@ from common.models.messages_kernel import (
     StartingTask,
 )
 
-from common.auth.azure_credential_utils import get_azure_credential
+
 from common.config.app_config import config
 from common.database.database_base import DatabaseBase
 
@@ -37,7 +37,7 @@ class JsonService:
         # Search validation configuration
         self.search_endpoint = config.AZURE_SEARCH_ENDPOINT
 
-        self.search_credential = get_azure_credential()
+        self.search_credential = config.get_azure_credentials()
 
         # Model validation configuration
         self.subscription_id = config.AZURE_AI_SUBSCRIPTION_ID

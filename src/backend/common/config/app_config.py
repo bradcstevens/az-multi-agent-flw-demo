@@ -4,8 +4,7 @@ import os
 from typing import Optional
 
 from azure.ai.projects.aio import AIProjectClient
-from azure.cosmos.aio import CosmosClient
-from common.auth.azure_credential_utils import get_azure_credential
+from azure.identity import ManagedIdentityCredential, DefaultAzureCredential
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -74,6 +73,26 @@ class AppConfig:
         self._cosmos_database = None
         self._ai_project_client = None
 
+    def get_azure_credential(cself, client_id=None):
+        """
+        Returns an Azure credential based on the application environment.
+
+        If the environment is 'dev', it uses DefaultAzureCredential.
+        Otherwise, it uses ManagedIdentityCredential.
+
+        Args:
+            client_id (str, optional): The client ID for the Managed Identity Credential.
+
+        Returns:
+            Credential object: Either DefaultAzureCredential or ManagedIdentityCredential.
+        """
+        if self.APP_ENV == "dev":
+            return (
+                DefaultAzureCredential()
+            )  # CodeQL [SM05139] Okay use of DefaultAzureCredential as it is only used in development
+        else:
+            return ManagedIdentityCredential(client_id=client_id)
+
     def get_azure_credentials(self):
         """Retrieve Azure credentials, either from environment variables or managed identity."""
         if self._azure_credentials is None:
@@ -83,7 +102,7 @@ class AppConfig:
     async def get_access_token(self) -> str:
         """Get Azure access token for API calls."""
         try:
-            credential = get_azure_credential()
+            credential = self.get_azure_credentials()
             token = credential.get_token(self.AZURE_COGNITIVE_SERVICES)
             return token.token
         except Exception as e:
