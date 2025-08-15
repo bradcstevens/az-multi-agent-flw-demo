@@ -7,7 +7,6 @@ from azure.ai.projects.aio import AIProjectClient
 from azure.cosmos.aio import CosmosClient
 from common.auth.azure_credential_utils import get_azure_credential
 from dotenv import load_dotenv
-from semantic_kernel.kernel import Kernel
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,6 +27,10 @@ class AppConfig:
         self.COSMOSDB_DATABASE = self._get_optional("COSMOSDB_DATABASE")
         self.COSMOSDB_CONTAINER = self._get_optional("COSMOSDB_CONTAINER")
 
+        self.APPLICATIONINSIGHTS_CONNECTION_STRING = self._get_required(
+            "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        )
+        self.APP_ENV = self._get_required("APP_ENV", "prod")
         # Azure OpenAI settings
         self.AZURE_OPENAI_DEPLOYMENT_NAME = self._get_required(
             "AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o"
@@ -50,6 +53,10 @@ class AppConfig:
         self.AZURE_AI_RESOURCE_GROUP = self._get_required("AZURE_AI_RESOURCE_GROUP")
         self.AZURE_AI_PROJECT_NAME = self._get_required("AZURE_AI_PROJECT_NAME")
         self.AZURE_AI_AGENT_ENDPOINT = self._get_required("AZURE_AI_AGENT_ENDPOINT")
+        self.AZURE_AI_PROJECT_ENDPOINT = self._get_optional("AZURE_AI_PROJECT_ENDPOINT")
+
+        # Azure Search settings
+        self.AZURE_SEARCH_ENDPOINT = self._get_optional("AZURE_SEARCH_ENDPOINT")
 
         # Cached clients and resources
         self._azure_credentials = None
@@ -111,17 +118,6 @@ class AppConfig:
             True if the environment variable exists and is set to 'true' or '1', False otherwise
         """
         return name in os.environ and os.environ[name].lower() in ["true", "1"]
-
-    def create_kernel(self):
-        """Creates a new Semantic Kernel instance.
-
-        Returns:
-            A new Semantic Kernel instance
-        """
-        # Create a new kernel instance without manually configuring OpenAI services
-        # The agents will be created using Azure AI Agent Project pattern instead
-        kernel = Kernel()
-        return kernel
 
     def get_ai_project_client(self):
         """Create and return an AIProjectClient for Azure AI Foundry using from_connection_string.

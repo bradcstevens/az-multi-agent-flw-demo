@@ -36,15 +36,13 @@ from common.models.messages_kernel import (
 )
 
 # Updated import for KernelArguments
-from common.utils.utils_kernel import (
-    rai_success,
-)
+from common.utils.utils_kernel import rai_success
 
 from common.database.database_factory import DatabaseFactory
 from v3.api.router import app_v3
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
-connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+connection_string = config.APPLICATIONINSIGHTS_CONNECTION_STRING
 if connection_string:
     # Configure Application Insights if the Instrumentation Key is found
     configure_azure_monitor(connection_string=connection_string)

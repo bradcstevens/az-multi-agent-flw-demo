@@ -22,6 +22,7 @@ from common.models.messages_kernel import (
 )
 
 from common.auth.azure_credential_utils import get_azure_credential
+from common.config.app_config import config
 from common.database.database_base import DatabaseBase
 
 
@@ -34,18 +35,15 @@ class JsonService:
         self.logger = logging.getLogger(__name__)
 
         # Search validation configuration
-        self.search_endpoint = os.getenv("AZURE_SEARCH_ENDPOINT")
-        self.search_key = os.getenv("AZURE_SEARCH_KEY")
-        if self.search_key:
-            self.search_credential = AzureKeyCredential(self.search_key)
-        else:
-            self.search_credential = DefaultAzureCredential()
+        self.search_endpoint = config.AZURE_SEARCH_ENDPOINT
+
+        self.search_credential = get_azure_credential()
 
         # Model validation configuration
-        self.subscription_id = os.getenv("AZURE_AI_SUBSCRIPTION_ID")
-        self.resource_group = os.getenv("AZURE_AI_RESOURCE_GROUP")
-        self.project_name = os.getenv("AZURE_AI_PROJECT_NAME")
-        self.project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
+        self.subscription_id = config.AZURE_AI_SUBSCRIPTION_ID
+        self.resource_group = config.AZURE_AI_RESOURCE_GROUP
+        self.project_name = config.AZURE_AI_PROJECT_NAME
+        self.project_endpoint = config.AZURE_AI_PROJECT_ENDPOINT
 
     async def validate_and_parse_team_config(
         self, json_data: Dict[str, Any], user_id: str
