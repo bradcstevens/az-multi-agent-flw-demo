@@ -10,33 +10,20 @@ from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion,
     OpenAIChatPromptExecutionSettings,
 )
-
-# Load environment variables
-load_dotenv()
-
-# Azure configuration
-TENANT_ID = ""
-CLIENT_ID = ""
+from common.config.app_config import config
 
 
 class AzureConfig:
     """Azure OpenAI and authentication configuration."""
 
     def __init__(self):
-        self.endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        self.reasoning_model = os.getenv("REASONING_MODEL_NAME", "o3")
-        self.standard_model = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4")
-        self.bing_connection_name = os.getenv("BING_CONNECTION_NAME")
+        self.endpoint = config.AZURE_OPENAI_ENDPOINT
+        self.reasoning_model = config.REASONING_MODEL_NAME
+        self.standard_model = config.AZURE_OPENAI_DEPLOYMENT_NAME
+        self.bing_connection_name = config.AZURE_BING_CONNECTION_NAME
 
         # Create credential
-        self.credential = SyncDefaultAzureCredential()
-
-    def get_azure_token(self):
-        """Get Azure token for authentication."""
-        token = self.credential.get_token(
-            "https://cognitiveservices.azure.com/.default"
-        )
-        return token.token
+        self.credential = config.get_azure_credentials()
 
     def create_chat_completion_service(self, use_reasoning_model=False):
         """Create Azure Chat Completion service."""
@@ -47,7 +34,7 @@ class AzureConfig:
         return AzureChatCompletion(
             deployment_name=model_name,
             endpoint=self.endpoint,
-            ad_token_provider=self.get_azure_token,
+            ad_token_provider=config.get_access_token(),
         )
 
     def create_execution_settings(self):

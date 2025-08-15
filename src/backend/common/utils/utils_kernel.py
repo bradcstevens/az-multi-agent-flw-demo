@@ -11,6 +11,7 @@ import semantic_kernel as sk
 
 # Import the credential utility
 from common.auth.azure_credential_utils import get_azure_credential
+from common.config.app_config import config
 
 # Import agent factory and the new AppConfig
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
@@ -34,14 +35,11 @@ async def rai_success(description: str, is_task_creation: bool) -> bool:
     """
     try:
         # Use managed identity for authentication to Azure OpenAI
-        credential = get_azure_credential()
-        access_token = credential.get_token(
-            "https://cognitiveservices.azure.com/.default"
-        ).token
+        access_token = await config.get_access_token()
 
-        CHECK_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-        API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
-        DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_MODEL_NAME")
+        CHECK_ENDPOINT = config.AZURE_OPENAI_ENDPOINT
+        API_VERSION = config.AZURE_OPENAI_API_VERSION
+        DEPLOYMENT_NAME = config.AZURE_AI_MODEL_DEPLOYMENT_NAME
 
         if not all([CHECK_ENDPOINT, API_VERSION, DEPLOYMENT_NAME]):
             logging.error("Missing required environment variables for RAI check")

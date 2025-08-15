@@ -283,16 +283,6 @@ class JsonService:
     # Model validation methods
     # -----------------------
 
-    async def get_access_token(self) -> str:
-        """Get Azure access token for API calls."""
-        try:
-            credential = get_azure_credential()
-            token = credential.get_token("https://management.azure.com/.default")
-            return token.token
-        except Exception as e:
-            self.logger.error(f"Failed to get access token: {e}")
-            raise
-
     async def list_model_deployments(self) -> List[Dict[str, Any]]:
         """
         List all model deployments in the Azure AI project using the REST API.

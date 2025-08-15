@@ -17,6 +17,7 @@ class AppConfig:
 
     def __init__(self):
         """Initialize the application configuration with environment variables."""
+        self.logger = logging.getLogger(__name__)
         # Azure authentication settings
         self.AZURE_TENANT_ID = self._get_optional("AZURE_TENANT_ID")
         self.AZURE_CLIENT_ID = self._get_optional("AZURE_CLIENT_ID")
@@ -31,6 +32,14 @@ class AppConfig:
             "APPLICATIONINSIGHTS_CONNECTION_STRING"
         )
         self.APP_ENV = self._get_required("APP_ENV", "prod")
+        self.AZURE_AI_MODEL_DEPLOYMENT_NAME = self._get_required(
+            "AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o"
+        )
+
+        self.AZURE_COGNITIVE_SERVICES = self._get_optional(
+            "AZURE_COGNITIVE_SERVICES", "https://cognitiveservices.azure.com/.default"
+        )
+
         # Azure OpenAI settings
         self.AZURE_OPENAI_DEPLOYMENT_NAME = self._get_required(
             "AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o"
@@ -39,9 +48,10 @@ class AppConfig:
             "AZURE_OPENAI_API_VERSION", "2024-11-20"
         )
         self.AZURE_OPENAI_ENDPOINT = self._get_required("AZURE_OPENAI_ENDPOINT")
-        self.AZURE_OPENAI_SCOPES = [
-            f"{self._get_optional('AZURE_OPENAI_SCOPE', 'https://cognitiveservices.azure.com/.default')}"
-        ]
+        self.REASONING_MODEL_NAME = self._get_optional("REASONING_MODEL_NAME", "o3")
+        self.AZURE_BING_CONNECTION_NAME = self._get_optional(
+            "AZURE_BING_CONNECTION_NAME"
+        )
 
         # Frontend settings
         self.FRONTEND_SITE_NAME = self._get_optional(
@@ -69,6 +79,16 @@ class AppConfig:
         if self._azure_credentials is None:
             self._azure_credentials = get_azure_credential()
         return self._azure_credentials
+
+    async def get_access_token(self) -> str:
+        """Get Azure access token for API calls."""
+        try:
+            credential = get_azure_credential()
+            token = credential.get_token(self.AZURE_COGNITIVE_SERVICES)
+            return token.token
+        except Exception as e:
+            self.logger.error(f"Failed to get access token: {e}")
+            raise
 
     def _get_required(self, name: str, default: Optional[str] = None) -> str:
         """Get a required configuration value from environment variables.
