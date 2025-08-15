@@ -424,7 +424,7 @@ class JsonService:
             required_models.update(team_level_models)
 
             if not required_models:
-                default_model = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
+                default_model = config.AZURE_OPENAI_DEPLOYMENT_NAME
                 required_models.add(default_model.lower())
 
             missing_models: List[str] = []

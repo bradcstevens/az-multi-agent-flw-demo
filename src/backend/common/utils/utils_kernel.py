@@ -13,16 +13,6 @@ import semantic_kernel as sk
 from common.auth.azure_credential_utils import get_azure_credential
 
 # Import agent factory and the new AppConfig
-from kernel_agents.agent_factory import AgentFactory
-from kernel_agents.group_chat_manager import GroupChatManager
-from kernel_agents.hr_agent import HrAgent
-from kernel_agents.human_agent import HumanAgent
-from kernel_agents.marketing_agent import MarketingAgent
-from kernel_agents.planner_agent import PlannerAgent
-from kernel_agents.procurement_agent import ProcurementAgent
-from kernel_agents.product_agent import ProductAgent
-from kernel_agents.tech_support_agent import TechSupportAgent
-from common.models.messages_kernel import AgentType
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 
 logging.basicConfig(level=logging.INFO)
@@ -30,57 +20,6 @@ logging.basicConfig(level=logging.INFO)
 # Cache for agent instances by session
 agent_instances: Dict[str, Dict[str, Any]] = {}
 azure_agent_instances: Dict[str, Dict[str, AzureAIAgent]] = {}
-
-
-async def get_agents(session_id: str, user_id: str) -> Dict[str, Any]:
-    """
-    Get or create agent instances for a session.
-
-    Args:
-        session_id: The session identifier
-        user_id: The user identifier
-
-    Returns:
-        Dictionary of agent instances mapped by their names
-    """
-    cache_key = f"{session_id}_{user_id}"
-
-    if cache_key in agent_instances:
-        return agent_instances[cache_key]
-
-    try:
-        # Create all agents for this session using the factory
-        raw_agents = await AgentFactory.create_all_agents(
-            session_id=session_id,
-            user_id=user_id,
-            temperature=0.0,  # Default temperature
-        )
-
-        # Get mapping of agent types to class names
-        agent_classes = {
-            AgentType.HR: HrAgent.__name__,
-            AgentType.PRODUCT: ProductAgent.__name__,
-            AgentType.MARKETING: MarketingAgent.__name__,
-            AgentType.PROCUREMENT: ProcurementAgent.__name__,
-            AgentType.TECH_SUPPORT: TechSupportAgent.__name__,
-            AgentType.GENERIC: TechSupportAgent.__name__,
-            AgentType.HUMAN: HumanAgent.__name__,
-            AgentType.PLANNER: PlannerAgent.__name__,
-            AgentType.GROUP_CHAT_MANAGER: GroupChatManager.__name__,
-        }
-
-        # Convert to the agent name dictionary format used by the rest of the app
-        agents = {
-            agent_classes[agent_type]: agent for agent_type, agent in raw_agents.items()
-        }
-
-        # Cache the agents
-        agent_instances[cache_key] = agents
-
-        return agents
-    except Exception as e:
-        logging.error(f"Error creating agents: {str(e)}")
-        raise
 
 
 async def rai_success(description: str, is_task_creation: bool) -> bool:
