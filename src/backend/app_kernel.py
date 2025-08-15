@@ -12,7 +12,6 @@ from typing import Dict, List, Optional
 from common.config.app_config import config
 from auth.auth_utils import get_authenticated_user_details
 from azure.monitor.opentelemetry import configure_azure_monitor
-from dateutil import parser
 from common.utils.event_utils import track_event_if_configured
 
 # FastAPI imports
@@ -39,6 +38,7 @@ from common.models.messages_kernel import (
 from common.utils.utils_kernel import rai_success
 
 from common.database.database_factory import DatabaseFactory
+from common.utils.utils_date import format_dates_in_messages
 from v3.api.router import app_v3
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
@@ -90,58 +90,6 @@ app.add_middleware(HealthCheckMiddleware, password="", checks={})
 # v3 endpoints
 app.include_router(app_v3)
 logging.info("Added health check middleware")
-
-
-def format_dates_in_messages(messages, target_locale="en-US"):
-    """
-    Format dates in agent messages according to the specified locale.
-
-    Args:
-        messages: List of message objects or string content
-        target_locale: Target locale for date formatting (default: en-US)
-
-    Returns:
-        Formatted messages with dates converted to target locale format
-    """
-    # Define target format patterns per locale
-    locale_date_formats = {
-        "en-IN": "%d %b %Y",  # 30 Jul 2025
-        "en-US": "%b %d, %Y",  # Jul 30, 2025
-    }
-
-    output_format = locale_date_formats.get(target_locale, "%d %b %Y")
-    # Match both "Jul 30, 2025, 12:00:00 AM" and "30 Jul 2025"
-    date_pattern = r"(\d{1,2} [A-Za-z]{3,9} \d{4}|[A-Za-z]{3,9} \d{1,2}, \d{4}(, \d{1,2}:\d{2}:\d{2} ?[APap][Mm])?)"
-
-    def convert_date(match):
-        date_str = match.group(0)
-        try:
-            dt = parser.parse(date_str)
-            return dt.strftime(output_format)
-        except Exception:
-            return date_str  # Leave it unchanged if parsing fails
-
-    # Process messages
-    if isinstance(messages, list):
-        formatted_messages = []
-        for message in messages:
-            if hasattr(message, "content") and message.content:
-                # Create a copy of the message with formatted content
-                formatted_message = (
-                    message.model_copy() if hasattr(message, "model_copy") else message
-                )
-                if hasattr(formatted_message, "content"):
-                    formatted_message.content = re.sub(
-                        date_pattern, convert_date, formatted_message.content
-                    )
-                formatted_messages.append(formatted_message)
-            else:
-                formatted_messages.append(message)
-        return formatted_messages
-    elif isinstance(messages, str):
-        return re.sub(date_pattern, convert_date, messages)
-    else:
-        return messages
 
 
 @app.post("/api/user_browser_language")
