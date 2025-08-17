@@ -292,7 +292,7 @@ class TeamService:
             return []
 
         try:
-            token = await self.get_access_token()
+            token = await config.get_access_token()
 
             url = (
                 f"https://management.azure.com/subscriptions/{self.subscription_id}/"
