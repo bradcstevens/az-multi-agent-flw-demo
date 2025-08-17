@@ -15,7 +15,7 @@ from common.utils.utils_kernel import (
     rai_success,
     rai_validate_team_config,
 )
-from src.backend.v3.common.services.team_service import TeamService
+from v3.common.services.team_service import TeamService
 from kernel_agents.agent_factory import AgentFactory
 from common.database.database_factory import DatabaseFactory
 from v3.models.orchestration_models import AgentType
