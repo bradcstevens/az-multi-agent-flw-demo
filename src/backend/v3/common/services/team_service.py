@@ -5,7 +5,6 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-import aiohttp
 from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import (
     ClientAuthenticationError,
@@ -24,6 +23,7 @@ from common.models.messages_kernel import (
 
 from common.config.app_config import config
 from common.database.database_base import DatabaseBase
+from v3.common.services.foundry_service import FoundryService
 
 
 class TeamService:
@@ -38,12 +38,6 @@ class TeamService:
         self.search_endpoint = config.AZURE_SEARCH_ENDPOINT
 
         self.search_credential = config.get_azure_credentials()
-
-        # Model validation configuration
-        self.subscription_id = config.AZURE_AI_SUBSCRIPTION_ID
-        self.resource_group = config.AZURE_AI_RESOURCE_GROUP
-        self.project_name = config.AZURE_AI_PROJECT_NAME
-        self.project_endpoint = config.AZURE_AI_PROJECT_ENDPOINT
 
     async def validate_and_parse_team_config(
         self, json_data: Dict[str, Any], user_id: str
@@ -279,65 +273,6 @@ class TeamService:
             self.logger.error("Error deleting team configuration: %s", str(e))
             return False
 
-    # -----------------------
-    # Model validation methods
-    # -----------------------
-
-    async def list_model_deployments(self) -> List[Dict[str, Any]]:
-        """
-        List all model deployments in the Azure AI project using the REST API.
-        """
-        if not all([self.subscription_id, self.resource_group, self.project_name]):
-            self.logger.error("Azure AI project configuration is incomplete")
-            return []
-
-        try:
-            token = await config.get_access_token()
-
-            url = (
-                f"https://management.azure.com/subscriptions/{self.subscription_id}/"
-                f"resourceGroups/{self.resource_group}/providers/Microsoft.MachineLearningServices/"
-                f"workspaces/{self.project_name}/onlineEndpoints"
-            )
-
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            }
-            params = {"api-version": "2024-10-01"}
-
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        deployments = data.get("value", [])
-                        deployment_info: List[Dict[str, Any]] = []
-                        for deployment in deployments:
-                            deployment_info.append(
-                                {
-                                    "name": deployment.get("name"),
-                                    "model": deployment.get("properties", {}).get(
-                                        "model", {}
-                                    ),
-                                    "status": deployment.get("properties", {}).get(
-                                        "provisioningState"
-                                    ),
-                                    "endpoint_uri": deployment.get(
-                                        "properties", {}
-                                    ).get("scoringUri"),
-                                }
-                            )
-                        return deployment_info
-                    else:
-                        error_text = await response.text()
-                        self.logger.error(
-                            f"Failed to list deployments. Status: {response.status}, Error: {error_text}"
-                        )
-                        return []
-        except Exception as e:
-            self.logger.error(f"Error listing model deployments: {e}")
-            return []
-
     def extract_models_from_agent(self, agent: Dict[str, Any]) -> set:
         """
         Extract all possible model references from a single agent configuration.
@@ -397,7 +332,8 @@ class TeamService:
     ) -> Tuple[bool, List[str]]:
         """Validate that all models required by agents in the team config are deployed."""
         try:
-            deployments = await self.list_model_deployments()
+            foundry_service = FoundryService()
+            deployments = await foundry_service.list_model_deployments()
             available_models = [
                 d.get("name", "").lower()
                 for d in deployments
@@ -434,7 +370,8 @@ class TeamService:
     async def get_deployment_status_summary(self) -> Dict[str, Any]:
         """Get a summary of deployment status for debugging/monitoring."""
         try:
-            deployments = await self.list_model_deployments()
+            foundry_service = FoundryService()
+            deployments = await foundry_service.list_model_deployments()
             summary: Dict[str, Any] = {
                 "total_deployments": len(deployments),
                 "successful_deployments": [],
