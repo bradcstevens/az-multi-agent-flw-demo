@@ -15,7 +15,7 @@ from common.utils.utils_kernel import (
     rai_success,
     rai_validate_team_config,
 )
-from common.services.json_service import JsonService
+from src.backend.v3.common.services.team_service import TeamService
 from kernel_agents.agent_factory import AgentFactory
 from common.database.database_factory import DatabaseFactory
 from v3.models.orchestration_models import AgentType
@@ -393,10 +393,10 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
 
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        json_service = JsonService(memory_store)
+        team_service = TeamService(memory_store)
 
         # Validate model deployments
-        models_valid, missing_models = await json_service.validate_team_models(
+        models_valid, missing_models = await team_service.validate_team_models(
             json_data
         )
         if not models_valid:
@@ -421,7 +421,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         )
 
         # Validate search indexes
-        search_valid, search_errors = await json_service.validate_team_search_indexes(
+        search_valid, search_errors = await team_service.validate_team_search_indexes(
             json_data
         )
         if not search_valid:
@@ -447,7 +447,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
 
         # Validate and parse the team configuration
         try:
-            team_config = await json_service.validate_and_parse_team_config(
+            team_config = await team_service.validate_and_parse_team_config(
                 json_data, user_id
             )
         except ValueError as e:
@@ -455,7 +455,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
 
         # Save the configuration
         try:
-            team_id = await json_service.save_team_configuration(team_config)
+            team_id = await team_service.save_team_configuration(team_config)
         except ValueError as e:
             raise HTTPException(
                 status_code=500, detail=f"Failed to save configuration: {str(e)}"
@@ -546,10 +546,10 @@ async def get_team_configs_endpoint(request: Request):
     try:
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        json_service = JsonService(memory_store)
+        team_service = TeamService(memory_store)
 
         # Retrieve all team configurations
-        team_configs = await json_service.get_all_team_configurations(user_id)
+        team_configs = await team_service.get_all_team_configurations(user_id)
 
         # Convert to dictionaries for response
         configs_dict = [config.model_dump() for config in team_configs]
@@ -624,10 +624,10 @@ async def get_team_config_by_id_endpoint(team_id: str, request: Request):
     try:
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        json_service = JsonService(memory_store)
+        team_service = TeamService(memory_store)
 
         # Retrieve the specific team configuration
-        team_config = await json_service.get_team_configuration(team_id, user_id)
+        team_config = await team_service.get_team_configuration(team_id, user_id)
 
         if team_config is None:
             raise HTTPException(status_code=404, detail="Team configuration not found")
@@ -690,10 +690,10 @@ async def delete_team_config_endpoint(team_id: str, request: Request):
     try:
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        json_service = JsonService(memory_store)
+        team_service = TeamService(memory_store)
 
         # Delete the team configuration
-        deleted = await json_service.delete_team_configuration(team_id, user_id)
+        deleted = await team_service.delete_team_configuration(team_id, user_id)
 
         if not deleted:
             raise HTTPException(status_code=404, detail="Team configuration not found")
@@ -741,9 +741,9 @@ async def get_model_deployments_endpoint(request: Request):
         )
 
     try:
-        json_service = JsonService()
-        deployments = await json_service.list_model_deployments()
-        summary = await json_service.get_deployment_status_summary()
+        team_service = TeamService()
+        deployments = await team_service.list_model_deployments()
+        summary = await team_service.get_deployment_status_summary()
         return {"deployments": deployments, "summary": summary}
     except Exception as e:
         logging.error(f"Error retrieving model deployments: {str(e)}")
@@ -773,8 +773,8 @@ async def get_search_indexes_endpoint(request: Request):
         )
 
     try:
-        json_service = JsonService()
-        summary = await json_service.get_search_index_summary()
+        team_service = TeamService()
+        summary = await team_service.get_search_index_summary()
         return {"search_summary": summary}
     except Exception as e:
         logging.error(f"Error retrieving search indexes: {str(e)}")

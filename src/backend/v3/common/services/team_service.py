@@ -26,7 +26,7 @@ from common.config.app_config import config
 from common.database.database_base import DatabaseBase
 
 
-class JsonService:
+class TeamService:
     """Service for handling JSON team configuration operations."""
 
     def __init__(self, memory_context: Optional[DatabaseBase] = None):
