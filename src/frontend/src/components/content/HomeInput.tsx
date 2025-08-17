@@ -40,36 +40,36 @@ import { Send } from "@/coral/imports/bundleicons";
 
 // Icon mapping function to convert string icons to FluentUI icons
 const getIconFromString = (iconString: string | React.ReactNode): React.ReactNode => {
-  // If it's already a React node, return it
-  if (typeof iconString !== 'string') {
-    return iconString;
-  }
-  
-  const iconMap: Record<string, React.ReactNode> = {
-    // Task/Logo icons
-    'Wrench': <Wrench20Regular />,
-    'TestTube': <Clipboard20Regular />, // Fallback since TestTube20Regular doesn't exist
-    'Terminal': <WindowConsole20Regular />,
-    'MonitorCog': <Desktop20Regular />,
-    'BookMarked': <BookmarkMultiple20Regular />,
-    'Search': <Search20Regular />,
-    'Robot': <Person20Regular />, // Fallback since Robot20Regular doesn't exist
-    'Code': <Code20Regular />,
-    'Play': <Play20Regular />,
-    'Shield': <Shield20Regular />,
-    'Globe': <Globe20Regular />,
-    'Person': <Person20Regular />,
-    'Database': <Database20Regular />,
-    'Document': <Document20Regular />,
-    'Building': <Building20Regular />,
-    'Desktop': <Desktop20Regular />,
-    
-    // Default fallback
-    '📋': <Clipboard20Regular />,
-    'default': <Clipboard20Regular />,
-  };
-  
-  return iconMap[iconString] || iconMap['default'] || <Clipboard20Regular />;
+    // If it's already a React node, return it
+    if (typeof iconString !== 'string') {
+        return iconString;
+    }
+
+    const iconMap: Record<string, React.ReactNode> = {
+        // Task/Logo icons
+        'Wrench': <Wrench20Regular />,
+        'TestTube': <Clipboard20Regular />, // Fallback since TestTube20Regular doesn't exist
+        'Terminal': <WindowConsole20Regular />,
+        'MonitorCog': <Desktop20Regular />,
+        'BookMarked': <BookmarkMultiple20Regular />,
+        'Search': <Search20Regular />,
+        'Robot': <Person20Regular />, // Fallback since Robot20Regular doesn't exist
+        'Code': <Code20Regular />,
+        'Play': <Play20Regular />,
+        'Shield': <Shield20Regular />,
+        'Globe': <Globe20Regular />,
+        'Person': <Person20Regular />,
+        'Database': <Database20Regular />,
+        'Document': <Document20Regular />,
+        'Building': <Building20Regular />,
+        'Desktop': <Desktop20Regular />,
+
+        // Default fallback
+        '📋': <Clipboard20Regular />,
+        'default': <Clipboard20Regular />,
+    };
+
+    return iconMap[iconString] || iconMap['default'] || <Clipboard20Regular />;
 };
 
 const HomeInput: React.FC<HomeInputProps> = ({
@@ -114,7 +114,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
 
             try {
                 const response = await TaskService.createPlan(
-                    input.trim(), 
+                    input.trim(),
                     selectedTeam?.team_id
                 );
                 setInput("");
@@ -126,17 +126,17 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 if (response.plan_id && response.plan_id !== null) {
                     showToast("Plan created!", "success");
                     dismissToast(id);
-                    
+
                     // Navigate to create page (no team ID in URL anymore)
                     console.log('HomeInput: Navigating to plan creation with team:', selectedTeam?.name);
-                    navigate(`/plan/${response.plan_id}/create`);
+                    navigate(`/plan/${response.plan_id}`);
                 } else {
                     showToast("Failed to create plan", "error");
                     dismissToast(id);
                 }
             } catch (error: any) {
                 dismissToast(id);
-                
+
                 // Check if this is an RAI validation error
                 let errorDetail = null;
                 try {
@@ -156,11 +156,11 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     setRAIError(errorDetail);
                 } else {
                     // Handle other errors with toast messages
-                    const errorMessage = errorDetail?.description || 
-                                        errorDetail?.message || 
-                                        error?.response?.data?.message ||
-                                        error?.message || 
-                                        "Something went wrong";
+                    const errorMessage = errorDetail?.description ||
+                        errorDetail?.message ||
+                        error?.response?.data?.message ||
+                        error?.message ||
+                        "Something went wrong";
                     showToast(errorMessage, "error");
                 }
 
@@ -188,7 +188,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
     }, [input]);
 
     // Convert team starting_tasks to QuickTask format
-    const tasksToDisplay: QuickTask[] = selectedTeam && selectedTeam.starting_tasks ? 
+    const tasksToDisplay: QuickTask[] = selectedTeam && selectedTeam.starting_tasks ?
         selectedTeam.starting_tasks.map((task, index) => {
             // Handle both string tasks and StartingTask objects
             if (typeof task === 'string') {
@@ -273,8 +273,8 @@ const HomeInput: React.FC<HomeInputProps> = ({
                             </>
                         )}
                         {tasksToDisplay.length === 0 && selectedTeam && (
-                            <div style={{ 
-                                textAlign: 'center', 
+                            <div style={{
+                                textAlign: 'center',
                                 padding: '32px 16px',
                                 color: '#666'
                             }}>
@@ -282,8 +282,8 @@ const HomeInput: React.FC<HomeInputProps> = ({
                             </div>
                         )}
                         {!selectedTeam && (
-                            <div style={{ 
-                                textAlign: 'center', 
+                            <div style={{
+                                textAlign: 'center',
                                 padding: '32px 16px',
                                 color: '#666'
                             }}>

@@ -29,7 +29,6 @@ import { TeamService } from "../services/TeamService";
 
 /**
  * Page component for creating and viewing a plan being generated
- * Accessible via the route /plan/{plan_id}/create/{team_id?}
  */
 const PlanCreatePage: React.FC = () => {
     const { planId, teamId } = useParams<{ planId: string; teamId?: string }>();
@@ -81,7 +80,7 @@ const PlanCreatePage: React.FC = () => {
                 }
             }
         };
-        
+
         loadTeamData();
     }, [teamId]);
 
@@ -98,9 +97,9 @@ const PlanCreatePage: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            
+
             let toastId = showToast("Generating plan steps...", "progress");
-            
+
             // Call the generate_plan endpoint using apiClient for proper authentication
             const result = await apiClient.post('/generate_plan', {
                 plan_id: planId
@@ -109,10 +108,10 @@ const PlanCreatePage: React.FC = () => {
             dismissToast(toastId);
             showToast("Plan generated successfully!", "success");
             setPlanGenerated(true);
-            
+
             // Now load the plan data to display it
             await loadPlanData(false);
-            
+
         } catch (err) {
             console.error("Failed to generate plan:", err);
             setError(
@@ -145,12 +144,12 @@ const PlanCreatePage: React.FC = () => {
                     plans.push(data);
                 }
                 setAllPlans(plans);
-                
+
                 // If plan has steps and we haven't generated yet, mark as generated
                 if (data.plan.steps && data.plan.steps.length > 0 && !planGenerated) {
                     setPlanGenerated(true);
                 }
-                
+
             } catch (err) {
                 console.log("Failed to load plan data:", err);
                 setError(
@@ -186,7 +185,7 @@ const PlanCreatePage: React.FC = () => {
                 await loadPlanData(false);
             } catch (error: any) {
                 dismissToast(id);
-                
+
                 // Check if this is an RAI validation error
                 let errorDetail = null;
                 try {
@@ -246,7 +245,7 @@ const PlanCreatePage: React.FC = () => {
             // Load the basic plan data first
             await loadPlanData(true);
         };
-        
+
         initializePage();
     }, []);
 
@@ -272,10 +271,10 @@ const PlanCreatePage: React.FC = () => {
     return (
         <CoralShellColumn>
             <CoralShellRow>
-                <PlanPanelLeft 
-                    onNewTaskButton={handleNewTaskButton} 
-                    reloadTasks={reloadLeftList} 
-                    restReload={()=>setReloadLeftList(false)}
+                <PlanPanelLeft
+                    onNewTaskButton={handleNewTaskButton}
+                    reloadTasks={reloadLeftList}
+                    restReload={() => setReloadLeftList(false)}
                     selectedTeam={selectedTeam}
                 />
 
@@ -300,7 +299,7 @@ const PlanCreatePage: React.FC = () => {
                                     />
                                 </PanelRightToggles>
                             </ContentToolbar>
-                            
+
                             {/* Show RAI error if present */}
                             {raiError && (
                                 <div style={{ padding: '16px 24px 0' }}>
@@ -313,7 +312,7 @@ const PlanCreatePage: React.FC = () => {
                                     />
                                 </div>
                             )}
-                            
+
                             <PlanChat
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}

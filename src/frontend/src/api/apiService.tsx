@@ -127,7 +127,7 @@ export class APIService {
     async getPlans(sessionId?: string, useCache = true): Promise<PlanWithSteps[]> {
         const cacheKey = `plans_${sessionId || 'all'}`;
         const params = sessionId ? { session_id: sessionId } : {};
-
+        // TODO replace session for team_id 
         const fetcher = async () => {
             const data = await apiClient.get(API_ENDPOINTS.PLANS, { params });
             if (useCache) {

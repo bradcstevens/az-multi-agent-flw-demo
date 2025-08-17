@@ -8,7 +8,6 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/plan/:planId/create" element={<PlanCreatePage />} />
         <Route path="/plan/:planId" element={<PlanPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

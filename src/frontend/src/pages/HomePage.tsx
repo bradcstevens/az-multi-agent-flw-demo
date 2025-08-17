@@ -111,7 +111,7 @@ const HomePage: React.FC = () => {
         try {
             const teams = await TeamService.getUserTeams();
             console.log('Teams refreshed after upload:', teams.length);
-            
+
             if (teams.length > 0) {
                 // Always keep "Business Operations Team" as default, even after new uploads
                 const businessOpsTeam = teams.find(team => team.name === "Business Operations Team");
@@ -119,7 +119,7 @@ const HomePage: React.FC = () => {
                 setSelectedTeam(defaultTeam);
                 console.log('Default team after upload:', defaultTeam.name);
                 console.log('Business Operations Team remains default');
-                
+
                 // Show a toast notification about the upload success
                 dispatchToast(
                     <Toast>
@@ -144,10 +144,10 @@ const HomePage: React.FC = () => {
         if (taskName.trim()) {
             try {
                 const response = await TaskService.createPlan(
-                    taskName.trim(), 
+                    taskName.trim(),
                     selectedTeam?.team_id
                 );
-                
+
                 if (response.plan_id && response.plan_id !== null) {
                     dispatchToast(
                         <Toast>
@@ -159,10 +159,10 @@ const HomePage: React.FC = () => {
                         </Toast>,
                         { intent: "success" }
                     );
-                    
+
                     // Navigate to create page (no team ID in URL anymore)
                     console.log('Navigating to plan creation with team:', selectedTeam?.name);
-                    navigate(`/plan/${response.plan_id}/create`);
+                    navigate(`/plan/${response.plan_id}`);
                 } else {
                     dispatchToast(
                         <Toast>
@@ -213,11 +213,11 @@ const HomePage: React.FC = () => {
                                 selectedTeam={selectedTeam}
                             />
                         ) : (
-                            <div style={{ 
-                                display: 'flex', 
-                                justifyContent: 'center', 
-                                alignItems: 'center', 
-                                height: '200px' 
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                height: '200px'
                             }}>
                                 <Spinner label="Loading team configuration..." />
                             </div>
