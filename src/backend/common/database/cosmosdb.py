@@ -74,8 +74,8 @@ class CosmosDBClient(DatabaseBase):
                 )
                 self.database = self.client.get_database_client(self.database_name)
 
-                self.container = await self._get_or_create_container(
-                    self.database, self.container_name, "/session_id"
+                self.container = await self._get_container(
+                    self.database, self.container_name
                 )
                 self._initialized = True
 
@@ -89,18 +89,12 @@ class CosmosDBClient(DatabaseBase):
         if not self._initialized:
             await self.initialize()
 
-    async def _get_or_create_container(
-        self, database: DatabaseProxy, container_name: str, partition_key: str
-    ):
-        """Get or create a CosmosDB container."""
+    async def _get_container(self, database: DatabaseProxy, container_name):
         try:
-            return await database.create_container(
-                id=container_name, partition_key=PartitionKey(path=partition_key)
-            )
-        except CosmosResourceExistsError:
             return database.get_container_client(container_name)
+
         except Exception as e:
-            self.logger.error("Failed to get/create CosmosDB container: %s", str(e))
+            self.logger.error("Failed to Get cosmosdb container", error=str(e))
             raise
 
     async def close(self) -> None:
