@@ -65,7 +65,7 @@ export class TeamService {
      */
     static async getUserTeams(): Promise<TeamConfig[]> {
         try {
-            const response = await apiClient.get('/team_configs');
+            const response = await apiClient.get('/v3/team_configs');
 
             // The apiClient returns the response data directly, not wrapped in a data property
             const teams = Array.isArray(response) ? response : [];
@@ -94,7 +94,7 @@ export class TeamService {
      */
     static async deleteTeam(teamId: string): Promise<boolean> {
         try {
-            const response = await apiClient.delete(`/team_configs/${teamId}`);
+            const response = await apiClient.delete(`/v3/team_configs/${teamId}`);
             return true;
         } catch (error: any) {
             return false;
