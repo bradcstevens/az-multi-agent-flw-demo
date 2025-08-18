@@ -2,16 +2,22 @@
 MACAE MCP Server - FastMCP server with organized tools and services.
 """
 
+###
 import sys
 import argparse
 from pathlib import Path
 from fastmcp import FastMCP
-from fastmcp.server.auth import BearerAuthProvider
+from fastmcp.server.auth.providers.jwt import JWTVerifier
 import logging
 from typing import Optional
 
 from core.factory import MCPToolFactory
-from services import HRService, TechSupportService, GeneralService, DataToolService
+from services import (
+    HRService,
+    TechSupportService,
+    GeneralService,
+    DataToolService,
+)
 from config.settings import config
 
 # Setup logging
@@ -42,7 +48,7 @@ def create_fastmcp_server():
                 "audience": config.audience,
             }
             if all(auth_config.values()):
-                auth = BearerAuthProvider(
+                auth = JWTVerifier(
                     jwks_uri=auth_config["jwks_uri"],
                     issuer=auth_config["issuer"],
                     algorithm="RS256",
