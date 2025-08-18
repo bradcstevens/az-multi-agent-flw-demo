@@ -7,7 +7,7 @@ export interface InputTask {
     /** The task description or goal */
     description: string;
     /** MANDATORY team identifier to use for this plan */
-    team_id: string;
+    team_id?: string;
 }
 
 /**
