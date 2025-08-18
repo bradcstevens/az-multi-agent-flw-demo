@@ -126,15 +126,46 @@ class DatabaseBase(ABC):
         """Retrieve a step by step_id and session_id."""
         pass
 
+    # Team Operations
+    @abstractmethod
+    async def add_team(self, team: TeamConfiguration) -> None:
+        """Add a team configuration to the database."""
+        pass
+
+    @abstractmethod
+    async def update_team(self, team: TeamConfiguration) -> None:
+        """Update a team configuration in the database."""
+        pass
+
+    @abstractmethod
+    async def get_team(self, team_id: str) -> Optional[TeamConfiguration]:
+        """Retrieve a team configuration by team_id."""
+        pass
+
+    @abstractmethod
+    async def get_team_by_id(self, id: str) -> Optional[TeamConfiguration]:
+        """Retrieve a team configuration by internal id."""
+        pass
+
+    @abstractmethod
+    async def get_all_teams_by_user(self, user_id: str) -> List[TeamConfiguration]:
+        """Retrieve all team configurations for the given user."""
+        pass
+
+    @abstractmethod
+    async def delete_team(self, team_id: str) -> bool:
+        """Delete a team configuration by team_id and return True if deleted."""
+        pass
+
+    @abstractmethod
+    async def delete_team_by_id(self, id: str) -> bool:
+        """Delete a team configuration by internal id and return True if deleted."""
+        pass
+
     # Data Management Operations
     @abstractmethod
     async def get_data_by_type(self, data_type: str) -> List[BaseDataModel]:
         """Retrieve all data of a specific type."""
-        pass
-
-    @abstractmethod
-    async def get_all_messages(self) -> List[Dict[str, Any]]:
-        """Retrieve all messages as dictionaries."""
         pass
 
     @abstractmethod
@@ -151,3 +182,8 @@ class DatabaseBase(ABC):
     async def __aexit__(self, exc_type, exc, tb):
         """Async context manager exit."""
         await self.close()
+
+    # Convenience aliases
+    async def get_steps_for_plan(self, plan_id: str) -> List[Step]:
+        """Convenience method aliasing get_steps_by_plan for compatibility."""
+        pass
