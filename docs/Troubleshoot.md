@@ -74,6 +74,7 @@ To prevent this issue, please ensure that the resource group you are targeting f
  
 <details>
 <summary><b>InternalSubscriptionIsOverQuotaForSku/ManagedEnvironmentProvisioningError </b></summary>
+
 Quotas are applied per resource group, subscriptions, accounts, and other scopes. For example, your subscription might be configured to limit the number of vCPUs for a region. If you attempt to deploy a virtual machine with more vCPUs than the permitted amount, you receive an error that the quota was exceeded. 
 For PowerShell, use the `Get-AzVMUsage` cmdlet to find virtual machine quotas.
 ```ps
@@ -84,11 +85,14 @@ based on available quota you can deploy application otherwise, you can request f
  
 <details>
 <summary><b>InsufficientQuota</b></summary>
+
  Before deployment check for quota available with your subscription to check quota refer [quota_check](../docs/quota_check.md) file.
+
 </details>
  
 <details>
 <summary><b>DeploymentModelNotSupported</b></summary>
+
    <br>
    If you hardcode the GPT model or version to anything other than gpt-4o, you will encounter a <b>DeploymentModelNotSupported</b> prevent this, please use the GPT model  <b>gpt-4o</b> with model version <b>2024-08-06</b>.
  
@@ -118,6 +122,7 @@ based on available quota you can deploy application otherwise, you can request f
 </details>
  <details>
 <summary><b>Workspace Name - InvalidParameter</b></summary>
+
  To avoid this errors in workspace ID follow below rules. 
 1. Must start and end with an alphanumeric character (letter or number).
 2. Allowed characters:
@@ -131,6 +136,7 @@ based on available quota you can deploy application otherwise, you can request f
 </details>
  <details>
 <summary><b>BadRequest: Dns record under zone Document is already taken</b></summary>
+
 This error can occur only when user hardcoding the CosmosDB Service name. To avoid this you can try few below suggestions.
 - Verify resource names are globally unique.
 - If you already created an account/resource with same name in another subscription or resource group, check and delete it before reusing the name.
@@ -138,6 +144,7 @@ This error can occur only when user hardcoding the CosmosDB Service name. To avo
 </details>
  <details>
 <summary><b>NetcfgSubnetRangeOutsideVnet</b></summary>
+
 - Ensure the subnet’s IP address range falls within the virtual network’s address space.
 - Always validate that the subnet CIDR block is a subset of the VNet range.
 - For Azure Bastion, the AzureBastionSubnet must be at least /27.
@@ -145,6 +152,7 @@ This error can occur only when user hardcoding the CosmosDB Service name. To avo
 </details>
  <details>
 <summary><b>DisableExport_PublicNetworkAccessMustBeDisabled</b></summary>
+
 - <b>Check container source:</b> Confirm whether the deployment is using a Docker image or Azure Container Registry (ACR).
 - <b>Verify ACR configuration:</b> If ACR is included, review its settings to ensure they comply with Azure requirements.
 - <b>Check export settings:</b> If export is disabled in ACR, make sure public network access is also disabled.
@@ -152,6 +160,7 @@ This error can occur only when user hardcoding the CosmosDB Service name. To avo
 </details>
  <details>
 <summary><b>AccountProvisioningStateInvalid</b></summary>
+
 - The AccountProvisioningStateInvalid error occurs when you try to use resources while they are still in the Accepted provisioning state.
 - This means the deployment has not yet fully completed.
 - To avoid this error, wait until the provisioning state changes to Succeeded.
@@ -159,6 +168,7 @@ This error can occur only when user hardcoding the CosmosDB Service name. To avo
 </details>
  <details>
 <summary><b>VaultNameNotValid</b></summary>
+
  In this template Vault name will be unique everytime, but if you trying to hard code the name then please make sure below points.
  1. Check name length
     - Ensure the Key Vault name is between 3 and 24 characters.
@@ -176,6 +186,7 @@ This error can occur only when user hardcoding the CosmosDB Service name. To avo
 </details>
  <details>
 <summary><b>DeploymentCanceled</b></summary>
+
  There might be multiple resions for this error you can follow below steps to troubleshoot.
  1. Check deployment history
     - Go to Azure Portal → Resource Group → Deployments.
@@ -226,6 +237,7 @@ Essentially: DeploymentCanceled itself is just a wrapper error — you need to c
 <details>
  
 <summary><b>DeploymentActive</b></summary>
+
 - This issue occurs when a deployment is already in progress and another deployment is triggered in the same resource group, causing a DeploymentActive error.
 - Cancel the ongoing deployment before starting a new one.
 - Do not initiate a new deployment in the same resource group until the previous one is completed.
