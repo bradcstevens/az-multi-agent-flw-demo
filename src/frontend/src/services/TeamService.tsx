@@ -37,7 +37,7 @@ export class TeamService {
         try {
             const formData = new FormData();
             formData.append('file', teamFile);
-
+            console.log(formData);
             const response = await apiClient.upload('/v3/upload_team_config', formData);
 
             return {

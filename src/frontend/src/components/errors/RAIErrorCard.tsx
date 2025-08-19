@@ -10,7 +10,7 @@ import {
     Lightbulb20Regular,
     Dismiss20Regular
 } from '@fluentui/react-icons';
-import './RAIErrorCard.css';
+import '../../styles/RAIErrorCard.css';
 
 export interface RAIErrorData {
     error_type: string;
