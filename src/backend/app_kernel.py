@@ -604,6 +604,7 @@ async def get_plans(
     request: Request,
     session_id: Optional[str] = Query(None),
     plan_id: Optional[str] = Query(None),
+    team_id: Optional[str] = Query(None),
 ):
     """
     Retrieve plans for the current user.
