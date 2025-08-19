@@ -177,7 +177,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
         if (textareaRef.current) {
             textareaRef.current.focus();
         }
-        onQuickTaskSelect(task.description);
+
     };
 
     useEffect(() => {
