@@ -41,10 +41,12 @@ const HomePage: React.FC = () => {
      */
     useEffect(() => {
         const loadDefaultTeam = async () => {
-            let defaultTeam  = TeamService.getStoredTeam();
+            let defaultTeam = TeamService.getStoredTeam();
             if (defaultTeam) {
                 setSelectedTeam(defaultTeam);
                 console.log('Default team loaded from storage:', defaultTeam.name);
+
+                setIsLoadingTeam(false);
                 return true;
             }
             setIsLoadingTeam(true);
