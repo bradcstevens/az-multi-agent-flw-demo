@@ -103,6 +103,7 @@ class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
     data_type: Literal["plan"] = Field("plan", Literal=True)
+    team_id: str
     session_id: str
     user_id: str
     initial_goal: str

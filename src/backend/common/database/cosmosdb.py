@@ -3,7 +3,8 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+
+import datetime
 from typing import Any, Dict, List, Optional, Type
 
 from azure.cosmos import PartitionKey, exceptions
@@ -111,7 +112,10 @@ class CosmosDBClient(DatabaseBase):
         try:
             # Convert to dictionary and handle datetime serialization
             document = item.model_dump()
-            document = json.loads(json.dumps(document, cls=DateTimeEncoder))
+
+            for key, value in list(document.items()):
+                if isinstance(value, datetime.datetime):
+                    document[key] = value.isoformat()
 
             await self.container.create_item(body=document)
         except Exception as e:
@@ -160,6 +164,7 @@ class CosmosDBClient(DatabaseBase):
             items = self.container.query_items(query=query, parameters=parameters)
             result_list = []
             async for item in items:
+                item["ts"] = item["_ts"]
                 try:
                     result_list.append(model_class.model_validate(item))
                 except Exception as validation_error:
@@ -233,6 +238,7 @@ class CosmosDBClient(DatabaseBase):
         parameters = [
             {"name": "@plan_id", "value": plan_id},
             {"name": "@data_type", "value": "plan"},
+            {"name": "@user_id", "value": self.user_id},
         ]
         results = await self.query_items(query, parameters, Plan)
         return results[0] if results else None
