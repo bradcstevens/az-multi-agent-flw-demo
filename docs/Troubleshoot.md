@@ -56,8 +56,6 @@ Before deploying the resources, you may need to enable the **Bring Your Own Publ
 2. Click on the **"Resource groups"** option available on the Azure portal home page.
 ![alt text](../docs/images/AzureHomePage.png)
 
-
- 
 3. In the Resource Groups search bar, search for the resource group you intend to target for deployment. If it exists, you can proceed with using it.
 ![alt text](../docs/images/resourcegroup1.png)
 
@@ -109,11 +107,18 @@ based on available quota you can deploy application otherwise, you can request f
  
 </details>
  <details>
-<summary><b>LinkedInvalidPropertyId/ ResourceNotFound</b></summary>
+<summary><b>LinkedInvalidPropertyId/ ResourceNotFound/DeploymentOutputEvaluationFailed</b></summary>
   
 - Before using any resource ID, ensure it follows the correct format.
 - Verify that the resource ID you are passing actually exists.
-- Make sure there are no typos in the resource ID..
+- Make sure there are no typos in the resource ID.
+- Verify that the provisioning state of the existing resource ID is `Succeeded` by running the following command
+
+    ```
+    az resource show --ids <Resource ID> --query "properties.provisioningState"
+    ```
+- For more information refer [Resource Not Found errors solutions](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/error-not-found?tabs=bicep)
+
 </details>
  <details>
 <summary><b>ResourceNameInvalid</b></summary>
