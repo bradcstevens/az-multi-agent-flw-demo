@@ -115,10 +115,14 @@ based on available quota you can deploy application otherwise, you can request f
  <details>
 <summary><b>ServiceUnavailable/ResourceNotFound</b></summary>
  
- Some Locations in MACAE does not support for deployment  for specific resources so please avoid using below resources
+  - Some Locations in MACAE does not support for deployment  for specific resources so please avoid using below resources
  ```
- eastus, westus, australiacentral, easteurope2...
+ eastus, westus, australiacentral, easteurope2
  ```
+
+  - You can request more quota, refer [Quota Request](https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/create-support-request-quota-increase)
+
+
 </details>
  <details>
 <summary><b>Workspace Name - InvalidParameter</b></summary>
