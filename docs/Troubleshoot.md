@@ -256,4 +256,20 @@ Essentially: DeploymentCanceled itself is just a wrapper error — you need to c
 - Do not initiate a new deployment in the same resource group until the previous one is completed.
 </details>
 
+<details>
+<summary><b>ResourceOperationFailure/ProvisioningDisabled</b></summary>
+ 
+  - This error occurs when provisioning of a resource is restricted in the selected region.
+    It usually happens because the service is not available in that region or provisioning has been temporarily disabled.  
+ 
+  - Please try creating the resource in another supported region. Example of restricted regions for some services:  
+    ```
+    centralindia, japaneast, brazilsouth    
+    ```
+   
+- If you need to use the same region, you can request a quota or provisioning exception.  
+  Refer [Quota Request](https://docs.microsoft.com/en-us/azure/sql-database/quota-increase-request) for more details.
+ 
+</details>
+
 💡 Note: If you encounter any other issues, please feel free to reach out to us or you can refer [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) Documentation. Thank you!
