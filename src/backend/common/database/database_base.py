@@ -105,6 +105,12 @@ class DatabaseBase(ABC):
         """Retrieve all plans for the user."""
         pass
 
+    @abstractmethod
+    async def get_data_by_type_and_session_id(
+        self, data_type: str, session_id: str
+    ) -> List[BaseDataModel]:
+        pass
+
     # Step Operations
     @abstractmethod
     async def add_step(self, step: Step) -> None:
