@@ -893,21 +893,30 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.17.0' = if (e
   }
 }
 
-// ========== AI Foundry: AI Services ========== //
-// WAF best practices for Open AI: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-openai
-var openAiSubResource = 'account'
-var openAiPrivateDnsZones = {
-  'privatelink.cognitiveservices.azure.com': openAiSubResource
-  'privatelink.openai.azure.com': openAiSubResource
-  'privatelink.services.ai.azure.com': openAiSubResource
+// ========== Private DNS Zones ========== //
+var privateDnsZones = [
+  'privatelink.cognitiveservices.azure.com'
+  'privatelink.openai.azure.com'
+  'privatelink.services.ai.azure.com'
+  'privatelink.documents.azure.com'
+  'privatelink.${toLower(replace(location,' ',''))}.azurecontainerapps.io'
+  'privatelink.azurewebsites.net'
+] 
+
+// DNS Zone Index Constants
+var dnsZoneIndex = {
+  cognitiveServices: 0
+  openAI: 1
+  aiServices: 2
+  cosmosDb: 3
+  containerAppEnvironment: 4
+  appService: 5
 }
 
-module privateDnsZonesAiServices 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
-  for zone in objectKeys(openAiPrivateDnsZones): if (enablePrivateNetworking) {
-    name: take(
-      'avm.res.network.private-dns-zone.ai-services.${uniqueString(aiFoundryAiServicesResourceName,zone)}.${solutionSuffix}',
-      64
-    )
+@batchSize(5)
+module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
+  for (zone, i) in privateDnsZones: if (enablePrivateNetworking) {
+    name: 'avm.res.network.private-dns-zone.${i}'
     params: {
       name: zone
       tags: tags
@@ -921,6 +930,9 @@ module privateDnsZonesAiServices 'br/public:avm/res/network/private-dns-zone:0.7
     }
   }
 ]
+
+// ========== AI Foundry: AI Services ========== //
+// WAF best practices for Open AI: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-openai
 
 // NOTE: Required version 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' not available in AVM
 var aiFoundryAiServicesResourceName = 'aif-${solutionSuffix}'
@@ -986,10 +998,20 @@ module aiFoundryAiServices 'modules/ai-services.bicep' = if (aiFoundryAIservices
             customNetworkInterfaceName: 'nic-${aiFoundryAiServicesResourceName}'
             subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
             privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: map(objectKeys(openAiPrivateDnsZones), zone => {
-                name: replace(zone, '.', '-')
-                privateDnsZoneResourceId: resourceId('Microsoft.Network/privateDnsZones', zone)
-              })
+              privateDnsZoneGroupConfigs: [
+                {
+                  name: 'ai-services-dns-zone-cognitiveservices'
+                  privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.cognitiveServices]!.outputs.resourceId
+                }
+                {
+                  name: 'ai-services-dns-zone-openai'
+                  privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.openAI]!.outputs.resourceId
+                }
+                {
+                  name: 'ai-services-dns-zone-aiservices'
+                  privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.aiServices]!.outputs.resourceId
+                }
+              ]
             }
           }
         ])
@@ -1051,20 +1073,6 @@ module resourceRoleAssignmentAiServicesAiProjectCognitiveServicesOpenAiUser 'br/
 
 // ========== Cosmos DB ========== //
 // WAF best practices for Cosmos DB: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/cosmos-db
-module privateDnsZonesCosmosDb 'br/public:avm/res/network/private-dns-zone:0.7.1' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.private-dns-zone.cosmos-db.${solutionSuffix}', 64)
-  params: {
-    name: 'privatelink.documents.azure.com'
-    enableTelemetry: enableTelemetry
-    virtualNetworkLinks: [
-      {
-        name: take('vnetlink-${virtualNetworkResourceName}-documents', 80)
-        virtualNetworkResourceId: virtualNetwork!.outputs.resourceId
-      }
-    ]
-    tags: tags
-  }
-}
 
 var cosmosDbResourceName = 'cosmos-${solutionSuffix}'
 var cosmosDbDatabaseName = 'macae'
@@ -1119,7 +1127,7 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.15.0' = {
             name: 'pep-${cosmosDbResourceName}'
             customNetworkInterfaceName: 'nic-${cosmosDbResourceName}'
             privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [{ privateDnsZoneResourceId: privateDnsZonesCosmosDb!.outputs.resourceId }]
+              privateDnsZoneGroupConfigs: [{ privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.cosmosDb]!.outputs.resourceId }]
             }
             service: 'Sql'
             subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
@@ -1199,16 +1207,7 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.11.2
   }
 }
 
-// Private DNS Zone Group for Container App Environment Private Endpoint
-module privateDnsZonesContainerAppEnvironment 'br/public:avm/res/network/private-dns-zone:0.7.1' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.private-dns-zone.app-environment.${solutionSuffix}', 64)
-  params: {
-    name: 'privatelink.${toLower(replace(containerAppEnvironment.outputs.location,' ',''))}.azurecontainerapps.io'
-    enableTelemetry: enableTelemetry
-    virtualNetworkLinks: [{ virtualNetworkResourceId: virtualNetwork!.outputs.resourceId }]
-    tags: tags
-  }
-}
+
 
 // Private Endpoint for Container App Environment
 var privateEndpointContainerAppEnvironmentService = 'managedEnvironments'
@@ -1233,7 +1232,7 @@ module privateEndpointContainerAppEnvironment 'br:mcr.microsoft.com/bicep/avm/re
     ]
     privateDnsZoneGroup: {
       privateDnsZoneGroupConfigs: [
-        { privateDnsZoneResourceId: privateDnsZonesContainerAppEnvironment!.outputs.resourceId }
+        { privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.containerAppEnvironment]!.outputs.resourceId }
       ]
     }
   }
@@ -1245,6 +1244,9 @@ module privateEndpointContainerAppEnvironment 'br:mcr.microsoft.com/bicep/avm/re
 var containerAppResourceName = 'ca-${solutionSuffix}'
 module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
   name: take('avm.res.app.container-app.${containerAppResourceName}', 64)
+  dependsOn:[
+    privateEndpointContainerAppEnvironment
+  ]
   params: {
     name: containerAppResourceName
     tags: tags
@@ -1399,16 +1401,6 @@ module webServerFarm 'br/public:avm/res/web/serverfarm:0.5.0' = {
 // ========== Frontend web site ========== //
 // WAF best practices for web app service: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/app-service-web-apps
 // PSRule for Web Server Farm: https://azure.github.io/PSRule.Rules.Azure/en/rules/resource/#app-service
-// Private DNS Zone Group for Web App Service Private Endpoint
-module privateDnsZonesWebApp 'br/public:avm/res/network/private-dns-zone:0.7.1' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.private-dns-zone.web-app.${solutionSuffix}', 64)
-  params: {
-    name: 'privatelink.azurewebsites.net'
-    enableTelemetry: enableTelemetry
-    virtualNetworkLinks: [{ virtualNetworkResourceId: virtualNetwork!.outputs.resourceId }]
-    tags: tags
-  }
-}
 
 //NOTE: AVM module adds 1 MB of overhead to the template. Keeping vanilla resource to save template size.
 var webSiteResourceName = 'app-${solutionSuffix}'
@@ -1451,7 +1443,7 @@ module webSite 'modules/web-sites.bicep' = {
             name: 'pep-${webSiteResourceName}'
             customNetworkInterfaceName: 'nic-${webSiteResourceName}'
             privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [{ privateDnsZoneResourceId: privateDnsZonesWebApp!.outputs.resourceId }]
+              privateDnsZoneGroupConfigs: [{ privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.appService]!.outputs.resourceId }]
             }
             service: 'sites'
             subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
