@@ -56,6 +56,7 @@ Before deploying the resources, you may need to enable the **Bring Your Own Publ
 2. Click on the **"Resource groups"** option available on the Azure portal home page.
 ![alt text](../docs/images/AzureHomePage.png)
 
+
  
 3. In the Resource Groups search bar, search for the resource group you intend to target for deployment. If it exists, you can proceed with using it.
 ![alt text](../docs/images/resourcegroup1.png)
