@@ -73,8 +73,6 @@ const getIconFromString = (iconString: string | React.ReactNode): React.ReactNod
 };
 
 const HomeInput: React.FC<HomeInputProps> = ({
-    onInputSubmit,
-    onQuickTaskSelect,
     selectedTeam,
 }) => {
     const [submitting, setSubmitting] = useState(false);

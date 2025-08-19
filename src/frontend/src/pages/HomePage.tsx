@@ -145,64 +145,6 @@ const HomePage: React.FC = () => {
         }
     }, [dispatchToast]);
 
-    /**
-     * Handle new task creation from input submission
-     * Creates a plan and navigates to the create plan page
-     */
-    const handleNewTask = useCallback(async (taskName: string) => {
-        if (taskName.trim()) {
-            try {
-                if (!selectedTeam) {
-                    console.log("it has no team");
-                    return;
-                }
-                const response = await TaskService.createPlan(
-                    taskName.trim(),
-                    selectedTeam?.team_id
-                );
-
-                if (response.plan_id && response.plan_id !== null) {
-                    dispatchToast(
-                        <Toast>
-                            <ToastTitle>Plan Created!</ToastTitle>
-                            <ToastBody>
-                                Successfully created plan for: {taskName}
-                                {selectedTeam && ` using ${selectedTeam.name} team`}
-                            </ToastBody>
-                        </Toast>,
-                        { intent: "success" }
-                    );
-
-                    // Navigate to create page (no team ID in URL anymore)
-                    console.log('Navigating to plan creation with team:', selectedTeam?.name);
-                    navigate(`/plan/${response.plan_id}`);
-                } else {
-                    dispatchToast(
-                        <Toast>
-                            <ToastTitle>
-                                <ErrorCircle20Regular />
-                                Failed to create plan
-                            </ToastTitle>
-                            <ToastBody>Unable to create plan. Please try again.</ToastBody>
-                        </Toast>,
-                        { intent: "error" }
-                    );
-                }
-            } catch (error: any) {
-                console.error('Error creating plan:', error);
-                dispatchToast(
-                    <Toast>
-                        <ToastTitle>
-                            <ErrorCircle20Regular />
-                            Error creating plan
-                        </ToastTitle>
-                        <ToastBody>{error.message || 'Something went wrong'}</ToastBody>
-                    </Toast>,
-                    { intent: "error" }
-                );
-            }
-        }
-    }, [navigate, dispatchToast, selectedTeam]);
 
     return (
         <>
@@ -221,8 +163,6 @@ const HomePage: React.FC = () => {
                         ></ContentToolbar>
                         {!isLoadingTeam ? (
                             <HomeInput
-                                onInputSubmit={handleNewTask}
-                                onQuickTaskSelect={handleNewTask}
                                 selectedTeam={selectedTeam}
                             />
                         ) : (
