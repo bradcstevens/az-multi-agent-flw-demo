@@ -1,6 +1,14 @@
 
 # 🛠️ Troubleshooting
  
+
+ <details>
+<summary><b>ReadOnlyDisabledSubscription</b></summary>  
+ 
+- Check if you have an active subscription before starting the deployment.
+ 
+</details>
+
  <details>
   <summary><b>MissingSubscriptionRegistration/ AllowBringYourOwnPublicIpAddress</b></summary>
  
@@ -86,7 +94,8 @@ based on available quota you can deploy application otherwise, you can request f
 <details>
 <summary><b>InsufficientQuota</b></summary>
 
- Before deployment check for quota available with your subscription to check quota refer [quota_check](../docs/quota_check.md) file.
+- Check if you have sufficient quota available in your subscription before deployment.
+- To verify, refer to the [quota_check](../docs/quota_check.md) file for details.
 
 </details>
  
