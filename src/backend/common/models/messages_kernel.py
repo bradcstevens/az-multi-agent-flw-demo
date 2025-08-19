@@ -178,6 +178,7 @@ class TeamConfiguration(BaseDataModel):
 
     team_id: str
     data_type: Literal["team_config"] = Field("team_config", Literal=True)
+    session_id: str  # Partition key
     name: str
     status: str
     created: str

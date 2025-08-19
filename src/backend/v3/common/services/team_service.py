@@ -67,6 +67,7 @@ class TeamService:
 
             # Generate unique IDs and timestamps
             unique_team_id = str(uuid.uuid4())
+            session_id = str(uuid.uuid4())
             current_timestamp = datetime.now(timezone.utc).isoformat()
 
             # Validate agents array exists and is not empty
@@ -104,6 +105,7 @@ class TeamService:
             # Create team configuration
             team_config = TeamConfiguration(
                 id=unique_team_id,  # Use generated GUID
+                session_id=session_id,
                 team_id=unique_team_id,  # Use generated GUID
                 name=json_data["name"],
                 status=json_data["status"],
@@ -253,17 +255,7 @@ class TeamService:
         """
         try:
             # First, verify the configuration exists and belongs to the user
-            team_config = await self.memory_context.get_team_by_id(team_id)
-
-            if team_config is None:
-                self.logger.warning(
-                    "Team configuration not found for deletion: %s", team_id
-                )
-                return False
-
-            # Delete the configuration using the specific delete_team_by_id method
-            success = await self.memory_context.delete_team_by_id(team_id)
-
+            success = await self.memory_context.delete_team(team_id)
             if success:
                 self.logger.info("Successfully deleted team configuration: %s", team_id)
 

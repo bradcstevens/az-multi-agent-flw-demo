@@ -129,8 +129,9 @@ class CosmosDBClient(DatabaseBase):
         try:
             # Convert to dictionary and handle datetime serialization
             document = item.model_dump()
-            document = json.loads(json.dumps(document, cls=DateTimeEncoder))
-
+            for key, value in list(document.items()):
+                if isinstance(value, datetime.datetime):
+                    document[key] = value.isoformat()
             await self.container.upsert_item(body=document)
         except Exception as e:
             self.logger.error("Failed to update item in CosmosDB: %s", str(e))
@@ -164,7 +165,7 @@ class CosmosDBClient(DatabaseBase):
             items = self.container.query_items(query=query, parameters=parameters)
             result_list = []
             async for item in items:
-                item["ts"] = item["_ts"]
+                # item["ts"] = item["_ts"]
                 try:
                     result_list.append(model_class.model_validate(item))
                 except Exception as validation_error:
@@ -352,88 +353,10 @@ class CosmosDBClient(DatabaseBase):
         try:
             # First find the team to get its document id and partition key
             team = await self.get_team(team_id)
+            print(team)
             if team:
-                # Use the session_id as partition key, or fall back to user_id if no session_id
-                partition_key = (
-                    team.session_id
-                    if hasattr(team, "session_id") and team.session_id
-                    else team.user_id
-                )
-                await self.container.delete_item(
-                    item=team.id, partition_key=partition_key
-                )
-                return True
-            return False
-        except Exception as e:
-            logging.exception(f"Failed to delete team from Cosmos DB: {e}")
-            return False
-
-    async def delete_team_by_id(self, id: str) -> bool:
-        """Delete a team configuration by its document id.
-
-        Args:
-            id: The document id of the team configuration to delete
-
-        Returns:
-            True if team was found and deleted, False otherwise
-        """
-        await self._ensure_initialized()
-
-        try:
-            # First find the team to get its partition key
-            team = await self.get_team_by_id(id)
-            if team:
-                # Debug logging
-                logging.info(f"Attempting to delete team {id}")
-                logging.info(f"Team user_id: {team.user_id}")
-                logging.info(
-                    f"Team session_id: {getattr(team, 'session_id', 'NOT_SET')}"
-                )
-
-                # Try different partition key strategies
-                partition_keys_to_try = []
-
-                # Strategy 1: Use session_id if it exists
-                if hasattr(team, "session_id") and team.session_id:
-                    partition_keys_to_try.append(team.session_id)
-                    logging.info(f"Will try session_id: {team.session_id}")
-
-                # Strategy 2: Use user_id as fallback
-                if team.user_id:
-                    partition_keys_to_try.append(team.user_id)
-                    logging.info(f"Will try user_id: {team.user_id}")
-
-                # Strategy 3: Use current context session_id
-                if self.session_id:
-                    partition_keys_to_try.append(self.session_id)
-                    logging.info(f"Will try context session_id: {self.session_id}")
-
-                # Strategy 4: Try null/empty partition key (for documents created without session_id)
-                partition_keys_to_try.extend([None, ""])
-                logging.info("Will try null and empty partition keys")
-
-                # Try each partition key until one works
-                for partition_key in partition_keys_to_try:
-                    try:
-                        logging.info(
-                            f"Attempting delete with partition key: {partition_key}"
-                        )
-                        await self.container.delete_item(
-                            item=id, partition_key=partition_key
-                        )
-                        logging.info(
-                            f"Successfully deleted team {id} with partition key: {partition_key}"
-                        )
-                        return True
-                    except Exception as e:
-                        logging.warning(
-                            f"Delete failed with partition key {partition_key}: {str(e)}"
-                        )
-                        continue
-
-                logging.error(f"All partition key strategies failed for team {id}")
-                return False
-            return False
+                await self.delete_item(item_id=team.id, partition_key=team.session_id)
+            return True
         except Exception as e:
             logging.exception(f"Failed to delete team from Cosmos DB: {e}")
             return False
@@ -487,154 +410,3 @@ class CosmosDBClient(DatabaseBase):
             team: The TeamConfiguration to update
         """
         await self.update_item(team)
-
-    async def get_team(self, team_id: str) -> Optional[TeamConfiguration]:
-        """Retrieve a specific team configuration by team_id.
-
-        Args:
-            team_id: The team_id of the team configuration to retrieve
-
-        Returns:
-            TeamConfiguration object or None if not found
-        """
-        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type"
-        parameters = [
-            {"name": "@team_id", "value": team_id},
-            {"name": "@data_type", "value": "team_config"},
-        ]
-        teams = await self.query_items(query, parameters, TeamConfiguration)
-        return teams[0] if teams else None
-
-    async def get_team_by_id(self, id: str) -> Optional[TeamConfiguration]:
-        """Retrieve a specific team configuration by its document id.
-
-        Args:
-            id: The document id of the team configuration to retrieve
-
-        Returns:
-            TeamConfiguration object or None if not found
-        """
-        query = "SELECT * FROM c WHERE c.id=@id AND c.data_type=@data_type"
-        parameters = [
-            {"name": "@id", "value": id},
-            {"name": "@data_type", "value": "team_config"},
-        ]
-        teams = await self.query_items(query, parameters, TeamConfiguration)
-        return teams[0] if teams else None
-
-    async def get_all_teams_by_user(self, user_id: str) -> List[TeamConfiguration]:
-        """Retrieve all team configurations for a specific user.
-
-        Args:
-            user_id: The user_id to get team configurations for
-
-        Returns:
-            List of TeamConfiguration objects
-        """
-        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type ORDER BY c.created DESC"
-        parameters = [
-            {"name": "@user_id", "value": user_id},
-            {"name": "@data_type", "value": "team_config"},
-        ]
-        teams = await self.query_items(query, parameters, TeamConfiguration)
-        return teams
-
-    async def delete_team(self, team_id: str) -> bool:
-        """Delete a team configuration by team_id.
-
-        Args:
-            team_id: The team_id of the team configuration to delete
-
-        Returns:
-            True if team was found and deleted, False otherwise
-        """
-        await self.ensure_initialized()
-
-        try:
-            # First find the team to get its document id and partition key
-            team = await self.get_team(team_id)
-            if team:
-                # Use the session_id as partition key, or fall back to user_id if no session_id
-                partition_key = (
-                    team.session_id
-                    if hasattr(team, "session_id") and team.session_id
-                    else team.user_id
-                )
-                await self._container.delete_item(
-                    item=team.id, partition_key=partition_key
-                )
-                return True
-            return False
-        except Exception as e:
-            logging.exception(f"Failed to delete team from Cosmos DB: {e}")
-            return False
-
-    async def delete_team_by_id(self, id: str) -> bool:
-        """Delete a team configuration by its document id.
-
-        Args:
-            id: The document id of the team configuration to delete
-
-        Returns:
-            True if team was found and deleted, False otherwise
-        """
-        await self.ensure_initialized()
-
-        try:
-            # First find the team to get its partition key
-            team = await self.get_team_by_id(id)
-            if team:
-                # Debug logging
-                logging.info(f"Attempting to delete team {id}")
-                logging.info(f"Team user_id: {team.user_id}")
-                logging.info(
-                    f"Team session_id: {getattr(team, 'session_id', 'NOT_SET')}"
-                )
-
-                # Try different partition key strategies
-                partition_keys_to_try = []
-
-                # Strategy 1: Use session_id if it exists
-                if hasattr(team, "session_id") and team.session_id:
-                    partition_keys_to_try.append(team.session_id)
-                    logging.info(f"Will try session_id: {team.session_id}")
-
-                # Strategy 2: Use user_id as fallback
-                if team.user_id:
-                    partition_keys_to_try.append(team.user_id)
-                    logging.info(f"Will try user_id: {team.user_id}")
-
-                # Strategy 3: Use current context session_id
-                if self.session_id:
-                    partition_keys_to_try.append(self.session_id)
-                    logging.info(f"Will try context session_id: {self.session_id}")
-
-                # Strategy 4: Try null/empty partition key (for documents created without session_id)
-                partition_keys_to_try.extend([None, ""])
-                logging.info("Will try null and empty partition keys")
-
-                # Try each partition key until one works
-                for partition_key in partition_keys_to_try:
-                    try:
-                        logging.info(
-                            f"Attempting delete with partition key: {partition_key}"
-                        )
-                        await self._container.delete_item(
-                            item=id, partition_key=partition_key
-                        )
-                        logging.info(
-                            f"Successfully deleted team {id} with partition key: {partition_key}"
-                        )
-                        return True
-                    except Exception as e:
-                        logging.warning(
-                            f"Delete failed with partition key {partition_key}: {str(e)}"
-                        )
-                        continue
-
-                logging.error(f"All partition key strategies failed for team {id}")
-                return False
-            return False
-        except Exception as e:
-            logging.exception(f"Failed to delete team from Cosmos DB: {e}")
-            return False
