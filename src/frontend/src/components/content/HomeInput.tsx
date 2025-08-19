@@ -4,22 +4,7 @@ import {
     Caption1,
     Title2,
 } from "@fluentui/react-components";
-import {
-    Desktop20Regular,
-    BookmarkMultiple20Regular,
-    Search20Regular,
-    Wrench20Regular,
-    Person20Regular,
-    Building20Regular,
-    Document20Regular,
-    Database20Regular,
-    Code20Regular,
-    Play20Regular,
-    Shield20Regular,
-    Globe20Regular,
-    Clipboard20Regular,
-    WindowConsole20Regular,
-} from '@fluentui/react-icons';
+
 import React, { useRef, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -27,7 +12,7 @@ import "./../../styles/Chat.css";
 import "../../styles/prism-material-oceanic.css";
 import "./../../styles/HomeInput.css";
 
-import { HomeInputProps, QuickTask } from "../../models/homeInput";
+import { HomeInputProps, iconMap, QuickTask } from "../../models/homeInput";
 import { TeamConfig } from "../../models/Team";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
@@ -37,6 +22,7 @@ import ChatInput from "@/coral/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
 import PromptCard from "@/coral/components/PromptCard";
 import { Send } from "@/coral/imports/bundleicons";
+import { Clipboard20Regular } from "@fluentui/react-icons";
 
 // Icon mapping function to convert string icons to FluentUI icons
 const getIconFromString = (iconString: string | React.ReactNode): React.ReactNode => {
@@ -44,30 +30,6 @@ const getIconFromString = (iconString: string | React.ReactNode): React.ReactNod
     if (typeof iconString !== 'string') {
         return iconString;
     }
-
-    const iconMap: Record<string, React.ReactNode> = {
-        // Task/Logo icons
-        'Wrench': <Wrench20Regular />,
-        'TestTube': <Clipboard20Regular />, // Fallback since TestTube20Regular doesn't exist
-        'Terminal': <WindowConsole20Regular />,
-        'MonitorCog': <Desktop20Regular />,
-        'BookMarked': <BookmarkMultiple20Regular />,
-        'Search': <Search20Regular />,
-        'Robot': <Person20Regular />, // Fallback since Robot20Regular doesn't exist
-        'Code': <Code20Regular />,
-        'Play': <Play20Regular />,
-        'Shield': <Shield20Regular />,
-        'Globe': <Globe20Regular />,
-        'Person': <Person20Regular />,
-        'Database': <Database20Regular />,
-        'Document': <Document20Regular />,
-        'Building': <Building20Regular />,
-        'Desktop': <Desktop20Regular />,
-
-        // Default fallback
-        '📋': <Clipboard20Regular />,
-        'default': <Clipboard20Regular />,
-    };
 
     return iconMap[iconString] || iconMap['default'] || <Clipboard20Regular />;
 };
