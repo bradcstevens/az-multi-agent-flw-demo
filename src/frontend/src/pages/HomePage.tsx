@@ -41,6 +41,12 @@ const HomePage: React.FC = () => {
      */
     useEffect(() => {
         const loadDefaultTeam = async () => {
+            let defaultTeam  = TeamService.getStoredTeam();
+            if (defaultTeam) {
+                setSelectedTeam(defaultTeam);
+                console.log('Default team loaded from storage:', defaultTeam.name);
+                return true;
+            }
             setIsLoadingTeam(true);
             try {
                 const teams = await TeamService.getUserTeams();
@@ -48,7 +54,8 @@ const HomePage: React.FC = () => {
                 if (teams.length > 0) {
                     // Always prioritize "Business Operations Team" as default
                     const businessOpsTeam = teams.find(team => team.name === "Business Operations Team");
-                    const defaultTeam = businessOpsTeam || teams[0];
+                    defaultTeam = businessOpsTeam || teams[0];
+                    TeamService.storageTeam(defaultTeam);
                     setSelectedTeam(defaultTeam);
                     console.log('Default team loaded:', defaultTeam.name, 'with', defaultTeam.starting_tasks?.length || 0, 'starting tasks');
                     console.log('Team logo:', defaultTeam.logo);
@@ -143,6 +150,10 @@ const HomePage: React.FC = () => {
     const handleNewTask = useCallback(async (taskName: string) => {
         if (taskName.trim()) {
             try {
+                if (!selectedTeam) {
+                    console.log("it has no team");
+                    return;
+                }
                 const response = await TaskService.createPlan(
                     taskName.trim(),
                     selectedTeam?.team_id

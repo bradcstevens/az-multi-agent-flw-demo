@@ -5,6 +5,32 @@ export class TeamService {
     /**
      * Upload a custom team configuration
      */
+    private static readonly STORAGE_KEY = 'macae.v3.customTeam';
+
+    static storageTeam(team: TeamConfig): boolean {
+        // Persist a TeamConfig to localStorage (browser-only).
+        if (typeof window === 'undefined' || !window.localStorage) return false;
+        try {
+            const serialized = JSON.stringify(team);
+            window.localStorage.setItem(TeamService.STORAGE_KEY, serialized);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    static getStoredTeam(): TeamConfig | null {
+        if (typeof window === 'undefined' || !window.localStorage) return null;
+        try {
+            const raw = window.localStorage.getItem(TeamService.STORAGE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return parsed as TeamConfig;
+        } catch {
+            return null;
+        }
+    }
+
     static async uploadCustomTeam(teamFile: File): Promise<{
         modelError?: any; success: boolean; team?: TeamConfig; error?: string; raiError?: any; searchError?: any
     }> {
@@ -12,7 +38,7 @@ export class TeamService {
             const formData = new FormData();
             formData.append('file', teamFile);
 
-            const response = await apiClient.upload('/upload_team_config', formData);
+            const response = await apiClient.upload('/v3/upload_team_config', formData);
 
             return {
                 success: true,
