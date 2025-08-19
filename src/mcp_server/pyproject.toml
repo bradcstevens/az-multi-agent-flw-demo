@@ -46,4 +46,4 @@ packages = ["."]
 include = ["**/*", "README.md"]
 
 [project.scripts]
-mcp-server = "mcp_server.app:main"
+mcp-server = "mcp_server:main"

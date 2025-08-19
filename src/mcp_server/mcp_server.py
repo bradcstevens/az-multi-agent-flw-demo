@@ -12,12 +12,10 @@ import logging
 from typing import Optional
 
 from core.factory import MCPToolFactory
-from services import (
-    HRService,
-    TechSupportService,
-    GeneralService,
-    DataToolService,
-)
+from services.hr_service import HRService
+from services.tech_support_service import TechSupportService
+from services.general_service import GeneralService
+from services.data_tool_service import DataToolService
 from config.settings import config
 
 # Setup logging
