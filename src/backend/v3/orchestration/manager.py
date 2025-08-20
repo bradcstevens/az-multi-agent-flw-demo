@@ -11,6 +11,7 @@ load_dotenv()
 from typing import Any, List, Optional
 
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+from common.config.app_config import config
 from semantic_kernel.agents.orchestration.magentic import (
     MagenticOrchestration, StandardMagenticManager)
 from semantic_kernel.agents.runtime import InProcessRuntime
@@ -21,58 +22,16 @@ from semantic_kernel.connectors.mcp import MCPStreamableHttpPlugin
 from semantic_kernel.contents import (ChatMessageContent,
                                       StreamingChatMessageContent)
 from semantic_kernel.kernel_pydantic import KernelBaseModel
+from v3.callbacks.response_handlers import (agent_response_callback,
+                                            streaming_agent_response_callback)
 from v3.magentic_agents.magentic_agent_factory import (cleanup_all_agents,
                                                        get_agents)
 from v3.orchestration.human_approval_manager import \
     HumanApprovalMagenticManager
 
-magentic_orchestration: MagenticOrchestration = None # Global reference for Magentic orchestration
 
-# track this should be offline state and attached to a session id
-coderagent = False
-
-def agent_response_callback(message: ChatMessageContent) -> None:
-    """Observer function to print detailed information about streaming messages."""
-    global coderagent
-    # import sys
-
-    # Get agent name to determine handling
-    agent_name = message.name or "Unknown Agent"
-
-    # Debug information about the message
-    message_type = type(message).__name__
-    metadata = getattr(message, 'metadata', {})
-    # when streaming code - list the coder info first once - 
-    if 'code' in metadata and metadata['code'] is True:
-        if coderagent == False:
-            print(f"\n🧠 **{agent_name}** [{message_type}]")
-            print("-" * (len(agent_name) + len(message_type) + 10))
-            coderagent = True
-        print(message.content, end='', flush=False)
-        return
-    elif coderagent == True:
-        coderagent = False
-    role = getattr(message, 'role', 'unknown')
-
-    print(f"\n🧠 **{agent_name}** [{message_type}] (role: {role})")
-    print("-" * (len(agent_name) + len(message_type) + 10))
-    if message.items[-1].content_type == 'function_call':
-        print(f"🔧 Function call: {message.items[-1].function_name}, Arguments: {message.items[-1].arguments}")
-    if metadata:
-        print(f"📋 Metadata: {metadata}")
-    
-# Add this function after your agent_response_callback function
-async def streaming_agent_response_callback(streaming_message: StreamingChatMessageContent, is_final: bool) -> None:
-    """Simple streaming callback to show real-time agent responses."""
-    if streaming_message.name != "CoderAgent":
-        # Print streaming content as it arrives
-        if hasattr(streaming_message, 'content') and streaming_message.content:
-            print(streaming_message.content, end='', flush=False)
-
-async def start_orchestration():
+async def init_orchestration(agents: List)-> MagenticOrchestration:
     """Main function to run the agents."""
-
-    global magentic_orchestration
 
     # Custom execution settings that should work with Azure OpenAI
     execution_settings = OpenAIChatPromptExecutionSettings(
@@ -89,7 +48,7 @@ async def start_orchestration():
 
     # 1. Create a Magentic orchestration with Azure OpenAI
     magentic_orchestration = MagenticOrchestration(
-        members=await get_agents(),
+        members=agents,
         manager=HumanApprovalMagenticManager(
             chat_completion_service=AzureChatCompletion(
                 deployment_name=os.getenv("AZURE_OPENAI_MODEL_NAME"),
@@ -101,7 +60,9 @@ async def start_orchestration():
         agent_response_callback=agent_response_callback,
         streaming_agent_response_callback=streaming_agent_response_callback,  # Add streaming callback
     )
+    return magentic_orchestration
 
+async def run_orchestration(magentic_orchestration: MagenticOrchestration) -> None:
     # 2. Create a runtime and start it
     runtime = InProcessRuntime()
     runtime.start()
@@ -169,6 +130,3 @@ async def start_orchestration():
             print(f"⚠️  Error during agent cleanup: {e}")
         # 5. Stop the runtime when idle
         await runtime.stop_when_idle()
-
-if __name__ == "__main__":
-    asyncio.run(start_orchestration())

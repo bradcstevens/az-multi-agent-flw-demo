@@ -1,7 +1,9 @@
-from typing import List, Any
+from typing import Any, List
+
 from pydantic import BaseModel
 
-class m_step(BaseModel):
+
+class MStep(BaseModel):
     """model of a step in a plan"""
     _agent: str = ""
     action: str = ""
@@ -15,12 +17,14 @@ class m_step(BaseModel):
         self._agent = value if value is not None else ""
 
 
-class m_plan(BaseModel):
+class MPlan(BaseModel):
     """model of a plan"""
+    session_id: str = ""
+    user_id: str = ""
     team_id: str = ""
     plan_id: str = ""
     user_request: str = ""
     team: List[str] = []
     facts: str = ""
-    steps: List[m_step] = []
+    steps: List[MStep] = []
 

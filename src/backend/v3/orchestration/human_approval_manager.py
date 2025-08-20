@@ -3,13 +3,14 @@ Human-in-the-loop Magentic Manager for employee onboarding orchestration.
 Extends StandardMagenticManager to add approval gates before plan execution.
 """
 
-from typing import Optional, List, Any
-from semantic_kernel.agents.orchestration.magentic import StandardMagenticManager, MagenticContext
-from semantic_kernel.agents import Agent
-from semantic_kernel.contents import ChatMessageContent
-from models.models import m_plan, m_step
-
 import re
+from typing import Any, List, Optional
+
+from semantic_kernel.agents import Agent
+from semantic_kernel.agents.orchestration.magentic import (
+    MagenticContext, StandardMagenticManager)
+from semantic_kernel.contents import ChatMessageContent
+from v3.models.models import MPlan, MStep
 
 
 class HumanApprovalMagenticManager(StandardMagenticManager):
@@ -20,7 +21,7 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
     
     # Define Pydantic fields to avoid validation errors
     approval_enabled: bool = True
-    magentic_plan: Optional[m_plan] = None
+    magentic_plan: Optional[MPlan] = None
     def __init__(self, *args, **kwargs):
         # Remove any custom kwargs before passing to parent
         super().__init__(*args, **kwargs)
@@ -172,11 +173,11 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         print("\nThe Magentic Manager will automatically coordinate these agents")
         print("based on the task requirements and agent capabilities.")
 
-    def plan_to_obj(self, magentic_context, ledger) -> m_plan:
+    def plan_to_obj(self, magentic_context, ledger) -> MPlan:
         """
         """
         
-        return_plan: m_plan = m_plan()
+        return_plan: MPlan = MPlan()
 
         # get the request text from the ledger
         if hasattr(magentic_context, 'task'):
@@ -223,7 +224,7 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
                 if prefix:
                     line = prefix + line
                 # Create the step object
-                step = m_step(agent=found_agent, action=line)
+                step = MStep(agent=found_agent, action=line)
 
                 # add the step to the plan
                 return_plan.steps.append(step)

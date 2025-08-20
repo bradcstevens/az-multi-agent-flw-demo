@@ -10,7 +10,6 @@ from typing import Dict, List, Optional
 
 from auth.auth_utils import get_authenticated_user_details
 from azure.monitor.opentelemetry import configure_azure_monitor
-# Semantic Kernel imports
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
 from common.models.messages_kernel import (AgentMessage, AgentType,
@@ -28,6 +27,8 @@ from kernel_agents.agent_factory import AgentFactory
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
 from v3.api.router import app_v3
+# Semantic Kernel imports
+from v3.config.settings import orchestration_config
 from v3.magentic_agents.magentic_agent_factory import (cleanup_all_agents,
                                                        get_agents)
 
@@ -60,17 +61,15 @@ logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").setLevel(
 )
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan event handler to create and clean up agents."""
-    config.agents = await get_agents()
-    yield
-    await cleanup_all_agents()
-
-
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     """Lifespan event handler to create and clean up agents."""
+#     config.agents = await get_agents()
+#     yield
+#     await cleanup_all_agents()
 
 # Initialize the FastAPI app
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 frontend_url = config.FRONTEND_SITE_NAME
 
@@ -598,7 +597,7 @@ async def approve_step_endpoint(
 
         return {"status": "All steps approved"}
 
-
+# Get plans is called in the initial side rendering of the frontend
 @app.get("/api/plans")
 async def get_plans(
     request: Request,
@@ -662,6 +661,7 @@ async def get_plans(
       404:
         description: Plan not found
     """
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
@@ -669,6 +669,9 @@ async def get_plans(
             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
         )
         raise HTTPException(status_code=400, detail="no user")
+    
+    # Initialize agent team for this user session
+    await orchestration_config.get_current_orchestration(user_id=user_id)
 
     # Initialize memory context
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
