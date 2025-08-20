@@ -2,7 +2,6 @@
 
 import inspect
 import time
-from datetime import datetime
 from typing import Annotated, Callable, List
 
 from semantic_kernel.functions import kernel_function
