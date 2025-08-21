@@ -78,11 +78,12 @@ async def serve_app(full_path: str):
     - Return 404 on suspicious access instead of leaking details.
     """
     try:
-        candidate = (BUILD_DIR_PATH / full_path).resolve()
+        # Normalize and join to avoid odd path segments, then resolve.
+        # This mirrors the suggested remediation (normpath + join) but
+        # uses Path.relative_to() as the final containment check.
+        normalized = os.path.normpath(os.path.join(BUILD_DIR, full_path))
+        candidate = Path(normalized).resolve()
 
-        # Compute relative parts and block dotfiles anywhere in path.
-        # Use Path.relative_to() as the canonical containment check; it
-        # raises an exception if `candidate` is outside `BUILD_DIR_PATH`.
         try:
             rel_parts = candidate.relative_to(BUILD_DIR_PATH).parts
         except Exception:
