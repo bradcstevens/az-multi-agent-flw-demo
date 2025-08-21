@@ -5,9 +5,6 @@
     "solutionName": {
       "value": "${AZURE_ENV_NAME}"
     },
-    "solutionLocation": {
-      "value": "${AZURE_LOCATION}"
-    },
     "location": {
       "value": "${AZURE_LOCATION}"
     },
@@ -49,6 +46,12 @@
     },
     "virtualMachineAdminPassword": {
       "value": "${AZURE_ENV_VM_ADMIN_PASSWORD}"
+    },
+    "existingLogAnalyticsWorkspaceId": {
+        "value": "${AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID}"
+    },
+    "existingFoundryProjectResourceId": {
+      "value": "${AZURE_ENV_FOUNDRY_PROJECT_ID}"
     }
   }
 }

@@ -107,10 +107,10 @@ param frontendContainerImageTag string = 'latest_2025-07-22_895'
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
-@description('Use this parameter to reuse an existing Log Analytics Workspace')
+@description('Optional. Resource ID of an existing Log Analytics Workspace')
 param existingLogAnalyticsWorkspaceId string = ''
- 
-@description('Use this parameter to reuse an existing AI project resource ID')
+
+@description('Optional. Resource ID of an existing Foundry project')
 param existingFoundryProjectResourceId string = ''
 
 // ============== //
@@ -979,6 +979,7 @@ module aiFoundryAiServices 'modules/ai-services.bicep' = if (aiFoundryAIservices
     name: aiFoundryAiServicesResourceName
     location: azureAiServiceLocation
     tags: tags
+    existingFoundryProjectResourceId: existingFoundryProjectResourceId
     projectName: aiFoundryAiServicesAiProjectResourceName
     projectDescription: 'AI Foundry Project'
     sku: 'S0'
@@ -1014,7 +1015,7 @@ module aiFoundryAiServices 'modules/ai-services.bicep' = if (aiFoundryAIservices
     // WAF aligned configuration for Monitoring
     diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
     publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-    privateEndpoints: enablePrivateNetworking
+    privateEndpoints: (enablePrivateNetworking &&  empty(existingFoundryProjectResourceId))
       ? ([
           {
             name: 'pep-${aiFoundryAiServicesResourceName}'
@@ -1054,43 +1055,6 @@ module aiFoundryAiServices 'modules/ai-services.bicep' = if (aiFoundryAIservices
         }
       }
     ]
-  }
-}
-
-//Role assignments for AI Project
-module resourceRoleAssignmentAiServicesAiProjectAiUser 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
-  name: 'avm.ptn.authorization.resource-role-assignment.${uniqueString(aiFoundryAiServicesAiProjectResourceName,containerAppResourceName,'Azure AI User')}'
-  params: {
-    roleName: 'Azure AI User'
-    roleDefinitionId: '53ca6127-db72-4b80-b1b0-d745d6d5456d'
-    principalId: userAssignedIdentity.outputs.principalId
-    principalType: 'ServicePrincipal'
-    resourceId: aiFoundryAiServices.outputs.aiProjectResourceId
-    enableTelemetry: enableTelemetry
-  }
-}
-
-module resourceRoleAssignmentAiServicesAiProjectAiDeveloper 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
-  name: 'avm.ptn.authorization.resource-role-assignment.${uniqueString(aiFoundryAiServicesAiProjectResourceName,containerAppResourceName,'Azure AI Developer')}'
-  params: {
-    roleName: 'Azure AI Developer'
-    roleDefinitionId: '64702f94-c441-49e6-a78b-ef80e0188fee'
-    principalId: userAssignedIdentity.outputs.principalId
-    principalType: 'ServicePrincipal'
-    resourceId: aiFoundryAiServices.outputs.aiProjectResourceId
-    enableTelemetry: enableTelemetry
-  }
-}
-
-module resourceRoleAssignmentAiServicesAiProjectCognitiveServicesOpenAiUser 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
-  name: 'avm.ptn.authorization.resource-role-assignment.${uniqueString(aiFoundryAiServicesAiProjectResourceName,containerAppResourceName,'Cognitive Services OpenAI User')}'
-  params: {
-    roleName: 'Cognitive Services OpenAI User'
-    roleDefinitionId: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-    principalId: userAssignedIdentity.outputs.principalId
-    principalType: 'ServicePrincipal'
-    resourceId: aiFoundryAiServices.outputs.aiProjectResourceId
-    enableTelemetry: enableTelemetry
   }
 }
 
@@ -1342,7 +1306,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_OPENAI_ENDPOINT'
-            value: 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/'
+            value: aiFoundryAiServices.outputs.endpoint
           }
           {
             name: 'AZURE_OPENAI_MODEL_NAME'
@@ -1382,7 +1346,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_AI_AGENT_ENDPOINT'
-            value: aiFoundryAiServices.outputs.aiProjectApiEndpoint
+            value: aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
           }
           {
             name: 'AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME'
