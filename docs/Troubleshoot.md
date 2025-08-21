@@ -100,10 +100,8 @@ based on available quota you can deploy application otherwise, you can request f
  
 <details>
 <summary><b>DeploymentModelNotSupported</b></summary>
-
-   <br>
-   If you hardcode the GPT model or version to anything other than gpt-4o, you will encounter a <b>DeploymentModelNotSupported</b> prevent this, please use the GPT model  <b>gpt-4o</b> with model version <b>2024-08-06</b>.
  
+ -  The updated model may not be supported in the selected region. Please verify its availability in the [Azure AI Foundry models](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions) document.
  
 </details>
  <details>
@@ -117,25 +115,30 @@ based on available quota you can deploy application otherwise, you can request f
     ```
     az resource show --ids <Resource ID> --query "properties.provisioningState"
     ```
+- Sample Resource IDs format
+    - Log Analytics Workspace Resource ID
+    ```
+    /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}
+    ```
+    - Azure AI Foundry Project Resource ID
+    ```
+    /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.MachineLearningServices/workspaces/{name}
+    ```
 - For more information refer [Resource Not Found errors solutions](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/error-not-found?tabs=bicep)
 
 </details>
  <details>
 <summary><b>ResourceNameInvalid</b></summary>
  
-- Ensure the resource name is within the allowed length and naming rules defined for that specific resource type.
-- Avoid using consecutive hyphens (--) in the resource name.
-- Do not include unsupported special characters, as each resource type enforces specific naming validations.
+- Ensure the resource name is within the allowed length and naming rules defined for that specific resource type, you can refer [Resource Naming Convention](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules) document.
+
 </details>
  <details>
 <summary><b>ServiceUnavailable/ResourceNotFound</b></summary>
  
-  - Some Locations in MACAE does not support for deployment  for specific resources so please avoid using below resources
- ```
- eastus, westus, australiacentral, easteurope2
- ```
+  - Regions are restricted to guarantee compatibility with paired regions and replica locations for data redundancy and failover scenarios based on articles [Azure regions list](https://learn.microsoft.com/en-us/azure/reliability/regions-list) and [Azure Database for MySQL Flexible Server - Azure Regions](https://learn.microsoft.com/azure/mysql/flexible-server/overview#azure-regions).
 
-  - You can request more quota, refer [Quota Request](https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/create-support-request-quota-increase)
+  - You can request more quota, refer [Quota Request](https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/create-support-request-quota-increase) Documentation
 
 
 </details>
@@ -159,7 +162,7 @@ based on available quota you can deploy application otherwise, you can request f
 This error can occur only when user hardcoding the CosmosDB Service name. To avoid this you can try few below suggestions.
 - Verify resource names are globally unique.
 - If you already created an account/resource with same name in another subscription or resource group, check and delete it before reusing the name.
-- By dedault in this template we are using unique prefix with every resource/account name to avoid this kind for errors.
+- By default in this template we are using unique prefix with every resource/account name to avoid this kind for errors.
 </details>
  <details>
 <summary><b>NetcfgSubnetRangeOutsideVnet</b></summary>
@@ -176,6 +179,7 @@ This error can occur only when user hardcoding the CosmosDB Service name. To avo
 - <b>Verify ACR configuration:</b> If ACR is included, review its settings to ensure they comply with Azure requirements.
 - <b>Check export settings:</b> If export is disabled in ACR, make sure public network access is also disabled.
 - <b>Dedeploy after fix:</b> Correct the configuration and redeploy. This will prevent the Conflict error during deployment.
+- For more information refer [ACR Data Loss Prevention](https://learn.microsoft.com/en-us/azure/container-registry/data-loss-prevention) document. 
 </details>
  <details>
 <summary><b>AccountProvisioningStateInvalid</b></summary>
@@ -206,7 +210,7 @@ This error can occur only when user hardcoding the CosmosDB Service name. To avo
  <details>
 <summary><b>DeploymentCanceled</b></summary>
 
- There might be multiple resions for this error you can follow below steps to troubleshoot.
+ There might be multiple reasons for this error you can follow below steps to troubleshoot.
  1. Check deployment history
     - Go to Azure Portal → Resource Group → Deployments.
     - Look at the detailed error message for the deployment that was canceled — this will show which resource failed and why.
@@ -268,14 +272,12 @@ Essentially: DeploymentCanceled itself is just a wrapper error — you need to c
   - This error occurs when provisioning of a resource is restricted in the selected region.
     It usually happens because the service is not available in that region or provisioning has been temporarily disabled.  
  
-  - Please try creating the resource in another supported region. Example of restricted regions for some services:  
-    ```
-    centralindia, japaneast, brazilsouth    
-    ```
+  - Regions are restricted to guarantee compatibility with paired regions and replica locations for data redundancy and failover scenarios based on articles [Azure regions list](https://learn.microsoft.com/en-us/azure/reliability/regions-list) and [Azure Database for MySQL Flexible Server - Azure Regions](https://learn.microsoft.com/azure/mysql/flexible-server/overview#azure-regions).
    
 - If you need to use the same region, you can request a quota or provisioning exception.  
   Refer [Quota Request](https://docs.microsoft.com/en-us/azure/sql-database/quota-increase-request) for more details.
  
 </details>
 
-💡 Note: If you encounter any other issues, please feel free to reach out to us or you can refer [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) Documentation. Thank you!
+💡 Note: If you encounter any other issues, you can refer to the [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) documentation.
+If the problem persists, you can also raise an bug in our [MACAE Github Issues](https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/issues) for further support.
