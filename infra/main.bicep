@@ -924,7 +924,7 @@ var privateDnsZones = [
   'privatelink.documents.azure.com'
   'privatelink.${toLower(replace(location,' ',''))}.azurecontainerapps.io'
   'privatelink.azurewebsites.net'
-] 
+]
 
 // DNS Zone Index Constants
 var dnsZoneIndex = {
@@ -936,10 +936,22 @@ var dnsZoneIndex = {
   appService: 5
 }
 
+// List of DNS zone indices that correspond to AI-related services.
+var aiRelatedDnsZoneIndices = [
+  dnsZoneIndex.cognitiveServices
+  dnsZoneIndex.openAI
+  dnsZoneIndex.aiServices
+]
+
+// ===================================================
+// DEPLOY PRIVATE DNS ZONES
+// - Deploys all zones if no existing Foundry project is used
+// - Excludes AI-related zones when using with an existing Foundry project
+// ===================================================
 @batchSize(5)
 module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
-  for (zone, i) in privateDnsZones: if (enablePrivateNetworking) {
-    name: 'avm.res.network.private-dns-zone.${i}'
+  for (zone, i) in privateDnsZones: if (enablePrivateNetworking && (empty(existingFoundryProjectResourceId) || !contains(aiRelatedDnsZoneIndices, i))) {
+    name: 'avm.res.network.private-dns-zone.${contains(zone, 'azurecontainerapps.io') ? 'containerappenv' : split(zone, '.')[1]}'
     params: {
       name: zone
       tags: tags
@@ -1193,8 +1205,6 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.11.2
         ]
   }
 }
-
-
 
 // Private Endpoint for Container App Environment
 var privateEndpointContainerAppEnvironmentService = 'managedEnvironments'
