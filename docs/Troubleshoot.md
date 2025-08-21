@@ -107,12 +107,12 @@ based on available quota you can deploy application otherwise, you can request f
  
 </details>
  <details>
-<summary><b>LinkedInvalidPropertyId/ ResourceNotFound/DeploymentOutputEvaluationFailed</b></summary>
+<summary><b>LinkedInvalidPropertyId/ ResourceNotFound/DeploymentOutputEvaluationFailed/ CanNotRestoreANonExistingResource </b></summary>
   
 - Before using any resource ID, ensure it follows the correct format.
 - Verify that the resource ID you are passing actually exists.
 - Make sure there are no typos in the resource ID.
-- Verify that the provisioning state of the existing resource ID is `Succeeded` by running the following command
+- Verify that the provisioning state of the existing resource is `Succeeded` by running the following command to avoid this error while deployment or restoring the resource.
 
     ```
     az resource show --ids <Resource ID> --query "properties.provisioningState"
