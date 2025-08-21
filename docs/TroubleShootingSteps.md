@@ -283,5 +283,19 @@ Essentially: DeploymentCanceled itself is just a wrapper error — you need to c
  
 </details>
 
+<details>
+<summary><b>MaxNumberOfRegionalEnvironmentsInSubExceeded</b></summary>
+ 
+- This error occurs when you try to create more than the allowed number of **Azure Container App Environments (ACA Environments)** in the same region for a subscription.  
+- For example, in **Sweden Central**, only **1 Container App Environment** is allowed per subscription.  
+ 
+The subscription 'xxxx-xxxx' cannot have more than 1 Container App Environments in Sweden Central.
+ 
+- To fix this, you can:
+  - Deploy the Container App Environment in a **different region**, OR  
+  - Request a quota increase via Azure Support → [Quota Increase Request](https://go.microsoft.com/fwlink/?linkid=2208872)  
+ 
+</details>
+
 💡 Note: If you encounter any other issues, you can refer to the [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) documentation.
 If the problem persists, you can also raise an bug in our [MACAE Github Issues](https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/issues) for further support.
