@@ -1,6 +1,10 @@
-
 # 🛠️ Troubleshooting
  
+When deploying Azure resources, you may come across different error codes that stop or delay the deployment process. This section lists some of the most common errors along with possible causes and step-by-step resolutions.
+ 
+Use these as quick reference guides to unblock your deployments.
+
+## Error Codes
 
  <details>
 <summary><b>ReadOnlyDisabledSubscription</b></summary>  

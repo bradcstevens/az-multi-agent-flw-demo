@@ -221,7 +221,7 @@ Once you've opened the project in [Codespaces](#github-codespaces), [Dev Contain
 
 
 ### 🛠️ Troubleshooting
- If you encounter any issues during the deployment process, please refer  [throubleshoot](../docs/Troubleshoot.md) document for detailed steps and solutions
+ If you encounter any issues during the deployment process, please refer  [troubleshooting](../docs/TroubleShootingSteps.md) document for detailed steps and solutions.
 
 # Local setup
 
