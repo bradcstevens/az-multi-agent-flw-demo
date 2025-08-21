@@ -80,14 +80,13 @@ async def serve_app(full_path: str):
     try:
         candidate = (BUILD_DIR_PATH / full_path).resolve()
 
-        # Ensure resolved path is within BUILD_DIR
-        if not str(candidate).startswith(str(BUILD_DIR_PATH)):
-            raise HTTPException(status_code=404)
-
-        # Compute relative parts and block dotfiles anywhere in path
+        # Compute relative parts and block dotfiles anywhere in path.
+        # Use Path.relative_to() as the canonical containment check; it
+        # raises an exception if `candidate` is outside `BUILD_DIR_PATH`.
         try:
             rel_parts = candidate.relative_to(BUILD_DIR_PATH).parts
         except Exception:
+            # Not contained -> possible traversal attempt
             raise HTTPException(status_code=404)
 
         if any(part.startswith('.') for part in rel_parts):
