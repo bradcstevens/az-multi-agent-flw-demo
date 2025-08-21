@@ -1,6 +1,10 @@
-
 # 🛠️ Troubleshooting
  
+When deploying Azure resources, you may come across different error codes that stop or delay the deployment process. This section lists some of the most common errors along with possible causes and step-by-step resolutions.
+ 
+Use these as quick reference guides to unblock your deployments.
+
+## Error Codes
 
  <details>
 <summary><b>ReadOnlyDisabledSubscription</b></summary>  
@@ -276,6 +280,20 @@ Essentially: DeploymentCanceled itself is just a wrapper error — you need to c
    
 - If you need to use the same region, you can request a quota or provisioning exception.  
   Refer [Quota Request](https://docs.microsoft.com/en-us/azure/sql-database/quota-increase-request) for more details.
+ 
+</details>
+
+<details>
+<summary><b>MaxNumberOfRegionalEnvironmentsInSubExceeded</b></summary>
+ 
+- This error occurs when you try to create more than the allowed number of **Azure Container App Environments (ACA Environments)** in the same region for a subscription.  
+- For example, in **Sweden Central**, only **1 Container App Environment** is allowed per subscription.  
+ 
+The subscription 'xxxx-xxxx' cannot have more than 1 Container App Environments in Sweden Central.
+ 
+- To fix this, you can:
+  - Deploy the Container App Environment in a **different region**, OR  
+  - Request a quota increase via Azure Support → [Quota Increase Request](https://go.microsoft.com/fwlink/?linkid=2208872)  
  
 </details>
 
