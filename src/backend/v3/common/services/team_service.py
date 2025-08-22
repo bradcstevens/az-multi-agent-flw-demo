@@ -145,6 +145,9 @@ class TeamService:
             description=agent_data.get("description", ""),
             icon=agent_data["icon"],
             index_name=agent_data.get("index_name", ""),
+            use_rag=agent_data.get("use_rag", False),
+            use_mcp=agent_data.get("use_mcp", False),
+            coding_tools=agent_data.get("coding_tools", False),
         )
 
     def _validate_and_parse_task(self, task_data: Dict[str, Any]) -> StartingTask:
