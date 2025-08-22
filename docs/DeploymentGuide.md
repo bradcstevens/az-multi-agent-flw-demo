@@ -334,6 +334,7 @@ The files for the dev container are located in `/.devcontainer/` folder.
 
    - Use the output from the deployment or check the Azure Portal under "Deployments" in the resource group.
    - Make sure to set APP_ENV to "**dev**" in `.env` file.
+   - When you run `azd provision` or `azd up`, a `.env` file is generated at `.azure/<env-name>/.env` (you can check the default environment using `azd env list`). Copy the contents of this file into your backend `.env` file. Additionally, for local development, make sure to include `BACKEND_API_URL=http://localhost:8000` and `FRONTEND_SITE_NAME=http://127.0.0.1:3000` in the `.env`.
 
 7. **(Optional) Set up a virtual environment:**
 
