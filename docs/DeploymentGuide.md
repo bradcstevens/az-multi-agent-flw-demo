@@ -328,12 +328,17 @@ The files for the dev container are located in `/.devcontainer/` folder.
    - Update the `.env` file with the required values from your Azure resource group in Azure Portal App Service environment variables.
    - Alternatively, if resources were
    provisioned using `azd provision` or `azd up`, a `.env` file is automatically generated in the `.azure/<env-name>/.env`
-   file. To get your `<env-name>` run `azd env list` to see which env is default.
+   file. You can copy the contents of this file into your backend `.env` file.
+
+    _**Note**: To get your `<env-name>` run `azd env list` to see which env is default._
 
 6. **Fill in the `.env` file:**
 
    - Use the output from the deployment or check the Azure Portal under "Deployments" in the resource group.
    - Make sure to set APP_ENV to "**dev**" in `.env` file.
+   - For local development, make sure to include below env variables in the `.env`
+     - `BACKEND_API_URL=http://localhost:8000`
+     - `FRONTEND_SITE_NAME=http://127.0.0.1:3000` .
 
 7. **(Optional) Set up a virtual environment:**
 
