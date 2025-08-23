@@ -29,4 +29,5 @@ dependencies = [
     "python-multipart>=0.0.20",
     "semantic-kernel>=1.32.2",
     "uvicorn>=0.34.2",
+    "pylint-pydantic>=0.3.5",
 ]
