@@ -1,5 +1,6 @@
 from typing import Any, Dict
 import logging
+import re
 from azure.ai.projects.aio import AIProjectClient
 from git import List
 import aiohttp
@@ -54,12 +55,11 @@ class FoundryService:
         try:
             # Get Azure Management API token (not Cognitive Services token)
             credential = config.get_azure_credentials()
-            token = credential.get_token("https://management.azure.com/.default")
+            token = credential.get_token(config.AZURE_MANAGEMENT_SCOPE)
 
             # Extract Azure OpenAI resource name from endpoint URL
             openai_endpoint = config.AZURE_OPENAI_ENDPOINT
             # Extract resource name from URL like "https://aisa-macae-d3x6aoi7uldi.openai.azure.com/"
-            import re
             match = re.search(r'https://([^.]+)\.openai\.azure\.com', openai_endpoint)
             if not match:
                 self.logger.error(f"Could not extract resource name from endpoint: {openai_endpoint}")
