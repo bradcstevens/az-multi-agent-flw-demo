@@ -91,29 +91,25 @@ const HomePage: React.FC = () => {
     const handleTeamSelect = useCallback((team: TeamConfig | null) => {
         setSelectedTeam(team);
         if (team) {
-
-            showToast(`{team.name} team has been selected with {team.agents.length} agents`, "success");
-            // dispatchToast(
-            //     <Toast>
-            //         <ToastTitle>Team Selected</ToastTitle>
-            //         <ToastBody>
-            //             {team.name} team has been selected with {team.agents.length} agents
-            //         </ToastBody>
-            //     </Toast>,
-            //     { intent: "success" }
-            // );
+            dispatchToast(
+                <Toast>
+                    <ToastTitle>Team Selected</ToastTitle>
+                    <ToastBody>
+                        {team.name} team has been selected with {team.agents.length} agents
+                    </ToastBody>
+                </Toast>,
+                { intent: "success" }
+            );
         } else {
-
-            showToast(`No team is currently selected`, "info");
-            // dispatchToast(
-            //     <Toast>
-            //         <ToastTitle>Team Deselected</ToastTitle>
-            //         <ToastBody>
-            //             No team is currently selected
-            //         </ToastBody>
-            //     </Toast>,
-            //     { intent: "info" }
-            // );
+            dispatchToast(
+                <Toast>
+                    <ToastTitle>Team Deselected</ToastTitle>
+                    <ToastBody>
+                        No team is currently selected
+                    </ToastBody>
+                </Toast>,
+                { intent: "info" }
+            );
         }
     }, [dispatchToast]);
 
@@ -132,17 +128,15 @@ const HomePage: React.FC = () => {
                 setSelectedTeam(defaultTeam);
                 console.log('Default team after upload:', defaultTeam.name);
                 console.log('Business Operations Team remains default');
-                showToast(`Team uploaded. {defaultTeam.name} remains your default team.`, "success");
-                // Show a toast notification about the upload success
-                // dispatchToast(
-                //     <Toast>
-                //         <ToastTitle>Team Uploaded Successfully!</ToastTitle>
-                //         <ToastBody>
-                //             Team uploaded. {defaultTeam.name} remains your default team.
-                //         </ToastBody>
-                //     </Toast>,
-                //     { intent: "success" }
-                // );
+                dispatchToast(
+                    <Toast>
+                        <ToastTitle>Team Uploaded Successfully!</ToastTitle>
+                        <ToastBody>
+                            Team uploaded. {defaultTeam.name} remains your default team.
+                        </ToastBody>
+                    </Toast>,
+                    { intent: "success" }
+                );
             }
         } catch (error) {
             console.error('Error refreshing teams after upload:', error);
