@@ -2,45 +2,36 @@
 import asyncio
 import logging
 import os
-
 # Azure monitoring
 import re
 import uuid
+from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
-# Semantic Kernel imports
-from common.config.app_config import config
 from auth.auth_utils import get_authenticated_user_details
 from azure.monitor.opentelemetry import configure_azure_monitor
+from common.config.app_config import config
+from common.database.database_factory import DatabaseFactory
+from common.models.messages_kernel import (AgentMessage, AgentType,
+                                           HumanClarification, HumanFeedback,
+                                           InputTask, Plan, PlanStatus,
+                                           PlanWithSteps, Step, UserLanguage)
 from common.utils.event_utils import track_event_if_configured
-
+from common.utils.utils_date import format_dates_in_messages
+# Updated import for KernelArguments
+from common.utils.utils_kernel import rai_success
 # FastAPI imports
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
-
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
-from common.models.messages_kernel import (
-    AgentMessage,
-    AgentType,
-    HumanClarification,
-    HumanFeedback,
-    InputTask,
-    Plan,
-    PlanStatus,
-    PlanWithSteps,
-    Step,
-    UserLanguage,
-)
-
-# Updated import for KernelArguments
-from common.utils.utils_kernel import rai_success
-
-from common.database.database_factory import DatabaseFactory
-from common.utils.utils_date import format_dates_in_messages
 from v3.api.router import app_v3
 from common.utils.websocket_streaming import websocket_streaming_endpoint, ws_manager
+# Semantic Kernel imports
+from v3.config.settings import orchestration_config
+from v3.magentic_agents.magentic_agent_factory import (cleanup_all_agents,
+                                                       get_agents)
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
 connection_string = config.APPLICATIONINSIGHTS_CONNECTION_STRING
@@ -69,6 +60,14 @@ logging.getLogger("azure.identity.aio._internal").setLevel(logging.WARNING)
 logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").setLevel(
     logging.WARNING
 )
+
+
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     """Lifespan event handler to create and clean up agents."""
+#     config.agents = await get_agents()
+#     yield
+#     await cleanup_all_agents()
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -605,7 +604,7 @@ async def approve_step_endpoint(
 
         return {"status": "All steps approved"}
 
-
+# Get plans is called in the initial side rendering of the frontend
 @app.get("/api/plans")
 async def get_plans(
     request: Request,
@@ -670,6 +669,7 @@ async def get_plans(
       404:
         description: Plan not found
     """
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
@@ -677,6 +677,9 @@ async def get_plans(
             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
         )
         raise HTTPException(status_code=400, detail="no user")
+    
+    # Initialize agent team for this user session
+    await orchestration_config.get_current_orchestration(user_id=user_id)
 
     # Initialize memory context
     memory_store = await DatabaseFactory.get_database(user_id=user_id)

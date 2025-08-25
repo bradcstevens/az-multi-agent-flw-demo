@@ -160,6 +160,9 @@ class TeamAgent(KernelBaseModel):
     description: str = ""
     icon: str
     index_name: str = ""
+    use_rag: bool = False
+    use_mcp: bool = False
+    coding_tools: bool = False
 
 
 class StartingTask(KernelBaseModel):
