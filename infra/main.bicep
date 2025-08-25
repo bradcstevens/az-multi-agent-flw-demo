@@ -127,22 +127,6 @@ var solutionSuffix = toLower(trim(replace(
   ''
 )))
 
-// Region pairs list based on article in [Azure regions list](https://learn.microsoft.com/azure/reliability/regions-list)
-// var azureRegionPairs = {
-//   australiaeast: 'australiasoutheast'
-//   centralus: 'eastus2'
-//   eastasia: 'southeastasia'
-//   eastus: 'centralus'
-//   eastus2: 'centralus'
-//   japaneast: 'japanwest'
-//   northeurope: 'westeurope'
-//   southeastasia: 'eastasia'
-//   uksouth: 'ukwest'
-//   westeurope: 'northeurope'
-// }
-// // Paired location calculated based on 'location' parameter. This location will be used by applicable resources if `enableScalability` is set to `true`
-// var pairedLocation = azureRegionPairs[location]
-
 // Region pairs list based on article in [Azure Database for MySQL Flexible Server - Azure Regions](https://learn.microsoft.com/azure/mysql/flexible-server/overview#azure-regions) for supported high availability regions for CosmosDB.
 var cosmosDbZoneRedundantHaRegionPairs = {
   australiaeast: 'uksouth' //'southeastasia'
@@ -280,7 +264,7 @@ var logAnalyticsWorkspaceResourceId = useExistingLogAnalytics
   : logAnalyticsWorkspace!.outputs.resourceId
 var logAnalyticsPrimarySharedKey = useExistingLogAnalytics
   ? existingLogAnalyticsWorkspace!.listKeys().primarySharedKey
-  : logAnalyticsWorkspace.outputs.primarySharedKey
+  : logAnalyticsWorkspace!.outputs!.primarySharedKey
 var logAnalyticsWorkspaceId = useExistingLogAnalytics
   ? existingLogAnalyticsWorkspace!.properties.customerId
   : logAnalyticsWorkspace!.outputs.logAnalyticsWorkspaceId
@@ -1086,7 +1070,7 @@ resource existingAiFoundryAiServices 'Microsoft.CognitiveServices/accounts@2025-
   scope: resourceGroup(split(existingAiFoundryResourceId, '/')[2], split(existingAiFoundryResourceId, '/')[4])
 }
 
-module existingAiFoundryAiServicesDeployments 'modules/ai-services-model-deployments.bicep' = if (useExistingAiFoundry) {
+module existingAiFoundryAiServicesDeployments 'modules/ai-services-deployments.bicep' = if (useExistingAiFoundry) {
   name: take('module.ai-services-model-deployments.${existingAiFoundryAiServices.name}', 64)
   params: {
     name: existingAiFoundryAiServices.name
