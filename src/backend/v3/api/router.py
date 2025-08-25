@@ -26,7 +26,8 @@ from fastapi import (
 from kernel_agents.agent_factory import AgentFactory
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
-from v3.config.settings import orchestration_config
+
+# from v3.config.settings import orchestration_config
 from v3.models.models import MPlan, MStep
 from v3.models.orchestration_models import AgentType
 

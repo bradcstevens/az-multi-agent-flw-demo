@@ -8,10 +8,13 @@ import os
 from common.config.app_config import config
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.connectors.ai.open_ai import (
-    AzureChatCompletion, OpenAIChatPromptExecutionSettings)
-from v3.magentic_agents.magentic_agent_factory import (cleanup_all_agents,
-                                                       get_agents)
-from v3.orchestration.manager import init_orchestration
+    AzureChatCompletion,
+    OpenAIChatPromptExecutionSettings,
+)
+
+# from v3.magentic_agents.magentic_agent_factory import (cleanup_all_agents,
+#                                                        get_agents)
+# from v3.orchestration.manager import init_orchestration
 
 
 class AzureConfig:
@@ -58,22 +61,23 @@ class MCPConfig:
             if token
             else {}
         )
-    
-class OrchestrationConfig:
-    """Configuration for orchestration settings."""
 
-    def __init__(self):
-        self._orchestrations = {}
 
-    async def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
-        """Initialize or get existing orchestration instance."""
-        if user_id not in self._orchestrations:
-            agents = await get_agents()
-            self._orchestrations[user_id] = await init_orchestration(agents)
-        return self._orchestrations[user_id]
+# class OrchestrationConfig:
+#     """Configuration for orchestration settings."""
+
+#     def __init__(self):
+#         self._orchestrations = {}
+
+#     async def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
+#         """Initialize or get existing orchestration instance."""
+#         if user_id not in self._orchestrations:
+#             agents = await get_agents()
+#             self._orchestrations[user_id] = await init_orchestration(agents)
+#         return self._orchestrations[user_id]
 
 
 # Global config instances
 azure_config = AzureConfig()
 mcp_config = MCPConfig()
-orchestration_config = OrchestrationConfig()
+# orchestration_config = OrchestrationConfig()
