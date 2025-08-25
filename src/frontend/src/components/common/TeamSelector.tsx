@@ -22,8 +22,8 @@ import {
   TabList
 } from '@fluentui/react-components';
 import {
-  ChevronUp16Regular,
   ChevronDown16Regular,
+  ChevronUpDown16Regular,
   CloudAdd20Regular,
   Delete20Regular,
   Search20Regular,
@@ -487,10 +487,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
                 {selectedTeam ? selectedTeam.name : 'No team selected'}
               </Body1>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              <ChevronUp16Regular style={{ color: '#605e5c' }} />
-              <ChevronDown16Regular style={{ color: '#605e5c' }} />
-            </div>
+            <ChevronUpDown16Regular style={{ color: '#605e5c' }} />
           </Button>
         </DialogTrigger>
         <DialogSurface style={{ 

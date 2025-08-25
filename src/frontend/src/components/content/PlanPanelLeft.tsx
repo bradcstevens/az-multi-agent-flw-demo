@@ -171,7 +171,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         </PanelLeftToolbar>
 
         {/* Team Selector right under the toolbar */}
-        <div style={{ padding: '0 16px', marginTop: '8px', marginBottom: '16px' }}>
+        <div style={{  marginTop: '8px', marginBottom: '8px' }}>
           <TeamSelector
             onTeamSelect={handleTeamSelect}
             onTeamUpload={onTeamUpload}
