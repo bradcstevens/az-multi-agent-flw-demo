@@ -40,7 +40,7 @@ from common.utils.utils_kernel import rai_success
 from common.database.database_factory import DatabaseFactory
 from common.utils.utils_date import format_dates_in_messages
 from v3.api.router import app_v3
-from websocket_streaming import websocket_streaming_endpoint, ws_manager
+from common.utils.websocket_streaming import websocket_streaming_endpoint, ws_manager
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
 connection_string = config.APPLICATIONINSIGHTS_CONNECTION_STRING
@@ -903,7 +903,7 @@ async def test_streaming_updates(plan_id: str):
     Test endpoint to simulate streaming updates for a plan.
     This is for testing the WebSocket streaming functionality.
     """
-    from websocket_streaming import send_plan_update, send_agent_message, send_step_update
+    from common.utils.websocket_streaming import send_plan_update, send_agent_message, send_step_update
     
     try:
         # Simulate a series of streaming updates
