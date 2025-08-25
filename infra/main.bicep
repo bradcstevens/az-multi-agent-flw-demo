@@ -111,7 +111,7 @@ param enableTelemetry bool = true
 param existingLogAnalyticsWorkspaceId string = ''
 
 @description('Optional. Resource ID of an existing Ai Foundry AI Services resource.')
-param existingAiFoundryResourceId string = ''
+param existingAiFoundryAiProjectResourceId string = ''
 
 // ============== //
 // Variables      //
@@ -129,7 +129,7 @@ var solutionSuffix = toLower(trim(replace(
 
 // Region pairs list based on article in [Azure Database for MySQL Flexible Server - Azure Regions](https://learn.microsoft.com/azure/mysql/flexible-server/overview#azure-regions) for supported high availability regions for CosmosDB.
 var cosmosDbZoneRedundantHaRegionPairs = {
-  australiaeast: 'uksouth' //'southeastasia'
+  australiaeast: 'uksouth'
   centralus: 'eastus2'
   eastasia: 'southeastasia'
   eastus: 'centralus'
@@ -942,7 +942,7 @@ var aiRelatedDnsZoneIndices = [
 // ===================================================
 @batchSize(5)
 module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
-  for (zone, i) in privateDnsZones: if (enablePrivateNetworking && (!useExistingAiFoundry || !contains(
+  for (zone, i) in privateDnsZones: if (enablePrivateNetworking && (!useExistingAiFoundryAiProject || !contains(
     aiRelatedDnsZoneIndices,
     i
   ))) {
@@ -1050,10 +1050,14 @@ module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
 //   }
 // }
 
-var useExistingAiFoundry = !empty(existingAiFoundryResourceId)
-var aiFoundryAiServicesResourceName = useExistingAiFoundry
-  ? split(existingAiFoundryResourceId, '/')[8]
+// resource id: /subscriptions/<subscription-id>/resourceGroups/<resource-group-name>/providers/Microsoft.CognitiveServices/accounts/<ai-services-name>/projects/<project-name>
+var useExistingAiFoundryAiProject = !empty(existingAiFoundryAiProjectResourceId)
+var aiFoundryAiServicesResourceName = useExistingAiFoundryAiProject
+  ? split(existingAiFoundryAiProjectResourceId, '/')[8]
   : 'aif-${solutionSuffix}'
+var aiFoundryAiProjectResourceName = useExistingAiFoundryAiProject
+  ? split(existingAiFoundryAiProjectResourceId, '/')[10]
+  : 'proj-${solutionSuffix}'
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
   name: gptModelName
@@ -1064,13 +1068,17 @@ var aiFoundryAiServicesModelDeployment = {
   }
   raiPolicyName: 'Microsoft.Default'
 }
+var aiFoundryAiProjectDescription = 'AI Foundry Project'
 
-resource existingAiFoundryAiServices 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (useExistingAiFoundry) {
+resource existingAiFoundryAiServices 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (useExistingAiFoundryAiProject) {
   name: aiFoundryAiServicesResourceName
-  scope: resourceGroup(split(existingAiFoundryResourceId, '/')[2], split(existingAiFoundryResourceId, '/')[4])
+  scope: resourceGroup(
+    split(existingAiFoundryAiProjectResourceId, '/')[2],
+    split(existingAiFoundryAiProjectResourceId, '/')[4]
+  )
 }
 
-module existingAiFoundryAiServicesDeployments 'modules/ai-services-deployments.bicep' = if (useExistingAiFoundry) {
+module existingAiFoundryAiServicesDeployments 'modules/ai-services-deployments.bicep' = if (useExistingAiFoundryAiProject) {
   name: take('module.ai-services-model-deployments.${existingAiFoundryAiServices.name}', 64)
   params: {
     name: existingAiFoundryAiServices.name
@@ -1109,7 +1117,7 @@ module existingAiFoundryAiServicesDeployments 'modules/ai-services-deployments.b
   }
 }
 
-module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-services/account:0.13.2' = if (!useExistingAiFoundry) {
+module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-services/account:0.13.2' = if (!useExistingAiFoundryAiProject) {
   name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
@@ -1192,10 +1200,12 @@ module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-service
   }
 }
 
-var aiFoundryAiProjectResourceName = 'proj-${solutionSuffix}'
-var aiFoundryAiProjectDescription = 'AI Foundry Project'
+resource existingAiFoundryAiServicesProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = if (useExistingAiFoundryAiProject) {
+  name: aiFoundryAiProjectResourceName
+  parent: existingAiFoundryAiServices
+}
 
-module aiFoundryAiServicesProject 'modules/ai-project.bicep' = {
+module aiFoundryAiServicesProject 'modules/ai-project.bicep' = if (!useExistingAiFoundryAiProject) {
   name: take('module.ai-project.${aiFoundryAiProjectResourceName}', 64)
   params: {
     name: aiFoundryAiProjectResourceName
@@ -1205,6 +1215,13 @@ module aiFoundryAiServicesProject 'modules/ai-project.bicep' = {
     aiServicesName: aiFoundryAiServicesResourceName
   }
 }
+
+var aiFoundryAiProjectName = useExistingAiFoundryAiProject
+  ? existingAiFoundryAiServicesProject.name
+  : aiFoundryAiServicesProject!.outputs.name
+var aiFoundryAiProjectEndpoint = useExistingAiFoundryAiProject
+  ? existingAiFoundryAiServicesProject!.properties.endpoints['AI Foundry API']
+  : aiFoundryAiServicesProject!.outputs.apiEndpoint
 
 // ========== Cosmos DB ========== //
 // WAF best practices for Cosmos DB: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/cosmos-db
@@ -1453,7 +1470,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_OPENAI_ENDPOINT'
-            value: aiFoundryAiServicesProject.outputs.apiEndpoint
+            value: aiFoundryAiProjectEndpoint
           }
           {
             name: 'AZURE_OPENAI_MODEL_NAME'
@@ -1485,7 +1502,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_AI_PROJECT_NAME'
-            value: aiFoundryAiServicesProject.outputs.name
+            value: aiFoundryAiProjectName
           }
           {
             name: 'FRONTEND_SITE_NAME'
@@ -1493,7 +1510,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_AI_AGENT_ENDPOINT'
-            value: aiFoundryAiServicesProject!.outputs.apiEndpoint
+            value: aiFoundryAiProjectEndpoint
           }
           {
             name: 'AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME'
