@@ -2,6 +2,8 @@ import uuid
 import logging
 import json
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from typing import Optional
+from pydantic import BaseModel
 
 from auth.auth_utils import get_authenticated_user_details
 from common.models.messages_kernel import (
@@ -23,6 +25,13 @@ from common.database.database_factory import DatabaseFactory
 from v3.models.models import MPlan, MStep
 from v3.models.orchestration_models import AgentType
 from common.config.app_config import config
+
+
+class TeamSelectionRequest(BaseModel):
+    """Request model for team selection."""
+    team_id: str
+    session_id: Optional[str] = None
+
 
 app_v3 = APIRouter(
     prefix="/api/v3",
@@ -594,6 +603,126 @@ async def get_model_deployments_endpoint(request: Request):
         return {"deployments": deployments, "summary": summary}
     except Exception as e:
         logging.error(f"Error retrieving model deployments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app_v3.post("/select_team")
+async def select_team_endpoint(selection: TeamSelectionRequest, request: Request):
+    """
+    Update team selection for a plan or session.
+    
+    Used when users change teams on the plan page.
+
+    ---
+    tags:
+      - Team Selection
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            team_id:
+              type: string
+              description: The ID of the team to select
+            session_id:
+              type: string
+              description: Optional session ID to associate with the team selection
+    responses:
+      200:
+        description: Team selection updated successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+            message:
+              type: string
+            team_id:
+              type: string
+            team_name:
+              type: string
+            session_id:
+              type: string
+      400:
+        description: Invalid request
+      401:
+        description: Missing or invalid user information
+      404:
+        description: Team configuration not found
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    if not selection.team_id:
+        raise HTTPException(status_code=400, detail="Team ID is required")
+
+    try:
+        # Initialize memory store and service
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        team_service = TeamService(memory_store)
+
+        # Verify the team exists and user has access to it
+        team_config = await team_service.get_team_configuration(selection.team_id, user_id)
+        if team_config is None:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Team configuration '{selection.team_id}' not found or access denied"
+            )
+
+        # Generate session ID if not provided
+        session_id = selection.session_id or str(uuid.uuid4())
+
+        # Here you could store the team selection in user preferences, session data, etc.
+        # For now, we'll just validate and return the selection
+        
+        # Track the team selection event
+        track_event_if_configured(
+            "Team selected",
+            {
+                "status": "success",
+                "team_id": selection.team_id,
+                "team_name": team_config.name,
+                "user_id": user_id,
+                "session_id": session_id,
+            },
+        )
+
+        return {
+            "status": "success",
+            "message": f"Team '{team_config.name}' selected successfully",
+            "team_id": selection.team_id,
+            "team_name": team_config.name,
+            "session_id": session_id,
+            "agents_count": len(team_config.agents),
+            "team_description": team_config.description,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logging.error(f"Error selecting team: {str(e)}")
+        track_event_if_configured(
+            "Team selection error",
+            {
+                "status": "error",
+                "team_id": selection.team_id,
+                "user_id": user_id,
+                "error": str(e),
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 

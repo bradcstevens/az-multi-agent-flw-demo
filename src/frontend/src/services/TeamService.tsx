@@ -128,6 +128,40 @@ export class TeamService {
     }
 
     /**
+     * Select a team for a plan/session
+     */
+    static async selectTeam(teamId: string, sessionId?: string): Promise<{
+        success: boolean;
+        data?: any;
+        error?: string;
+    }> {
+        try {
+            const response = await apiClient.post('/v3/select_team', {
+                team_id: teamId,
+                session_id: sessionId
+            });
+
+            return {
+                success: true,
+                data: response
+            };
+        } catch (error: any) {
+            let errorMessage = 'Failed to select team';
+            
+            if (error.response?.data?.detail) {
+                errorMessage = error.response.data.detail;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
+            return {
+                success: false,
+                error: errorMessage
+            };
+        }
+    }
+
+    /**
      * Validate a team configuration JSON structure
      */
     static validateTeamConfig(config: any): { isValid: boolean; errors: string[]; warnings: string[] } {

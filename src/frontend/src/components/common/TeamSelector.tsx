@@ -74,12 +74,14 @@ interface TeamSelectorProps {
   onTeamSelect?: (team: TeamConfig | null) => void;
   onTeamUpload?: () => Promise<void>;
   selectedTeam?: TeamConfig | null;
+  sessionId?: string; // Optional session ID for team selection
 }
 
 const TeamSelector: React.FC<TeamSelectorProps> = ({
   onTeamSelect,
   onTeamUpload,
   selectedTeam,
+  sessionId,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [teams, setTeams] = useState<TeamConfig[]>([]);
@@ -93,6 +95,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
   const [teamToDelete, setTeamToDelete] = useState<TeamConfig | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('teams');
+  const [selectionLoading, setSelectionLoading] = useState(false);
 
   const loadTeams = async () => {
     setLoading(true);
@@ -124,11 +127,31 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
     }
   };
 
-  const handleContinue = () => {
-    if (tempSelectedTeam) {
-      onTeamSelect?.(tempSelectedTeam);
+  const handleContinue = async () => {
+    if (!tempSelectedTeam) return;
+
+    setSelectionLoading(true);
+    setError(null);
+
+    try {
+      // Call the backend API to select the team
+      const result = await TeamService.selectTeam(tempSelectedTeam.team_id, sessionId);
+      
+      if (result.success) {
+        // Successfully selected team on backend
+        console.log('Team selected:', result.data);
+        onTeamSelect?.(tempSelectedTeam);
+        setIsOpen(false);
+      } else {
+        // Handle selection error
+        setError(result.error || 'Failed to select team');
+      }
+    } catch (err: any) {
+      console.error('Error selecting team:', err);
+      setError('Failed to select team. Please try again.');
+    } finally {
+      setSelectionLoading(false);
     }
-    setIsOpen(false);
   };
 
   const handleCancel = () => {
@@ -624,10 +647,10 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
             <Button 
               appearance="primary" 
               onClick={handleContinue}
-              disabled={!tempSelectedTeam}
+              disabled={!tempSelectedTeam || selectionLoading}
               className={styles.continueButton}
             >
-              Continue
+              {selectionLoading ? 'Selecting...' : 'Continue'}
             </Button>
           </DialogActions>
         </DialogSurface>
