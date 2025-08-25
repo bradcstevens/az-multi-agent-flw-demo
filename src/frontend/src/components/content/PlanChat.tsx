@@ -3,7 +3,7 @@ import { Copy, Send } from "@/coral/imports/bundleicons";
 import ChatInput from "@/coral/modules/ChatInput";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
-import { AgentType, PlanChatProps, role } from "@/models";
+import { AgentType, ChatMessage, PlanChatProps, role } from "@/models";
 import { StreamingPlanUpdate } from "@/services/WebSocketService";
 import {
   Body1,
@@ -14,6 +14,11 @@ import {
 } from "@fluentui/react-components";
 import { DiamondRegular, HeartRegular } from "@fluentui/react-icons";
 import { useEffect, useRef, useState } from "react";
+
+// Type guard to check if a message has streaming properties
+const hasStreamingProperties = (msg: ChatMessage): msg is ChatMessage & { streaming?: boolean; status?: string; message_type?: string; } => {
+  return 'streaming' in msg || 'status' in msg || 'message_type' in msg;
+};
 import ReactMarkdown from "react-markdown";
 import "../../styles/PlanChat.css";
 import "../../styles/Chat.css";
@@ -94,7 +99,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
   ];
 
   // Merge streaming messages with existing messages
-  const allMessages = [...displayMessages];
+  const allMessages: ChatMessage[] = [...displayMessages];
   
   // Add streaming messages as assistant messages
   streamingMessages.forEach(streamMsg => {
@@ -136,7 +141,7 @@ const PlanChat: React.FC<PlanChatProps> = ({
             return (
               <div
                 key={index}
-                className={`message ${isHuman ? role.user : role.assistant} ${(msg as any).streaming ? 'streaming-message' : ''}`}
+                className={`message ${isHuman ? role.user : role.assistant} ${hasStreamingProperties(msg) && msg.streaming ? 'streaming-message' : ''}`}
               >
                 {!isHuman && (
                   <div className="plan-chat-header">
@@ -152,16 +157,16 @@ const PlanChat: React.FC<PlanChatProps> = ({
                       >
                         BOT
                       </Tag>
-                      {(msg as any).streaming && (
+                      {hasStreamingProperties(msg) && msg.streaming && (
                         <Tag
                           size="extra-small"
                           shape="rounded"
                           appearance="outline"
                           icon={<Spinner size="extra-tiny" />}
                         >
-                          {(msg as any).message_type === 'thinking' ? 'Thinking...' : 
-                           (msg as any).message_type === 'action' ? 'Acting...' : 
-                           (msg as any).status === 'in_progress' ? 'Working...' : 'Live'}
+                          {msg.message_type === 'thinking' ? 'Thinking...' : 
+                           msg.message_type === 'action' ? 'Acting...' : 
+                           msg.status === 'in_progress' ? 'Working...' : 'Live'}
                         </Tag>
                       )}
                     </div>
