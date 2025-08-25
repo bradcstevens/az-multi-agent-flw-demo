@@ -382,7 +382,8 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
           cursor: 'pointer',
           transition: 'all 0.2s ease',
           boxSizing: 'border-box',
-          width: '100%'
+          width: '100%',
+          overflow: 'hidden'
         }}
         onClick={() => setTempSelectedTeam(team)}
       >
@@ -409,7 +410,9 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
           gap: '6px', 
           flexWrap: 'wrap', 
           justifyContent: 'center',
-          minWidth: '200px'
+          minWidth: '0',
+          maxWidth: '180px',
+          overflow: 'hidden'
         }}>
           {team.agents.slice(0, 3).map((agent) => (
             <Badge
@@ -419,9 +422,23 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
               style={{
                 backgroundColor: '#e6f3ff',
                 color: '#0066cc',
-                border: '1px solid #b3d9ff'
+                border: '1px solid #b3d9ff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                minHeight: '24px'
               }}
             >
+              {agent.icon && (
+                <span style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  fontSize: '12px' 
+                }}>
+                  {getIconFromString(agent.icon)}
+                </span>
+              )}
               {agent.type}
             </Badge>
           ))}
@@ -432,7 +449,9 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
               style={{
                 backgroundColor: '#e6f3ff',
                 color: '#0066cc',
-                border: '1px solid #b3d9ff'
+                border: '1px solid #b3d9ff',
+                padding: '4px 8px',
+                minHeight: '24px'
               }}
             >
               +{team.agents.length - 3}
@@ -493,13 +512,14 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
         <DialogSurface style={{ 
           maxWidth: '800px', 
           width: '90vw', 
-          minWidth: '600px',
+          minWidth: '500px',
           borderRadius: '12px',
           padding: '0',
           backgroundColor: '#ffffff',
           color: '#323130',
           border: '1px solid #e1e1e1',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          overflow: 'hidden'
         }}>
           <DialogTitle style={{ 
             padding: '24px 24px 16px 24px',
@@ -512,14 +532,14 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
           }}>
             Select a Team
           </DialogTitle>
-          <DialogContent style={{ padding: '0', width: '100%', margin: '0' }}>
+          <DialogContent style={{ padding: '0', width: '100%', margin: '0', overflow: 'hidden' }}>
             <DialogBody style={{ 
               padding: '24px', 
               backgroundColor: '#ffffff', 
               width: '100%', 
               margin: '0',
               display: 'block',
-              overflow: 'visible',
+              overflow: 'hidden',
               gap: 'unset',
               maxHeight: 'unset',
               gridTemplateRows: 'unset',
@@ -563,7 +583,8 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
               </div>
 
               {/* Tab Content - Directly below tabs without separation */}
-              {activeTab === 'teams' && (
+              <div style={{ overflow: 'hidden', width: '100%' }}>
+                {activeTab === 'teams' && (
                 <div style={{ 
                   width: '100%'
                 }}>
@@ -610,9 +631,10 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
                         <div style={{ 
                           maxHeight: '400px', 
                           overflowY: 'auto',
-                          paddingRight: '4px',
-                          marginRight: '-4px',
-                          width: '100%',
+                          overflowX: 'hidden',
+                          paddingRight: '8px',
+                          marginRight: '-8px',
+                          width: 'calc(100% + 8px)',
                           boxSizing: 'border-box'
                         }}>
                           {filteredTeams.map((team) => renderTeamCard(team))}
@@ -796,6 +818,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
                   </div>
                 </div>
               )}
+              </div>
             </DialogBody>
           </DialogContent>
           <DialogActions style={{ 
