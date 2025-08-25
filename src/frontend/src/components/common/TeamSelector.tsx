@@ -237,9 +237,15 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
       if (result.success) {
         setUploadMessage('Team uploaded successfully!');
         
+        // Immediately add the team to local state for instant visibility
         if (result.team) {
           setTeams(currentTeams => [...currentTeams, result.team!]);
         }
+        
+        // Also reload teams from server in the background to ensure consistency
+        setTimeout(() => {
+          loadTeams().catch(console.error);
+        }, 1000);
         
         setUploadMessage(null);
         if (onTeamUpload) {
@@ -323,9 +329,15 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
       if (result.success) {
         setUploadMessage('Team uploaded successfully!');
         
+        // Immediately add the team to local state for instant visibility
         if (result.team) {
           setTeams(currentTeams => [...currentTeams, result.team!]);
         }
+        
+        // Also reload teams from server in the background to ensure consistency
+        setTimeout(() => {
+          loadTeams().catch(console.error);
+        }, 1000);
         
         setUploadMessage(null);
         if (onTeamUpload) {
@@ -819,11 +831,25 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={(event, data) => setDeleteConfirmOpen(data.open)}>
-        <DialogSurface>
-          <DialogContent>
-            <DialogBody>
-              <DialogTitle>⚠️ Delete Team Configuration</DialogTitle>
-              <div style={{ marginTop: '16px', marginBottom: '20px' }}>
+        <DialogSurface style={{ 
+          maxWidth: '500px',
+          width: '90vw'
+        }}>
+          <DialogContent style={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'visible',
+            gap: '16px',
+            maxHeight: 'none'
+          }}>
+            <DialogBody style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              padding: '24px'
+            }}>
+              <DialogTitle style={{ margin: '0', padding: '0' }}>⚠️ Delete Team Configuration</DialogTitle>
+              <div>
                 <Text style={{ display: 'block', marginBottom: '16px' }}>
                   Are you sure you want to delete <strong>"{teamToDelete?.name}"</strong>?
                 </Text>
@@ -839,7 +865,13 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
                 </div>
               </div>
             </DialogBody>
-            <DialogActions>
+            <DialogActions style={{ 
+              display: 'flex',
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              padding: '0 24px 24px 24px'
+            }}>
               <Button 
                 appearance="secondary" 
                 disabled={deleteLoading}
@@ -847,13 +879,22 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
                   setDeleteConfirmOpen(false);
                   setTeamToDelete(null);
                 }}
+                style={{ 
+                  padding: '8px 16px',
+                  minWidth: '80px'
+                }}
               >
                 Cancel
               </Button>
               <Button 
                 appearance="primary" 
                 disabled={deleteLoading}
-                style={{ backgroundColor: '#d13438', color: 'white' }}
+                style={{ 
+                  backgroundColor: '#d13438', 
+                  color: 'white',
+                  padding: '8px 16px',
+                  minWidth: '100px'
+                }}
                 onClick={confirmDeleteTeam}
               >
                 {deleteLoading ? 'Deleting...' : 'Delete Team'}
