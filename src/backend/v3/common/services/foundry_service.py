@@ -52,16 +52,31 @@ class FoundryService:
             return []
 
         try:
-            token = await config.get_access_token()
+            # Get Azure Management API token (not Cognitive Services token)
+            credential = config.get_azure_credentials()
+            token = credential.get_token("https://management.azure.com/.default")
 
+            # Extract Azure OpenAI resource name from endpoint URL
+            openai_endpoint = config.AZURE_OPENAI_ENDPOINT
+            # Extract resource name from URL like "https://aisa-macae-d3x6aoi7uldi.openai.azure.com/"
+            import re
+            match = re.search(r'https://([^.]+)\.openai\.azure\.com', openai_endpoint)
+            if not match:
+                self.logger.error(f"Could not extract resource name from endpoint: {openai_endpoint}")
+                return []
+            
+            openai_resource_name = match.group(1)
+            self.logger.info(f"Using Azure OpenAI resource: {openai_resource_name}")
+            
+            # Query Azure OpenAI resource deployments
             url = (
                 f"https://management.azure.com/subscriptions/{self.subscription_id}/"
-                f"resourceGroups/{self.resource_group}/providers/Microsoft.MachineLearningServices/"
-                f"workspaces/{self.project_name}/onlineEndpoints"
+                f"resourceGroups/{self.resource_group}/providers/Microsoft.CognitiveServices/"
+                f"accounts/{openai_resource_name}/deployments"
             )
 
             headers = {
-                "Authorization": f"Bearer {token}",
+                "Authorization": f"Bearer {token.token}",
                 "Content-Type": "application/json",
             }
             params = {"api-version": "2024-10-01"}
