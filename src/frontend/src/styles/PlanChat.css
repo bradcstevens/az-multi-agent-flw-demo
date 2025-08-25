@@ -44,6 +44,25 @@
   color: var(--colorNeutralForeground3, #666);
 }
 
+/* WebSocket Connection Status */
+.connection-status {
+  display: flex;
+  justify-content: center;
+  padding: 8px 16px;
+  margin-bottom: 8px;
+}
+
+/* Streaming message animations */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.streaming-message {
+  animation: pulse 2s infinite;
+}
+
 
 
 

@@ -4,6 +4,7 @@ import ChatInput from "@/coral/modules/ChatInput";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 import { AgentType, PlanChatProps, role } from "@/models";
+import { StreamingPlanUpdate } from "@/services/WebSocketService";
 import {
   Body1,
   Button,
@@ -28,6 +29,8 @@ const PlanChat: React.FC<PlanChatProps> = ({
   setInput,
   submittingChatDisableInput,
   OnChatSubmit,
+  streamingMessages = [],
+  wsConnected = false,
 }) => {
   const messages = planData?.messages || [];
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -36,11 +39,16 @@ const PlanChat: React.FC<PlanChatProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
 
+  // Debug logging
+  console.log('PlanChat - planData:', planData);
+  console.log('PlanChat - messages:', messages);
+  console.log('PlanChat - messages.length:', messages.length);
+
   // Scroll to Bottom useEffect
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, streamingMessages]);
 
   //Scroll to Bottom Buttom
 
@@ -75,17 +83,60 @@ const PlanChat: React.FC<PlanChatProps> = ({
     return (
       <ContentNotFound subtitle="The requested page could not be found." />
     );
+
+  // If no messages exist, show the initial task as the first message
+  const displayMessages = messages.length > 0 ? messages : [
+    {
+      source: AgentType.HUMAN,
+      content: planData.plan?.initial_goal || "Task started",
+      timestamp: planData.plan?.timestamp || new Date().toISOString()
+    }
+  ];
+
+  // Merge streaming messages with existing messages
+  const allMessages = [...displayMessages];
+  
+  // Add streaming messages as assistant messages
+  streamingMessages.forEach(streamMsg => {
+    if (streamMsg.content) {
+      allMessages.push({
+        source: streamMsg.agent_name || 'AI Assistant',
+        content: streamMsg.content,
+        timestamp: new Date().toISOString(),
+        streaming: true,
+        status: streamMsg.status,
+        message_type: streamMsg.message_type
+      });
+    }
+  });
+
+  console.log('PlanChat - all messages including streaming:', allMessages);
+
   return (
     <div className="chat-container">
       <div className="messages" ref={messagesContainerRef}>
+        {/* WebSocket Connection Status */}
+        {wsConnected && (
+          <div className="connection-status">
+            <Tag
+              appearance="filled"
+              color="success"
+              size="extra-small"
+              icon={<DiamondRegular />}
+            >
+              Real-time updates active
+            </Tag>
+          </div>
+        )}
+        
         <div className="message-wrapper">
-          {messages.map((msg, index) => {
+          {allMessages.map((msg, index) => {
             const isHuman = msg.source === AgentType.HUMAN;
 
             return (
               <div
                 key={index}
-                className={`message ${isHuman ? role.user : role.assistant}`}
+                className={`message ${isHuman ? role.user : role.assistant} ${(msg as any).streaming ? 'streaming-message' : ''}`}
               >
                 {!isHuman && (
                   <div className="plan-chat-header">
@@ -101,6 +152,18 @@ const PlanChat: React.FC<PlanChatProps> = ({
                       >
                         BOT
                       </Tag>
+                      {(msg as any).streaming && (
+                        <Tag
+                          size="extra-small"
+                          shape="rounded"
+                          appearance="outline"
+                          icon={<Spinner size="extra-tiny" />}
+                        >
+                          {(msg as any).message_type === 'thinking' ? 'Thinking...' : 
+                           (msg as any).message_type === 'action' ? 'Acting...' : 
+                           (msg as any).status === 'in_progress' ? 'Working...' : 'Live'}
+                        </Tag>
+                      )}
                     </div>
                   </div>
                 )}

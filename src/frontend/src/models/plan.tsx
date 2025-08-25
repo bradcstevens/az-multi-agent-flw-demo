@@ -123,4 +123,6 @@ export interface PlanChatProps {
     setInput: any;
     submittingChatDisableInput: boolean;
     OnChatSubmit: (message: string) => void;
+    streamingMessages?: any[];
+    wsConnected?: boolean;
 }
