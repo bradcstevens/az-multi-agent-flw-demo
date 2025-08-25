@@ -28,7 +28,7 @@ import "../../styles/PlanPanelLeft.css";
 import PanelFooter from "@/coral/components/Panels/PanelFooter";
 import PanelUserCard from "../../coral/components/Panels/UserCard";
 import { getUserInfoGlobal } from "@/api/config";
-import SettingsButton from "../common/SettingsButton";
+import TeamSelector from "../common/TeamSelector";
 import { TeamConfig } from "../../models/Team";
 
 const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ 
@@ -170,19 +170,14 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
           <Tooltip content="New task" relationship={"label"} />
         </PanelLeftToolbar>
 
-        {/* Team Display Section */}
-        {selectedTeam && (
-          <div style={{ 
-            padding: '8px 16px',
-            textAlign: 'left'
-          }}>
-            <Body1Strong style={{ color: 'white', fontSize: '14px' }}>
-              {selectedTeam.name}
-            </Body1Strong>
-          </div>
-        )}
-
-        <br />
+        {/* Team Selector right under the toolbar */}
+        <div style={{  marginTop: '8px', marginBottom: '8px' }}>
+          <TeamSelector
+            onTeamSelect={handleTeamSelect}
+            onTeamUpload={onTeamUpload}
+            selectedTeam={selectedTeam}
+          />
+        </div>
         <div
           className="tab tab-new-task"
           onClick={() => navigate("/", { state: { focusInput: true } })}
@@ -212,13 +207,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
         <PanelFooter>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-            {/* Settings Button on top */}
-            <SettingsButton
-              onTeamSelect={handleTeamSelect}
-              onTeamUpload={onTeamUpload}
-              selectedTeam={selectedTeam}
-            />
-            {/* User Card below */}
+            {/* User Card */}
             <PanelUserCard
               name={userInfo ? userInfo.user_first_last_name : "Guest"}
               // alias={userInfo ? userInfo.user_email : ""}

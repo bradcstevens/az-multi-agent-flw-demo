@@ -21,12 +21,13 @@ from common.utils.utils_date import format_dates_in_messages
 # Updated import for KernelArguments
 from common.utils.utils_kernel import rai_success
 # FastAPI imports
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
 from v3.api.router import app_v3
+from common.utils.websocket_streaming import websocket_streaming_endpoint, ws_manager
 # Semantic Kernel imports
 from v3.config.settings import orchestration_config
 from v3.magentic_agents.magentic_agent_factory import (cleanup_all_agents,
@@ -89,6 +90,12 @@ app.add_middleware(HealthCheckMiddleware, password="", checks={})
 # v3 endpoints
 app.include_router(app_v3)
 logging.info("Added health check middleware")
+
+# WebSocket streaming endpoint
+@app.websocket("/ws/streaming")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time plan execution streaming"""
+    await websocket_streaming_endpoint(websocket)
 
 
 @app.post("/api/user_browser_language")
@@ -891,6 +898,77 @@ async def get_agent_tools():
                 description: Arguments required by the tool function
     """
     return []
+
+
+@app.post("/api/test/streaming/{plan_id}")
+async def test_streaming_updates(plan_id: str):
+    """
+    Test endpoint to simulate streaming updates for a plan.
+    This is for testing the WebSocket streaming functionality.
+    """
+    from common.utils.websocket_streaming import send_plan_update, send_agent_message, send_step_update
+    
+    try:
+        # Simulate a series of streaming updates
+        await send_agent_message(
+            plan_id=plan_id,
+            agent_name="Data Analyst",
+            content="Starting analysis of the data...",
+            message_type="thinking"
+        )
+        
+        await asyncio.sleep(1)
+        
+        await send_plan_update(
+            plan_id=plan_id,
+            step_id="step_1",
+            agent_name="Data Analyst",
+            content="Analyzing customer data patterns...",
+            status="in_progress",
+            message_type="action"
+        )
+        
+        await asyncio.sleep(2)
+        
+        await send_agent_message(
+            plan_id=plan_id,
+            agent_name="Data Analyst", 
+            content="Found 3 key insights in the customer data. Processing recommendations...",
+            message_type="result"
+        )
+        
+        await asyncio.sleep(1)
+        
+        await send_step_update(
+            plan_id=plan_id,
+            step_id="step_1",
+            status="completed",
+            content="Data analysis completed successfully!"
+        )
+        
+        await send_agent_message(
+            plan_id=plan_id,
+            agent_name="Business Advisor",
+            content="Reviewing the analysis results and preparing strategic recommendations...",
+            message_type="thinking"
+        )
+        
+        await asyncio.sleep(2)
+        
+        await send_plan_update(
+            plan_id=plan_id,
+            step_id="step_2", 
+            agent_name="Business Advisor",
+            content="Based on the data analysis, I recommend focusing on customer retention strategies for the identified high-value segments.",
+            status="completed",
+            message_type="result"
+        )
+        
+        return {"status": "success", "message": f"Test streaming updates sent for plan {plan_id}"}
+        
+    except Exception as e:
+        logging.error(f"Error sending test streaming updates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Run the app

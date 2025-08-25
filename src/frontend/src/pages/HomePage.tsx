@@ -2,12 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Button,
-    Spinner,
-    Toast,
-    ToastTitle,
-    ToastBody,
-    useToastController,
-    Toaster
+    Spinner
 } from '@fluentui/react-components';
 import {
     Add20Regular,
@@ -26,13 +21,14 @@ import { TaskService } from '../services/TaskService';
 import { TeamConfig } from '../models/Team';
 import { TeamService } from '../services/TeamService';
 import InlineToaster, { useInlineToaster } from "../components/toast/InlineToaster";
+
 /**
  * HomePage component - displays task lists and provides navigation
  * Accessible via the route "/"
  */
 const HomePage: React.FC = () => {
     const navigate = useNavigate();
-    const { dispatchToast } = useToastController("toast");
+    const { showToast, dismissToast } = useInlineToaster();
     const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
     const [isLoadingTeam, setIsLoadingTeam] = useState(true);
     const { showToast, dismissToast } = useInlineToaster();
@@ -90,12 +86,19 @@ const HomePage: React.FC = () => {
      */
     const handleTeamSelect = useCallback((team: TeamConfig | null) => {
         setSelectedTeam(team);
-        if (team) {
-            showToast(`${team.name} team has been selected with ${team.agents.length} agents`, "success");
+      if (team) {
+            showToast(
+                `${team.name} team has been selected with ${team.agents.length} agents`,
+                "success"
+            );
         } else {
-            showToast(`No team is currently selected`, "info");
+            showToast(
+                "No team is currently selected",
+                "info"
+            );
         }
     }, [showToast]);
+
 
     /**
      * Handle team upload completion - refresh team list and keep Business Operations Team as default
@@ -112,8 +115,10 @@ const HomePage: React.FC = () => {
                 setSelectedTeam(defaultTeam);
                 console.log('Default team after upload:', defaultTeam.name);
                 console.log('Business Operations Team remains default');
-                showToast(`Team uploaded. ${defaultTeam.name} remains your default team.`, "success");
-
+                showToast(
+                    `Team uploaded successfully! ${defaultTeam.name} remains your default team.`,
+                    "success"
+                );
             }
         } catch (error) {
             console.error('Error refreshing teams after upload:', error);
@@ -123,7 +128,7 @@ const HomePage: React.FC = () => {
 
     return (
         <>
-            <Toaster toasterId="toast" />
+            <InlineToaster />
             <CoralShellColumn>
                 <CoralShellRow>
                     <PlanPanelLeft

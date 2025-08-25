@@ -274,21 +274,21 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         models_valid, missing_models = await team_service.validate_team_models(
             json_data
         )
-        # if not models_valid:
-        #     error_message = (
-        #         f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
-        #         f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
-        #     )
-        #     track_event_if_configured(
-        #         "Team configuration model validation failed",
-        #         {
-        #             "status": "failed",
-        #             "user_id": user_id,
-        #             "filename": file.filename,
-        #             "missing_models": missing_models,
-        #         },
-        #     )
-        #     raise HTTPException(status_code=400, detail=error_message)
+        if not models_valid:
+            error_message = (
+                f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
+                f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
+            )
+            track_event_if_configured(
+                "Team configuration model validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "missing_models": missing_models,
+                },
+            )
+            raise HTTPException(status_code=400, detail=error_message)
 
         track_event_if_configured(
             "Team configuration model validation passed",
@@ -296,29 +296,29 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         )
 
         # Validate search indexes
-        # search_valid, search_errors = await team_service.validate_team_search_indexes(
-        #     json_data
-        # )
-        # if not search_valid:
-        #     error_message = (
-        #         f"Search index validation failed:\n\n{chr(10).join([f'• {error}' for error in search_errors])}\n\n"
-        #         f"Please ensure all referenced search indexes exist in your Azure AI Search service."
-        #     )
-        #     track_event_if_configured(
-        #         "Team configuration search validation failed",
-        #         {
-        #             "status": "failed",
-        #             "user_id": user_id,
-        #             "filename": file.filename,
-        #             "search_errors": search_errors,
-        #         },
-        #     )
-        #     raise HTTPException(status_code=400, detail=error_message)
+        search_valid, search_errors = await team_service.validate_team_search_indexes(
+            json_data
+        )
+        if not search_valid:
+            error_message = (
+                f"Search index validation failed:\n\n{chr(10).join([f'• {error}' for error in search_errors])}\n\n"
+                f"Please ensure all referenced search indexes exist in your Azure AI Search service."
+            )
+            track_event_if_configured(
+                "Team configuration search validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "search_errors": search_errors,
+                },
+            )
+            raise HTTPException(status_code=400, detail=error_message)
 
-        # track_event_if_configured(
-        #     "Team configuration search validation passed",
-        #     {"status": "passed", "user_id": user_id, "filename": file.filename},
-        # )
+        track_event_if_configured(
+            "Team configuration search validation passed",
+            {"status": "passed", "user_id": user_id, "filename": file.filename},
+        )
 
         # Validate and parse the team configuration
         try:
@@ -351,9 +351,9 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         return {
             "status": "success",
             "team_id": team_id,
-            "team_id": team_config.team_id,
             "name": team_config.name,
             "message": "Team configuration uploaded and saved successfully",
+            "team": team_config.model_dump()  # Return the full team configuration
         }
 
     except HTTPException:
