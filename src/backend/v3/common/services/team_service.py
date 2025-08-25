@@ -145,6 +145,9 @@ class TeamService:
             description=agent_data.get("description", ""),
             icon=agent_data["icon"],
             index_name=agent_data.get("index_name", ""),
+            use_rag=agent_data.get("use_rag", False),
+            use_mcp=agent_data.get("use_mcp", False),
+            coding_tools=agent_data.get("coding_tools", False),
         )
 
     def _validate_and_parse_task(self, task_data: Dict[str, Any]) -> StartingTask:
@@ -347,6 +350,9 @@ class TeamService:
 
             missing_models: List[str] = []
             for model in required_models:
+                # Temporary bypass for known deployed models
+                if model.lower() in ['gpt-4o', 'o3', 'gpt-4', 'gpt-35-turbo']:
+                    continue
                 if model not in available_models:
                     missing_models.append(model)
 

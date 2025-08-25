@@ -2,25 +2,27 @@ import { AgentType, StepStatus, PlanStatus } from './enums';
 
 /**
  * Message roles compatible with Semantic Kernel
+ * Currently unused but kept for potential future use
  */
-export enum MessageRole {
-    SYSTEM = "system",
-    USER = "user",
-    ASSISTANT = "assistant",
-    FUNCTION = "function"
-}
+// export enum MessageRole {
+//     SYSTEM = "system",
+//     USER = "user",
+//     ASSISTANT = "assistant",
+//     FUNCTION = "function"
+// }
 
 /**
- * Base class for chat messages
+ * Base class for generic chat messages with roles
+ * Currently unused but kept for potential future use with Semantic Kernel integration
  */
-export interface ChatMessage {
-    /** Role of the message sender */
-    role: MessageRole;
-    /** Content of the message */
-    content: string;
-    /** Additional metadata */
-    metadata: Record<string, any>;
-}
+// export interface GenericChatMessage {
+//     /** Role of the message sender */
+//     role: MessageRole;
+//     /** Content of the message */
+//     content: string;
+//     /** Additional metadata */
+//     metadata: Record<string, any>;
+// }
 
 /**
  * Message sent to request approval for a step

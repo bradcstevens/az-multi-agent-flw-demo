@@ -126,6 +126,77 @@ export class TeamService {
             return false;
         }
     }
+
+    /**
+     * Validate a team configuration JSON structure
+     */
+    static validateTeamConfig(config: any): { isValid: boolean; errors: string[]; warnings: string[] } {
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
+        // Required fields validation
+        const requiredFields = ['id', 'team_id', 'name', 'description', 'status', 'created', 'created_by', 'agents'];
+        for (const field of requiredFields) {
+            if (!config[field]) {
+                errors.push(`Missing required field: ${field}`);
+            }
+        }
+
+        // Status validation
+        if (config.status && !['visible', 'hidden'].includes(config.status)) {
+            errors.push('Status must be either "visible" or "hidden"');
+        }
+
+        // Agents validation
+        if (config.agents && Array.isArray(config.agents)) {
+            config.agents.forEach((agent: any, index: number) => {
+                const agentRequiredFields = ['input_key', 'type', 'name'];
+                for (const field of agentRequiredFields) {
+                    if (!agent[field]) {
+                        errors.push(`Agent ${index + 1}: Missing required field: ${field}`);
+                    }
+                }
+
+                // RAG agent validation
+                if (agent.use_rag === true && !agent.index_name) {
+                    errors.push(`Agent ${index + 1} (${agent.name}): RAG agents must have an index_name`);
+                }
+
+                // New field warnings for completeness
+                if (agent.type === 'RAG' && !agent.use_rag) {
+                    warnings.push(`Agent ${index + 1} (${agent.name}): RAG type agent should have use_rag: true`);
+                }
+
+                if (agent.use_rag && !agent.index_endpoint) {
+                    warnings.push(`Agent ${index + 1} (${agent.name}): RAG agent missing index_endpoint (will use default)`);
+                }
+            });
+        } else if (config.agents) {
+            errors.push('Agents must be an array');
+        }
+
+        // Starting tasks validation
+        if (config.starting_tasks && Array.isArray(config.starting_tasks)) {
+            config.starting_tasks.forEach((task: any, index: number) => {
+                const taskRequiredFields = ['id', 'name', 'prompt'];
+                for (const field of taskRequiredFields) {
+                    if (!task[field]) {
+                        warnings.push(`Starting task ${index + 1}: Missing recommended field: ${field}`);
+                    }
+                }
+            });
+        }
+
+        // Optional field checks
+        const optionalFields = ['logo', 'plan', 'protected'];
+        for (const field of optionalFields) {
+            if (!config[field]) {
+                warnings.push(`Optional field missing: ${field} (recommended for better user experience)`);
+            }
+        }
+
+        return { isValid: errors.length === 0, errors, warnings };
+    }
 }
 
 export default TeamService;

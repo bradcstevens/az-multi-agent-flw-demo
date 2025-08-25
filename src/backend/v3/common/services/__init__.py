@@ -9,9 +9,11 @@ Exports:
 from .base_api_service import BaseAPIService
 from .mcp_service import MCPService
 from .foundry_service import FoundryService
+from .agents_service import AgentsService
 
 __all__ = [
     "BaseAPIService",
     "MCPService",
     "FoundryService",
+    "AgentsService",
 ]

@@ -76,7 +76,19 @@ export interface PlanMessage extends BaseModel {
     source: string;
     /** Step identifier */
     step_id: string;
+    /** Whether this is a streaming message */
+    streaming?: boolean;
+    /** Status of the streaming message */
+    status?: string;
+    /** Type of message (thinking, action, etc.) */
+    message_type?: string;
 }
+
+/**
+ * Union type for chat messages - can be either a regular plan message or a temporary streaming message
+ */
+export type ChatMessage = PlanMessage | { source: string; content: string; timestamp: string; streaming?: boolean; status?: string; message_type?: string; };
+
 /**
  * Represents a plan that includes its associated steps.
  */
@@ -123,4 +135,6 @@ export interface PlanChatProps {
     setInput: any;
     submittingChatDisableInput: boolean;
     OnChatSubmit: (message: string) => void;
+    streamingMessages?: any[];
+    wsConnected?: boolean;
 }

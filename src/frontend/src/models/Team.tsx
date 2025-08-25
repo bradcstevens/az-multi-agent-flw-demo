@@ -6,10 +6,14 @@ export interface Agent {
     description?: string;
     icon?: string;
     index_name?: string;
-    deployment_name?:string;
+    index_endpoint?: string;  // New: For RAG agents with custom endpoints
+    deployment_name?: string;
     id?: string;
     capabilities?: string[];
     role?: string;
+    use_rag?: boolean;        // New: Flag for RAG capabilities
+    use_mcp?: boolean;        // New: Flag for MCP (Model Context Protocol)
+    coding_tools?: boolean;   // New: Flag for coding capabilities
 }
 
 

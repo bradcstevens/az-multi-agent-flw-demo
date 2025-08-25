@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from azure.ai.projects.aio import AIProjectClient
-from azure.identity import ManagedIdentityCredential, DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -37,6 +37,10 @@ class AppConfig:
 
         self.AZURE_COGNITIVE_SERVICES = self._get_optional(
             "AZURE_COGNITIVE_SERVICES", "https://cognitiveservices.azure.com/.default"
+        )
+
+        self.AZURE_MANAGEMENT_SCOPE = self._get_optional(
+            "AZURE_MANAGEMENT_SCOPE", "https://management.azure.com/.default"
         )
 
         # Azure OpenAI settings
@@ -76,6 +80,8 @@ class AppConfig:
         self._cosmos_client = None
         self._cosmos_database = None
         self._ai_project_client = None
+
+        self._agents = {}
 
     def get_azure_credential(self, client_id=None):
         """
@@ -203,6 +209,15 @@ class AppConfig:
             language: The language code to set (e.g., 'en-US')
         """
         os.environ["USER_LOCAL_BROWSER_LANGUAGE"] = language
+
+    # Get agent team list by user_id dictionary index
+    def get_agents(self) -> dict[str, list]:
+        """Get the list of agents configured in the application.
+
+        Returns:
+            A list of agent names or configurations
+        """
+        return self._agents
 
 
 # Create a global instance of AppConfig

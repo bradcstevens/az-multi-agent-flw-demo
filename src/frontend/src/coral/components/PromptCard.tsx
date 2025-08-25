@@ -51,19 +51,22 @@ const PromptCard: React.FC<PromptCardProps> = ({
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {icon && (
-          <div
-            style={{
-              fontSize: "20px",
-              color: "var(--colorBrandForeground1)",
-              marginTop: "2px",
-            }}
-          >
-            {icon}
-          </div>
-        )}
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <Body1Strong>{title}</Body1Strong>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {icon && (
+              <div
+                style={{
+                  fontSize: "20px",
+                  color: "var(--colorBrandForeground1)",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {icon}
+              </div>
+            )}
+            <Body1Strong>{title}</Body1Strong>
+          </div>
           <Body1 style={{ color: "var(--colorNeutralForeground3)" }}>
             {description}
           </Body1>

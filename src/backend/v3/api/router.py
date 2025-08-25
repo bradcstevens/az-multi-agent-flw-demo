@@ -1,9 +1,10 @@
-import uuid
-import logging
 import json
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+import logging
+import uuid
 
 from auth.auth_utils import get_authenticated_user_details
+from common.config.app_config import config
+from common.database.database_factory import DatabaseFactory
 from common.models.messages_kernel import (
     GeneratePlanRequest,
     InputTask,
@@ -11,15 +12,24 @@ from common.models.messages_kernel import (
     PlanStatus,
 )
 from common.utils.event_utils import track_event_if_configured
-from common.utils.utils_kernel import (
-    rai_success,
-    rai_validate_team_config,
+from common.utils.utils_kernel import rai_success, rai_validate_team_config
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
 )
-from v3.common.services.team_service import TeamService
 from kernel_agents.agent_factory import AgentFactory
-from common.database.database_factory import DatabaseFactory
+from semantic_kernel.agents.runtime import InProcessRuntime
+from v3.common.services.team_service import TeamService
+
+# from v3.config.settings import orchestration_config
+from v3.models.models import MPlan, MStep
 from v3.models.orchestration_models import AgentType
-from common.config.app_config import config
 
 app_v3 = APIRouter(
     prefix="/api/v3",
@@ -27,8 +37,9 @@ app_v3 = APIRouter(
 )
 
 
+# To do: change endpoint to process request
 @app_v3.post("/create_plan")
-async def create_plan_endpoint(input_task: InputTask, request: Request):
+async def process_request(input_task: InputTask, request: Request):
     """
     Create a new plan without full processing.
 
@@ -128,14 +139,28 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
 
         # Create a new Plan object
-        plan = Plan(
-            session_id=input_task.session_id,
-            team_id=input_task.team_id,
-            user_id=user_id,
-            initial_goal=input_task.description,
-            overall_status=PlanStatus.in_progress,
-            source=AgentType.PLANNER.value,
+        plan = MPlan()
+        #     session_id=input_task.session_id,
+        #     team_id=input_task.team_id,
+        #     user_id=user_id,
+        #     initial_goal=input_task.description,
+        #     overall_status=PlanStatus.in_progress,
+        #     source=AgentType.PLANNER.value,
+        # )
+
+        # setup and call the magentic orchestration
+        magentic_orchestration = await orchestration_config.get_current_orchestration(
+            user_id
         )
+
+        runtime = InProcessRuntime()
+        runtime.start()
+
+        # invoke returns immediately, wait on result.get
+        orchestration_result = await magentic_orchestration.invoke(
+            task=input_task.description, runtime=runtime
+        )
+        team_result = await orchestration_result.get()
 
         # Save the plan to the database
         await memory_store.add_plan(plan)
@@ -250,21 +275,21 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         models_valid, missing_models = await team_service.validate_team_models(
             json_data
         )
-        # if not models_valid:
-        #     error_message = (
-        #         f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
-        #         f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
-        #     )
-        #     track_event_if_configured(
-        #         "Team configuration model validation failed",
-        #         {
-        #             "status": "failed",
-        #             "user_id": user_id,
-        #             "filename": file.filename,
-        #             "missing_models": missing_models,
-        #         },
-        #     )
-        #     raise HTTPException(status_code=400, detail=error_message)
+        if not models_valid:
+            error_message = (
+                f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
+                f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
+            )
+            track_event_if_configured(
+                "Team configuration model validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "missing_models": missing_models,
+                },
+            )
+            raise HTTPException(status_code=400, detail=error_message)
 
         track_event_if_configured(
             "Team configuration model validation passed",
@@ -272,29 +297,29 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         )
 
         # Validate search indexes
-        # search_valid, search_errors = await team_service.validate_team_search_indexes(
-        #     json_data
-        # )
-        # if not search_valid:
-        #     error_message = (
-        #         f"Search index validation failed:\n\n{chr(10).join([f'• {error}' for error in search_errors])}\n\n"
-        #         f"Please ensure all referenced search indexes exist in your Azure AI Search service."
-        #     )
-        #     track_event_if_configured(
-        #         "Team configuration search validation failed",
-        #         {
-        #             "status": "failed",
-        #             "user_id": user_id,
-        #             "filename": file.filename,
-        #             "search_errors": search_errors,
-        #         },
-        #     )
-        #     raise HTTPException(status_code=400, detail=error_message)
+        search_valid, search_errors = await team_service.validate_team_search_indexes(
+            json_data
+        )
+        if not search_valid:
+            error_message = (
+                f"Search index validation failed:\n\n{chr(10).join([f'• {error}' for error in search_errors])}\n\n"
+                f"Please ensure all referenced search indexes exist in your Azure AI Search service."
+            )
+            track_event_if_configured(
+                "Team configuration search validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "search_errors": search_errors,
+                },
+            )
+            raise HTTPException(status_code=400, detail=error_message)
 
-        # track_event_if_configured(
-        #     "Team configuration search validation passed",
-        #     {"status": "passed", "user_id": user_id, "filename": file.filename},
-        # )
+        track_event_if_configured(
+            "Team configuration search validation passed",
+            {"status": "passed", "user_id": user_id, "filename": file.filename},
+        )
 
         # Validate and parse the team configuration
         try:
@@ -327,9 +352,9 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         return {
             "status": "success",
             "team_id": team_id,
-            "team_id": team_config.team_id,
             "name": team_config.name,
             "message": "Team configuration uploaded and saved successfully",
+            "team": team_config.model_dump(),  # Return the full team configuration
         }
 
     except HTTPException:
@@ -630,3 +655,28 @@ async def get_search_indexes_endpoint(request: Request):
     except Exception as e:
         logging.error(f"Error retrieving search indexes: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+# WebSocket endpoint for job status updates
+plans = {}  # job_id -> current plan
+approvals = {}  # job_id -> True/False/None
+sockets = {}  # job_id -> WebSocket
+
+
+@app_v3.websocket("/ws/{job_id}")
+async def ws(job_id: str, websocket: WebSocket):
+    await websocket.accept()
+    sockets[job_id] = websocket
+    try:
+        if job_id in plans:
+            await websocket.send_json({"type": "plan_ready", "plan": plans[job_id]})
+        while True:
+            msg = await websocket.receive_json()
+            if msg.get("type") == "approve":
+                approvals[job_id] = True
+                await websocket.send_json({"type": "ack", "message": "approved"})
+            elif msg.get("type") == "reject":
+                approvals[job_id] = False
+                await websocket.send_json({"type": "ack", "message": "rejected"})
+    except WebSocketDisconnect:
+        sockets.pop(job_id, None)
