@@ -38,6 +38,9 @@ class TestFoundryAgentIntegration:
             'search_config': search_config
         }
 
+    # Creating agent for each test for now due to "E Failed: Bing search test failed 
+    # with error: The thread could not be created due to an error response from the 
+    # service" error when trying to use Pytest fixtures to share agent instance.
     async def create_foundry_agent(self):
         """Create and initialize a FoundryAgentTemplate for testing."""
         agent_configs = self.get_agent_configs()
@@ -110,8 +113,6 @@ class TestFoundryAgentIntegration:
             assert 'yes' in response.lower(), \
                 "Responsed that the agent could not perform the Bing search"
             
-            print(f"✅ Bing Search Test Response: {response[:20]}...")
-            
         except Exception as e:
             pytest.fail(f"Bing search test failed with error: {e}")
         finally:
@@ -130,7 +131,7 @@ class TestFoundryAgentIntegration:
             # Starter query is necessary to increase likely hood of correct response
             starter = "Do you have access to internal documents?"
 
-            response = await self._get_agent_response(agent, starter)
+            starter_response = await self._get_agent_response(agent, starter)
 
             query = "Can you tell me about any incident reports that have affected the warehouses??"
             
@@ -139,10 +140,9 @@ class TestFoundryAgentIntegration:
             # Check for the expected indicator of successful RAG retrieval
             assert any(indicator in response.lower() for indicator in [
                 'heavy rain', 'Logistics', '2023-07-18'
-            ]), f"Expected code execution indicators in response, got: {response}"
-            
-            print(f"✅ RAG Search Test Response: {response[:200]}...")
-            
+            ]), f"Expected code execution indicators in response, got: {response}\n" \
+                f"Starter response - can you see RAG?: {starter_response}"
+
         except Exception as e:
             pytest.fail(f"RAG search test failed with error: {e}")
         finally:
@@ -164,8 +164,6 @@ class TestFoundryAgentIntegration:
             # Check for the expected MCP response indicator
             assert "Hello from MCP, Tom" in response, \
                 f"Expected 'Hello from MCP, Tom' in MCP response, got: {response}"
-            
-            print(f"✅ MCP Test Response: {response[:200]}...")
             
         except Exception as e:
             pytest.fail(f"MCP test failed with error: {e}")
@@ -194,8 +192,7 @@ class TestFoundryAgentIntegration:
             assert "120" in response, \
                 f"Expected factorial result '120' in response, got: {response}"
             
-            print(f"✅ Code Interpreter Test Response: {response[:200]}...")
-            
+
         except Exception as e:
             pytest.fail(f"Code Interpreter test failed with error: {e}")
         finally:
@@ -213,8 +210,6 @@ class TestFoundryAgentIntegration:
             # Check that tools were configured based on available configs
             if agent.mcp and agent.mcp.url:
                 assert agent.mcp_plugin is not None, "MCP plugin should be available"
-            
-            print("✅ Agent initialization test passed")
             
         except Exception as e:
             pytest.fail(f"Agent initialization test failed with error: {e}")
@@ -243,8 +238,6 @@ class TestFoundryAgentIntegration:
             # Should still be able to handle basic queries even without tools
             response = await self._get_agent_response(agent, "Hello, how are you?")
             assert len(response) > 0, "Should get some response even without tools"
-            
-            print("✅ Graceful degradation test passed")
             
         except Exception as e:
             pytest.fail(f"Agent should handle missing configs gracefully, but failed with: {e}")
@@ -275,9 +268,6 @@ class TestFoundryAgentIntegration:
             
             # Should get a comprehensive response that may use multiple tools
             assert len(response) > 100, "Should get comprehensive response using multiple capabilities"
-            
-            print(f"✅ Multi-capability Test Response: {response[:200]}...")
-            print(f"✅ Available capabilities tested: {', '.join(available_capabilities)}")
             
         except Exception as e:
             pytest.fail(f"Multi-capability test failed with error: {e}")

@@ -53,19 +53,31 @@ class BingConfig:
 @dataclass(slots=True)
 class SearchConfig:
     """Configuration for connecting to Azure AI Search."""
-    connection_name: str = ""
-    index_name: str = ""
+    connection_name: str | None = None
+    endpoint: str | None = None
+    index_name: str | None = None
+    embedding_endpoint: str | None = None  # Azure OpenAI endpoint
+    embedding_model: str | None = None  # e.g., "text-embedding-ada-002"
+    api_key: str | None = None  # API key for Azure AI Search
 
     @classmethod
     def from_env(cls) -> "SearchConfig":
         connection_name = os.getenv("AZURE_AI_SEARCH_CONNECTION_NAME")
         index_name = os.getenv("AZURE_AI_SEARCH_INDEX_NAME")
+        endpoint = os.getenv("AZURE_AI_SEARCH_ENDPOINT")
+        embedding_endpoint = os.getenv("AZURE_AI_SEARCH_EMBEDDING_ENDPOINT")
+        embedding_model = os.getenv("AZURE_AI_SEARCH_EMBEDDING_MODEL_NAME")
+        api_key = os.getenv("AZURE_AI_SEARCH_API_KEY")
         
         # Raise exception if any required environment variable is missing
-        if not all([connection_name, index_name]):
-            raise ValueError(f"{cls.__name__} Missing required environment variables")
+        if not all([connection_name, index_name, endpoint]):
+            raise ValueError(f"{cls.__name__} Missing required Azure Search environment variables")
             
         return cls(
             connection_name=connection_name,
             index_name=index_name,
+            endpoint=endpoint,
+            embedding_endpoint=embedding_endpoint,
+            embedding_model=embedding_model,
+            api_key=api_key,
         )
