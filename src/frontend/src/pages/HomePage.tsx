@@ -25,7 +25,7 @@ import ContentToolbar from '@/coral/components/Content/ContentToolbar';
 import { TaskService } from '../services/TaskService';
 import { TeamConfig } from '../models/Team';
 import { TeamService } from '../services/TeamService';
-
+import InlineToaster, { useInlineToaster } from "../components/toast/InlineToaster";
 /**
  * HomePage component - displays task lists and provides navigation
  * Accessible via the route "/"
@@ -35,7 +35,7 @@ const HomePage: React.FC = () => {
     const { dispatchToast } = useToastController("toast");
     const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
     const [isLoadingTeam, setIsLoadingTeam] = useState(true);
-
+    const { showToast, dismissToast } = useInlineToaster();
     /**
      * Load teams and set default team on component mount
      */
@@ -91,31 +91,11 @@ const HomePage: React.FC = () => {
     const handleTeamSelect = useCallback((team: TeamConfig | null) => {
         setSelectedTeam(team);
         if (team) {
-
-            showToast(`{team.name} team has been selected with {team.agents.length} agents`, "success");
-            // dispatchToast(
-            //     <Toast>
-            //         <ToastTitle>Team Selected</ToastTitle>
-            //         <ToastBody>
-            //             {team.name} team has been selected with {team.agents.length} agents
-            //         </ToastBody>
-            //     </Toast>,
-            //     { intent: "success" }
-            // );
+            showToast(`${team.name} team has been selected with ${team.agents.length} agents`, "success");
         } else {
-
             showToast(`No team is currently selected`, "info");
-            // dispatchToast(
-            //     <Toast>
-            //         <ToastTitle>Team Deselected</ToastTitle>
-            //         <ToastBody>
-            //             No team is currently selected
-            //         </ToastBody>
-            //     </Toast>,
-            //     { intent: "info" }
-            // );
         }
-    }, [dispatchToast]);
+    }, [showToast]);
 
     /**
      * Handle team upload completion - refresh team list and keep Business Operations Team as default
@@ -132,22 +112,13 @@ const HomePage: React.FC = () => {
                 setSelectedTeam(defaultTeam);
                 console.log('Default team after upload:', defaultTeam.name);
                 console.log('Business Operations Team remains default');
-                showToast(`Team uploaded. {defaultTeam.name} remains your default team.`, "success");
-                // Show a toast notification about the upload success
-                // dispatchToast(
-                //     <Toast>
-                //         <ToastTitle>Team Uploaded Successfully!</ToastTitle>
-                //         <ToastBody>
-                //             Team uploaded. {defaultTeam.name} remains your default team.
-                //         </ToastBody>
-                //     </Toast>,
-                //     { intent: "success" }
-                // );
+                showToast(`Team uploaded. ${defaultTeam.name} remains your default team.`, "success");
+
             }
         } catch (error) {
             console.error('Error refreshing teams after upload:', error);
         }
-    }, [dispatchToast]);
+    }, [showToast]);
 
 
     return (
