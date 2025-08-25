@@ -31,7 +31,7 @@ const HomePage: React.FC = () => {
     const { showToast, dismissToast } = useInlineToaster();
     const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
     const [isLoadingTeam, setIsLoadingTeam] = useState(true);
-    const { showToast, dismissToast } = useInlineToaster();
+
     /**
      * Load teams and set default team on component mount
      */
@@ -86,7 +86,7 @@ const HomePage: React.FC = () => {
      */
     const handleTeamSelect = useCallback((team: TeamConfig | null) => {
         setSelectedTeam(team);
-      if (team) {
+        if (team) {
             showToast(
                 `${team.name} team has been selected with ${team.agents.length} agents`,
                 "success"

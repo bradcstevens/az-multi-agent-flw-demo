@@ -353,7 +353,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
             "team_id": team_id,
             "name": team_config.name,
             "message": "Team configuration uploaded and saved successfully",
-            "team": team_config.model_dump()  # Return the full team configuration
+            "team": team_config.model_dump(),  # Return the full team configuration
         }
 
     except HTTPException:
