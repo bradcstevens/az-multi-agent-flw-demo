@@ -32,22 +32,11 @@ resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = 
   }
 }
 
-@description('AI Project metadata including name, resource ID, and API endpoint.')
-output aiProjectInfo aiProjectOutputType = {
-  name: aiProject.name
-  resourceId: aiProject.id
-  apiEndpoint: aiProject!.properties.endpoints['AI Foundry API']
-}
+@description('Required. Name of the AI project.')
+output name string = aiProject.name
 
-@export()
-@description('Output type representing AI project information.')
-type aiProjectOutputType = {
-  @description('Required. Name of the AI project.')
-  name: string
+@description('Required. Resource ID of the AI project.')
+output resourceId string = aiProject.id
 
-  @description('Required. Resource ID of the AI project.')
-  resourceId: string
-
-  @description('Required. API endpoint for the AI project.')
-  apiEndpoint: string
-}
+@description('Required. API endpoint for the AI project.')
+output apiEndpoint string = aiProject!.properties.endpoints['AI Foundry API']

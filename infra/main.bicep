@@ -107,11 +107,11 @@ param frontendContainerImageTag string = 'latest_2025-07-22_895'
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
-@description('Optional. Resource ID of an existing Log Analytics Workspace')
+@description('Optional. Resource ID of an existing Log Analytics Workspace.')
 param existingLogAnalyticsWorkspaceId string = ''
 
-@description('Optional. Resource ID of an existing Foundry project')
-param existingFoundryProjectResourceId string = ''
+@description('Optional. Resource ID of an existing Ai Foundry AI Services resource.')
+param existingAiFoundryResourceId string = ''
 
 // ============== //
 // Variables      //
@@ -958,7 +958,7 @@ var aiRelatedDnsZoneIndices = [
 // ===================================================
 @batchSize(5)
 module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
-  for (zone, i) in privateDnsZones: if (enablePrivateNetworking && (empty(existingFoundryProjectResourceId) || !contains(
+  for (zone, i) in privateDnsZones: if (enablePrivateNetworking && (!useExistingAiFoundry || !contains(
     aiRelatedDnsZoneIndices,
     i
   ))) {
@@ -1066,9 +1066,9 @@ module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
 //   }
 // }
 
-var useExistingAiFoundry = !empty(existingFoundryProjectResourceId)
+var useExistingAiFoundry = !empty(existingAiFoundryResourceId)
 var aiFoundryAiServicesResourceName = useExistingAiFoundry
-  ? split(existingFoundryProjectResourceId, '/')[8]
+  ? split(existingAiFoundryResourceId, '/')[8]
   : 'aif-${solutionSuffix}'
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
@@ -1083,10 +1083,49 @@ var aiFoundryAiServicesModelDeployment = {
 
 resource existingAiFoundryAiServices 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (useExistingAiFoundry) {
   name: aiFoundryAiServicesResourceName
-  scope: resourceGroup(split(existingFoundryProjectResourceId, '/')[2], split(existingFoundryProjectResourceId, '/')[4])
+  scope: resourceGroup(split(existingAiFoundryResourceId, '/')[2], split(existingAiFoundryResourceId, '/')[4])
 }
 
-module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-services/account:0.13.1' = if (!useExistingAiFoundry) {
+module existingAiFoundryAiServicesDeployments 'modules/ai-services-model-deployments.bicep' = if (useExistingAiFoundry) {
+  name: take('module.ai-services-model-deployments.${existingAiFoundryAiServices.name}', 64)
+  params: {
+    name: existingAiFoundryAiServices.name
+    deployments: [
+      {
+        name: aiFoundryAiServicesModelDeployment.name
+        model: {
+          format: aiFoundryAiServicesModelDeployment.format
+          name: aiFoundryAiServicesModelDeployment.name
+          version: aiFoundryAiServicesModelDeployment.version
+        }
+        raiPolicyName: aiFoundryAiServicesModelDeployment.raiPolicyName
+        sku: {
+          name: aiFoundryAiServicesModelDeployment.sku.name
+          capacity: aiFoundryAiServicesModelDeployment.sku.capacity
+        }
+      }
+    ]
+    roleAssignments: [
+      {
+        roleDefinitionIdOrName: '53ca6127-db72-4b80-b1b0-d745d6d5456d' // Azure AI User
+        principalId: userAssignedIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
+        roleDefinitionIdOrName: '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer
+        principalId: userAssignedIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
+        roleDefinitionIdOrName: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
+        principalId: userAssignedIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+    ]
+  }
+}
+
+module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-services/account:0.13.2' = if (!useExistingAiFoundry) {
   name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
@@ -1100,6 +1139,21 @@ module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-service
     apiProperties: {
       //staticsEnabled: false
     }
+    deployments: [
+      {
+        name: aiFoundryAiServicesModelDeployment.name
+        model: {
+          format: aiFoundryAiServicesModelDeployment.format
+          name: aiFoundryAiServicesModelDeployment.name
+          version: aiFoundryAiServicesModelDeployment.version
+        }
+        raiPolicyName: aiFoundryAiServicesModelDeployment.raiPolicyName
+        sku: {
+          name: aiFoundryAiServicesModelDeployment.sku.name
+          capacity: aiFoundryAiServicesModelDeployment.sku.capacity
+        }
+      }
+    ]
     networkAcls: {
       defaultAction: 'Allow'
       virtualNetworkRules: []
@@ -1126,7 +1180,7 @@ module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-service
     // WAF aligned configuration for Monitoring
     diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
     publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-    privateEndpoints: (enablePrivateNetworking && empty(existingFoundryProjectResourceId))
+    privateEndpoints: (enablePrivateNetworking)
       ? ([
           {
             name: 'pep-${aiFoundryAiServicesResourceName}'
@@ -1151,38 +1205,13 @@ module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-service
           }
         ])
       : []
-    deployments: [
-      {
-        name: aiFoundryAiServicesModelDeployment.name
-        model: {
-          format: aiFoundryAiServicesModelDeployment.format
-          name: aiFoundryAiServicesModelDeployment.name
-          version: aiFoundryAiServicesModelDeployment.version
-        }
-        raiPolicyName: aiFoundryAiServicesModelDeployment.raiPolicyName
-        sku: {
-          name: aiFoundryAiServicesModelDeployment.sku.name
-          capacity: aiFoundryAiServicesModelDeployment.sku.capacity
-        }
-      }
-    ]
   }
 }
 
-var useExistingAiProject = !empty(existingFoundryProjectResourceId)
-var aiFoundryAiProjectResourceName = useExistingAiProject
-  ? last(split(existingFoundryProjectResourceId, '/'))
-  : 'proj-${solutionSuffix}'
+var aiFoundryAiProjectResourceName = 'proj-${solutionSuffix}'
 var aiFoundryAiProjectDescription = 'AI Foundry Project'
-var aiFoundryAiProjectEndpoint = useExistingAiProject
-  ? format(
-      'https://{0}.services.ai.azure.com/api/projects/{1}',
-      aiFoundryAiServicesResourceName,
-      aiFoundryAiProjectResourceName
-    )
-  : aiFoundryAiServicesProject!.outputs.aiProjectInfo.apiEndpoint
 
-module aiFoundryAiServicesProject 'modules/ai-project.bicep' = if (!useExistingAiProject) {
+module aiFoundryAiServicesProject 'modules/ai-project.bicep' = {
   name: take('module.ai-project.${aiFoundryAiProjectResourceName}', 64)
   params: {
     name: aiFoundryAiProjectResourceName
@@ -1345,7 +1374,6 @@ module privateEndpointContainerAppEnvironment 'br:mcr.microsoft.com/bicep/avm/re
     privateLinkServiceConnections: [
       {
         name: '${last(split(containerAppEnvironment.outputs.resourceId, '/'))}-${privateEndpointContainerAppEnvironmentService}-0'
-
         properties: {
           groupIds: [privateEndpointContainerAppEnvironmentService]
           privateLinkServiceId: containerAppEnvironment.outputs.resourceId
@@ -1441,7 +1469,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_OPENAI_ENDPOINT'
-            value: aiFoundryAiServices.outputs.endpoint
+            value: aiFoundryAiServicesProject.outputs.apiEndpoint
           }
           {
             name: 'AZURE_OPENAI_MODEL_NAME'
@@ -1473,7 +1501,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_AI_PROJECT_NAME'
-            value: aiFoundryAiServicesAiProjectResourceName
+            value: aiFoundryAiServicesProject.outputs.name
           }
           {
             name: 'FRONTEND_SITE_NAME'
@@ -1481,7 +1509,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_AI_AGENT_ENDPOINT'
-            value: aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
+            value: aiFoundryAiServicesProject!.outputs.apiEndpoint
           }
           {
             name: 'AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME'
