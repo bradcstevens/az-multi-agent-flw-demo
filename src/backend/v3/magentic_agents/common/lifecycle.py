@@ -19,7 +19,7 @@ class MCPEnabledBase:
 
     def __init__(self, mcp: MCPConfig | None = None) -> None:
         self._stack: AsyncExitStack | None = None
-        self.mcp_cfg: MCPConfig = mcp or MCPConfig.from_env()
+        self.mcp_cfg: MCPConfig | None = mcp 
         self.mcp_plugin: MCPStreamableHttpPlugin | None = None
         self._agent: Any | None = None  # delegate target
 
@@ -75,10 +75,8 @@ class MCPEnabledBase:
         }
 
     async def _enter_mcp_if_configured(self) -> None:
-        if not self.mcp_cfg.url:
+        if not self.mcp_cfg:
             return
-        # Note: had this commented out in my testing because I don't have
-        # access to your resources
         headers = self._build_mcp_headers()
         plugin = MCPStreamableHttpPlugin(
             name=self.mcp_cfg.name,

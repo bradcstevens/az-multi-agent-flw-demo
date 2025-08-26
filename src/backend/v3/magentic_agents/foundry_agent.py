@@ -13,17 +13,8 @@ from v3.magentic_agents.common.lifecycle import AzureAgentBase
 from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
                                                     SearchConfig)
 
+# exception too broad warning
 # pylint: disable=w0718 
-# - exception too broad warning
-
-# Log to console
-# logging.basicConfig(
-#     level=logging.INFO,  # Set the logging level to INFO
-#     format='%(asctime)s - %(levelname)s - %(message)s',  # Customize the log format
-#     handlers=[
-#         logging.StreamHandler()  # Output logs to the console
-#     ]
-# )
 
 class FoundryAgentTemplate(AzureAgentBase):
     """Agent that uses Azure AI Search and Bing tools for information retrieval."""

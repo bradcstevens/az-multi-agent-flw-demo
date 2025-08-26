@@ -9,14 +9,13 @@ from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
                                            Plan, PlanStatus)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (APIRouter, Depends, File, HTTPException, Request,
-                     UploadFile)
+from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
+                     HTTPException, Request, UploadFile, WebSocket,
+                     WebSocketDisconnect)
 from kernel_agents.agent_factory import AgentFactory
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
-from v3.config.settings import orchestration_config
-from v3.models.models import MPlan, MStep
-from v3.models.orchestration_models import AgentType
+from v3.orchestration.orchestration_manager import OrchestrationManager
 
 app_v3 = APIRouter(
     prefix="/api/v3",
@@ -25,7 +24,7 @@ app_v3 = APIRouter(
 
 # To do: change endpoint to process request
 @app_v3.post("/create_plan")
-async def process_request(input_task: InputTask, request: Request):
+async def process_request(background_tasks: BackgroundTasks, input_task: InputTask, request: Request):
     """
     Create a new plan without full processing.
 
@@ -121,59 +120,23 @@ async def process_request(input_task: InputTask, request: Request):
         input_task.session_id = str(uuid.uuid4())
 
     try:
-        # Initialize memory store
-        memory_store = await DatabaseFactory.get_database(user_id=user_id)
-
-        # Create a new Plan object
-        plan = MPlan()
-        #     session_id=input_task.session_id,
-        #     team_id=input_task.team_id,
-        #     user_id=user_id,
-        #     initial_goal=input_task.description,
-        #     overall_status=PlanStatus.in_progress,
-        #     source=AgentType.PLANNER.value,
-        # )
-
-        # setup and call the magentic orchestration
-        magentic_orchestration = await orchestration_config.get_current_orchestration(user_id)
-
-        runtime = InProcessRuntime()
-        runtime.start()
-
-        # invoke returns immediately, wait on result.get
-        orchestration_result = await magentic_orchestration.invoke(task=input_task.description,runtime=runtime)
-        team_result = await orchestration_result.get()
-
-        # Save the plan to the database
-        await memory_store.add_plan(plan)
-
-        # Log successful plan creation
-        track_event_if_configured(
-            "PlanCreated",
-            {
-                "status": f"Plan created with ID: {plan.id}",
-                "session_id": input_task.session_id,
-                "plan_id": plan.id,
-                "description": input_task.description,
-            },
-        )
+        background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
 
         return {
-            "plan_id": plan.id,
-            "status": "Plan created successfully",
+            "status": "Request started successfully",
             "session_id": input_task.session_id,
         }
 
     except Exception as e:
         track_event_if_configured(
-            "CreatePlanError",
+            "RequestStartFailed",
             {
                 "session_id": input_task.session_id,
                 "description": input_task.description,
                 "error": str(e),
             },
         )
-        raise HTTPException(status_code=400, detail=f"Error creating plan: {e}") from e
+        raise HTTPException(status_code=400, detail=f"Error starting request: {e}") from e
 
 
 @app_v3.post("/upload_team_config")

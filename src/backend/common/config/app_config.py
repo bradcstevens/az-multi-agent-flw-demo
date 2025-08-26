@@ -71,6 +71,10 @@ class AppConfig:
         # Example: http://127.0.0.1:8000/mcp
         self.MCP_SERVER_ENDPOINT = self._get_optional("MCP_SERVER_ENDPOINT")
 
+        test_team_json = self._get_optional("TEST_TEAM_JSON")
+
+        self.AGENT_TEAM_FILE = f"../../data/agent_teams/{test_team_json}.json"
+
         # Cached clients and resources
         self._azure_credentials = None
         self._cosmos_client = None

@@ -3,15 +3,10 @@ Configuration settings for the Magentic Employee Onboarding system.
 Handles Azure OpenAI, MCP, and environment setup.
 """
 
-import os
-
 from common.config.app_config import config
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion, OpenAIChatPromptExecutionSettings)
-from v3.magentic_agents.magentic_agent_factory import (cleanup_all_agents,
-                                                       get_agents)
-from v3.orchestration.manager import init_orchestration
 
 
 class AzureConfig:
@@ -64,13 +59,13 @@ class OrchestrationConfig:
 
     def __init__(self):
         self._orchestrations = {}
+        self.plans = {}       # job_id -> current plan
+        self.approvals = {}   # job_id -> True/False/None
+        self.sockets = {}     # job_id -> WebSocket
 
-    async def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
-        """Initialize or get existing orchestration instance."""
-        if user_id not in self._orchestrations:
-            agents = await get_agents()
-            self._orchestrations[user_id] = await init_orchestration(agents)
-        return self._orchestrations[user_id]
+    def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
+        """get existing orchestration instance."""
+        return self._orchestrations.get(user_id, None)
 
 
 # Global config instances

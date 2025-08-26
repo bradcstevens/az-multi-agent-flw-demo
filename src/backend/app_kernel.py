@@ -28,9 +28,7 @@ from kernel_agents.agent_factory import AgentFactory
 from middleware.health_check import HealthCheckMiddleware
 from v3.api.router import app_v3
 # Semantic Kernel imports
-from v3.config.settings import orchestration_config
-from v3.magentic_agents.magentic_agent_factory import (cleanup_all_agents,
-                                                       get_agents)
+from v3.orchestration.orchestration_manager import OrchestrationManager
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
 connection_string = config.APPLICATIONINSIGHTS_CONNECTION_STRING
@@ -59,14 +57,6 @@ logging.getLogger("azure.identity.aio._internal").setLevel(logging.WARNING)
 logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").setLevel(
     logging.WARNING
 )
-
-
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     """Lifespan event handler to create and clean up agents."""
-#     config.agents = await get_agents()
-#     yield
-#     await cleanup_all_agents()
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -671,7 +661,7 @@ async def get_plans(
         raise HTTPException(status_code=400, detail="no user")
     
     # Initialize agent team for this user session
-    await orchestration_config.get_current_orchestration(user_id=user_id)
+    await OrchestrationManager.get_current_orchestration(user_id=user_id)
 
     # Initialize memory context
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
