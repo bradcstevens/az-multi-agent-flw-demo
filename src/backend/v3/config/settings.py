@@ -58,14 +58,14 @@ class OrchestrationConfig:
     """Configuration for orchestration settings."""
 
     def __init__(self):
-        self._orchestrations = {}
+        self.orchestrations = {}
         self.plans = {}       # job_id -> current plan
         self.approvals = {}   # job_id -> True/False/None
         self.sockets = {}     # job_id -> WebSocket
 
     def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
         """get existing orchestration instance."""
-        return self._orchestrations.get(user_id, None)
+        return self.orchestrations.get(user_id, None)
 
 
 # Global config instances

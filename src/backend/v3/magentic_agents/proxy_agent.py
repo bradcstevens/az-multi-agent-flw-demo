@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
+""" Proxy agent that prompts for human clarification."""
 
-import asyncio
+import logging
 import uuid
 from collections.abc import AsyncIterable
 from typing import AsyncIterator
@@ -25,6 +26,7 @@ class DummyAgentThread(AgentThread):
         self._chat_history = chat_history if chat_history is not None else ChatHistory()
         self._id: str = thread_id or f"thread_{uuid.uuid4().hex}"
         self._is_deleted = False
+        self.logger = logging.getLogger(__name__)
         
     @override
     async def _create(self) -> str:
@@ -76,6 +78,7 @@ class ProxyAgentResponseItem:
     def __init__(self, message: ChatMessageContent, thread: AgentThread):
         self.message = message
         self.thread = thread
+        self.logger = logging.getLogger(__name__)
 
 class ProxyAgent(Agent):
     """Simple proxy agent that prompts for human clarification."""
@@ -83,9 +86,11 @@ class ProxyAgent(Agent):
     def __init__(self):
         super().__init__(
             name="ProxyAgent", 
-            description="I help clarify requests by asking the human user for more information. Please ask me for more details about any unclear requirements, missing information, or if you need me to elaborate on any aspect of the task."
+            description="""Call this agent when you need to clarify requests by asking the human user 
+            for more information. Ask it for more details about any unclear requirements, missing information, 
+            or if you need the user to elaborate on any aspect of the task."""
         )
-        self.instructions = "I gather clarification from the human user when requested by other agents."
+        self.instructions = ""
     
     async def invoke(self, message: str,*, thread: AgentThread | None = None,**kwargs) -> AsyncIterator[ChatMessageContent]:
         """Ask human user for clarification about the message."""
@@ -96,12 +101,13 @@ class ProxyAgent(Agent):
             construct_thread=lambda: DummyAgentThread(),
             expected_type=DummyAgentThread,
         )
+        # Replace with websocket call when available
         print(f"\n🤔 ProxyAgent: Another agent is asking for clarification about:")
         print(f"   Request: {message}")
         print("-" * 60)
         
         # Get human input
-        human_response = input("💬 Please provide clarification: ").strip()
+        human_response = input("Please provide clarification: ").strip()
         
         if not human_response:
             human_response = "No additional clarification provided."
@@ -138,13 +144,13 @@ class ProxyAgent(Agent):
         else:
             message = str(messages)
 
-        
-        print(f"\n🤔 ProxyAgent: Another agent is asking for clarification about:")
+        # Replace with websocket call when available
+        print(f"\nProxyAgent: Another agent is asking for clarification about:")
         print(f"   Request: {message}")
         print("-" * 60)
         
-        # Get human input
-        human_response = input("💬 Please provide clarification: ").strip()
+        # Get human input - replace with websocket call when available
+        human_response = input("Please provide clarification: ").strip()
         
         if not human_response:
             human_response = "No additional clarification provided."
@@ -181,21 +187,3 @@ class ProxyAgent(Agent):
 async def create_proxy_agent():
     """Factory function for human proxy agent."""
     return ProxyAgent()
-
-# Test harness
-async def test_proxy_agent():
-    """Test the proxy agent."""
-    print("🤖 Testing proxy agent...")
-    
-    agent = ProxyAgent()
-    test_messages = [
-        "More information needed.  What is the name of the employee?"
-    ]
-    
-    for message in test_messages:
-        print(f"\n🤖 Simulating agent request: {message}")
-        async for response in agent.invoke(message):
-            print(f"📝 Response: {response.content}")
-
-if __name__ == "__main__":
-    asyncio.run(test_proxy_agent())

@@ -62,7 +62,7 @@ class OrchestrationManager:
             factory = MagenticAgentFactory()
             # to do: change to parsing teams from cosmos db
             agents = await factory.get_agents(config.AGENT_TEAM_FILE)
-            orchestration_config._orchestrations[user_id] = await cls.init_orchestration(agents)
+            orchestration_config.orchestrations[user_id] = await cls.init_orchestration(agents)
         return orchestration_config.get_current_orchestration(user_id)
 
     @classmethod

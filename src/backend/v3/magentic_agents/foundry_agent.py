@@ -1,14 +1,11 @@
 """ Agent template for building foundry agents with Azure AI Search, Bing, and MCP plugins. """
 
-import asyncio
 import logging
 from typing import List, Optional
 
 from azure.ai.agents.models import (AzureAISearchTool, BingGroundingTool,
                                     CodeInterpreterToolDefinition)
 from semantic_kernel.agents import AzureAIAgent  # pylint: disable=E0611
-from semantic_kernel.agents import \
-    AzureAIAgentSettings  # pylint: disable=E0611
 from v3.magentic_agents.common.lifecycle import AzureAgentBase
 from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
                                                     SearchConfig)

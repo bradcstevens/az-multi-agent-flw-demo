@@ -663,60 +663,62 @@ async def get_plans(
     # Initialize agent team for this user session
     await OrchestrationManager.get_current_orchestration(user_id=user_id)
 
-    # Initialize memory context
-    memory_store = await DatabaseFactory.get_database(user_id=user_id)
-    if session_id:
-        plan = await memory_store.get_plan_by_session(session_id=session_id)
-        if not plan:
-            track_event_if_configured(
-                "GetPlanBySessionNotFound",
-                {"status_code": 400, "detail": "Plan not found"},
-            )
-            raise HTTPException(status_code=404, detail="Plan not found")
+    # Replace the following with code to get plan run history from the database
 
-        # Use get_steps_by_plan to match the original implementation
-        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
-        return [plan_with_steps]
-    if plan_id:
-        plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
-        if not plan:
-            track_event_if_configured(
-                "GetPlanBySessionNotFound",
-                {"status_code": 400, "detail": "Plan not found"},
-            )
-            raise HTTPException(status_code=404, detail="Plan not found")
+    # # Initialize memory context
+    # memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    # if session_id:
+    #     plan = await memory_store.get_plan_by_session(session_id=session_id)
+    #     if not plan:
+    #         track_event_if_configured(
+    #             "GetPlanBySessionNotFound",
+    #             {"status_code": 400, "detail": "Plan not found"},
+    #         )
+    #         raise HTTPException(status_code=404, detail="Plan not found")
 
-        # Use get_steps_by_plan to match the original implementation
-        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
-        messages = await memory_store.get_data_by_type_and_session_id(
-            "agent_message", session_id=plan.session_id
-        )
+    #     # Use get_steps_by_plan to match the original implementation
+    #     steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
+    #     plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+    #     plan_with_steps.update_step_counts()
+    #     return [plan_with_steps]
+    # if plan_id:
+    #     plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
+    #     if not plan:
+    #         track_event_if_configured(
+    #             "GetPlanBySessionNotFound",
+    #             {"status_code": 400, "detail": "Plan not found"},
+    #         )
+    #         raise HTTPException(status_code=404, detail="Plan not found")
 
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
+    #     # Use get_steps_by_plan to match the original implementation
+    #     steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
+    #     messages = await memory_store.get_data_by_type_and_session_id(
+    #         "agent_message", session_id=plan.session_id
+    #     )
 
-        # Format dates in messages according to locale
-        formatted_messages = format_dates_in_messages(
-            messages, config.get_user_local_browser_language()
-        )
+    #     plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+    #     plan_with_steps.update_step_counts()
 
-        return [plan_with_steps, formatted_messages]
+    #     # Format dates in messages according to locale
+    #     formatted_messages = format_dates_in_messages(
+    #         messages, config.get_user_local_browser_language()
+    #     )
 
-    all_plans = await memory_store.get_all_plans()
-    # Fetch steps for all plans concurrently
-    steps_for_all_plans = await asyncio.gather(
-        *[memory_store.get_steps_by_plan(plan_id=plan.id) for plan in all_plans]
-    )
-    # Create list of PlanWithSteps and update step counts
-    list_of_plans_with_steps = []
-    for plan, steps in zip(all_plans, steps_for_all_plans):
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
-        list_of_plans_with_steps.append(plan_with_steps)
+    #     return [plan_with_steps, formatted_messages]
 
-    return list_of_plans_with_steps
+    # all_plans = await memory_store.get_all_plans()
+    # # Fetch steps for all plans concurrently
+    # steps_for_all_plans = await asyncio.gather(
+    #     *[memory_store.get_steps_by_plan(plan_id=plan.id) for plan in all_plans]
+    # )
+    # # Create list of PlanWithSteps and update step counts
+    # list_of_plans_with_steps = []
+    # for plan, steps in zip(all_plans, steps_for_all_plans):
+    #     plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+    #     plan_with_steps.update_step_counts()
+    #     list_of_plans_with_steps.append(plan_with_steps)
+
+    return []
 
 
 @app.get("/api/steps/{plan_id}", response_model=List[Step])

@@ -11,6 +11,7 @@ from typing import List, Union
 from v3.magentic_agents.foundry_agent import FoundryAgentTemplate
 from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
                                                     SearchConfig)
+from v3.magentic_agents.proxy_agent import ProxyAgent
 from v3.magentic_agents.reasoning_agent import ReasoningAgentTemplate
 
 
@@ -38,7 +39,7 @@ class MagenticAgentFactory:
             data = json.load(f)
         return json.loads(json.dumps(data), object_hook=lambda d: SimpleNamespace(**d))
     
-    async def create_agent_from_config(self, agent_obj: SimpleNamespace, team_model: str = None) -> Union[FoundryAgentTemplate, ReasoningAgentTemplate]:
+    async def create_agent_from_config(self, agent_obj: SimpleNamespace) -> Union[FoundryAgentTemplate, ReasoningAgentTemplate, ProxyAgent]:
         """
         Create an agent from configuration object.
         
@@ -55,6 +56,10 @@ class MagenticAgentFactory:
         """
         # Get model from agent config, team model, or environment
         deployment_name = getattr(agent_obj, 'deployment_name', None)
+
+        if not deployment_name and agent_obj.name.lower() == "proxyagent":
+            self.logger.info("Creating ProxyAgent")
+            return ProxyAgent()
         
         # Validate supported models
         supported_models = json.loads(os.getenv("SUPPORTED_MODELS"))
@@ -114,7 +119,7 @@ class MagenticAgentFactory:
         self.logger.info(f"Successfully created and initialized agent '{agent_obj.name}'")
         return agent
 
-    async def get_agents(self, file_path: str, team_model: str = None) -> List:
+    async def get_agents(self, file_path: str) -> List:
         """
         Create and return a team of agents from JSON configuration.
         
@@ -137,7 +142,7 @@ class MagenticAgentFactory:
                 try:
                     self.logger.info(f"Creating agent {i}/{len(team.agents)}: {agent_cfg.name}")
                     
-                    agent = await self.create_agent_from_config(agent_cfg, team_model)
+                    agent = await self.create_agent_from_config(agent_cfg)
                     agents.append(agent)
                     self._agent_list.append(agent)  # Keep track for cleanup
                     
