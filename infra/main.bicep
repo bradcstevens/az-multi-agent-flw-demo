@@ -1125,6 +1125,7 @@ module aiFoundryAiServicesProject 'modules/ai-project.bicep' = if (!useExistingA
     location: azureAiServiceLocation
     tags: tags
     desc: aiFoundryAiProjectDescription
+    //Implicit dependencies below
     aiServicesName: useExistingAiFoundryAiProject ? existingAiFoundryAiServices.name : aiFoundryAiServices!.outputs.name
   }
 }
