@@ -965,6 +965,12 @@ module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
 // WAF best practices for Open AI: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-openai
 
 var useExistingAiFoundryAiProject = !empty(existingAiFoundryAiProjectResourceId)
+var aiFoundryAiServicesResourceGroupName = useExistingAiFoundryAiProject
+  ? split(existingAiFoundryAiProjectResourceId, '/')[4]
+  : 'rg-${solutionSuffix}'
+var aiFoundryAiServicesSubscriptionId = useExistingAiFoundryAiProject
+  ? split(existingAiFoundryAiProjectResourceId, '/')[2]
+  : subscription().id
 var aiFoundryAiServicesResourceName = useExistingAiFoundryAiProject
   ? split(existingAiFoundryAiProjectResourceId, '/')[8]
   : 'aif-${solutionSuffix}'
@@ -985,14 +991,12 @@ var aiFoundryAiProjectDescription = 'AI Foundry Project'
 
 resource existingAiFoundryAiServices 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (useExistingAiFoundryAiProject) {
   name: aiFoundryAiServicesResourceName
-  scope: resourceGroup(
-    split(existingAiFoundryAiProjectResourceId, '/')[2],
-    split(existingAiFoundryAiProjectResourceId, '/')[4]
-  )
+  scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
 }
 
 module existingAiFoundryAiServicesDeployments 'modules/ai-services-deployments.bicep' = if (useExistingAiFoundryAiProject) {
   name: take('module.ai-services-model-deployments.${existingAiFoundryAiServices.name}', 64)
+  scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
   params: {
     name: existingAiFoundryAiServices.name
     deployments: [
