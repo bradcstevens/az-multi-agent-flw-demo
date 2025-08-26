@@ -1,30 +1,23 @@
-import uuid
-import logging
 import json
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+import logging
+import uuid
 from typing import Optional
-from pydantic import BaseModel
 
 from auth.auth_utils import get_authenticated_user_details
-from common.models.messages_kernel import (
-    GeneratePlanRequest,
-    InputTask,
-    Plan,
-    PlanStatus,
-)
-from common.utils.event_utils import track_event_if_configured
-from common.utils.utils_kernel import (
-    rai_success,
-    rai_validate_team_config,
-)
-from v3.common.services.team_service import TeamService
-from kernel_agents.agent_factory import AgentFactory
-from common.database.database_factory import DatabaseFactory
-
-# from v3.config.settings import orchestration_config
-from v3.models.models import MPlan, MStep
-from v3.models.orchestration_models import AgentType
 from common.config.app_config import config
+from common.database.database_factory import DatabaseFactory
+from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
+                                           Plan, PlanStatus)
+from common.utils.event_utils import track_event_if_configured
+from common.utils.utils_kernel import rai_success, rai_validate_team_config
+from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
+                     HTTPException, Request, UploadFile, WebSocket,
+                     WebSocketDisconnect)
+from kernel_agents.agent_factory import AgentFactory
+from pydantic import BaseModel
+from semantic_kernel.agents.runtime import InProcessRuntime
+from v3.common.services.team_service import TeamService
+from v3.orchestration.orchestration_manager import OrchestrationManager
 
 
 class TeamSelectionRequest(BaseModel):
@@ -40,7 +33,7 @@ app_v3 = APIRouter(
 
 
 @app_v3.post("/create_plan")
-async def create_plan_endpoint(input_task: InputTask, request: Request):
+async def process_request(background_tasks: BackgroundTasks, input_task: InputTask, request: Request):
     """
     Create a new plan without full processing.
 
@@ -133,45 +126,23 @@ async def create_plan_endpoint(input_task: InputTask, request: Request):
         input_task.session_id = str(uuid.uuid4())
 
     try:
-        memory_store = await DatabaseFactory.get_database(user_id=user_id)
-
-        plan = Plan(
-            session_id=input_task.session_id,
-            team_id=input_task.team_id,
-            user_id=user_id,
-            initial_goal=input_task.description,
-            overall_status=PlanStatus.in_progress,
-            source=AgentType.PLANNER.value,
-        )
-
-        await memory_store.add_plan(plan)
-
-        track_event_if_configured(
-            "PlanCreated",
-            {
-                "status": f"Plan created with ID: {plan.id}",
-                "session_id": input_task.session_id,
-                "plan_id": plan.id,
-                "description": input_task.description,
-            },
-        )
+        background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
 
         return {
-            "plan_id": plan.id,
-            "status": "Plan created successfully",
+            "status": "Request started successfully",
             "session_id": input_task.session_id,
         }
 
     except Exception as e:
         track_event_if_configured(
-            "CreatePlanError",
+            "RequestStartFailed",
             {
                 "session_id": input_task.session_id,
                 "description": input_task.description,
                 "error": str(e),
             },
         )
-        raise HTTPException(status_code=400, detail=f"Error creating plan: {e}") from e
+        raise HTTPException(status_code=400, detail=f"Error starting request: {e}") from e
 
 
 @app_v3.post("/upload_team_config")

@@ -2,7 +2,6 @@
 import asyncio
 import logging
 import os
-
 # Azure monitoring
 import re
 import uuid
@@ -13,37 +12,25 @@ from auth.auth_utils import get_authenticated_user_details
 from azure.monitor.opentelemetry import configure_azure_monitor
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (
-    AgentMessage,
-    AgentType,
-    HumanClarification,
-    HumanFeedback,
-    InputTask,
-    Plan,
-    PlanStatus,
-    PlanWithSteps,
-    Step,
-    UserLanguage,
-)
+from common.models.messages_kernel import (AgentMessage, AgentType,
+                                           HumanClarification, HumanFeedback,
+                                           InputTask, Plan, PlanStatus,
+                                           PlanWithSteps, Step, UserLanguage)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_date import format_dates_in_messages
-
 # Updated import for KernelArguments
 from common.utils.utils_kernel import rai_success
-
+from common.utils.websocket_streaming import (websocket_streaming_endpoint,
+                                              ws_manager)
 # FastAPI imports
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
-
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
 from v3.api.router import app_v3
-from common.utils.websocket_streaming import websocket_streaming_endpoint, ws_manager
-
 # Semantic Kernel imports
-# from v3.config.settings import orchestration_config
-# from v3.magentic_agents.magentic_agent_factory import cleanup_all_agents, get_agents
+from v3.orchestration.orchestration_manager import OrchestrationManager
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
 connection_string = config.APPLICATIONINSIGHTS_CONNECTION_STRING
@@ -72,14 +59,6 @@ logging.getLogger("azure.identity.aio._internal").setLevel(logging.WARNING)
 logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").setLevel(
     logging.WARNING
 )
-
-
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     """Lifespan event handler to create and clean up agents."""
-#     config.agents = await get_agents()
-#     yield
-#     await cleanup_all_agents()
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -693,62 +672,64 @@ async def get_plans(
         raise HTTPException(status_code=400, detail="no user")
 
     # Initialize agent team for this user session
-    await orchestration_config.get_current_orchestration(user_id=user_id)
+    await OrchestrationManager.get_current_orchestration(user_id=user_id)
 
-    # Initialize memory context
-    memory_store = await DatabaseFactory.get_database(user_id=user_id)
-    if session_id:
-        plan = await memory_store.get_plan_by_session(session_id=session_id)
-        if not plan:
-            track_event_if_configured(
-                "GetPlanBySessionNotFound",
-                {"status_code": 400, "detail": "Plan not found"},
-            )
-            raise HTTPException(status_code=404, detail="Plan not found")
+    # Replace the following with code to get plan run history from the database
 
-        # Use get_steps_by_plan to match the original implementation
-        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
-        return [plan_with_steps]
-    if plan_id:
-        plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
-        if not plan:
-            track_event_if_configured(
-                "GetPlanBySessionNotFound",
-                {"status_code": 400, "detail": "Plan not found"},
-            )
-            raise HTTPException(status_code=404, detail="Plan not found")
+    # # Initialize memory context
+    # memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    # if session_id:
+    #     plan = await memory_store.get_plan_by_session(session_id=session_id)
+    #     if not plan:
+    #         track_event_if_configured(
+    #             "GetPlanBySessionNotFound",
+    #             {"status_code": 400, "detail": "Plan not found"},
+    #         )
+    #         raise HTTPException(status_code=404, detail="Plan not found")
 
-        # Use get_steps_by_plan to match the original implementation
-        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
-        messages = await memory_store.get_data_by_type_and_session_id(
-            "agent_message", session_id=plan.session_id
-        )
+    #     # Use get_steps_by_plan to match the original implementation
+    #     steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
+    #     plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+    #     plan_with_steps.update_step_counts()
+    #     return [plan_with_steps]
+    # if plan_id:
+    #     plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
+    #     if not plan:
+    #         track_event_if_configured(
+    #             "GetPlanBySessionNotFound",
+    #             {"status_code": 400, "detail": "Plan not found"},
+    #         )
+    #         raise HTTPException(status_code=404, detail="Plan not found")
 
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
+    #     # Use get_steps_by_plan to match the original implementation
+    #     steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
+    #     messages = await memory_store.get_data_by_type_and_session_id(
+    #         "agent_message", session_id=plan.session_id
+    #     )
 
-        # Format dates in messages according to locale
-        formatted_messages = format_dates_in_messages(
-            messages, config.get_user_local_browser_language()
-        )
+    #     plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+    #     plan_with_steps.update_step_counts()
 
-        return [plan_with_steps, formatted_messages]
+    #     # Format dates in messages according to locale
+    #     formatted_messages = format_dates_in_messages(
+    #         messages, config.get_user_local_browser_language()
+    #     )
 
-    all_plans = await memory_store.get_all_plans()
-    # Fetch steps for all plans concurrently
-    steps_for_all_plans = await asyncio.gather(
-        *[memory_store.get_steps_by_plan(plan_id=plan.id) for plan in all_plans]
-    )
-    # Create list of PlanWithSteps and update step counts
-    list_of_plans_with_steps = []
-    for plan, steps in zip(all_plans, steps_for_all_plans):
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
-        list_of_plans_with_steps.append(plan_with_steps)
+    #     return [plan_with_steps, formatted_messages]
 
-    return list_of_plans_with_steps
+    # all_plans = await memory_store.get_all_plans()
+    # # Fetch steps for all plans concurrently
+    # steps_for_all_plans = await asyncio.gather(
+    #     *[memory_store.get_steps_by_plan(plan_id=plan.id) for plan in all_plans]
+    # )
+    # # Create list of PlanWithSteps and update step counts
+    # list_of_plans_with_steps = []
+    # for plan, steps in zip(all_plans, steps_for_all_plans):
+    #     plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+    #     plan_with_steps.update_step_counts()
+    #     list_of_plans_with_steps.append(plan_with_steps)
+
+    return []
 
 
 @app.get("/api/steps/{plan_id}", response_model=List[Step])
@@ -920,11 +901,9 @@ async def test_streaming_updates(plan_id: str):
     Test endpoint to simulate streaming updates for a plan.
     This is for testing the WebSocket streaming functionality.
     """
-    from common.utils.websocket_streaming import (
-        send_plan_update,
-        send_agent_message,
-        send_step_update,
-    )
+    from common.utils.websocket_streaming import (send_agent_message,
+                                                  send_plan_update,
+                                                  send_step_update)
 
     try:
         # Simulate a series of streaming updates
