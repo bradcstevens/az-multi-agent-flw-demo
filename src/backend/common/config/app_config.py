@@ -39,6 +39,10 @@ class AppConfig:
             "AZURE_COGNITIVE_SERVICES", "https://cognitiveservices.azure.com/.default"
         )
 
+        self.AZURE_MANAGEMENT_SCOPE = self._get_optional(
+            "AZURE_MANAGEMENT_SCOPE", "https://management.azure.com/.default"
+        )
+
         # Azure OpenAI settings
         self.AZURE_OPENAI_DEPLOYMENT_NAME = self._get_required(
             "AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o"

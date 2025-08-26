@@ -1,8 +1,10 @@
 import json
 import logging
 import uuid
+from typing import Optional
 
 from auth.auth_utils import get_authenticated_user_details
+# from v3.orchestration.orchestration_manager import OrchestrationManager
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
 from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
@@ -13,16 +15,23 @@ from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
                      HTTPException, Request, UploadFile, WebSocket,
                      WebSocketDisconnect)
 from kernel_agents.agent_factory import AgentFactory
+from pydantic import BaseModel
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
-from v3.orchestration.orchestration_manager import OrchestrationManager
+
+
+class TeamSelectionRequest(BaseModel):
+    """Request model for team selection."""
+    team_id: str
+    session_id: Optional[str] = None
+
 
 app_v3 = APIRouter(
     prefix="/api/v3",
     responses={404: {"description": "Not found"}},
 )
 
-# To do: change endpoint to process request
+
 @app_v3.post("/create_plan")
 async def process_request(background_tasks: BackgroundTasks, input_task: InputTask, request: Request):
     """
@@ -73,33 +82,31 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
               type: string
               description: Error message
     """
-    # Perform RAI check on the description
-    # if not await rai_success(input_task.description, False):
-    #     track_event_if_configured(
-    #         "RAI failed",
-    #         {
-    #             "status": "Plan not created - RAI check failed",
-    #             "description": input_task.description,
-    #             "session_id": input_task.session_id,
-    #         },
-    #     )
-    #     raise HTTPException(
-    #         status_code=400,
-    #         detail={
-    #             "error_type": "RAI_VALIDATION_FAILED",
-    #             "message": "Content Safety Check Failed",
-    #             "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
-    #             "suggestions": [
-    #                 "Remove any potentially harmful, inappropriate, or unsafe content",
-    #                 "Use more professional and constructive language",
-    #                 "Focus on legitimate business or educational objectives",
-    #                 "Ensure your request complies with content policies",
-    #             ],
-    #             "user_action": "Please revise your request and try again",
-    #         },
-    #     )
+    if not await rai_success(input_task.description, False):
+        track_event_if_configured(
+            "RAI failed",
+            {
+                "status": "Plan not created - RAI check failed",
+                "description": input_task.description,
+                "session_id": input_task.session_id,
+            },
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "RAI_VALIDATION_FAILED",
+                "message": "Content Safety Check Failed",
+                "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+                "suggestions": [
+                    "Remove any potentially harmful, inappropriate, or unsafe content",
+                    "Use more professional and constructive language",
+                    "Focus on legitimate business or educational objectives",
+                    "Ensure your request complies with content policies",
+                ],
+                "user_action": "Please revise your request and try again",
+            },
+        )
 
-    # Get authenticated user
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
 
@@ -115,7 +122,6 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         )
         raise HTTPException(status_code=400, detail="no team id")
 
-    # Generate session ID if not provided
     if not input_task.session_id:
         input_task.session_id = str(uuid.uuid4())
 
@@ -220,21 +226,21 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         models_valid, missing_models = await team_service.validate_team_models(
             json_data
         )
-        # if not models_valid:
-        #     error_message = (
-        #         f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
-        #         f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
-        #     )
-        #     track_event_if_configured(
-        #         "Team configuration model validation failed",
-        #         {
-        #             "status": "failed",
-        #             "user_id": user_id,
-        #             "filename": file.filename,
-        #             "missing_models": missing_models,
-        #         },
-        #     )
-        #     raise HTTPException(status_code=400, detail=error_message)
+        if not models_valid:
+            error_message = (
+                f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
+                f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
+            )
+            track_event_if_configured(
+                "Team configuration model validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "missing_models": missing_models,
+                },
+            )
+            raise HTTPException(status_code=400, detail=error_message)
 
         track_event_if_configured(
             "Team configuration model validation passed",
@@ -242,29 +248,29 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         )
 
         # Validate search indexes
-        # search_valid, search_errors = await team_service.validate_team_search_indexes(
-        #     json_data
-        # )
-        # if not search_valid:
-        #     error_message = (
-        #         f"Search index validation failed:\n\n{chr(10).join([f'• {error}' for error in search_errors])}\n\n"
-        #         f"Please ensure all referenced search indexes exist in your Azure AI Search service."
-        #     )
-        #     track_event_if_configured(
-        #         "Team configuration search validation failed",
-        #         {
-        #             "status": "failed",
-        #             "user_id": user_id,
-        #             "filename": file.filename,
-        #             "search_errors": search_errors,
-        #         },
-        #     )
-        #     raise HTTPException(status_code=400, detail=error_message)
+        search_valid, search_errors = await team_service.validate_team_search_indexes(
+            json_data
+        )
+        if not search_valid:
+            error_message = (
+                f"Search index validation failed:\n\n{chr(10).join([f'• {error}' for error in search_errors])}\n\n"
+                f"Please ensure all referenced search indexes exist in your Azure AI Search service."
+            )
+            track_event_if_configured(
+                "Team configuration search validation failed",
+                {
+                    "status": "failed",
+                    "user_id": user_id,
+                    "filename": file.filename,
+                    "search_errors": search_errors,
+                },
+            )
+            raise HTTPException(status_code=400, detail=error_message)
 
-        # track_event_if_configured(
-        #     "Team configuration search validation passed",
-        #     {"status": "passed", "user_id": user_id, "filename": file.filename},
-        # )
+        track_event_if_configured(
+            "Team configuration search validation passed",
+            {"status": "passed", "user_id": user_id, "filename": file.filename},
+        )
 
         # Validate and parse the team configuration
         try:
@@ -297,9 +303,9 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
         return {
             "status": "success",
             "team_id": team_id,
-            "team_id": team_config.team_id,
             "name": team_config.name,
             "message": "Team configuration uploaded and saved successfully",
+            "team": team_config.model_dump()  # Return the full team configuration
         }
 
     except HTTPException:
@@ -568,6 +574,126 @@ async def get_model_deployments_endpoint(request: Request):
         return {"deployments": deployments, "summary": summary}
     except Exception as e:
         logging.error(f"Error retrieving model deployments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+@app_v3.post("/select_team")
+async def select_team_endpoint(selection: TeamSelectionRequest, request: Request):
+    """
+    Update team selection for a plan or session.
+    
+    Used when users change teams on the plan page.
+
+    ---
+    tags:
+      - Team Selection
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            team_id:
+              type: string
+              description: The ID of the team to select
+            session_id:
+              type: string
+              description: Optional session ID to associate with the team selection
+    responses:
+      200:
+        description: Team selection updated successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+            message:
+              type: string
+            team_id:
+              type: string
+            team_name:
+              type: string
+            session_id:
+              type: string
+      400:
+        description: Invalid request
+      401:
+        description: Missing or invalid user information
+      404:
+        description: Team configuration not found
+    """
+    # Validate user authentication
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+
+    if not selection.team_id:
+        raise HTTPException(status_code=400, detail="Team ID is required")
+
+    try:
+        # Initialize memory store and service
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        team_service = TeamService(memory_store)
+
+        # Verify the team exists and user has access to it
+        team_config = await team_service.get_team_configuration(selection.team_id, user_id)
+        if team_config is None:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Team configuration '{selection.team_id}' not found or access denied"
+            )
+
+        # Generate session ID if not provided
+        session_id = selection.session_id or str(uuid.uuid4())
+
+        # Here you could store the team selection in user preferences, session data, etc.
+        # For now, we'll just validate and return the selection
+        
+        # Track the team selection event
+        track_event_if_configured(
+            "Team selected",
+            {
+                "status": "success",
+                "team_id": selection.team_id,
+                "team_name": team_config.name,
+                "user_id": user_id,
+                "session_id": session_id,
+            },
+        )
+
+        return {
+            "status": "success",
+            "message": f"Team '{team_config.name}' selected successfully",
+            "team_id": selection.team_id,
+            "team_name": team_config.name,
+            "session_id": session_id,
+            "agents_count": len(team_config.agents),
+            "team_description": team_config.description,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logging.error(f"Error selecting team: {str(e)}")
+        track_event_if_configured(
+            "Team selection error",
+            {
+                "status": "error",
+                "team_id": selection.team_id,
+                "user_id": user_id,
+                "error": str(e),
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 

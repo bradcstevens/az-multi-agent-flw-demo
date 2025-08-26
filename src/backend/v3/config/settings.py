@@ -53,9 +53,10 @@ class MCPConfig:
             if token
             else {}
         )
-    
-class OrchestrationConfig:
-    """Configuration for orchestration settings."""
+
+
+# class OrchestrationConfig:
+#     """Configuration for orchestration settings."""
 
     def __init__(self):
         self.orchestrations = {}
@@ -71,4 +72,4 @@ class OrchestrationConfig:
 # Global config instances
 azure_config = AzureConfig()
 mcp_config = MCPConfig()
-orchestration_config = OrchestrationConfig()
+# orchestration_config = OrchestrationConfig()

@@ -105,6 +105,12 @@ class DatabaseBase(ABC):
         """Retrieve all plans for the user."""
         pass
 
+    @abstractmethod
+    async def get_data_by_type_and_session_id(
+        self, data_type: str, session_id: str
+    ) -> List[BaseDataModel]:
+        pass
+
     # Step Operations
     @abstractmethod
     async def add_step(self, step: Step) -> None:
@@ -155,11 +161,6 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def delete_team(self, team_id: str) -> bool:
         """Delete a team configuration by team_id and return True if deleted."""
-        pass
-
-    @abstractmethod
-    async def delete_team_by_id(self, id: str) -> bool:
-        """Delete a team configuration by internal id and return True if deleted."""
         pass
 
     # Data Management Operations

@@ -14,7 +14,11 @@
             "system_message": "You are an AI Agent. You have knowledge about HR (e.g., human resources), policies, procedures, and onboarding guidelines.",
             "description": "Handles employee onboarding, HR policies, and human resources management tasks.",
             "icon": "Person",
-            "index_name": ""
+            "index_name": "",
+            "use_rag": false,
+            "use_mcp": false,
+            "coding_tools": false,
+            "use_bing": false
         },
         {
             "input_key": "tech-support-001",
@@ -24,7 +28,11 @@
             "system_message": "You are a Product agent. You have knowledge about product management, development, and compliance guidelines. When asked to call a function, you should summarize back what was done.",
             "description": "Provides technical support for mobile plans, telecommunications, and IT services.",
             "icon": "Phone",
-            "index_name": ""
+            "index_name": "",
+            "use_rag": false,
+            "use_mcp": false,
+            "coding_tools": false,
+            "use_bing": false
         },
         {
             "input_key": "procurement-001",
@@ -34,7 +42,11 @@
             "system_message": "You are a Procurement agent. You specialize in purchasing, vendor management, supply chain operations, and inventory control. You help with creating purchase orders, managing vendors, tracking orders, and ensuring efficient procurement processes.",
             "description": "Manages purchasing decisions, add-ons, and procurement processes.",
             "icon": "ShoppingBag",
-            "index_name": ""
+            "index_name": "",
+            "use_rag": false,
+            "use_mcp": false,
+            "coding_tools": false,
+            "use_bing": false
         },
         {
             "input_key": "marketing-001",
@@ -44,7 +56,11 @@
             "system_message": "You are a Marketing agent. You specialize in marketing strategy, campaign development, content creation, and market analysis. You help create effective marketing campaigns, analyze market data, and develop promotional content for products and services.",
             "description": "Creates marketing content, press releases, and promotional materials.",
             "icon": "DocumentEdit",
-            "index_name": ""
+            "index_name": "",
+            "use_rag": false,
+            "use_mcp": false,
+            "coding_tools": false,
+            "use_bing": false
         },
         {
             "input_key": "generic-001",
@@ -54,7 +70,11 @@
             "system_message": "You are a Generic agent that can help with general questions and provide basic information. You can search for information and perform simple calculations.",
             "description": "Provides general assistance and handles miscellaneous tasks that don't require specialized expertise.",
             "icon": "Bot",
-            "index_name": ""
+            "index_name": "",
+            "use_rag": false,
+            "use_mcp": false,
+            "coding_tools": false,
+            "use_bing": false
         }
     ],
     "description": "Business Operations team handles employee onboarding, telecommunications support, procurement, and marketing tasks for comprehensive business operations management.",

@@ -2,12 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Button,
-    Spinner,
-    Toast,
-    ToastTitle,
-    ToastBody,
-    useToastController,
-    Toaster
+    Spinner
 } from '@fluentui/react-components';
 import {
     Add20Regular,
@@ -25,6 +20,7 @@ import ContentToolbar from '@/coral/components/Content/ContentToolbar';
 import { TaskService } from '../services/TaskService';
 import { TeamConfig } from '../models/Team';
 import { TeamService } from '../services/TeamService';
+import InlineToaster, { useInlineToaster } from "../components/toast/InlineToaster";
 
 /**
  * HomePage component - displays task lists and provides navigation
@@ -32,7 +28,7 @@ import { TeamService } from '../services/TeamService';
  */
 const HomePage: React.FC = () => {
     const navigate = useNavigate();
-    const { dispatchToast } = useToastController("toast");
+    const { showToast, dismissToast } = useInlineToaster();
     const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
     const [isLoadingTeam, setIsLoadingTeam] = useState(true);
 
@@ -91,27 +87,18 @@ const HomePage: React.FC = () => {
     const handleTeamSelect = useCallback((team: TeamConfig | null) => {
         setSelectedTeam(team);
         if (team) {
-            dispatchToast(
-                <Toast>
-                    <ToastTitle>Team Selected</ToastTitle>
-                    <ToastBody>
-                        {team.name} team has been selected with {team.agents.length} agents
-                    </ToastBody>
-                </Toast>,
-                { intent: "success" }
+            showToast(
+                `${team.name} team has been selected with ${team.agents.length} agents`,
+                "success"
             );
         } else {
-            dispatchToast(
-                <Toast>
-                    <ToastTitle>Team Deselected</ToastTitle>
-                    <ToastBody>
-                        No team is currently selected
-                    </ToastBody>
-                </Toast>,
-                { intent: "info" }
+            showToast(
+                "No team is currently selected",
+                "info"
             );
         }
-    }, [dispatchToast]);
+    }, [showToast]);
+
 
     /**
      * Handle team upload completion - refresh team list and keep Business Operations Team as default
@@ -128,27 +115,20 @@ const HomePage: React.FC = () => {
                 setSelectedTeam(defaultTeam);
                 console.log('Default team after upload:', defaultTeam.name);
                 console.log('Business Operations Team remains default');
-
-                // Show a toast notification about the upload success
-                dispatchToast(
-                    <Toast>
-                        <ToastTitle>Team Uploaded Successfully!</ToastTitle>
-                        <ToastBody>
-                            Team uploaded. {defaultTeam.name} remains your default team.
-                        </ToastBody>
-                    </Toast>,
-                    { intent: "success" }
+                showToast(
+                    `Team uploaded successfully! ${defaultTeam.name} remains your default team.`,
+                    "success"
                 );
             }
         } catch (error) {
             console.error('Error refreshing teams after upload:', error);
         }
-    }, [dispatchToast]);
+    }, [showToast]);
 
 
     return (
         <>
-            <Toaster toasterId="toast" />
+            <InlineToaster />
             <CoralShellColumn>
                 <CoralShellRow>
                     <PlanPanelLeft
@@ -166,6 +146,7 @@ const HomePage: React.FC = () => {
                                 selectedTeam={selectedTeam}
                             />
                         ) : (
+                            // TODO MOVE THIS STYLE TO CSS 
                             <div style={{
                                 display: 'flex',
                                 justifyContent: 'center',

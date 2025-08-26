@@ -1,8 +1,12 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Text,
     ToggleButton,
+    Toast,
+    ToastTitle,
+    ToastBody,
+    useToastController,
 } from "@fluentui/react-components";
 import "../styles/PlanPage.css";
 import CoralShellColumn from "../coral/components/Layout/CoralShellColumn";
@@ -23,6 +27,9 @@ import PanelRightToggles from "@/coral/components/Header/PanelRightToggles";
 import { TaskListSquareLtr } from "@/coral/imports/bundleicons";
 import LoadingMessage, { loadingMessages } from "@/coral/components/LoadingMessage";
 import { RAIErrorCard, RAIErrorData } from "../components/errors";
+import { TeamConfig } from "../models/Team";
+import { TeamService } from "../services/TeamService";
+import { webSocketService, StreamMessage, StreamingPlanUpdate } from "../services/WebSocketService";
 
 /**
  * Page component for displaying a specific plan
@@ -32,6 +39,7 @@ const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
     const { showToast, dismissToast } = useInlineToaster();
+    const { dispatchToast } = useToastController("toast");
 
     const [input, setInput] = useState("");
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
@@ -44,8 +52,86 @@ const PlanPage: React.FC = () => {
     );
     const [reloadLeftList, setReloadLeftList] = useState(true);
     const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
+    const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
+    const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
+    const [wsConnected, setWsConnected] = useState<boolean>(false);
+
+    const loadPlanDataRef = useRef<((navigate?: boolean) => Promise<void>) | null>(null);
 
     const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
+
+    // WebSocket connection and streaming setup
+    useEffect(() => {
+        const initializeWebSocket = async () => {
+            try {
+                await webSocketService.connect();
+                setWsConnected(true);
+            } catch (error) {
+                console.error('Failed to connect to WebSocket:', error);
+                setWsConnected(false);
+            }
+        };
+
+        initializeWebSocket();
+
+        // Set up WebSocket event listeners
+        const unsubscribeConnectionStatus = webSocketService.on('connection_status', (message: StreamMessage) => {
+            setWsConnected(message.data?.connected || false);
+        });
+
+        const unsubscribePlanUpdate = webSocketService.on('plan_update', (message: StreamMessage) => {
+            if (message.data && message.data.plan_id === planId) {
+                console.log('Plan update received:', message.data);
+                setStreamingMessages(prev => [...prev, message.data as StreamingPlanUpdate]);
+                
+                // Refresh plan data for major updates
+                if (message.data.status === 'completed' && loadPlanDataRef.current) {
+                    loadPlanDataRef.current(false);
+                }
+            }
+        });
+
+        const unsubscribeStepUpdate = webSocketService.on('step_update', (message: StreamMessage) => {
+            if (message.data && message.data.plan_id === planId) {
+                console.log('Step update received:', message.data);
+                setStreamingMessages(prev => [...prev, message.data as StreamingPlanUpdate]);
+            }
+        });
+
+        const unsubscribeAgentMessage = webSocketService.on('agent_message', (message: StreamMessage) => {
+            if (message.data && message.data.plan_id === planId) {
+                console.log('Agent message received:', message.data);
+                setStreamingMessages(prev => [...prev, message.data as StreamingPlanUpdate]);
+            }
+        });
+
+        const unsubscribeError = webSocketService.on('error', (message: StreamMessage) => {
+            console.error('WebSocket error:', message.data);
+            showToast('Connection error: ' + (message.data?.error || 'Unknown error'), 'error');
+        });
+
+        // Cleanup function
+        return () => {
+            unsubscribeConnectionStatus();
+            unsubscribePlanUpdate();
+            unsubscribeStepUpdate();
+            unsubscribeAgentMessage();
+            unsubscribeError();
+            webSocketService.disconnect();
+        };
+    }, [planId, showToast]);
+
+    // Subscribe to plan updates when planId changes
+    useEffect(() => {
+        if (planId && wsConnected) {
+            console.log('Subscribing to plan updates for:', planId);
+            webSocketService.subscribeToPlan(planId);
+
+            return () => {
+                webSocketService.unsubscribeFromPlan(planId);
+            };
+        }
+    }, [planId, wsConnected]);
 
     // 🌀 Cycle loading messages while loading
     useEffect(() => {
@@ -57,6 +143,35 @@ const PlanPage: React.FC = () => {
         }, 2000);
         return () => clearInterval(interval);
     }, [loading]);
+
+    // Load default team on component mount
+    useEffect(() => {
+        const loadDefaultTeam = async () => {
+            let defaultTeam = TeamService.getStoredTeam();
+            if (defaultTeam) {
+                setSelectedTeam(defaultTeam);
+                console.log('Default team loaded from storage:', defaultTeam.name);
+                return;
+            }
+            
+            try {
+                const teams = await TeamService.getUserTeams();
+                console.log('All teams loaded:', teams);
+                if (teams.length > 0) {
+                    // Always prioritize "Business Operations Team" as default
+                    const businessOpsTeam = teams.find(team => team.name === "Business Operations Team");
+                    defaultTeam = businessOpsTeam || teams[0];
+                    TeamService.storageTeam(defaultTeam);
+                    setSelectedTeam(defaultTeam);
+                    console.log('Default team loaded:', defaultTeam.name);
+                }
+            } catch (error) {
+                console.error('Error loading default team:', error);
+            }
+        };
+
+        loadDefaultTeam();
+    }, []);
 
 
     useEffect(() => {
@@ -101,6 +216,11 @@ const PlanPage: React.FC = () => {
         },
         [planId]
     );
+
+    // Update the ref whenever loadPlanData changes
+    useEffect(() => {
+        loadPlanDataRef.current = loadPlanData;
+    }, [loadPlanData]);
 
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
@@ -190,6 +310,64 @@ const PlanPage: React.FC = () => {
         NewTaskService.handleNewTaskFromPlan(navigate);
     };
 
+    /**
+     * Handle team selection from the TeamSelector
+     */
+    const handleTeamSelect = useCallback((team: TeamConfig | null) => {
+        setSelectedTeam(team);
+        if (team) {
+            dispatchToast(
+                <Toast>
+                    <ToastTitle>Team Selected</ToastTitle>
+                    <ToastBody>
+                        {team.name} team has been selected with {team.agents.length} agents
+                    </ToastBody>
+                </Toast>,
+                { intent: "success" }
+            );
+        } else {
+            dispatchToast(
+                <Toast>
+                    <ToastTitle>Team Deselected</ToastTitle>
+                    <ToastBody>
+                        No team is currently selected
+                    </ToastBody>
+                </Toast>,
+                { intent: "info" }
+            );
+        }
+    }, [dispatchToast]);
+
+    /**
+     * Handle team upload completion - refresh team list
+     */
+    const handleTeamUpload = useCallback(async () => {
+        try {
+            const teams = await TeamService.getUserTeams();
+            console.log('Teams refreshed after upload:', teams.length);
+
+            if (teams.length > 0) {
+                // Always keep "Business Operations Team" as default, even after new uploads
+                const businessOpsTeam = teams.find(team => team.name === "Business Operations Team");
+                const defaultTeam = businessOpsTeam || teams[0];
+                setSelectedTeam(defaultTeam);
+                console.log('Default team after upload:', defaultTeam.name);
+                
+                dispatchToast(
+                    <Toast>
+                        <ToastTitle>Team Uploaded Successfully!</ToastTitle>
+                        <ToastBody>
+                            Team uploaded. {defaultTeam.name} remains your default team.
+                        </ToastBody>
+                    </Toast>,
+                    { intent: "success" }
+                );
+            }
+        } catch (error) {
+            console.error('Error refreshing teams after upload:', error);
+        }
+    }, [dispatchToast]);
+
     if (!planId) {
         return (
             <div style={{ padding: "20px" }}>
@@ -201,7 +379,14 @@ const PlanPage: React.FC = () => {
     return (
         <CoralShellColumn>
             <CoralShellRow>
-                <PlanPanelLeft onNewTaskButton={handleNewTaskButton} reloadTasks={reloadLeftList} restReload={()=>setReloadLeftList(false)}/>
+                <PlanPanelLeft 
+                    onNewTaskButton={handleNewTaskButton} 
+                    reloadTasks={reloadLeftList} 
+                    restReload={() => setReloadLeftList(false)}
+                    onTeamSelect={handleTeamSelect}
+                    onTeamUpload={handleTeamUpload}
+                    selectedTeam={selectedTeam}
+                />
 
                 <Content>
                     {/* 🐙 Only replaces content body, not page shell */}
@@ -215,7 +400,7 @@ const PlanPage: React.FC = () => {
                     ) : (
                         <>
                             <ContentToolbar
-                                panelTitle={planData?.plan?.initial_goal || "Plan Details"}
+                                panelTitle="Multi-Agent Planner"
                             // panelIcon={<ChatMultiple20Regular />}
                             >
                                 <PanelRightToggles>
@@ -246,6 +431,8 @@ const PlanPage: React.FC = () => {
                                 setInput={setInput}
                                 submittingChatDisableInput={submittingChatDisableInput}
                                 input={input}
+                                streamingMessages={streamingMessages}
+                                wsConnected={wsConnected}
                             />
                         </>
                     )}
