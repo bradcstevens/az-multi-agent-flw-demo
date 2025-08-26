@@ -1126,7 +1126,7 @@ module aiFoundryAiServicesProject 'modules/ai-project.bicep' = if (!useExistingA
     tags: tags
     desc: aiFoundryAiProjectDescription
     //Implicit dependencies below
-    aiServicesName: useExistingAiFoundryAiProject ? existingAiFoundryAiServices.name : aiFoundryAiServices!.outputs.name
+    aiServicesName: aiFoundryAiServices!.outputs.name
   }
 }
 
