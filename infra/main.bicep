@@ -964,100 +964,13 @@ module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
 // ========== AI Foundry: AI Services ========== //
 // WAF best practices for Open AI: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-openai
 
-// //TODO: update to AVM module when AI Projects and AI Projects RBAC are supported
-// module aiFoundryAiServices 'modules/ai-services.bicep' = if (aiFoundryAIservicesEnabled) {
-//   name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
-//   params: {
-//     name: aiFoundryAiServicesResourceName
-//     location: azureAiServiceLocation
-//     tags: tags
-//     existingFoundryProjectResourceId: existingFoundryProjectResourceId
-//     projectName: aiFoundryAiServicesAiProjectResourceName
-//     projectDescription: 'AI Foundry Project'
-//     sku: 'S0'
-//     kind: 'AIServices'
-//     disableLocalAuth: true
-//     customSubDomainName: aiFoundryAiServicesResourceName
-//     apiProperties: {
-//       //staticsEnabled: false
-//     }
-//     networkAcls: {
-//       defaultAction: 'Allow'
-//       virtualNetworkRules: []
-//       ipRules: []
-//     }
-//     managedIdentities: { userAssignedResourceIds: [userAssignedIdentity!.outputs.resourceId] } //To create accounts or projects, you must enable a managed identity on your resource
-//     roleAssignments: [
-//       {
-//         roleDefinitionIdOrName: '53ca6127-db72-4b80-b1b0-d745d6d5456d' // Azure AI User
-//         principalId: userAssignedIdentity.outputs.principalId
-//         principalType: 'ServicePrincipal'
-//       }
-//       {
-//         roleDefinitionIdOrName: '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer
-//         principalId: userAssignedIdentity.outputs.principalId
-//         principalType: 'ServicePrincipal'
-//       }
-//       {
-//         roleDefinitionIdOrName: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
-//         principalId: userAssignedIdentity.outputs.principalId
-//         principalType: 'ServicePrincipal'
-//       }
-//     ]
-//     // WAF aligned configuration for Monitoring
-//     diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
-//     publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-//     privateEndpoints: (enablePrivateNetworking && empty(existingFoundryProjectResourceId))
-//       ? ([
-//           {
-//             name: 'pep-${aiFoundryAiServicesResourceName}'
-//             customNetworkInterfaceName: 'nic-${aiFoundryAiServicesResourceName}'
-//             subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
-//             privateDnsZoneGroup: {
-//               privateDnsZoneGroupConfigs: [
-//                 {
-//                   name: 'ai-services-dns-zone-cognitiveservices'
-//                   privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.cognitiveServices]!.outputs.resourceId
-//                 }
-//                 {
-//                   name: 'ai-services-dns-zone-openai'
-//                   privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.openAI]!.outputs.resourceId
-//                 }
-//                 {
-//                   name: 'ai-services-dns-zone-aiservices'
-//                   privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.aiServices]!.outputs.resourceId
-//                 }
-//               ]
-//             }
-//           }
-//         ])
-//       : []
-//     deployments: [
-//       {
-//         name: aiFoundryAiServicesModelDeployment.name
-//         model: {
-//           format: aiFoundryAiServicesModelDeployment.format
-//           name: aiFoundryAiServicesModelDeployment.name
-//           version: aiFoundryAiServicesModelDeployment.version
-//         }
-//         raiPolicyName: aiFoundryAiServicesModelDeployment.raiPolicyName
-//         sku: {
-//           name: aiFoundryAiServicesModelDeployment.sku.name
-//           capacity: aiFoundryAiServicesModelDeployment.sku.capacity
-//         }
-//       }
-//     ]
-//   }
-// }
-
-// resource id: /subscriptions/<subscription-id>/resourceGroups/<resource-group-name>/providers/Microsoft.CognitiveServices/accounts/<ai-services-name>/projects/<project-name>
 var useExistingAiFoundryAiProject = !empty(existingAiFoundryAiProjectResourceId)
 var aiFoundryAiServicesResourceName = useExistingAiFoundryAiProject
   ? split(existingAiFoundryAiProjectResourceId, '/')[8]
   : 'aif-${solutionSuffix}'
 var aiFoundryAiProjectResourceName = useExistingAiFoundryAiProject
   ? split(existingAiFoundryAiProjectResourceId, '/')[10]
-  : 'proj-${solutionSuffix}'
+  : 'proj-${solutionSuffix}' // AI Project resource id: /subscriptions/<subscription-id>/resourceGroups/<resource-group-name>/providers/Microsoft.CognitiveServices/accounts/<ai-services-name>/projects/<project-name>
 var aiFoundryAiServicesModelDeployment = {
   format: 'OpenAI'
   name: gptModelName
