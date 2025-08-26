@@ -4,7 +4,6 @@ import uuid
 from typing import Optional
 
 from auth.auth_utils import get_authenticated_user_details
-# from v3.orchestration.orchestration_manager import OrchestrationManager
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
 from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
@@ -18,6 +17,7 @@ from kernel_agents.agent_factory import AgentFactory
 from pydantic import BaseModel
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
+from v3.orchestration.orchestration_manager import OrchestrationManager
 
 
 class TeamSelectionRequest(BaseModel):
