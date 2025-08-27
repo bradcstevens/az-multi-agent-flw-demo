@@ -81,7 +81,7 @@ const TaskList: React.FC<TaskListProps> = ({
     <div className="task-list-container">
       <Accordion defaultOpenItems="1" collapsible>
         <AccordionItem value="1">
-          <AccordionHeader expandIconPosition="end" style={{marginRight:'12px'}}>
+          <AccordionHeader expandIconPosition="end">
             In progress
           </AccordionHeader>
           <AccordionPanel>
@@ -93,7 +93,7 @@ const TaskList: React.FC<TaskListProps> = ({
           </AccordionPanel>
         </AccordionItem>
         <AccordionItem value="2">
-          <AccordionHeader expandIconPosition="end" style={{marginRight:'12px'}}>Completed</AccordionHeader>
+          <AccordionHeader expandIconPosition="end">Completed</AccordionHeader>
           <AccordionPanel>
             {loading
               ? Array.from({ length: 5 }, (_, i) =>
