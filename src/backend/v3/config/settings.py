@@ -3,11 +3,18 @@ Configuration settings for the Magentic Employee Onboarding system.
 Handles Azure OpenAI, MCP, and environment setup.
 """
 
+import asyncio
+import json
+import logging
+from typing import Dict
+
 from common.config.app_config import config
+from fastapi import WebSocket
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion, OpenAIChatPromptExecutionSettings)
 
+logger = logging.getLogger(__name__)
 
 class AzureConfig:
     """Azure OpenAI and authentication configuration."""
@@ -67,9 +74,66 @@ class OrchestrationConfig:
     def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
         """get existing orchestration instance."""
         return self.orchestrations.get(user_id, None)
+    
+class ConnectionConfig:
+    """Connection manager for WebSocket connections."""
+
+    def __init__(self):
+        self.connections: Dict[str, WebSocket] = {}
+
+    def add_connection(self, process_id, connection):
+        """Add a new connection."""
+        self.connections[process_id] = connection
+
+    def remove_connection(self, process_id):
+        """Remove a connection."""
+        if process_id in self.connections:
+            del self.connections[process_id]
+
+    def get_connection(self, process_id):
+        """Get a connection."""
+        return self.connections.get(process_id)
+    
+    async def close_connection(self, process_id):
+        """Remove a connection."""
+        connection = self.get_connection(process_id)
+        if connection:
+            asyncio.run_coroutine_threadsafe(connection.close(), asyncio.get_event_loop())
+            logger.info("Connection closed for batch ID: %s", process_id)
+        else:
+            logger.warning("No connection found for batch ID: %s", process_id)
+        connection_config.remove_connection(process_id)
+        logger.info("Connection removed for batch ID: %s", process_id)
+
+    async def send_status_update_async(self, message: str, process_id: str):
+        """Send a status update to a specific client."""
+        connection = self.get_connection(process_id)
+        if connection:
+            await connection.send_text(message)
+        else:
+            logger.warning("No connection found for batch ID: %s", process_id)
+
+
+    def send_status_update(self, message: str, process_id: str):
+        """Send a status update to a specific client."""
+        connection = self.get_connection(str(process_id))
+        if connection:
+            try:
+                # Directly send the message using this connection object
+                asyncio.run_coroutine_threadsafe(
+                    connection.send_text(
+                        message
+                    ),
+                    asyncio.get_event_loop(),
+                )
+            except Exception as e:
+                logger.error("Failed to send message: %s", e)
+        else:
+            logger.warning("No connection found for batch ID: %s", process_id)
 
 
 # Global config instances
 azure_config = AzureConfig()
 mcp_config = MCPConfig()
 orchestration_config = OrchestrationConfig()
+connection_config = ConnectionConfig()

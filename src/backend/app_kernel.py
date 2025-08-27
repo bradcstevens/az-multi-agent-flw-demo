@@ -23,12 +23,14 @@ from common.utils.utils_kernel import rai_success
 from common.utils.websocket_streaming import (websocket_streaming_endpoint,
                                               ws_manager)
 # FastAPI imports
-from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
+from fastapi import (FastAPI, HTTPException, Query, Request, WebSocket,
+                     WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
 from v3.api.router import app_v3
+from v3.config.settings import connection_config
 # Semantic Kernel imports
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
@@ -69,7 +71,9 @@ frontend_url = config.FRONTEND_SITE_NAME
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        frontend_url
+        "http://localhost:3000",    # Add this for local development
+        "https://localhost:3000",   # Add this if using HTTPS locally
+        "http://127.0.0.1:3000",
     ],  # Allow all origins for development; restrict in production
     allow_credentials=True,
     allow_methods=["*"],
@@ -84,10 +88,59 @@ logging.info("Added health check middleware")
 
 
 # WebSocket streaming endpoint
-@app.websocket("/ws/streaming")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time plan execution streaming"""
-    await websocket_streaming_endpoint(websocket)
+# @app.websocket("/ws/streaming")
+# async def websocket_endpoint(websocket: WebSocket):
+#     """WebSocket endpoint for real-time plan execution streaming"""
+#     await websocket_streaming_endpoint(websocket)
+
+# @app.websocket("/socket/{process_id}")
+# async def process_outputs(websocket: WebSocket, process_id: str):
+#     """ Web-Socket endpoint for real-time process status updates. """
+        
+#     # Always accept the WebSocket connection first
+#     await websocket.accept()
+#     connection_config.add_connection(process_id=process_id, connection=websocket)
+
+@app.websocket("/socket/{process_id}")
+async def process_outputs(websocket: WebSocket, process_id: str):
+    """ Web-Socket endpoint for real-time process status updates. """
+        
+    # Always accept the WebSocket connection first
+    await websocket.accept()
+
+    # user_id = None
+    # try:
+    #     # WebSocket headers are different, try to get user info
+    #     headers = dict(websocket.headers)
+    #     authenticated_user = get_authenticated_user_details(request_headers=headers)
+    #     user_id = authenticated_user.get("user_principal_id")
+    #     if not user_id:
+    #         user_id = f"anonymous_{process_id}"
+    # except Exception as e:
+    #     logging.warning(f"Could not extract user from WebSocket headers: {e}")
+        # user_id = f"anonymous_{user_id}"
+
+    # Add to the connection manager for backend updates
+
+    connection_config.add_connection(process_id, websocket)
+    track_event_if_configured("WebSocketConnectionAccepted", {"process_id": "user_id"})
+
+      # Keep the connection open - FastAPI will close the connection if this returns
+    while True:
+        # no expectation that we will receive anything from the client but this keeps
+        # the connection open and does not take cpu cycle
+        try:
+            await websocket.receive_text()
+        except asyncio.TimeoutError:
+            pass
+
+        except WebSocketDisconnect:
+            track_event_if_configured("WebSocketDisconnect", {"process_id": user_id})
+            logging.info(f"Client disconnected from batch {user_id}")
+            await connection_config.close_connection(user_id)
+        except Exception as e:
+            logging.error("Error in WebSocket connection", error=str(e))
+            await connection_config.close_connection(user_id)
 
 
 @app.post("/api/user_browser_language")
@@ -670,9 +723,11 @@ async def get_plans(
             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
         )
         raise HTTPException(status_code=400, detail="no user")
+    
+    await connection_config.send_status_update_async("Test message from get_plans", user_id)
 
     # Initialize agent team for this user session
-    await OrchestrationManager.get_current_orchestration(user_id=user_id)
+    #await OrchestrationManager.get_current_orchestration(user_id=user_id)
 
     # Replace the following with code to get plan run history from the database
 
@@ -895,80 +950,80 @@ async def get_agent_tools():
     return []
 
 
-@app.post("/api/test/streaming/{plan_id}")
-async def test_streaming_updates(plan_id: str):
-    """
-    Test endpoint to simulate streaming updates for a plan.
-    This is for testing the WebSocket streaming functionality.
-    """
-    from common.utils.websocket_streaming import (send_agent_message,
-                                                  send_plan_update,
-                                                  send_step_update)
+# @app.post("/api/test/streaming/{plan_id}")
+# async def test_streaming_updates(plan_id: str):
+#     """
+#     Test endpoint to simulate streaming updates for a plan.
+#     This is for testing the WebSocket streaming functionality.
+#     """
+#     from common.utils.websocket_streaming import (send_agent_message,
+#                                                   send_plan_update,
+#                                                   send_step_update)
 
-    try:
-        # Simulate a series of streaming updates
-        await send_agent_message(
-            plan_id=plan_id,
-            agent_name="Data Analyst",
-            content="Starting analysis of the data...",
-            message_type="thinking",
-        )
+#     try:
+#         # Simulate a series of streaming updates
+#         await send_agent_message(
+#             plan_id=plan_id,
+#             agent_name="Data Analyst",
+#             content="Starting analysis of the data...",
+#             message_type="thinking",
+#         )
 
-        await asyncio.sleep(1)
+#         await asyncio.sleep(1)
 
-        await send_plan_update(
-            plan_id=plan_id,
-            step_id="step_1",
-            agent_name="Data Analyst",
-            content="Analyzing customer data patterns...",
-            status="in_progress",
-            message_type="action",
-        )
+#         await send_plan_update(
+#             plan_id=plan_id,
+#             step_id="step_1",
+#             agent_name="Data Analyst",
+#             content="Analyzing customer data patterns...",
+#             status="in_progress",
+#             message_type="action",
+#         )
 
-        await asyncio.sleep(2)
+#         await asyncio.sleep(2)
 
-        await send_agent_message(
-            plan_id=plan_id,
-            agent_name="Data Analyst",
-            content="Found 3 key insights in the customer data. Processing recommendations...",
-            message_type="result",
-        )
+#         await send_agent_message(
+#             plan_id=plan_id,
+#             agent_name="Data Analyst",
+#             content="Found 3 key insights in the customer data. Processing recommendations...",
+#             message_type="result",
+#         )
 
-        await asyncio.sleep(1)
+#         await asyncio.sleep(1)
 
-        await send_step_update(
-            plan_id=plan_id,
-            step_id="step_1",
-            status="completed",
-            content="Data analysis completed successfully!",
-        )
+#         await send_step_update(
+#             plan_id=plan_id,
+#             step_id="step_1",
+#             status="completed",
+#             content="Data analysis completed successfully!",
+#         )
 
-        await send_agent_message(
-            plan_id=plan_id,
-            agent_name="Business Advisor",
-            content="Reviewing the analysis results and preparing strategic recommendations...",
-            message_type="thinking",
-        )
+#         await send_agent_message(
+#             plan_id=plan_id,
+#             agent_name="Business Advisor",
+#             content="Reviewing the analysis results and preparing strategic recommendations...",
+#             message_type="thinking",
+#         )
 
-        await asyncio.sleep(2)
+#         await asyncio.sleep(2)
 
-        await send_plan_update(
-            plan_id=plan_id,
-            step_id="step_2",
-            agent_name="Business Advisor",
-            content="Based on the data analysis, I recommend focusing on customer retention strategies for the identified high-value segments.",
-            status="completed",
-            message_type="result",
-        )
+#         await send_plan_update(
+#             plan_id=plan_id,
+#             step_id="step_2",
+#             agent_name="Business Advisor",
+#             content="Based on the data analysis, I recommend focusing on customer retention strategies for the identified high-value segments.",
+#             status="completed",
+#             message_type="result",
+#         )
 
-        return {
-            "status": "success",
-            "message": f"Test streaming updates sent for plan {plan_id}",
-        }
+#         return {
+#             "status": "success",
+#             "message": f"Test streaming updates sent for plan {plan_id}",
+#         }
 
-    except Exception as e:
-        logging.error(f"Error sending test streaming updates: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+#     except Exception as e:
+#         logging.error(f"Error sending test streaming updates: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 # Run the app

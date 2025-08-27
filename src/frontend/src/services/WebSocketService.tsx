@@ -37,7 +37,8 @@ class WebSocketService {
                 // Get WebSocket URL from environment or default to localhost
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsHost = process.env.REACT_APP_WS_HOST || '127.0.0.1:8000';
-                const wsUrl = `${wsProtocol}//${wsHost}/ws/streaming`;
+                const processId = '12345'; // Replace with actual process ID as needed'
+                const wsUrl = `${wsProtocol}//${wsHost}/socket/${processId}`;
 
                 console.log('Connecting to WebSocket:', wsUrl);
                 
@@ -52,7 +53,8 @@ class WebSocketService {
 
                 this.ws.onmessage = (event) => {
                     try {
-                        const message: StreamMessage = JSON.parse(event.data);
+                        //const message: StreamMessage = JSON.parse(event.data);
+                        const message: StreamMessage = event.data;
                         this.handleMessage(message);
                     } catch (error) {
                         console.error('Error parsing WebSocket message:', error);

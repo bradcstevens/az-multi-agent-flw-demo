@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import uuid
@@ -17,8 +18,11 @@ from kernel_agents.agent_factory import AgentFactory
 from pydantic import BaseModel
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
+from v3.config.settings import connection_config
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
+router = APIRouter()
+logger = logging.getLogger(__name__)
 
 class TeamSelectionRequest(BaseModel):
     """Request model for team selection."""
@@ -82,30 +86,32 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
               type: string
               description: Error message
     """
-    if not await rai_success(input_task.description, False):
-        track_event_if_configured(
-            "RAI failed",
-            {
-                "status": "Plan not created - RAI check failed",
-                "description": input_task.description,
-                "session_id": input_task.session_id,
-            },
-        )
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error_type": "RAI_VALIDATION_FAILED",
-                "message": "Content Safety Check Failed",
-                "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
-                "suggestions": [
-                    "Remove any potentially harmful, inappropriate, or unsafe content",
-                    "Use more professional and constructive language",
-                    "Focus on legitimate business or educational objectives",
-                    "Ensure your request complies with content policies",
-                ],
-                "user_action": "Please revise your request and try again",
-            },
-        )
+    await connection_config.send_status_update_async(message="sending test from the server", process_id='12345')
+
+    # if not await rai_success(input_task.description, False):
+    #     track_event_if_configured(
+    #         "RAI failed",
+    #         {
+    #             "status": "Plan not created - RAI check failed",
+    #             "description": input_task.description,
+    #             "session_id": input_task.session_id,
+    #         },
+    #     )
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail={
+    #             "error_type": "RAI_VALIDATION_FAILED",
+    #             "message": "Content Safety Check Failed",
+    #             "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+    #             "suggestions": [
+    #                 "Remove any potentially harmful, inappropriate, or unsafe content",
+    #                 "Use more professional and constructive language",
+    #                 "Focus on legitimate business or educational objectives",
+    #                 "Ensure your request complies with content policies",
+    #             ],
+    #             "user_action": "Please revise your request and try again",
+    #         },
+    #     )
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -126,7 +132,7 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         input_task.session_id = str(uuid.uuid4())
 
     try:
-        background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
+        #background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
 
         return {
             "status": "Request started successfully",
@@ -569,7 +575,7 @@ async def get_model_deployments_endpoint(request: Request):
 
     try:
         team_service = TeamService()
-        deployments = await team_service.list_model_deployments()
+        deployments = [] #await team_service.extract_models_from_agent()
         summary = await team_service.get_deployment_status_summary()
         return {"deployments": deployments, "summary": summary}
     except Exception as e:
@@ -726,3 +732,45 @@ async def get_search_indexes_endpoint(request: Request):
     except Exception as e:
         logging.error(f"Error retrieving search indexes: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error occurred")
+    
+
+# @app_v3.websocket("/socket/{process_id}")
+# async def process_outputs(websocket: WebSocket, process_id: str):
+#     """ Web-Socket endpoint for real-time process status updates. """
+        
+#     # Always accept the WebSocket connection first
+#     await websocket.accept()
+
+#     user_id = None
+#     try:
+#         # WebSocket headers are different, try to get user info
+#         headers = dict(websocket.headers)
+#         authenticated_user = get_authenticated_user_details(request_headers=headers)
+#         user_id = authenticated_user.get("user_principal_id")
+#         if not user_id:
+#             user_id = f"anonymous_{process_id}"
+#     except Exception as e:
+#         logger.warning(f"Could not extract user from WebSocket headers: {e}")
+#         # user_id = f"anonymous_{user_id}"
+
+#     # Add to the connection manager for backend updates
+
+#     connection_config.add_connection(user_id, websocket)
+#     track_event_if_configured("WebSocketConnectionAccepted", {"process_id": user_id})
+
+#       # Keep the connection open - FastAPI will close the connection if this returns
+#     while True:
+#         # no expectation that we will receive anything from the client but this keeps
+#         # the connection open and does not take cpu cycle
+#         try:
+#             await websocket.receive_text()
+#         except asyncio.TimeoutError:
+#             pass
+
+#         except WebSocketDisconnect:
+#             track_event_if_configured("WebSocketDisconnect", {"process_id": user_id})
+#             logger.info(f"Client disconnected from batch {user_id}")
+#             await connection_config.close_connection(user_id)
+#         except Exception as e:
+#             logger.error("Error in WebSocket connection", error=str(e))
+#             await connection_config.close_connection(user_id)
