@@ -74,6 +74,7 @@ app.add_middleware(
         "http://localhost:3000",    # Add this for local development
         "https://localhost:3000",   # Add this if using HTTPS locally
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
     ],  # Allow all origins for development; restrict in production
     allow_credentials=True,
     allow_methods=["*"],

@@ -132,7 +132,7 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         input_task.session_id = str(uuid.uuid4())
 
     try:
-        #background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
+        background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
         await connection_config.send_status_update_async("Test message from process_request", user_id)
 
         return {

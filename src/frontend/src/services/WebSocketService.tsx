@@ -1,9 +1,5 @@
-/**
- * WebSocket Service for real-time plan execution streaming
- */
-
 export interface StreamMessage {
-    type: 'plan_update' | 'step_update' | 'agent_message' | 'error' | 'connection_status';
+    type: 'plan_update' | 'step_update' | 'agent_message' | 'error' | 'connection_status' | 'plan_approval_request' | 'final_result';
     plan_id?: string;
     session_id?: string;
     data?: any;
@@ -16,8 +12,32 @@ export interface StreamingPlanUpdate {
     step_id?: string;
     agent_name?: string;
     content?: string;
-    status?: 'in_progress' | 'completed' | 'error';
-    message_type?: 'thinking' | 'action' | 'result' | 'clarification_needed';
+    status?: 'in_progress' | 'completed' | 'error' | 'creating_plan' | 'pending_approval';
+    message_type?: 'thinking' | 'action' | 'result' | 'clarification_needed' | 'plan_approval_request';
+}
+
+// Add these new interfaces after StreamingPlanUpdate
+export interface PlanApprovalRequestData {
+    plan_id: string;
+    session_id: string;
+    plan: {
+        steps: Array<{
+            id: string;
+            description: string;
+            agent: string;
+            estimated_duration?: string;
+        }>;
+        total_steps: number;
+        estimated_completion?: string;
+    };
+    status: 'PENDING_APPROVAL';
+}
+
+export interface PlanApprovalResponseData {
+    plan_id: string;
+    session_id: string;
+    approved: boolean;
+    feedback?: string;
 }
 
 class WebSocketService {
@@ -37,7 +57,7 @@ class WebSocketService {
                 // Get WebSocket URL from environment or default to localhost
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsHost = process.env.REACT_APP_WS_HOST || '127.0.0.1:8000';
-                const processId = crypto.randomUUID(); // Replace with actual process ID as needed'
+                const processId = crypto.randomUUID(); // Generate unique process ID for this session
                 const wsUrl = `${wsProtocol}//${wsHost}/socket/${processId}`;
 
                 console.log('Connecting to WebSocket:', wsUrl);
@@ -53,11 +73,11 @@ class WebSocketService {
 
                 this.ws.onmessage = (event) => {
                     try {
-                        //const message: StreamMessage = JSON.parse(event.data);
-                        const message: StreamMessage = event.data;
+                        const message: StreamMessage =  JSON.parse(event.data);
                         this.handleMessage(message);
                     } catch (error) {
-                        console.error('Error parsing WebSocket message:', error);
+                        console.error('Error parsing WebSocket message:', error, 'Raw data:', event.data);
+                        this.emit('error', { error: 'Failed to parse WebSocket message' });
                     }
                 };
 
@@ -182,12 +202,20 @@ class WebSocketService {
     /**
      * Handle incoming WebSocket messages
      */
+    /**
+ * Handle incoming WebSocket messages
+ */
     private handleMessage(message: StreamMessage): void {
         console.log('WebSocket message received:', message);
 
         // Emit to specific event listeners
         if (message.type) {
             this.emit(message.type, message.data);
+        }
+
+        // Handle plan approval requests specifically
+        if (message.type === 'plan_approval_request') {
+            console.log('Plan approval request received via WebSocket:', message.data);
         }
 
         // Emit to general message listeners
@@ -240,6 +268,29 @@ class WebSocketService {
             console.warn('WebSocket is not connected. Cannot send message:', message);
         }
     }
+
+    /**
+ * Send plan approval response
+ */
+    sendPlanApprovalResponse(response: PlanApprovalResponseData): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        console.error('WebSocket not connected - cannot send plan approval response');
+        this.emit('error', { error: 'Cannot send plan approval response - WebSocket not connected' });
+        return;
+    }
+
+    try {
+        const message = {
+            type: 'plan_approval_response',
+            data: response
+        };
+        this.ws.send(JSON.stringify(message));
+        console.log('Plan approval response sent:', response);
+    } catch (error) {
+        console.error('Failed to send plan approval response:', error);
+        this.emit('error', { error: 'Failed to send plan approval response' });
+    }
+}
 }
 
 // Export singleton instance

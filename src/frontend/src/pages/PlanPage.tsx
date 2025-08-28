@@ -8,6 +8,7 @@ import {
     ToastBody,
     useToastController,
 } from "@fluentui/react-components";
+import { apiService } from "../api/apiService";
 import "../styles/PlanPage.css";
 import CoralShellColumn from "../coral/components/Layout/CoralShellColumn";
 import CoralShellRow from "../coral/components/Layout/CoralShellRow";
@@ -30,6 +31,7 @@ import { RAIErrorCard, RAIErrorData } from "../components/errors";
 import { TeamConfig } from "../models/Team";
 import { TeamService } from "../services/TeamService";
 import { webSocketService, StreamMessage, StreamingPlanUpdate } from "../services/WebSocketService";
+
 
 /**
  * Page component for displaying a specific plan
@@ -122,8 +124,9 @@ const PlanPage: React.FC = () => {
     }, [planId, showToast]);
 
     // Subscribe to plan updates when planId changes
-    useEffect(() => {
-        if (planId && wsConnected) {
+      useEffect(() => {
+        if (planId && wsConnected && !planId.startsWith('sid_')) {
+            // Only subscribe if we have a real plan_id (not session_id)
             console.log('Subscribing to plan updates for:', planId);
             webSocketService.subscribeToPlan(planId);
 
@@ -196,15 +199,17 @@ const PlanPage: React.FC = () => {
 
                 setError(null);
                 const data = await PlanDataService.fetchPlanData(planId,navigate);
-                let plans = [...allPlans];
+
+               setAllPlans(currentPlans => {
+                const plans = [...currentPlans];
                 const existingIndex = plans.findIndex(p => p.plan.id === data.plan.id);
                 if (existingIndex !== -1) {
                     plans[existingIndex] = data;
                 } else {
                     plans.push(data);
                 }
-                setAllPlans(plans);
-                //setPlanData(data);
+                return plans;
+            });
             } catch (err) {
                 console.log("Failed to load plan data:", err);
                 setError(
@@ -303,8 +308,74 @@ const PlanPage: React.FC = () => {
 
 
     useEffect(() => {
-        loadPlanData(true);
-    }, [loadPlanData]);
+
+        const initializePlanLoading  = async () => {
+        if (!planId) return;
+        
+        // Check if this looks like a session_id (starts with "sid_")
+        if (planId.startsWith('sid_')) {
+            console.log('Detected session_id, resolving to plan_id:', planId);
+            
+            try {
+                // Try to find the plan by session_id
+                const plans = await apiService.getPlans();
+                const matchingPlan = plans.find(plan => plan.session_id === planId);
+                
+                if (matchingPlan) {
+                    // Found the plan! Replace URL with correct plan_id
+                    console.log('Resolved session_id to plan_id:', matchingPlan.id);
+                    navigate(`/plan/${matchingPlan.id}`, { replace: true });
+                    return; // Navigation will trigger reload with correct ID
+                } else {
+                    // Plan not created yet, start polling
+                    console.log('Plan not found yet, starting polling for session:', planId);
+                    let attempts = 0;
+                    const maxAttempts = 20; // Poll for up to 20 seconds
+                    
+                    const pollForPlan = async () => {
+                        attempts++;
+                        if (attempts > maxAttempts) {
+                            console.error('Plan creation timed out after polling');
+                            setError(new Error('Plan creation is taking longer than expected. Please check your task list or try creating a new plan.'));
+                            setLoading(false);
+                            return;
+                        }
+                        
+                        try {
+                            const plans = await apiService.getPlans();
+                            const plan = plans.find(p => p.session_id === planId);
+                            
+                            if (plan) {
+                                console.log(`Found plan after ${attempts} attempts:`, plan.id);
+                                navigate(`/plan/${plan.id}`, { replace: true });
+                            } else {
+                                // Wait and try again
+                                setTimeout(pollForPlan, 1000); // Poll every second
+                            }
+                        } catch (error) {
+                            console.error('Polling error:', error);
+                            if (attempts < maxAttempts) {
+                                setTimeout(pollForPlan, 2000); // Wait longer on error
+                            }
+                        }
+                    };
+                    
+                    pollForPlan();
+                }
+            } catch (error) {
+                console.error('Session resolution error:', error);
+                setError(error instanceof Error ? error : new Error('Failed to resolve plan from session'));
+                setLoading(false);
+            }
+        } else {
+          
+            console.log('Using plan_id directly:', planId);
+            loadPlanData(true);
+        }
+    };
+
+    initializePlanLoading ();
+}, [planId, navigate, loadPlanData]);
 
     const handleNewTaskButton = () => {
         NewTaskService.handleNewTaskFromPlan(navigate);
