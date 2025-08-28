@@ -162,8 +162,8 @@ const PlanPage: React.FC = () => {
                 console.log('All teams loaded:', teams);
                 if (teams.length > 0) {
                     // Always prioritize "Business Operations Team" as default
-                    const businessOpsTeam = teams.find(team => team.name === "Business Operations Team");
-                    defaultTeam = businessOpsTeam || teams[0];
+                    const hrTeam = teams.find(team => team.name === "Human Resources Team");
+                    defaultTeam = hrTeam || teams[0];
                     TeamService.storageTeam(defaultTeam);
                     setSelectedTeam(defaultTeam);
                     console.log('Default team loaded:', defaultTeam.name);
@@ -412,32 +412,32 @@ const PlanPage: React.FC = () => {
     /**
      * Handle team upload completion - refresh team list
      */
-    const handleTeamUpload = useCallback(async () => {
-        try {
-            const teams = await TeamService.getUserTeams();
-            console.log('Teams refreshed after upload:', teams.length);
+   const handleTeamUpload = useCallback(async () => {
+    try {
+        const teams = await TeamService.getUserTeams();
+        console.log('Teams refreshed after upload:', teams.length);
 
-            if (teams.length > 0) {
-                // Always keep "Business Operations Team" as default, even after new uploads
-                const businessOpsTeam = teams.find(team => team.name === "Business Operations Team");
-                const defaultTeam = businessOpsTeam || teams[0];
-                setSelectedTeam(defaultTeam);
-                console.log('Default team after upload:', defaultTeam.name);
-                
-                dispatchToast(
-                    <Toast>
-                        <ToastTitle>Team Uploaded Successfully!</ToastTitle>
-                        <ToastBody>
-                            Team uploaded. {defaultTeam.name} remains your default team.
-                        </ToastBody>
-                    </Toast>,
-                    { intent: "success" }
-                );
-            }
-        } catch (error) {
-            console.error('Error refreshing teams after upload:', error);
+        if (teams.length > 0) {
+            // Always keep "Human Resources Team" as default, even after new uploads
+            const hrTeam = teams.find(team => team.name === "Human Resources Team");
+            const defaultTeam = hrTeam || teams[0];
+            setSelectedTeam(defaultTeam);
+            console.log('Default team after upload:', defaultTeam.name);
+            
+            dispatchToast(
+                <Toast>
+                    <ToastTitle>Team Uploaded Successfully!</ToastTitle>
+                    <ToastBody>
+                        Team uploaded. {defaultTeam.name} remains your default team.
+                    </ToastBody>
+                </Toast>,
+                { intent: "success" }
+            );
         }
-    }, [dispatchToast]);
+    } catch (error) {
+        console.error('Error refreshing teams after upload:', error);
+    }
+}, [dispatchToast]);
 
     if (!planId) {
         return (
