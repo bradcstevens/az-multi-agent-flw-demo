@@ -1100,6 +1100,8 @@ module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = if (contai
     activeRevisionsMode: 'Single'
     corsPolicy: {
       allowedOrigins: [
+        'https://${webSiteName}.azurewebsites.net'
+        'http://${webSiteName}.azurewebsites.net'
       ]
     }
     // WAF aligned configuration for Scalability
@@ -1120,7 +1122,7 @@ module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = if (contai
     containers: [
       {
         name: 'mcp'
-        image: 'macaer.azurecr.io/macaebackend:macaev3' //'${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
+        image: 'macaemcpacrdk.azurecr.io/macae-mac-app:t7' //'${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
         resources: {
           //TODO: Make cpu and memory parameterized
           cpu: containerAppConfiguration.?containerCpu ?? '2.0'

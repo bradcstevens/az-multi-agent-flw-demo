@@ -40,4 +40,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:9000/health || exit 1
 
 # Run your main script
-CMD ["uv", "run", "python", "mcp_server.py"]
+CMD ["uv", "run", "python", "mcp_server.py", "--transport", "http", "--host", "0.0.0.0", "--port", "9000"]
