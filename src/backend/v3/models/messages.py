@@ -13,11 +13,28 @@ class AgentMessage:
     content: str
 
 @dataclass(slots=True)
+class AgentStreamStart:
+    """Start of a streaming message from the backend to the frontend via WebSocket."""
+    agent_name: str
+
+@dataclass(slots=True)
+class AgentStreamEnd:
+    """End of a streaming message from the backend to the frontend via WebSocket."""
+    agent_name: str
+
+@dataclass(slots=True)
 class AgentMessageStreaming:
     """Streaming message from the backend to the frontend via WebSocket."""
     agent_name: str
     content: str
     is_final: bool = False
+
+@dataclass(slots=True)
+class AgentToolMessage:
+    """Message from an agent using a tool."""
+    agent_name: str
+    tool_name: str
+    input: str 
 
 @dataclass(slots=True)
 class PlanApprovalRequest:
