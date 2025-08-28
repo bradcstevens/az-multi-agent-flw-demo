@@ -9,6 +9,7 @@ import logging
 from typing import Dict
 
 from common.config.app_config import config
+from common.models.messages_kernel import TeamConfiguration
 from fastapi import WebSocket
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.connectors.ai.open_ai import (
@@ -131,9 +132,26 @@ class ConnectionConfig:
         else:
             logger.warning("No connection found for batch ID: %s", process_id)
 
+class TeamConfig:
+    """Team configuration for agents."""
+
+    def __init__(self):
+        self.teams: Dict[str, TeamConfiguration] = {}
+
+    def set_current_team(self, user_id: str, team_config: TeamConfiguration):
+        """Add a new team configuration."""
+
+        # To do: close current team of agents if any
+
+        self.teams[user_id] = team_config
+
+    def get_current_team(self, user_id: str) -> TeamConfiguration:
+        """Get the current team configuration."""
+        return self.teams.get(user_id, None)
 
 # Global config instances
 azure_config = AzureConfig()
 mcp_config = MCPConfig()
 orchestration_config = OrchestrationConfig()
 connection_config = ConnectionConfig()
+team_config = TeamConfig()

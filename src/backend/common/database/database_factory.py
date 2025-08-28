@@ -3,9 +3,10 @@
 import logging
 from typing import Optional
 
+from common.config.app_config import config
+
 from .cosmosdb import CosmosDBClient
 from .database_base import DatabaseBase
-from common.config.app_config import config
 
 
 class DatabaseFactory:

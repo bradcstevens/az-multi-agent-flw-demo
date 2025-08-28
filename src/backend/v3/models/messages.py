@@ -1,8 +1,10 @@
 """Messages from the backend to the frontend via WebSocket."""
 
 from dataclasses import dataclass
+from typing import Any, Dict, List, Literal, Optional
 
-from models import MPlan, PlanStatus
+from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
+from v3.models.models import MPlan, PlanStatus
 
 
 @dataclass(slots=True)
@@ -80,3 +82,31 @@ class FinalResultMessage:
     result: str
     summary: str | None = None
     context: dict | None = None
+
+class HumanFeedback(KernelBaseModel):
+    """Message containing human feedback on a step."""
+
+    step_id: Optional[str] = None
+    plan_id: str
+    session_id: str
+    approved: bool
+    human_feedback: Optional[str] = None
+    updated_action: Optional[str] = None
+
+
+class HumanClarification(KernelBaseModel):
+    """Message containing human clarification on a plan."""
+
+    plan_id: str
+    session_id: str
+    human_clarification: str
+
+class ApprovalRequest(KernelBaseModel):
+    """Message sent to HumanAgent to request approval for a step."""
+
+    step_id: str
+    plan_id: str
+    session_id: str
+    user_id: str
+    action: str
+    agent_name: str

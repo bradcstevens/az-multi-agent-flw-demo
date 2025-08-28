@@ -86,63 +86,6 @@ app.add_middleware(HealthCheckMiddleware, password="", checks={})
 app.include_router(app_v3)
 logging.info("Added health check middleware")
 
-
-# WebSocket streaming endpoint
-# @app.websocket("/ws/streaming")
-# async def websocket_endpoint(websocket: WebSocket):
-#     """WebSocket endpoint for real-time plan execution streaming"""
-#     await websocket_streaming_endpoint(websocket)
-
-# @app.websocket("/socket/{process_id}")
-# async def process_outputs(websocket: WebSocket, process_id: str):
-#     """ Web-Socket endpoint for real-time process status updates. """
-        
-#     # Always accept the WebSocket connection first
-#     await websocket.accept()
-#     connection_config.add_connection(process_id=process_id, connection=websocket)
-
-@app.websocket("/socket/{process_id}")
-async def start_comms(websocket: WebSocket, process_id: str):
-    """ Web-Socket endpoint for real-time process status updates. """
-        
-    # Always accept the WebSocket connection first
-    await websocket.accept()
-
-    user_id = None
-    try:
-        # WebSocket headers are different, try to get user info
-        headers = dict(websocket.headers)
-        authenticated_user = get_authenticated_user_details(request_headers=headers)
-        user_id = authenticated_user.get("user_principal_id")
-        if not user_id:
-            user_id = f"anonymous_{process_id}"
-    except Exception as e:
-        logging.warning(f"Could not extract user from WebSocket headers: {e}")
-        user_id = f"anonymous_{user_id}"
-
-    # Add to the connection manager for backend updates
-
-    connection_config.add_connection(user_id, websocket)
-    track_event_if_configured("WebSocketConnectionAccepted", {"process_id": "user_id"})
-
-      # Keep the connection open - FastAPI will close the connection if this returns
-    while True:
-        # no expectation that we will receive anything from the client but this keeps
-        # the connection open and does not take cpu cycle
-        try:
-            await websocket.receive_text()
-        except asyncio.TimeoutError:
-            pass
-
-        except WebSocketDisconnect:
-            track_event_if_configured("WebSocketDisconnect", {"process_id": process_id})
-            logging.info(f"Client disconnected from batch {process_id}")
-            await connection_config.close_connection(user_id)
-        except Exception as e:
-            logging.error("Error in WebSocket connection", error=str(e))
-            await connection_config.close_connection(user_id)
-
-
 @app.post("/api/user_browser_language")
 async def user_browser_language_endpoint(user_language: UserLanguage, request: Request):
     """
@@ -175,128 +118,128 @@ async def user_browser_language_endpoint(user_language: UserLanguage, request: R
     return {"status": "Language received successfully"}
 
 
-@app.post("/api/input_task")
-async def input_task_endpoint(input_task: InputTask, request: Request):
-    """
-    Receive the initial input task from the user.
-    """
-    # Fix 1: Properly await the async rai_success function
-    if not await rai_success(input_task.description, True):
-        print("RAI failed")
+# @app.post("/api/input_task")
+# async def input_task_endpoint(input_task: InputTask, request: Request):
+#     """
+#     Receive the initial input task from the user.
+#     """
+#     # Fix 1: Properly await the async rai_success function
+#     if not await rai_success(input_task.description, True):
+#         print("RAI failed")
 
-        track_event_if_configured(
-            "RAI failed",
-            {
-                "status": "Plan not created - RAI validation failed",
-                "description": input_task.description,
-                "session_id": input_task.session_id,
-            },
-        )
+#         track_event_if_configured(
+#             "RAI failed",
+#             {
+#                 "status": "Plan not created - RAI validation failed",
+#                 "description": input_task.description,
+#                 "session_id": input_task.session_id,
+#             },
+#         )
 
-        return {
-            "status": "RAI_VALIDATION_FAILED",
-            "message": "Content Safety Check Failed",
-            "detail": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
-            "suggestions": [
-                "Remove any potentially harmful, inappropriate, or unsafe content",
-                "Use more professional and constructive language",
-                "Focus on legitimate business or educational objectives",
-                "Ensure your request complies with content policies",
-            ],
-        }
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
+#         return {
+#             "status": "RAI_VALIDATION_FAILED",
+#             "message": "Content Safety Check Failed",
+#             "detail": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+#             "suggestions": [
+#                 "Remove any potentially harmful, inappropriate, or unsafe content",
+#                 "Use more professional and constructive language",
+#                 "Focus on legitimate business or educational objectives",
+#                 "Ensure your request complies with content policies",
+#             ],
+#         }
+#     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+#     user_id = authenticated_user["user_principal_id"]
 
-    if not user_id:
-        track_event_if_configured(
-            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
-        )
-        raise HTTPException(status_code=400, detail="no user")
+#     if not user_id:
+#         track_event_if_configured(
+#             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+#         )
+#         raise HTTPException(status_code=400, detail="no user")
 
-    # Generate session ID if not provided
-    if not input_task.session_id:
-        input_task.session_id = str(uuid.uuid4())
+#     # Generate session ID if not provided
+#     if not input_task.session_id:
+#         input_task.session_id = str(uuid.uuid4())
 
-    try:
-        # Create all agents instead of just the planner agent
-        # This ensures other agents are created first and the planner has access to them
-        memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        client = None
-        try:
-            client = config.get_ai_project_client()
-        except Exception as client_exc:
-            logging.error(f"Error creating AIProjectClient: {client_exc}")
+#     try:
+#         # Create all agents instead of just the planner agent
+#         # This ensures other agents are created first and the planner has access to them
+#         memory_store = await DatabaseFactory.get_database(user_id=user_id)
+#         client = None
+#         try:
+#             client = config.get_ai_project_client()
+#         except Exception as client_exc:
+#             logging.error(f"Error creating AIProjectClient: {client_exc}")
 
-        agents = await AgentFactory.create_all_agents(
-            session_id=input_task.session_id,
-            user_id=user_id,
-            memory_store=memory_store,
-            client=client,
-        )
+#         agents = await AgentFactory.create_all_agents(
+#             session_id=input_task.session_id,
+#             user_id=user_id,
+#             memory_store=memory_store,
+#             client=client,
+#         )
 
-        group_chat_manager = agents[AgentType.GROUP_CHAT_MANAGER.value]
+#         group_chat_manager = agents[AgentType.GROUP_CHAT_MANAGER.value]
 
-        # Convert input task to JSON for the kernel function, add user_id here
+#         # Convert input task to JSON for the kernel function, add user_id here
 
-        # Use the planner to handle the task
-        await group_chat_manager.handle_input_task(input_task)
+#         # Use the planner to handle the task
+#         await group_chat_manager.handle_input_task(input_task)
 
-        # Get plan from memory store
-        plan = await memory_store.get_plan_by_session(input_task.session_id)
+#         # Get plan from memory store
+#         plan = await memory_store.get_plan_by_session(input_task.session_id)
 
-        if not plan:  # If the plan is not found, raise an error
-            track_event_if_configured(
-                "PlanNotFound",
-                {
-                    "status": "Plan not found",
-                    "session_id": input_task.session_id,
-                    "description": input_task.description,
-                },
-            )
-            raise HTTPException(status_code=404, detail="Plan not found")
-        # Log custom event for successful input task processing
-        track_event_if_configured(
-            "InputTaskProcessed",
-            {
-                "status": f"Plan created with ID: {plan.id}",
-                "session_id": input_task.session_id,
-                "plan_id": plan.id,
-                "description": input_task.description,
-            },
-        )
-        if client:
-            try:
-                client.close()
-            except Exception as e:
-                logging.error(f"Error sending to AIProjectClient: {e}")
-        return {
-            "status": f"Plan created with ID: {plan.id}",
-            "session_id": input_task.session_id,
-            "plan_id": plan.id,
-            "description": input_task.description,
-        }
+#         if not plan:  # If the plan is not found, raise an error
+#             track_event_if_configured(
+#                 "PlanNotFound",
+#                 {
+#                     "status": "Plan not found",
+#                     "session_id": input_task.session_id,
+#                     "description": input_task.description,
+#                 },
+#             )
+#             raise HTTPException(status_code=404, detail="Plan not found")
+#         # Log custom event for successful input task processing
+#         track_event_if_configured(
+#             "InputTaskProcessed",
+#             {
+#                 "status": f"Plan created with ID: {plan.id}",
+#                 "session_id": input_task.session_id,
+#                 "plan_id": plan.id,
+#                 "description": input_task.description,
+#             },
+#         )
+#         if client:
+#             try:
+#                 client.close()
+#             except Exception as e:
+#                 logging.error(f"Error sending to AIProjectClient: {e}")
+#         return {
+#             "status": f"Plan created with ID: {plan.id}",
+#             "session_id": input_task.session_id,
+#             "plan_id": plan.id,
+#             "description": input_task.description,
+#         }
 
-    except Exception as e:
-        # Extract clean error message for rate limit errors
-        error_msg = str(e)
-        if "Rate limit is exceeded" in error_msg:
-            match = re.search(
-                r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg
-            )
-            if match:
-                error_msg = "Application temporarily unavailable due to quota limits. Please try again later."
+#     except Exception as e:
+#         # Extract clean error message for rate limit errors
+#         error_msg = str(e)
+#         if "Rate limit is exceeded" in error_msg:
+#             match = re.search(
+#                 r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg
+#             )
+#             if match:
+#                 error_msg = "Application temporarily unavailable due to quota limits. Please try again later."
 
-        track_event_if_configured(
-            "InputTaskError",
-            {
-                "session_id": input_task.session_id,
-                "description": input_task.description,
-                "error": str(e),
-            },
-        )
-        raise HTTPException(
-            status_code=400, detail=f"Error creating plan: {error_msg}"
-        ) from e
+#         track_event_if_configured(
+#             "InputTaskError",
+#             {
+#                 "session_id": input_task.session_id,
+#                 "description": input_task.description,
+#                 "error": str(e),
+#             },
+#         )
+#         raise HTTPException(
+#             status_code=400, detail=f"Error creating plan: {error_msg}"
+#         ) from e
 
 
 @app.post("/api/human_feedback")
@@ -782,21 +725,6 @@ async def get_plans(
     #     list_of_plans_with_steps.append(plan_with_steps)
 
     return []
-
-@app.get("/api/init_team")
-async def init_team(
-    request: Request,
-):
-    """ Initialize the team of agents """
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
-    if not user_id:
-        track_event_if_configured(
-            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
-        )
-        raise HTTPException(status_code=400, detail="no user")
-    # Initialize agent team for this user session
-    await OrchestrationManager.get_current_orchestration(user_id=user_id)
     
 @app.get("/api/steps/{plan_id}", response_model=List[Step])
 async def get_steps_by_plan(plan_id: str, request: Request) -> List[Step]:
