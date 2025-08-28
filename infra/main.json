@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.36.177.2456",
-      "templateHash": "8105097777867936274"
+      "templateHash": "13495209407654381460"
     },
     "name": "Multi-Agent Custom Automation Engine",
     "description": "This module contains the resources required to deploy the Multi-Agent Custom Automation Engine solution accelerator for both Sandbox environments and WAF aligned environments."
@@ -42604,6 +42604,14 @@
     "APP_ENV": {
       "type": "string",
       "value": "Prod"
+    },
+    "AI_FOUNDRY_RESOURCE_ID": {
+      "type": "string",
+      "value": "[reference('aiFoundryAiServices').outputs.resourceId.value]"
+    },
+    "COSMOSDB_ACCOUNT_NAME": {
+      "type": "string",
+      "value": "[variables('cosmosDbResourceName')]"
     }
   }
 }
