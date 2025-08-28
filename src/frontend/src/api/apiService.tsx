@@ -114,8 +114,12 @@ export class APIService {
      * @param inputTask The task description and optional session ID
      * @returns Promise with the response containing plan ID and status
      */
-    async createPlan(inputTask: InputTask): Promise<{ plan_id: string; status: string; session_id: string }> {
-        return apiClient.post(API_ENDPOINTS.CREATE_PLAN, inputTask);
+    // async createPlan(inputTask: InputTask): Promise<{ plan_id: string; status: string; session_id: string }> {
+    //     return apiClient.post(API_ENDPOINTS.CREATE_PLAN, inputTask);
+    // }
+
+    async createPlan(inputTask: InputTask): Promise<{ status: string; session_id: string }> {
+    return apiClient.post(API_ENDPOINTS.CREATE_PLAN, inputTask);
     }
 
     /**
