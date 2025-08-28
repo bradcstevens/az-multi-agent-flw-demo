@@ -86,7 +86,7 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
               type: string
               description: Error message
     """
-    await connection_config.send_status_update_async(message="sending test from the server", process_id='12345')
+
 
     # if not await rai_success(input_task.description, False):
     #     track_event_if_configured(
@@ -133,6 +133,7 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
 
     try:
         #background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
+        await connection_config.send_status_update_async("Test message from process_request", user_id)
 
         return {
             "status": "Request started successfully",

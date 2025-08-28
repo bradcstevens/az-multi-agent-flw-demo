@@ -102,27 +102,27 @@ logging.info("Added health check middleware")
 #     connection_config.add_connection(process_id=process_id, connection=websocket)
 
 @app.websocket("/socket/{process_id}")
-async def process_outputs(websocket: WebSocket, process_id: str):
+async def start_comms(websocket: WebSocket, process_id: str):
     """ Web-Socket endpoint for real-time process status updates. """
         
     # Always accept the WebSocket connection first
     await websocket.accept()
 
-    # user_id = None
-    # try:
-    #     # WebSocket headers are different, try to get user info
-    #     headers = dict(websocket.headers)
-    #     authenticated_user = get_authenticated_user_details(request_headers=headers)
-    #     user_id = authenticated_user.get("user_principal_id")
-    #     if not user_id:
-    #         user_id = f"anonymous_{process_id}"
-    # except Exception as e:
-    #     logging.warning(f"Could not extract user from WebSocket headers: {e}")
-        # user_id = f"anonymous_{user_id}"
+    user_id = None
+    try:
+        # WebSocket headers are different, try to get user info
+        headers = dict(websocket.headers)
+        authenticated_user = get_authenticated_user_details(request_headers=headers)
+        user_id = authenticated_user.get("user_principal_id")
+        if not user_id:
+            user_id = f"anonymous_{process_id}"
+    except Exception as e:
+        logging.warning(f"Could not extract user from WebSocket headers: {e}")
+        user_id = f"anonymous_{user_id}"
 
     # Add to the connection manager for backend updates
 
-    connection_config.add_connection(process_id, websocket)
+    connection_config.add_connection(user_id, websocket)
     track_event_if_configured("WebSocketConnectionAccepted", {"process_id": "user_id"})
 
       # Keep the connection open - FastAPI will close the connection if this returns
@@ -135,8 +135,8 @@ async def process_outputs(websocket: WebSocket, process_id: str):
             pass
 
         except WebSocketDisconnect:
-            track_event_if_configured("WebSocketDisconnect", {"process_id": user_id})
-            logging.info(f"Client disconnected from batch {user_id}")
+            track_event_if_configured("WebSocketDisconnect", {"process_id": process_id})
+            logging.info(f"Client disconnected from batch {process_id}")
             await connection_config.close_connection(user_id)
         except Exception as e:
             logging.error("Error in WebSocket connection", error=str(e))
@@ -726,10 +726,7 @@ async def get_plans(
     
     await connection_config.send_status_update_async("Test message from get_plans", user_id)
 
-    # Initialize agent team for this user session
-    #await OrchestrationManager.get_current_orchestration(user_id=user_id)
-
-    # Replace the following with code to get plan run history from the database
+    #### <To do: Francia> Replace the following with code to get plan run history from the database
 
     # # Initialize memory context
     # memory_store = await DatabaseFactory.get_database(user_id=user_id)
@@ -786,7 +783,21 @@ async def get_plans(
 
     return []
 
-
+@app.get("/api/init_team")
+async def init_team(
+    request: Request,
+):
+    """ Initialize the team of agents """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+    # Initialize agent team for this user session
+    await OrchestrationManager.get_current_orchestration(user_id=user_id)
+    
 @app.get("/api/steps/{plan_id}", response_model=List[Step])
 async def get_steps_by_plan(plan_id: str, request: Request) -> List[Step]:
     """
