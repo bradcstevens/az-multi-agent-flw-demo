@@ -58,7 +58,7 @@ class WebSocketService {
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsHost = process.env.REACT_APP_WS_HOST || '127.0.0.1:8000';
                 const processId = crypto.randomUUID(); // Generate unique process ID for this session
-                const wsUrl = `${wsProtocol}//${wsHost}/socket/${processId}`;
+                const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}`;
 
                 console.log('Connecting to WebSocket:', wsUrl);
                 

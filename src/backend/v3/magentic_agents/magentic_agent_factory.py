@@ -133,8 +133,6 @@ class MagenticAgentFactory:
         # self.logger.info(f"Loading team configuration from: {file_path}")
         
         try:
-            # team = self.parse_team_config(file_path)
-            # self.logger.info(f"Parsed team '{team.name}' with {len(team.agents)} agents")
             
             initalized_agents = []
             
@@ -146,7 +144,7 @@ class MagenticAgentFactory:
                     initalized_agents.append(agent)
                     self._agent_list.append(agent)  # Keep track for cleanup
                     
-                    self.logger.info(f"✅ Agent {i}/{len(team.agents)} created: {agent_cfg.name}")
+                    self.logger.info(f"✅ Agent {i}/{len(team_config_input.agents)} created: {agent_cfg.name}")
                     
                 except (UnsupportedModelError, InvalidConfigurationError) as e:
                     self.logger.warning(f"Skipped agent {agent_cfg.name}: {e}")
@@ -155,7 +153,7 @@ class MagenticAgentFactory:
                     self.logger.error(f"Failed to create agent {agent_cfg.name}: {e}")
                     continue
             
-            self.logger.info(f"Successfully created {len(initalized_agents)}/{len(team.agents)} agents for team '{team.name}'")
+            self.logger.info(f"Successfully created {len(initalized_agents)}/{len(team_config_input.agents)} agents for team '{team_config_input.name}'")
             return initalized_agents
             
         except Exception as e:

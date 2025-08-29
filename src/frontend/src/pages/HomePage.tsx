@@ -21,7 +21,6 @@ import { TaskService } from '../services/TaskService';
 import { TeamConfig } from '../models/Team';
 import { TeamService } from '../services/TeamService';
 import InlineToaster, { useInlineToaster } from "../components/toast/InlineToaster";
-import { initializeTeam } from '@/api/config';
 
 /**
  * HomePage component - displays task lists and provides navigation
@@ -83,14 +82,14 @@ useEffect(() => {
             console.log('Initializing team from backend...');
             
             // Call the backend init_team endpoint (takes ~20 seconds)
-            const initResponse = await initializeTeam();
+            const initResponse = await TeamService.initializeTeam();
             
-            if (initResponse.status === 'Request started successfully' && initResponse.team_id) {
-                console.log('Team initialization completed:', initResponse.team_id);
+            if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
+                console.log('Team initialization completed:', initResponse.data?.team_id);
                 
                 // Now fetch the actual team details using the team_id
                 const teams = await TeamService.getUserTeams();
-                const initializedTeam = teams.find(team => team.team_id === initResponse.team_id);
+                const initializedTeam = teams.find(team => team.team_id === initResponse.data?.team_id);
                 
                 if (initializedTeam) {
                     setSelectedTeam(initializedTeam);
@@ -158,7 +157,7 @@ useEffect(() => {
     };
 
     initTeam();
-}, [showToast]);
+}, []);
 
     /**
     * Handle new task creation from the "New task" button

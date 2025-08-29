@@ -198,7 +198,7 @@ class TeamService:
         """
         try:
             # Get the specific configuration using the team-specific method
-            team_config = await self.memory_context.get_team_by_id(team_id)
+            team_config = await self.memory_context.get_team(team_id)
 
             if team_config is None:
                 return None
