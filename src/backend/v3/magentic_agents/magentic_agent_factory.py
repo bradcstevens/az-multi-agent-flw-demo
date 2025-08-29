@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import List, Union
 
 from common.models.messages_kernel import TeamConfiguration
+from v3.config.settings import current_user_id
 from v3.magentic_agents.foundry_agent import FoundryAgentTemplate
 from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
                                                     SearchConfig)
@@ -60,7 +61,8 @@ class MagenticAgentFactory:
 
         if not deployment_name and agent_obj.name.lower() == "proxyagent":
             self.logger.info("Creating ProxyAgent")
-            return ProxyAgent()
+            user_id = current_user_id.get()
+            return ProxyAgent(user_id=user_id)
         
         # Validate supported models
         supported_models = json.loads(os.getenv("SUPPORTED_MODELS"))
