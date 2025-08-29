@@ -1095,7 +1095,7 @@ module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = if (contai
       systemAssigned: true
       userAssignedResourceIds: [userAssignedIdentity!.outputs.resourceId] 
     }
-    ingressTargetPort: containerAppConfiguration.?ingressTargetPort ?? 8000
+    ingressTargetPort: 9000
     ingressExternal: true
     activeRevisionsMode: 'Single'
     corsPolicy: {
@@ -1122,7 +1122,7 @@ module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = if (contai
     containers: [
       {
         name: 'mcp'
-        image: 'macaemcpacrdk.azurecr.io/macae-mac-app:t7' //'${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
+        image: 'macaemcpacrdk.azurecr.io/macae-mac-app:t9' //'${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
         resources: {
           //TODO: Make cpu and memory parameterized
           cpu: containerAppConfiguration.?containerCpu ?? '2.0'

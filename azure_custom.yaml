@@ -13,6 +13,14 @@ services:
     docker:
       image: backend
       remoteBuild: true
+  
+  mcp:
+    project: ./src/mcp_server
+    language: py
+    host: containerapp
+    docker:
+      image: mcp
+      remoteBuild: true
 
   frontend:
     project: ./src/frontend
