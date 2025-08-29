@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import json
 import logging
 import uuid
@@ -9,27 +10,20 @@ from auth.auth_utils import get_authenticated_user_details
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
 from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
-                                           Plan, PlanStatus)
+                                           TeamSelectionRequest)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
 from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
                      HTTPException, Request, UploadFile, WebSocket,
                      WebSocketDisconnect)
 from kernel_agents.agent_factory import AgentFactory
-from pydantic import BaseModel
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
-from v3.config.settings import connection_config, team_config
+from v3.config.settings import connection_config, current_user_id, team_config
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-class TeamSelectionRequest(BaseModel):
-    """Request model for team selection."""
-    team_id: str
-    session_id: Optional[str] = None
-
 
 app_v3 = APIRouter(
     prefix="/api/v3",
@@ -50,32 +44,38 @@ async def start_comms(websocket: WebSocket, process_id: str):
         authenticated_user = get_authenticated_user_details(request_headers=headers)
         user_id = authenticated_user.get("user_principal_id")
         if not user_id:
-            user_id = f"anonymous_{process_id}"
+            user_id = "00000000-0000-0000-0000-000000000000"
     except Exception as e:
         logging.warning(f"Could not extract user from WebSocket headers: {e}")
-        user_id = f"anonymous_{user_id}"
+        user_id = "00000000-0000-0000-0000-000000000000"
+
+    current_user_id.set(user_id)
 
     # Add to the connection manager for backend updates
-
-    connection_config.add_connection(user_id, websocket)
-    track_event_if_configured("WebSocketConnectionAccepted", {"process_id": "user_id"})
+    connection_config.add_connection(process_id=process_id, connection=websocket, user_id=user_id)
+    track_event_if_configured("WebSocketConnectionAccepted", {"process_id": process_id, "user_id": user_id})
 
       # Keep the connection open - FastAPI will close the connection if this returns
-    while True:
-        # no expectation that we will receive anything from the client but this keeps
-        # the connection open and does not take cpu cycle
-        try:
-            await websocket.receive_text()
-        except asyncio.TimeoutError:
-            pass
-
-        except WebSocketDisconnect:
-            track_event_if_configured("WebSocketDisconnect", {"process_id": process_id})
-            logging.info(f"Client disconnected from batch {process_id}")
-            await connection_config.close_connection(user_id)
-        except Exception as e:
-            logging.error("Error in WebSocket connection", error=str(e))
-            await connection_config.close_connection(user_id)
+    try:
+        # Keep the connection open - FastAPI will close the connection if this returns
+        while True:
+            # no expectation that we will receive anything from the client but this keeps
+            # the connection open and does not take cpu cycle
+            try:
+                message = await websocket.receive_text()
+                logging.debug(f"Received WebSocket message from {user_id}: {message}")
+            except asyncio.TimeoutError:
+                pass
+            except WebSocketDisconnect:
+                track_event_if_configured("WebSocketDisconnect", {"process_id": process_id, "user_id": user_id})
+                logging.info(f"Client disconnected from batch {process_id}")
+                break
+    except Exception as e:
+        # Fixed logging syntax - removed the error= parameter
+        logging.error(f"Error in WebSocket connection: {str(e)}")
+    finally:
+        # Always clean up the connection
+        await connection_config.close_connection(user_id)
 
 @app_v3.get("/init_team")
 async def init_team(
@@ -112,7 +112,7 @@ async def init_team(
           )
       
       # Set as current team in memory
-      team_config.set_current_team(user_id=user_id, team_config=team_configuration)
+      team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
       
       # Initialize agent team for this user session
       await OrchestrationManager.get_current_or_new_orchestration(user_id=user_id, team_config=team_configuration)
@@ -227,8 +227,16 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         input_task.session_id = str(uuid.uuid4())
 
     try:
-        background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
-        #await connection_config.send_status_update_async("Test message from process_request", user_id)
+        current_user_id.set(user_id)  # Set context
+        current_context = contextvars.copy_context()  # Capture context
+        # background_tasks.add_task(
+        #     lambda: current_context.run(lambda:OrchestrationManager().run_orchestration, user_id, input_task)
+        # )
+
+        async def run_with_context():
+            return await current_context.run(OrchestrationManager().run_orchestration, user_id, input_task)
+
+        background_tasks.add_task(run_with_context)
 
         return {
             "status": "Request started successfully",
@@ -789,45 +797,3 @@ async def get_search_indexes_endpoint(request: Request):
     except Exception as e:
         logging.error(f"Error retrieving search indexes: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error occurred")
-    
-
-# @app_v3.websocket("/socket/{process_id}")
-# async def process_outputs(websocket: WebSocket, process_id: str):
-#     """ Web-Socket endpoint for real-time process status updates. """
-        
-#     # Always accept the WebSocket connection first
-#     await websocket.accept()
-
-#     user_id = None
-#     try:
-#         # WebSocket headers are different, try to get user info
-#         headers = dict(websocket.headers)
-#         authenticated_user = get_authenticated_user_details(request_headers=headers)
-#         user_id = authenticated_user.get("user_principal_id")
-#         if not user_id:
-#             user_id = f"anonymous_{process_id}"
-#     except Exception as e:
-#         logger.warning(f"Could not extract user from WebSocket headers: {e}")
-#         # user_id = f"anonymous_{user_id}"
-
-#     # Add to the connection manager for backend updates
-
-#     connection_config.add_connection(user_id, websocket)
-#     track_event_if_configured("WebSocketConnectionAccepted", {"process_id": user_id})
-
-#       # Keep the connection open - FastAPI will close the connection if this returns
-#     while True:
-#         # no expectation that we will receive anything from the client but this keeps
-#         # the connection open and does not take cpu cycle
-#         try:
-#             await websocket.receive_text()
-#         except asyncio.TimeoutError:
-#             pass
-
-#         except WebSocketDisconnect:
-#             track_event_if_configured("WebSocketDisconnect", {"process_id": user_id})
-#             logger.info(f"Client disconnected from batch {user_id}")
-#             await connection_config.close_connection(user_id)
-#         except Exception as e:
-#             logger.error("Error in WebSocket connection", error=str(e))
-#             await connection_config.close_connection(user_id)

@@ -65,12 +65,18 @@ const PlanPage: React.FC = () => {
     // WebSocket connection and streaming setup
     useEffect(() => {
         const initializeWebSocket = async () => {
-            try {
-                await webSocketService.connect();
+            // Only connect if not already connected
+            if (!webSocketService.isConnected()) {
+                try {
+                    await webSocketService.connect();
+                    setWsConnected(true);
+                } catch (error) {
+                    console.error('Failed to connect to WebSocket:', error);
+                    setWsConnected(false);
+                }
+            } else {
+                // Already connected
                 setWsConnected(true);
-            } catch (error) {
-                console.error('Failed to connect to WebSocket:', error);
-                setWsConnected(false);
             }
         };
 
@@ -121,7 +127,7 @@ const PlanPage: React.FC = () => {
             unsubscribeError();
             webSocketService.disconnect();
         };
-    }, [planId, showToast]);
+    }, [planId]);
 
     // Subscribe to plan updates when planId changes
       useEffect(() => {

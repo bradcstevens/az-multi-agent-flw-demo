@@ -1,8 +1,10 @@
 # Copyright (c) Microsoft. All rights reserved.
 """ Orchestration manager to handle the orchestration logic. """
 
+import contextvars
 import os
 import uuid
+from contextvars import ContextVar
 from typing import List, Optional
 
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
@@ -13,15 +15,22 @@ from semantic_kernel.agents.runtime import InProcessRuntime
 from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion, OpenAIChatPromptExecutionSettings)
 from v3.callbacks.response_handlers import (agent_response_callback,
+                                            set_user_context,
                                             streaming_agent_response_callback)
-from v3.config.settings import config, orchestration_config
+from v3.config.settings import config, current_user_id, orchestration_config
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
 from v3.orchestration.human_approval_manager import \
     HumanApprovalMagenticManager
 
+# Context variable to hold the current user ID
+current_user_id: ContextVar[Optional[str]] = contextvars.ContextVar("current_user_id", default=None)
 
 class OrchestrationManager:
     """Manager for handling orchestration logic."""
+
+    def __init__(self):
+        self.user_id: Optional[str] = None
+
     @classmethod
     async def init_orchestration(cls, agents: List)-> MagenticOrchestration:
         """Main function to run the agents."""
@@ -56,19 +65,21 @@ class OrchestrationManager:
         return magentic_orchestration
     
     @classmethod
-    async def get_current_or_new_orchestration(cls, user_id: str, team_config: TeamConfiguration) -> MagenticOrchestration:
+    async def get_current_or_new_orchestration(self, user_id: str, team_config: TeamConfiguration) -> MagenticOrchestration:
         """get existing orchestration instance."""
         current_orchestration = orchestration_config.get_current_orchestration(user_id)
         if current_orchestration is None:
             factory = MagenticAgentFactory()
             # to do: change to parsing teams from cosmos db
             agents = await factory.get_agents(team_config_input=team_config)
-            orchestration_config.orchestrations[user_id] = await cls.init_orchestration(agents)
+            orchestration_config.orchestrations[user_id] = await self.init_orchestration(agents)
         return orchestration_config.get_current_orchestration(user_id)
 
-    @classmethod
-    async def run_orchestration(cls, user_id, input_task) -> None:
+    async def run_orchestration(self, user_id, input_task) -> None:
         """ Run the orchestration with user input loop."""
+        token = current_user_id.set(user_id)
+
+        set_user_context(user_id)
 
         job_id = str(uuid.uuid4())
         orchestration_config.approvals[job_id] = None
@@ -77,6 +88,15 @@ class OrchestrationManager:
 
         if magentic_orchestration is None:
             raise ValueError("Orchestration not initialized for user.")
+        
+        try:
+            # ADD THIS: Set user_id on the approval manager before invoke
+            if hasattr(magentic_orchestration, '_manager') and hasattr(magentic_orchestration._manager, 'current_user_id'):
+                #object.__setattr__(magentic_orchestration._manager, 'current_user_id', user_id)
+                magentic_orchestration._manager.current_user_id = user_id
+                print(f"🔍 DEBUG: Set user_id on manager = {user_id}")
+        except Exception as e:
+            print(f"Error setting user_id on manager: {e}")
         
         runtime = InProcessRuntime()
         runtime.start()
@@ -104,3 +124,5 @@ class OrchestrationManager:
             print(f"Unexpected error: {e}")
         finally:
             await runtime.stop_when_idle()
+            current_user_id.reset(token)
+

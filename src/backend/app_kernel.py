@@ -667,8 +667,7 @@ async def get_plans(
             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
         )
         raise HTTPException(status_code=400, detail="no user")
-    
-    await connection_config.send_status_update_async("Test message from get_plans", user_id)
+  
 
     #### <To do: Francia> Replace the following with code to get plan run history from the database
 

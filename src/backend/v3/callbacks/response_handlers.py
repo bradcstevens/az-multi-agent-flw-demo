@@ -2,13 +2,22 @@
 Enhanced response callbacks for employee onboarding agent system.
 Provides detailed monitoring and response handling for different agent types.
 """
-
+import asyncio
 import sys
 
 from semantic_kernel.contents import (ChatMessageContent,
                                       StreamingChatMessageContent)
+from v3.config.settings import connection_config, current_user_id
 
 coderagent = False
+
+# Module-level variable to store current user_id
+_current_user_id: str = None
+
+def set_user_context(user_id: str):
+    """Set the user context for callbacks in this module."""
+    global _current_user_id
+    _current_user_id = user_id
 
 def agent_response_callback(message: ChatMessageContent) -> None:
     """Observer function to print detailed information about streaming messages."""
@@ -31,7 +40,18 @@ def agent_response_callback(message: ChatMessageContent) -> None:
         return
     elif coderagent == True:
         coderagent = False
+        
     role = getattr(message, 'role', 'unknown')
+
+    # Send to WebSocket
+    if _current_user_id:
+        try:
+            asyncio.create_task(connection_config.send_status_update_async({
+                "type": "agent_message",
+                "data": {"agent_name": agent_name, "content": message.content, "role": role}
+            }, _current_user_id))
+        except Exception as e:
+            print(f"Error sending WebSocket message: {e}")
 
     print(f"\n🧠 **{agent_name}** [{message_type}] (role: {role})")
     print("-" * (len(agent_name) + len(message_type) + 10))

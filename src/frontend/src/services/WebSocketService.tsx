@@ -42,6 +42,7 @@ export interface PlanApprovalResponseData {
 
 class WebSocketService {
     private ws: WebSocket | null = null;
+    private processId: string | null = null; // Add this to store the process ID
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
     private reconnectDelay = 1000;
@@ -52,13 +53,40 @@ class WebSocketService {
      * Connect to WebSocket server
      */
     connect(): Promise<void> {
+        // If already connected, return resolved promise
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            console.log('WebSocket already connected');
+            return Promise.resolve();
+        }
+
+        // If already connecting, wait for that connection
+        if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+            console.log('WebSocket connection already in progress');
+            return new Promise((resolve, reject) => {
+                const checkConnection = () => {
+                    if (this.ws?.readyState === WebSocket.OPEN) {
+                        resolve();
+                    } else if (this.ws?.readyState === WebSocket.CLOSED) {
+                        reject(new Error('Connection failed'));
+                    } else {
+                        setTimeout(checkConnection, 100);
+                    }
+                };
+                checkConnection();
+            });
+        }
         return new Promise((resolve, reject) => {
             try {
                 // Get WebSocket URL from environment or default to localhost
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsHost = process.env.REACT_APP_WS_HOST || '127.0.0.1:8000';
-                const processId = crypto.randomUUID(); // Generate unique process ID for this session
-                const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}`;
+                
+                // Generate process ID only once per service instance, or reuse existing
+                if (!this.processId) {
+                    this.processId = crypto.randomUUID();
+                }
+                
+                const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${this.processId}`;
 
                 console.log('Connecting to WebSocket:', wsUrl);
                 
