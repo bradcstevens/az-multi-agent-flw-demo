@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import List, Union
 
+from common.models.messages_kernel import TeamConfiguration
 from v3.magentic_agents.foundry_agent import FoundryAgentTemplate
 from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
                                                     SearchConfig)
@@ -32,12 +33,12 @@ class MagenticAgentFactory:
         self.logger = logging.getLogger(__name__)
         self._agent_list: List = []
     
-    @staticmethod
-    def parse_team_config(file_path: Union[str, Path]) -> SimpleNamespace:
-        """Parse JSON file into objects using SimpleNamespace."""
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-        return json.loads(json.dumps(data), object_hook=lambda d: SimpleNamespace(**d))
+    # @staticmethod
+    # def parse_team_config(file_path: Union[str, Path]) -> SimpleNamespace:
+    #     """Parse JSON file into objects using SimpleNamespace."""
+    #     with open(file_path, 'r') as f:
+    #         data = json.load(f)
+    #     return json.loads(json.dumps(data), object_hook=lambda d: SimpleNamespace(**d))
     
     async def create_agent_from_config(self, agent_obj: SimpleNamespace) -> Union[FoundryAgentTemplate, ReasoningAgentTemplate, ProxyAgent]:
         """
@@ -119,34 +120,31 @@ class MagenticAgentFactory:
         self.logger.info(f"Successfully created and initialized agent '{agent_obj.name}'")
         return agent
 
-    async def get_agents(self, file_path: str) -> List:
+    async def get_agents(self, team_config_input: TeamConfiguration) -> List:
         """
         Create and return a team of agents from JSON configuration.
         
         Args:
-            file_path: Path to the JSON team configuration file
-            team_model: Optional model override for all agents in the team
+            team_config_input: team configuration object from cosmos db
             
         Returns:
             List of initialized agent instances
         """
-        self.logger.info(f"Loading team configuration from: {file_path}")
+        # self.logger.info(f"Loading team configuration from: {file_path}")
         
         try:
-            team = self.parse_team_config(file_path)
-            self.logger.info(f"Parsed team '{team.name}' with {len(team.agents)} agents")
             
-            agents = []
+            initalized_agents = []
             
-            for i, agent_cfg in enumerate(team.agents, 1):
+            for i, agent_cfg in enumerate(team_config_input.agents, 1):
                 try:
-                    self.logger.info(f"Creating agent {i}/{len(team.agents)}: {agent_cfg.name}")
+                    self.logger.info(f"Creating agent {i}/{len(team_config_input.agents)}: {agent_cfg.name}")
                     
                     agent = await self.create_agent_from_config(agent_cfg)
-                    agents.append(agent)
+                    initalized_agents.append(agent)
                     self._agent_list.append(agent)  # Keep track for cleanup
                     
-                    self.logger.info(f"✅ Agent {i}/{len(team.agents)} created: {agent_cfg.name}")
+                    self.logger.info(f"✅ Agent {i}/{len(team_config_input.agents)} created: {agent_cfg.name}")
                     
                 except (UnsupportedModelError, InvalidConfigurationError) as e:
                     self.logger.warning(f"Skipped agent {agent_cfg.name}: {e}")
@@ -155,8 +153,8 @@ class MagenticAgentFactory:
                     self.logger.error(f"Failed to create agent {agent_cfg.name}: {e}")
                     continue
             
-            self.logger.info(f"Successfully created {len(agents)}/{len(team.agents)} agents for team '{team.name}'")
-            return agents
+            self.logger.info(f"Successfully created {len(initalized_agents)}/{len(team_config_input.agents)} agents for team '{team_config_input.name}'")
+            return initalized_agents
             
         except Exception as e:
             self.logger.error(f"Failed to load team configuration: {e}")

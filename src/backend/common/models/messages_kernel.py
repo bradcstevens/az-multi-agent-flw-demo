@@ -156,12 +156,15 @@ class TeamAgent(KernelBaseModel):
     input_key: str
     type: str
     name: str
+    deployment_name: str
     system_message: str = ""
     description: str = ""
     icon: str
     index_name: str = ""
     use_rag: bool = False
     use_mcp: bool = False
+    use_bing: bool = False
+    use_reasoning: bool = False
     coding_tools: bool = False
 
 

@@ -3,9 +3,10 @@
 
 import os
 import uuid
-from typing import List
+from typing import List, Optional
 
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+from common.models.messages_kernel import TeamConfiguration
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.agents.runtime import InProcessRuntime
 # Create custom execution settings to fix schema issues
@@ -55,13 +56,13 @@ class OrchestrationManager:
         return magentic_orchestration
     
     @classmethod
-    async def get_current_orchestration(cls, user_id: str) -> MagenticOrchestration:
+    async def get_current_or_new_orchestration(cls, user_id: str, team_config: TeamConfiguration) -> MagenticOrchestration:
         """get existing orchestration instance."""
         current_orchestration = orchestration_config.get_current_orchestration(user_id)
         if current_orchestration is None:
             factory = MagenticAgentFactory()
             # to do: change to parsing teams from cosmos db
-            agents = await factory.get_agents(config.AGENT_TEAM_FILE)
+            agents = await factory.get_agents(team_config_input=team_config)
             orchestration_config.orchestrations[user_id] = await cls.init_orchestration(agents)
         return orchestration_config.get_current_orchestration(user_id)
 

@@ -6,23 +6,14 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from azure.core.credentials import AzureKeyCredential
-from azure.core.exceptions import (
-    ClientAuthenticationError,
-    HttpResponseError,
-    ResourceNotFoundError,
-)
+from azure.core.exceptions import (ClientAuthenticationError,
+                                   HttpResponseError, ResourceNotFoundError)
 from azure.identity import DefaultAzureCredential
 from azure.search.documents.indexes import SearchIndexClient
-
-from common.models.messages_kernel import (
-    TeamConfiguration,
-    TeamAgent,
-    StartingTask,
-)
-
-
 from common.config.app_config import config
 from common.database.database_base import DatabaseBase
+from common.models.messages_kernel import (StartingTask, TeamAgent,
+                                           TeamConfiguration)
 from v3.common.services.foundry_service import FoundryService
 
 
@@ -141,12 +132,15 @@ class TeamService:
             input_key=agent_data["input_key"],
             type=agent_data["type"],
             name=agent_data["name"],
+            deployment_name=agent_data.get("deployment_name", ""),
+            icon=agent_data["icon"],
             system_message=agent_data.get("system_message", ""),
             description=agent_data.get("description", ""),
-            icon=agent_data["icon"],
-            index_name=agent_data.get("index_name", ""),
             use_rag=agent_data.get("use_rag", False),
             use_mcp=agent_data.get("use_mcp", False),
+            use_bing=agent_data.get("use_bing", False),
+            use_reasoning=agent_data.get("use_reasoning", False),
+            index_name=agent_data.get("index_name", ""),
             coding_tools=agent_data.get("coding_tools", False),
         )
 
@@ -204,7 +198,7 @@ class TeamService:
         """
         try:
             # Get the specific configuration using the team-specific method
-            team_config = await self.memory_context.get_team_by_id(team_id)
+            team_config = await self.memory_context.get_team(team_id)
 
             if team_config is None:
                 return None
