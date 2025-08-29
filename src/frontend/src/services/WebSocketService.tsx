@@ -1,3 +1,5 @@
+import { getUserId } from '../api/config';
+
 export interface StreamMessage {
     type: 'plan_update' | 'step_update' | 'agent_message' | 'error' | 'connection_status' | 'plan_approval_request' | 'final_result';
     plan_id?: string;
@@ -8,12 +10,13 @@ export interface StreamMessage {
 
 export interface StreamingPlanUpdate {
     plan_id: string;
-    session_id: string;
+    session_id?: string;
     step_id?: string;
     agent_name?: string;
     content?: string;
     status?: 'in_progress' | 'completed' | 'error' | 'creating_plan' | 'pending_approval';
     message_type?: 'thinking' | 'action' | 'result' | 'clarification_needed' | 'plan_approval_request';
+    timestamp?: number;
 }
 
 // Add these new interfaces after StreamingPlanUpdate
@@ -58,7 +61,11 @@ class WebSocketService {
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsHost = process.env.REACT_APP_WS_HOST || '127.0.0.1:8000';
                 const processId = crypto.randomUUID(); // Generate unique process ID for this session
-                const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}`;
+
+                // const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}`;
+                // Build WebSocket URL with authentication headers as query parameters
+            const userId = getUserId(); // Import this from config
+            const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}?user_id=${encodeURIComponent(userId)}`;
 
                 console.log('Connecting to WebSocket:', wsUrl);
                 
