@@ -14,8 +14,9 @@ from semantic_kernel.agents.runtime import InProcessRuntime
 # Create custom execution settings to fix schema issues
 from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion, OpenAIChatPromptExecutionSettings)
+from semantic_kernel.contents import (ChatMessageContent,
+                                      StreamingChatMessageContent)
 from v3.callbacks.response_handlers import (agent_response_callback,
-                                            set_user_context,
                                             streaming_agent_response_callback)
 from v3.config.settings import config, current_user_id, orchestration_config
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
@@ -32,7 +33,7 @@ class OrchestrationManager:
         self.user_id: Optional[str] = None
 
     @classmethod
-    async def init_orchestration(cls, agents: List)-> MagenticOrchestration:
+    async def init_orchestration(cls, agents: List, user_id: str = None)-> MagenticOrchestration:
         """Main function to run the agents."""
 
         # Custom execution settings that should work with Azure OpenAI
@@ -59,10 +60,24 @@ class OrchestrationManager:
                 ),
                 execution_settings=execution_settings
             ),
-            agent_response_callback=agent_response_callback,
-            streaming_agent_response_callback=streaming_agent_response_callback,  # Add streaming callback
+            agent_response_callback=cls._user_aware_agent_callback(user_id),
+            streaming_agent_response_callback=cls._user_aware_streaming_callback(user_id)
         )
         return magentic_orchestration
+    
+    @staticmethod
+    def _user_aware_agent_callback(user_id: str):
+        """Factory method that creates a callback with captured user_id"""
+        def callback(message: ChatMessageContent):
+            return agent_response_callback(message, user_id)
+        return callback
+    
+    @staticmethod
+    def _user_aware_streaming_callback(user_id: str):
+        """Factory method that creates a streaming callback with captured user_id"""
+        async def callback(streaming_message: StreamingChatMessageContent, is_final: bool):
+            return await streaming_agent_response_callback(streaming_message, is_final, user_id)
+        return callback
     
     @classmethod
     async def get_current_or_new_orchestration(self, user_id: str, team_config: TeamConfiguration) -> MagenticOrchestration:
@@ -70,16 +85,13 @@ class OrchestrationManager:
         current_orchestration = orchestration_config.get_current_orchestration(user_id)
         if current_orchestration is None:
             factory = MagenticAgentFactory()
-            # to do: change to parsing teams from cosmos db
             agents = await factory.get_agents(team_config_input=team_config)
-            orchestration_config.orchestrations[user_id] = await self.init_orchestration(agents)
+            orchestration_config.orchestrations[user_id] = await self.init_orchestration(agents, user_id)
         return orchestration_config.get_current_orchestration(user_id)
 
     async def run_orchestration(self, user_id, input_task) -> None:
         """ Run the orchestration with user input loop."""
         token = current_user_id.set(user_id)
-
-        set_user_context(user_id)
 
         job_id = str(uuid.uuid4())
         orchestration_config.approvals[job_id] = None
@@ -90,9 +102,7 @@ class OrchestrationManager:
             raise ValueError("Orchestration not initialized for user.")
         
         try:
-            # ADD THIS: Set user_id on the approval manager before invoke
             if hasattr(magentic_orchestration, '_manager') and hasattr(magentic_orchestration._manager, 'current_user_id'):
-                #object.__setattr__(magentic_orchestration._manager, 'current_user_id', user_id)
                 magentic_orchestration._manager.current_user_id = user_id
                 print(f"🔍 DEBUG: Set user_id on manager = {user_id}")
         except Exception as e:

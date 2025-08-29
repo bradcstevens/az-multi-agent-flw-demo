@@ -102,7 +102,7 @@ class ProxyAgent(Agent):
             expected_type=DummyAgentThread,
         )
         # Replace with websocket call when available
-        print(f"\n🤔 ProxyAgent: Another agent is asking for clarification about:")
+        print(f"\nProxyAgent: Another agent is asking for clarification about:")
         print(f"   Request: {message}")
         print("-" * 60)
         
