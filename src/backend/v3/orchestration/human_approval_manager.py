@@ -10,6 +10,8 @@ import v3.models.messages as messages
 from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
     MagenticContext, StandardMagenticManager)
+from semantic_kernel.agents.orchestration.prompts._magentic_prompts import \
+    ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT
 from semantic_kernel.contents import ChatMessageContent
 from v3.config.settings import connection_config, current_user_id
 from v3.models.models import MPlan, MStep
@@ -28,10 +30,22 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
 
     def __init__(self, *args, **kwargs):
         # Remove any custom kwargs before passing to parent
-        super().__init__(*args, **kwargs)
+
         # Use object.__setattr__ to bypass Pydantic validation
         # object.__setattr__(self, 'current_user_id', None)
+
+        custom_addition = """
+
+ADDITIONAL INSTRUCTIONS:
+To address this request we have assembled the following team:
+
+{{$team}}
+
+Please check with the team members to list all relevant tools they have access to, and their required parameters."""
+
+        kwargs['task_ledger_facts_prompt'] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + custom_addition
         
+        super().__init__(*args, **kwargs)
 
     async def plan(self, magentic_context: MagenticContext) -> Any:
         """
@@ -44,12 +58,12 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         elif not isinstance(task_text, str):
             task_text = str(task_text)
         
-        print(f"\n🎯 Human-in-the-Loop Magentic Manager Creating Plan:")
+        print(f"\n Human-in-the-Loop Magentic Manager Creating Plan:")
         print(f"   Task: {task_text}")
         print("-" * 60)
         
         # First, let the parent create the actual plan
-        print("📋 Creating execution plan...")
+        print(" Creating execution plan...")
         plan = await super().plan(magentic_context)
         self.magentic_plan = self.plan_to_obj( magentic_context, self.task_ledger)
 
@@ -110,19 +124,19 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         """
         Override to ensure final answer is prepared after all steps are executed.
         """
-        print("\n📝 Magentic Manager - Preparing final answer...")
+        print("\n Magentic Manager - Preparing final answer...")
 
         return await super().prepare_final_answer(magentic_context)
     
     async def _get_plan_approval_with_details(self, task: str, participant_descriptions: dict, plan: Any) -> bool:
         while True:
-            approval = input("\n❓ Approve this execution plan? [y/n/details]: ").strip().lower()
+            approval = input("\ Approve this execution plan? [y/n/details]: ").strip().lower()
             
             if approval in ['y', 'yes']:
-                print("✅ Plan approved by user")
+                print(" Plan approved by user")
                 return True
             elif approval in ['n', 'no']:
-                print("❌ Plan rejected by user")
+                print(" Plan rejected by user")
                 return False
             # elif approval in ['d', 'details']:
             #     self._show_detailed_plan_info(task, participant_descriptions, plan)
