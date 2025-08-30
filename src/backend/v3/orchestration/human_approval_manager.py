@@ -35,8 +35,6 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         # object.__setattr__(self, 'current_user_id', None)
 
         custom_addition = """
-
-ADDITIONAL INSTRUCTIONS:
 To address this request we have assembled the following team:
 
 {{$team}}
