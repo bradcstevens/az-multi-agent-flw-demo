@@ -18,7 +18,8 @@ from semantic_kernel.contents import (ChatMessageContent,
                                       StreamingChatMessageContent)
 from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
-from v3.config.settings import config, current_user_id, orchestration_config
+from v3.config.settings import (config, connection_config, current_user_id,
+                                orchestration_config)
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
 from v3.orchestration.human_approval_manager import \
     HumanApprovalMagenticManager
@@ -123,6 +124,17 @@ class OrchestrationManager:
                 value = await orchestration_result.get()
                 print(f"\nFinal result:\n{value}")
                 print("=" * 50)
+
+                # Send final result via WebSocket
+                await connection_config.send_status_update_async({
+                    "type": "final_result",
+                    "data": {
+                        "content": str(value),
+                        "status": "completed",
+                        "timestamp": str(uuid.uuid4())  # or use actual timestamp
+                    }
+                }, user_id)
+                print(f"Final result sent via WebSocket to user {user_id}")
             except Exception as e:
                 print(f"Error: {e}")
                 print(f"Error type: {type(e).__name__}")
