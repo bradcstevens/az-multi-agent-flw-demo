@@ -727,7 +727,7 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
         session_id = selection.session_id or str(uuid.uuid4())
 
         # save to in-memory config for current user
-        team_config.set_current_team(user_id=user_id, team_config=team_configuration)
+        team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
         
         # Track the team selection event
         track_event_if_configured(

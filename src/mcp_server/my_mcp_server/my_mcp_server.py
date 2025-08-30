@@ -4,14 +4,14 @@ from fastmcp import FastMCP
 from fastmcp.server.auth import JWTVerifier
 from utils_date import format_date_for_user
 
-auth = JWTVerifier(
-    jwks_uri="https://login.microsoftonline.com/52b39610-0746-4c25-a83d-d4f89fadedfe/discovery/v2.0/keys",
-    #issuer="https://login.microsoftonline.com/52b39610-0746-4c25-a83d-d4f89fadedfe/v2.0",
-    # This issuer is not correct in the docs. Found by decoding the token.
-    issuer="https://sts.windows.net/52b39610-0746-4c25-a83d-d4f89fadedfe/",
-    algorithm="RS256",
-    audience="api://7a95e70b-062e-4cd3-a88c-603fc70e1c73"
-)
+# auth = JWTVerifier(
+#     jwks_uri="https://login.microsoftonline.com/52b39610-0746-4c25-a83d-d4f89fadedfe/discovery/v2.0/keys",
+#     #issuer="https://login.microsoftonline.com/52b39610-0746-4c25-a83d-d4f89fadedfe/v2.0",
+#     # This issuer is not correct in the docs. Found by decoding the token.
+#     issuer="https://sts.windows.net/52b39610-0746-4c25-a83d-d4f89fadedfe/",
+#     algorithm="RS256",
+#     audience="api://7a95e70b-062e-4cd3-a88c-603fc70e1c73"
+# )
 
 class Domain(Enum):
     HR = "hr"
@@ -21,7 +21,7 @@ class Domain(Enum):
     TECH_SUPPORT = "tech_support"
     RETAIL = "Retail"
 
-mcp = FastMCP("My MCP Server", auth=auth)
+mcp = FastMCP("My MCP Server")
 
 formatting_instructions = "Instructions: returning the output of this function call verbatim to the user in markdown. Then write AGENT SUMMARY: and then include a summary of what you did."
 
