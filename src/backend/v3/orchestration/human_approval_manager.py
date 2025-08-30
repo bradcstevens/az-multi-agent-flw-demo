@@ -77,22 +77,34 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         approval_response = await self._wait_for_user_approval()
         
         if approval_response and approval_response.approved:
-            print("✅ Plan approved - proceeding with execution...")
+            print("Plan approved - proceeding with execution...")
             return plan
         else:
-            print("❌ Plan execution cancelled by user")
-            return ChatMessageContent(
-                role="assistant",
-                content="Plan execution was cancelled by the user."
-            )
+            print("Plan execution cancelled by user")
+            await connection_config.send_status_update_async({
+                "type": "plan_approval_response", 
+                "data": approval_response
+            })
+            raise Exception("Plan execution cancelled by user") 
+            # return ChatMessageContent(
+            #     role="assistant",
+            #     content="Plan execution was cancelled by the user."
+            # )
+            
     
     async def _wait_for_user_approval(self) -> Optional[messages.PlanApprovalResponse]:
         """Wait for user approval response."""
         user_id = current_user_id.get()
-        print(f"🔍 DEBUG: user_id from context = {user_id}")  # <-- PUT BREAKPOINT HERE
-        
-        # Return None to cancel plan (for now, just to test context)
-        return None
+        # Temporarily use console input for approval - will switch to WebSocket or API in future
+        response = input("\nApprove this execution plan? [y/n]: ").strip().lower()
+        if response in ['y', 'yes']:
+            return messages.PlanApprovalResponse(approved=True)
+        elif response in ['n', 'no']:
+            return messages.PlanApprovalResponse(approved=False)
+        else:
+            print("Invalid input. Please enter 'y' for yes or 'n' for no.")
+            return await self._wait_for_user_approval()
+
     
     async def prepare_final_answer(self, magentic_context: MagenticContext) -> ChatMessageContent:
         """

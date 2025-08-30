@@ -16,21 +16,6 @@ def agent_response_callback(message: ChatMessageContent, user_id: str = None) ->
 
     # Get agent name to determine handling
     agent_name = message.name or "Unknown Agent"
-
-
-    # Debug information about the message
-    # message_type = type(message).__name__
-    # metadata = getattr(message, 'metadata', {})
-    # # when streaming code - list the coder info first once - 
-    # if 'code' in metadata and metadata['code'] is True:
-    #     if coderagent == False:
-    #         print(f"\n **{agent_name}** [{message_type}]")
-    #         print("-" * (len(agent_name) + len(message_type) + 10))
-    #         coderagent = True
-    #     print(message.content, end='', flush=False)
-    #     return
-    # elif coderagent == True:
-    #     coderagent = False
         
     role = getattr(message, 'role', 'unknown')
 
