@@ -55,9 +55,9 @@ class MCPConfig:
     """MCP server configuration."""
 
     def __init__(self):
-        self.url = "http://127.0.0.1:8000/mcp/"
-        self.name = "MCPGreetingServer"
-        self.description = "MCP server with greeting and planning tools"
+        self.url = config.MCP_SERVER_ENDPOINT
+        self.name = config.MCP_SERVER_NAME
+        self.description = config.MCP_SERVER_DESCRIPTION
 
     def get_headers(self, token: str):
         """Get MCP headers with authentication token."""
