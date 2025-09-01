@@ -1265,12 +1265,12 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
         aadAuthFailureMode: 'http401WithBearerChallenge'
       }
     }
-    cmkEnforcement: virtualNetworkEnabled ? 'Enabled' : null
     disableLocalAuth: false
     hostingMode: 'default'
     managedIdentities: {
       systemAssigned: true
     }
+    publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
     networkRuleSet: {
       bypass: 'AzureServices'
     }
@@ -1344,6 +1344,7 @@ output AZURE_STORAGE_BLOB_URL string = avmStorageAccount.outputs.serviceEndpoint
 output AZURE_STORAGE_ACCOUNT_NAME string = storageAccountName
 output AZURE_STORAGE_CONTAINER_NAME string = storageContainerName
 output AZURE_SEARCH_ENDPOINT string = searchService.outputs.endpoint
+output AZURE_SEARCH_NAME string = searchService.outputs.name
 
 @export()
 @description('The type for the Multi-Agent Custom Automation Engine Log Analytics Workspace resource configuration.')

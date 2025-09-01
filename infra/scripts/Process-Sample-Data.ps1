@@ -3,7 +3,8 @@
 param(
     [string]$StorageAccount,
     [string]$BlobContainer,
-    [string]$AiSearch
+    [string]$AiSearch,
+    [string]$ResourceGroup
 )
 
 # Get parameters from azd env, if not provided
@@ -16,14 +17,18 @@ if (-not $BlobContainer) {
 }
 
 if (-not $AiSearch) {
-    $AiSearch = $(azd env get-value AZURE_SEARCH_ENDPOINT)
+    $AiSearch = $(azd env get-value AZURE_SEARCH_NAME)
+}
+
+if (-not $ResourceGroup) {
+    $ResourceGroup = $(azd env get-value AZURE_RESOURCE_GROUP)
 }
 
 $AzSubscriptionId = $(azd env get-value AZURE_SUBSCRIPTION_ID)
 
 # Check if all required arguments are provided
 if (-not $StorageAccount -or -not $BlobContainer -or -not $AiSearch) {
-    Write-Host "Usage: .\infra\scripts\Process-Sample-Data.ps1 -StorageAccount <StorageAccount> -BlobContainer <StorageContainerName> -AiSearch <AISearchName/AISearchEndpoint>"
+    Write-Host "Usage: .\infra\scripts\Process-Sample-Data.ps1 -StorageAccount <StorageAccount> -BlobContainer <StorageContainerName> -AiSearch <AISearchName> [-ResourceGroup <ResourceGroup>]"
     exit 1
 }
 
@@ -105,6 +110,40 @@ else {
     az account set --subscription $currentSubscriptionId
 }
 
+$stIsPublicAccessDisabled = $false
+$srchIsPublicAccessDisabled = $false
+# Enable public access for resources
+if ($ResourceGroup) {
+    $stPublicAccess = $(az storage account show --name $StorageAccount --resource-group $ResourceGroup --query "publicNetworkAccess" -o tsv)
+    if ($stPublicAccess -eq "Disabled") {
+        $stIsPublicAccessDisabled = $true
+        Write-Host "Enabling public access for storage account: $StorageAccount"
+        az storage account update --name $StorageAccount --public-network-access enabled --default-action Allow --output none
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Error: Failed to enable public access for storage account."
+            exit 1
+        }
+    }
+    else {
+        Write-Host "Public access is already enabled for storage account: $StorageAccount"
+    }
+
+    $srchPublicAccess = $(az search service show --name $AiSearch --resource-group $ResourceGroup --query "publicNetworkAccess" -o tsv)
+    if ($srchPublicAccess -eq "Disabled") {
+        $srchIsPublicAccessDisabled = $true
+        Write-Host "Enabling public access for search service: $AiSearch"
+        az search service update --name $AiSearch --resource-group $ResourceGroup --public-network-access enabled --output none
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Error: Failed to enable public access for search service."
+            exit 1
+        }
+    }
+    else {
+        Write-Host "Public access is already enabled for search service: $AiSearch"
+    }
+}
+
+
 # Upload sample files to blob storage
 Write-Host "Uploading sample files to blob storage..."
 $result = az storage blob upload-batch --account-name $StorageAccount --destination $BlobContainer --source "data/datasets" --auth-mode login --pattern "*" --overwrite --output none
@@ -185,6 +224,25 @@ $process = Start-Process -FilePath $pythonCmd -ArgumentList "infra/scripts/index
 if ($process.ExitCode -ne 0) {
     Write-Host "Error: Indexing python script execution failed."
     exit 1
+}
+
+#disable public access for resources
+if ($stIsPublicAccessDisabled) {
+    Write-Host "Disabling public access for storage account: $StorageAccount"
+    az storage account update --name $StorageAccount --public-network-access disabled --default-action Deny --output none
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: Failed to disable public access for storage account."
+        exit 1
+    }
+}
+
+if ($srchIsPublicAccessDisabled) {
+    Write-Host "Disabling public access for search service: $AiSearch"
+    az search service update --name $AiSearch --resource-group $ResourceGroup --public-network-access disabled --output none
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: Failed to disable public access for search service."
+        exit 1
+    }
 }
 
 Write-Host "Script executed successfully. Sample Data Processed Successfully."
