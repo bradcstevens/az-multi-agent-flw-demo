@@ -917,8 +917,6 @@ var privateDnsZones = [
   'privatelink.openai.azure.com'
   'privatelink.services.ai.azure.com'
   'privatelink.documents.azure.com'
-  'privatelink.${toLower(replace(location,' ',''))}.azurecontainerapps.io'
-  'privatelink.azurewebsites.net'
 ]
 
 // DNS Zone Index Constants
@@ -927,8 +925,6 @@ var dnsZoneIndex = {
   openAI: 1
   aiServices: 2
   cosmosDb: 3
-  containerAppEnvironment: 4
-  appService: 5
 }
 
 // List of DNS zone indices that correspond to AI-related services.
@@ -1247,8 +1243,8 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.11.2
     tags: tags
     enableTelemetry: enableTelemetry
     // WAF aligned configuration for Private Networking
-    publicNetworkAccess: 'Enabled' // Always enabling the public network access for Container App Environment
-    internal: enablePrivateNetworking ? true : false
+    publicNetworkAccess: 'Enabled' // Always enabling the publicNetworkAccess for Container App Environment
+    internal: false //  Must be false when publicNetworkAccess is'Enabled'
     infrastructureSubnetResourceId: enablePrivateNetworking ? virtualNetwork.?outputs.?subnetResourceIds[3] : null
     // WAF aligned configuration for Monitoring
     appLogsConfiguration: enableMonitoring
@@ -1282,43 +1278,12 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.11.2
   }
 }
 
-// Private Endpoint for Container App Environment
-var privateEndpointContainerAppEnvironmentService = 'managedEnvironments'
-module privateEndpointContainerAppEnvironment 'br:mcr.microsoft.com/bicep/avm/res/network/private-endpoint:0.11.0' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.private-endpoint.app-environment.${solutionSuffix}', 64)
-  params: {
-    name: 'pep-${containerAppEnvironmentResourceName}'
-    location: location
-    tags: tags
-    enableTelemetry: enableTelemetry
-    subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
-    customNetworkInterfaceName: 'nic-${containerAppEnvironmentResourceName}'
-    privateLinkServiceConnections: [
-      {
-        name: '${last(split(containerAppEnvironment.outputs.resourceId, '/'))}-${privateEndpointContainerAppEnvironmentService}-0'
-        properties: {
-          groupIds: [privateEndpointContainerAppEnvironmentService]
-          privateLinkServiceId: containerAppEnvironment.outputs.resourceId
-        }
-      }
-    ]
-    privateDnsZoneGroup: {
-      privateDnsZoneGroupConfigs: [
-        { privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.containerAppEnvironment]!.outputs.resourceId }
-      ]
-    }
-  }
-}
-
 // ========== Backend Container App Service ========== //
 // WAF best practices for container apps: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-container-apps
 // PSRule for Container App: https://azure.github.io/PSRule.Rules.Azure/en/rules/resource/#container-app
 var containerAppResourceName = 'ca-${solutionSuffix}'
 module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
   name: take('avm.res.app.container-app.${containerAppResourceName}', 64)
-  dependsOn: [
-    privateEndpointContainerAppEnvironment
-  ]
   params: {
     name: containerAppResourceName
     tags: tags
@@ -1509,21 +1474,6 @@ module webSite 'modules/web-sites.bicep' = {
     vnetImagePullEnabled: enablePrivateNetworking ? true : false
     virtualNetworkSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.subnetResourceIds[4] : null
     publicNetworkAccess: 'Enabled' // Always enabling the public network access for Web App
-    privateEndpoints: enablePrivateNetworking
-      ? [
-          {
-            name: 'pep-${webSiteResourceName}'
-            customNetworkInterfaceName: 'nic-${webSiteResourceName}'
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                { privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.appService]!.outputs.resourceId }
-              ]
-            }
-            service: 'sites'
-            subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
-          }
-        ]
-      : null
   }
 }
 
