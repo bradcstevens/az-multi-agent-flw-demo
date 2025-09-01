@@ -20,6 +20,10 @@ param existingLogAnalyticsWorkspaceId string = ''
 
 param azureopenaiVersion string = '2025-01-01-preview'
 
+//Get the current deployer's information
+var deployerInfo = deployer()
+var deployingUserPrincipalId = deployerInfo.objectId
+
 // Restricting deployment to only supported Azure OpenAI regions validated with GPT-4o model
 @metadata({
   azd : {
@@ -812,6 +816,36 @@ module cogServiceRoleAssignmentsExisting './modules/role.bicep' = if(useExisting
   scope: resourceGroup( split(existingFoundryProjectResourceId, '/')[2], split(existingFoundryProjectResourceId, '/')[4])
 }
 
+// User Role Assignment for Azure OpenAI - New Resources
+module userOpenAiRoleAssignment './modules/role.bicep' = if (aiFoundryAIservicesEnabled && !useExistingResourceId) {
+  name: take('user-openai-${uniqueString(deployingUserPrincipalId, aiFoundryAiServicesResourceName)}', 64)
+  params: {
+    name: 'user-openai-${uniqueString(deployingUserPrincipalId, aiFoundryAiServicesResourceName)}'
+    principalId: deployingUserPrincipalId
+    aiServiceName: aiFoundryAiServices.outputs.name
+    principalType: 'User'
+  }
+  scope: resourceGroup(subscription().subscriptionId, resourceGroup().name)
+  dependsOn: [
+    aiFoundryAiServices
+  ]
+}
+
+// User Role Assignment for Azure OpenAI - Existing Resources
+module userOpenAiRoleAssignmentExisting './modules/role.bicep' = if (aiFoundryAIservicesEnabled && useExistingResourceId) {
+  name: take('user-openai-existing-${uniqueString(deployingUserPrincipalId, aiFoundryAiServicesResourceName)}', 64)
+  params: {
+    name: 'user-openai-existing-${uniqueString(deployingUserPrincipalId, aiFoundryAiServicesResourceName)}'
+    principalId: deployingUserPrincipalId
+    aiServiceName: aiFoundryAiServices.outputs.name
+    principalType: 'User'
+  }
+  scope: resourceGroup(split(existingFoundryProjectResourceId, '/')[2], split(existingFoundryProjectResourceId, '/')[4])
+  dependsOn: [
+    aiFoundryAiServices
+  ]
+}
+
 // ========== Cosmos DB ========== //
 // WAF best practices for Cosmos DB: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/cosmos-db
 module privateDnsZonesCosmosDb 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (virtualNetworkEnabled) {
@@ -886,9 +920,11 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.12.0' = if (co
     capabilitiesToAdd: [
       'EnableServerless'
     ]
-    sqlRoleAssignmentsPrincipalIds: [
-      containerApp.outputs.?systemAssignedMIPrincipalId
-    ]
+    
+    sqlRoleAssignmentsPrincipalIds: concat(
+      [containerApp.outputs.?systemAssignedMIPrincipalId],
+      [deployingUserPrincipalId]
+    )
     sqlRoleDefinitions: [
       {
         // Replace this with built-in role definition Cosmos DB Built-in Data Contributor: https://docs.azure.cn/en-us/cosmos-db/nosql/security/reference-data-plane-roles#cosmos-db-built-in-data-contributor
@@ -1040,6 +1076,119 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
             name: 'APP_ENV'
             value: 'Prod'
           }
+          {
+            name: 'AZURE_STORAGE_BLOB_URL'
+            value: avmStorageAccount.outputs.serviceEndpoints.blob
+          }
+          {
+            name: 'AZURE_STORAGE_CONTAINER_NAME'
+            value: storageContainerName
+          }
+          {
+            name: 'AZURE_SEARCH_ENDPOINT'
+            value: searchService.outputs.endpoint
+          }
+          {
+            name: 'AZURE_SEARCH_CONNECTION_NAME'
+            value: aiSearchConnectionName
+          }
+        ]
+      }
+    ]
+  }
+}
+
+var containerAppMcpResourceName = 'ca-mcp-${solutionPrefix}'
+module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = if (containerAppEnabled) {
+  name: take('avm.res.app.container-app.${containerAppMcpResourceName}', 64)
+  params: {
+    name: containerAppMcpResourceName
+    tags: containerAppConfiguration.?tags ?? tags
+    location: containerAppConfiguration.?location ?? solutionLocation
+    enableTelemetry: enableTelemetry
+    environmentResourceId: containerAppConfiguration.?environmentResourceId ?? containerAppEnvironment.outputs.resourceId
+    managedIdentities: { 
+      systemAssigned: true
+      userAssignedResourceIds: [userAssignedIdentity!.outputs.resourceId] 
+    }
+    ingressTargetPort: 9000
+    ingressExternal: true
+    activeRevisionsMode: 'Single'
+    corsPolicy: {
+      allowedOrigins: [
+        'https://${webSiteName}.azurewebsites.net'
+        'http://${webSiteName}.azurewebsites.net'
+      ]
+    }
+    // WAF aligned configuration for Scalability
+    scaleSettings: {
+      maxReplicas: containerAppConfiguration.?maxReplicas ?? 1
+      minReplicas: containerAppConfiguration.?minReplicas ?? 1
+      rules: [
+        {
+          name: 'http-scaler'
+          http: {
+            metadata: {
+              concurrentRequests: containerAppConfiguration.?concurrentRequests ?? '100'
+            }
+          }
+        }
+      ]
+    }
+    containers: [
+      {
+        name: 'mcp'
+        image: 'macaemcpacrdk.azurecr.io/macae-mac-app:t9' //'${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
+        resources: {
+          //TODO: Make cpu and memory parameterized
+          cpu: containerAppConfiguration.?containerCpu ?? '2.0'
+          memory: containerAppConfiguration.?containerMemory ?? '4.0Gi'
+        }
+        env: [
+          {
+            name: 'MCP_HOST'
+            value: '0.0.0.0'
+          }
+          {
+            name: 'MCP_PORT'
+            value: '9000'
+          }
+          {
+            name: 'MCP_DEBUG'
+            value: 'false'
+          }
+          {
+            name: 'MCP_SERVER_NAME'
+            value: 'MACAE MCP Server'
+          }
+          {
+            name: 'MCP_ENABLE_AUTH'
+            value: 'true'
+          }
+          {
+            name: 'AZURE_TENANT_ID'
+            value: tenant().tenantId
+          }
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: userAssignedIdentity!.outputs.clientId
+          }
+          {
+            name: 'AZURE_JWKS_URI'
+            value: 'https://login.microsoftonline.com/${tenant().tenantId}/discovery/v2.0/keys'
+          }
+          {
+            name: 'AZURE_ISSUER'
+            value: 'https://sts.windows.net/${tenant().tenantId}/'
+          }
+          {
+            name: 'AZURE_AUDIENCE'
+            value: 'api://${userAssignedIdentity!.outputs.clientId}'
+          }
+          {
+            name: 'DATASET_PATH'
+            value: './datasets'
+          }
         ]
       }
     ]
@@ -1098,6 +1247,187 @@ module webSite 'br/public:avm/res/web/site:0.15.1' = if (webSiteEnabled) {
   }
 }
 
+
+// ========== Storage Account ========== //
+
+module privateDnsZonesStorageAccount 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (virtualNetworkEnabled) {
+  name: take('avm.res.network.private-dns-zone.storage-account.${solutionPrefix}', 64)
+  params: {
+    name: 'privatelink.blob.core.windows.net'
+    enableTelemetry: enableTelemetry
+    virtualNetworkLinks: [
+      {
+        name: 'vnetlink-storage-account'
+        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
+      }
+    ]
+    tags: tags
+  }
+}
+
+var storageAccountName = replace('st${solutionPrefix}', '-', '')
+param storageContainerName string = 'sample-dataset'
+module avmStorageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
+  name: take('avm.res.storage.storage-account.${storageAccountName}', 64)
+  params: {
+    name: storageAccountName
+    location: solutionLocation
+    managedIdentities: { systemAssigned: true }
+    minimumTlsVersion: 'TLS1_2'
+    enableTelemetry: enableTelemetry
+    tags: tags
+    accessTier: 'Hot'
+    supportsHttpsTrafficOnly: true
+
+    roleAssignments: [
+      {
+        principalId: userAssignedIdentity.outputs.principalId
+        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
+        principalType: 'ServicePrincipal'
+      }
+      {
+        principalId: deployingUserPrincipalId
+        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
+        principalType: 'User'
+      }
+    ]
+
+    // WAF aligned networking
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: virtualNetworkEnabled ? 'Deny' : 'Allow'
+    }
+    allowBlobPublicAccess: false
+    publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
+
+    // Private endpoints for blob
+    privateEndpoints: virtualNetworkEnabled
+      ? [
+          {
+            name: 'pep-blob-${solutionPrefix}'
+            privateDnsZoneGroup: {
+              privateDnsZoneGroupConfigs: [
+                {
+                  name: 'storage-dns-zone-group-blob'
+                  privateDnsZoneResourceId: privateDnsZonesStorageAccount.outputs.resourceId
+                }
+              ]
+            }
+            subnetResourceId: virtualNetwork.outputs.subnetResourceIds[0]
+            service: 'blob'
+          }
+        ]
+      : []
+    blobServices: {
+      automaticSnapshotPolicyEnabled: true
+      containerDeleteRetentionPolicyDays: 10
+      containerDeleteRetentionPolicyEnabled: true
+      containers: [
+        {
+          name: storageContainerName
+          publicAccess: 'None'
+        }
+      ]
+      deleteRetentionPolicyDays: 9
+      deleteRetentionPolicyEnabled: true
+      lastAccessTimeTrackingPolicyEnabled: true
+    }
+  }
+}
+
+// ========== Search Service ========== //
+
+module privateDnsZonesSearchService 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (virtualNetworkEnabled) {
+  name: take('avm.res.network.private-dns-zone.search-service.${solutionPrefix}', 64)
+  params: {
+    name: 'privatelink.search.windows.net'
+    enableTelemetry: enableTelemetry
+    virtualNetworkLinks: [
+      {
+        name: 'vnetlink-search-service'
+        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
+      }
+    ]
+    tags: tags
+  }
+}
+
+var searchServiceName = 'srch-${solutionPrefix}'
+module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
+  name: take('avm.res.search.search-service.${solutionPrefix}', 64)
+  params: {
+    name: searchServiceName
+    authOptions: {
+      aadOrApiKey: {
+        aadAuthFailureMode: 'http401WithBearerChallenge'
+      }
+    }
+    disableLocalAuth: false
+    hostingMode: 'default'
+    managedIdentities: {
+      systemAssigned: true
+    }
+    publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
+    networkRuleSet: {
+      bypass: 'AzureServices'
+    }
+    partitionCount: 1
+    replicaCount: 1
+    sku: 'standard'
+    tags: tags
+    roleAssignments: [
+      {
+        principalId: userAssignedIdentity.outputs.principalId
+        roleDefinitionIdOrName: 'Search Index Data Contributor'
+        principalType: 'ServicePrincipal'
+      }
+      {
+        principalId: deployingUserPrincipalId
+        roleDefinitionIdOrName: 'Search Index Data Contributor'
+        principalType: 'User'
+      }
+    ]
+    privateEndpoints: virtualNetworkEnabled
+      ? [
+          {
+            name: 'pep-search-${solutionPrefix}'
+            privateDnsZoneGroup: {
+              privateDnsZoneGroupConfigs: [
+                {
+                  privateDnsZoneResourceId: privateDnsZonesSearchService.outputs.resourceId
+                }
+              ]
+            }
+            subnetResourceId: virtualNetwork.outputs.subnetResourceIds[0]
+            service: 'searchService'
+          }
+        ]
+      : []
+  }
+}
+
+// ========== Search Service - AI Project Connection ========== //
+
+var aiSearchConnectionName = 'aifp-srch-connection-${solutionPrefix}'
+var aifSubscriptionId = useExistingFoundryProject ? split(existingFoundryProjectResourceId, '/')[2] : subscription().subscriptionId
+var aifResourceGroup = useExistingFoundryProject ? split(existingFoundryProjectResourceId, '/')[4] : resourceGroup().name
+module aiSearchFoundryConnection 'modules/aifp_search_connection.bicep' = if (aiFoundryAIservicesEnabled) {
+  name: take('aifp-srch-connection.${solutionPrefix}', 64)
+  scope: resourceGroup(aifSubscriptionId, aifResourceGroup)
+  params: {
+    aiFoundryProjectName: aiFoundryAiProjectName
+    aiFoundryName: aiFoundryAiServicesResourceName
+    aifSearchConnectionName: aiSearchConnectionName
+    searchServiceResourceId: searchService.outputs.resourceId
+    searchServiceLocation: searchService.outputs.location
+    searchServiceName: searchService.outputs.name
+  }
+  dependsOn: [
+    aiFoundryAiServices
+  ]
+}
+
+
 // ============ //
 // Outputs      //
 // ============ //
@@ -1106,6 +1436,12 @@ module webSite 'br/public:avm/res/web/site:0.15.1' = if (webSiteEnabled) {
 
 @description('The default url of the website to connect to the Multi-Agent Custom Automation Engine solution.')
 output webSiteDefaultHostname string = webSite.outputs.defaultHostname
+
+output AZURE_STORAGE_BLOB_URL string = avmStorageAccount.outputs.serviceEndpoints.blob
+output AZURE_STORAGE_ACCOUNT_NAME string = storageAccountName
+output AZURE_STORAGE_CONTAINER_NAME string = storageContainerName
+output AZURE_SEARCH_ENDPOINT string = searchService.outputs.endpoint
+output AZURE_SEARCH_NAME string = searchService.outputs.name
 
 @export()
 @description('The type for the Multi-Agent Custom Automation Engine Log Analytics Workspace resource configuration.')

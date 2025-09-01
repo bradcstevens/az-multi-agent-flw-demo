@@ -20,6 +20,10 @@ param existingLogAnalyticsWorkspaceId string = ''
 
 param azureopenaiVersion string = '2025-01-01-preview'
 
+//Get the current deployer's information
+var deployerInfo = deployer()
+var deployingUserPrincipalId = deployerInfo.objectId
+
 // Restricting deployment to only supported Azure OpenAI regions validated with GPT-4o model
 @metadata({
   azd : {
@@ -812,6 +816,36 @@ module cogServiceRoleAssignmentsExisting './modules/role.bicep' = if(useExisting
   scope: resourceGroup( split(existingFoundryProjectResourceId, '/')[2], split(existingFoundryProjectResourceId, '/')[4])
 }
 
+// User Role Assignment for Azure OpenAI - New Resources
+module userOpenAiRoleAssignment './modules/role.bicep' = if (aiFoundryAIservicesEnabled && !useExistingResourceId) {
+  name: take('user-openai-${uniqueString(deployingUserPrincipalId, aiFoundryAiServicesResourceName)}', 64)
+  params: {
+    name: 'user-openai-${uniqueString(deployingUserPrincipalId, aiFoundryAiServicesResourceName)}'
+    principalId: deployingUserPrincipalId
+    aiServiceName: aiFoundryAiServices.outputs.name
+    principalType: 'User'
+  }
+  scope: resourceGroup(subscription().subscriptionId, resourceGroup().name)
+  dependsOn: [
+    aiFoundryAiServices
+  ]
+}
+
+// User Role Assignment for Azure OpenAI - Existing Resources
+module userOpenAiRoleAssignmentExisting './modules/role.bicep' = if (aiFoundryAIservicesEnabled && useExistingResourceId) {
+  name: take('user-openai-existing-${uniqueString(deployingUserPrincipalId, aiFoundryAiServicesResourceName)}', 64)
+  params: {
+    name: 'user-openai-existing-${uniqueString(deployingUserPrincipalId, aiFoundryAiServicesResourceName)}'
+    principalId: deployingUserPrincipalId
+    aiServiceName: aiFoundryAiServices.outputs.name
+    principalType: 'User'
+  }
+  scope: resourceGroup(split(existingFoundryProjectResourceId, '/')[2], split(existingFoundryProjectResourceId, '/')[4])
+  dependsOn: [
+    aiFoundryAiServices
+  ]
+}
+
 // ========== Cosmos DB ========== //
 // WAF best practices for Cosmos DB: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/cosmos-db
 module privateDnsZonesCosmosDb 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (virtualNetworkEnabled) {
@@ -886,9 +920,10 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.12.0' = if (co
     capabilitiesToAdd: [
       'EnableServerless'
     ]
-    sqlRoleAssignmentsPrincipalIds: [
-      containerApp.outputs.?systemAssignedMIPrincipalId
-    ]
+    sqlRoleAssignmentsPrincipalIds: concat(
+      [containerApp.outputs.?systemAssignedMIPrincipalId],
+      [deployingUserPrincipalId]
+    )
     sqlRoleDefinitions: [
       {
         // Replace this with built-in role definition Cosmos DB Built-in Data Contributor: https://docs.azure.cn/en-us/cosmos-db/nosql/security/reference-data-plane-roles#cosmos-db-built-in-data-contributor
@@ -1072,6 +1107,110 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
           {
             name: 'APP_ENV'
             value: 'Prod'
+          }
+        ]
+      }
+    ]
+  }
+}
+
+
+var containerAppMcpResourceName = 'ca-mcp-${solutionPrefix}'
+module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = if (containerAppEnabled) {
+  name: take('avm.res.app.container-app.${containerAppMcpResourceName}', 64)
+  params: {
+    name: containerAppMcpResourceName
+    tags: union(tags, { 'azd-service-name': 'mcp' })
+    location: containerAppConfiguration.?location ?? solutionLocation
+    enableTelemetry: enableTelemetry
+    environmentResourceId: containerAppConfiguration.?environmentResourceId ?? containerAppEnvironment.outputs.resourceId
+    managedIdentities: { 
+      systemAssigned: true
+      userAssignedResourceIds: [userAssignedIdentity!.outputs.resourceId] 
+    }
+    ingressTargetPort: 9000
+    ingressExternal: true
+    activeRevisionsMode: 'Single'
+    corsPolicy: {
+      allowedOrigins: [
+        'https://${webSiteName}.azurewebsites.net'
+        'http://${webSiteName}.azurewebsites.net'
+      ]
+    }
+    // WAF aligned configuration for Scalability
+    scaleSettings: {
+      maxReplicas: containerAppConfiguration.?maxReplicas ?? 1
+      minReplicas: containerAppConfiguration.?minReplicas ?? 1
+      rules: [
+        {
+          name: 'http-scaler'
+          http: {
+            metadata: {
+              concurrentRequests: containerAppConfiguration.?concurrentRequests ?? '100'
+            }
+          }
+        }
+      ]
+    }
+     registries: [
+      {
+        server: containerRegistry.outputs.loginServer
+        identity: userAssignedIdentity.outputs.resourceId
+      }
+    ]
+    containers: [
+      {
+        name: 'mcp'
+        image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' //'${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
+        resources: {
+          //TODO: Make cpu and memory parameterized
+          cpu: containerAppConfiguration.?containerCpu ?? '2.0'
+          memory: containerAppConfiguration.?containerMemory ?? '4.0Gi'
+        }
+        env: [
+          {
+            name: 'MCP_HOST'
+            value: '0.0.0.0'
+          }
+          {
+            name: 'MCP_PORT'
+            value: '9000'
+          }
+          {
+            name: 'MCP_DEBUG'
+            value: 'false'
+          }
+          {
+            name: 'MCP_SERVER_NAME'
+            value: 'MACAE MCP Server'
+          }
+          {
+            name: 'MCP_ENABLE_AUTH'
+            value: 'true'
+          }
+          {
+            name: 'AZURE_TENANT_ID'
+            value: tenant().tenantId
+          }
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: userAssignedIdentity!.outputs.clientId
+          }
+          {
+            name: 'AZURE_JWKS_URI'
+            value: 'https://login.microsoftonline.com/${tenant().tenantId}/discovery/v2.0/keys'
+          }
+          {
+            name: 'AZURE_ISSUER'
+            value: 'https://sts.windows.net/${tenant().tenantId}/'
+          }
+          {
+            name: 'AZURE_AUDIENCE'
+            value: 'api://${userAssignedIdentity!.outputs.clientId}'
+          }
+          {
+            name: 'DATASET_PATH'
+            value: './datasets'
           }
         ]
       }
