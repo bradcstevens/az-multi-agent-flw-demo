@@ -1400,7 +1400,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_OPENAI_API_VERSION'
-            value: '2025-01-01-preview' //TODO: set parameter/variable
+            value: azureopenaiVersion
           }
           {
             name: 'APPLICATIONINSIGHTS_INSTRUMENTATION_KEY'
@@ -1533,3 +1533,20 @@ output resourceGroupName string = resourceGroup().name
 
 @description('The default url of the website to connect to the Multi-Agent Custom Automation Engine solution.')
 output webSiteDefaultHostname string = webSite.outputs.defaultHostname
+output COSMOSDB_ENDPOINT string = 'https://${cosmosDbResourceName}.documents.azure.com:443/'
+output COSMOSDB_DATABASE string = cosmosDbDatabaseName
+output COSMOSDB_CONTAINER string = cosmosDbDatabaseMemoryContainerName
+output AZURE_OPENAI_ENDPOINT string = 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/'
+output AZURE_OPENAI_MODEL_NAME string = aiFoundryAiServicesModelDeployment.name
+output AZURE_OPENAI_DEPLOYMENT_NAME string = aiFoundryAiServicesModelDeployment.name
+output AZURE_OPENAI_API_VERSION string = azureopenaiVersion
+// output APPLICATIONINSIGHTS_INSTRUMENTATION_KEY string = applicationInsights.outputs.instrumentationKey
+// output AZURE_AI_PROJECT_ENDPOINT string = aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
+output AZURE_AI_SUBSCRIPTION_ID string = subscription().subscriptionId
+output AZURE_AI_RESOURCE_GROUP string = resourceGroup().name
+output AZURE_AI_PROJECT_NAME string = aiFoundryAiProjectName
+output AZURE_AI_MODEL_DEPLOYMENT_NAME string = aiFoundryAiServicesModelDeployment.name
+// output APPLICATIONINSIGHTS_CONNECTION_STRING string = applicationInsights.outputs.connectionString
+output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = aiFoundryAiServicesModelDeployment.name
+output AZURE_AI_AGENT_ENDPOINT string = aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
+output APP_ENV string = 'Prod'
