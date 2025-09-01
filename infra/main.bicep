@@ -1356,7 +1356,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_OPENAI_ENDPOINT'
-            value: aiFoundryAiProjectEndpoint
+            value: 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/'
           }
           {
             name: 'AZURE_OPENAI_MODEL_NAME'
