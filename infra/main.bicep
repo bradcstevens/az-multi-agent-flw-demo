@@ -52,6 +52,9 @@ param gptModelName string = 'gpt-4o'
 @description('Optional. Version of the GPT model to deploy. Defaults to 2024-08-06.')
 param gptModelVersion string = '2024-08-06'
 
+@description('Optional. Version of the Azure OpenAI service to deploy. Defaults to 2025-01-01-preview.')
+param azureopenaiVersion string = '2025-01-01-preview'
+
 @minLength(1)
 @allowed([
   'Standard'
@@ -1548,5 +1551,5 @@ output AZURE_AI_PROJECT_NAME string = aiFoundryAiProjectName
 output AZURE_AI_MODEL_DEPLOYMENT_NAME string = aiFoundryAiServicesModelDeployment.name
 // output APPLICATIONINSIGHTS_CONNECTION_STRING string = applicationInsights.outputs.connectionString
 output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = aiFoundryAiServicesModelDeployment.name
-output AZURE_AI_AGENT_ENDPOINT string = aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
+output AZURE_AI_AGENT_ENDPOINT string = aiFoundryAiProjectEndpoint
 output APP_ENV string = 'Prod'
