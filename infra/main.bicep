@@ -1247,7 +1247,7 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.11.2
     tags: tags
     enableTelemetry: enableTelemetry
     // WAF aligned configuration for Private Networking
-    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: 'Enabled' // Always enabling the public network access for Container App Environment
     internal: enablePrivateNetworking ? true : false
     infrastructureSubnetResourceId: enablePrivateNetworking ? virtualNetwork.?outputs.?subnetResourceIds[3] : null
     // WAF aligned configuration for Monitoring
@@ -1508,7 +1508,7 @@ module webSite 'modules/web-sites.bicep' = {
     vnetRouteAllEnabled: enablePrivateNetworking ? true : false
     vnetImagePullEnabled: enablePrivateNetworking ? true : false
     virtualNetworkSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.subnetResourceIds[4] : null
-    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: 'Enabled' // Always enabling the public network access for Web App
     privateEndpoints: enablePrivateNetworking
       ? [
           {
