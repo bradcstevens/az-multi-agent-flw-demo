@@ -17,11 +17,10 @@ from common.models.messages_kernel import (AgentMessage, AgentType,
                                            InputTask, Plan, PlanStatus,
                                            PlanWithSteps, Step, UserLanguage)
 from common.utils.event_utils import track_event_if_configured
-from common.utils.utils_date import format_dates_in_messages
+
 # Updated import for KernelArguments
 from common.utils.utils_kernel import rai_success
-from common.utils.websocket_streaming import (websocket_streaming_endpoint,
-                                              ws_manager)
+
 # FastAPI imports
 from fastapi import (FastAPI, HTTPException, Query, Request, WebSocket,
                      WebSocketDisconnect)
@@ -30,7 +29,7 @@ from kernel_agents.agent_factory import AgentFactory
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
 from v3.api.router import app_v3
-from v3.config.settings import connection_config
+
 # Semantic Kernel imports
 from v3.orchestration.orchestration_manager import OrchestrationManager
 

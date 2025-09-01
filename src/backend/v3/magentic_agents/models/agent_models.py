@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import dataclass
-
+from common.config.app_config import config
 
 @dataclass(slots=True)
 class MCPConfig:
@@ -15,12 +15,12 @@ class MCPConfig:
 
     @classmethod
     def from_env(cls) -> "MCPConfig":
-        url = os.getenv("MCP_SERVER_ENDPOINT")
-        name = os.getenv("MCP_SERVER_NAME")
-        description = os.getenv("MCP_SERVER_DESCRIPTION")
-        tenant_id = os.getenv("TENANT_ID")
-        client_id = os.getenv("CLIENT_ID")
-        
+        url = config.MCP_SERVER_ENDPOINT
+        name = config.MCP_SERVER_NAME
+        description = config.MCP_SERVER_DESCRIPTION
+        tenant_id = config.TENANT_ID
+        client_id = config.CLIENT_ID
+
         # Raise exception if any required environment variable is missing
         if not all([url, name, description, tenant_id, client_id]):
             raise ValueError(f"{cls.__name__} Missing required environment variables")
@@ -40,7 +40,7 @@ class BingConfig:
 
     @classmethod
     def from_env(cls) -> "BingConfig":
-        connection_name = os.getenv("BING_CONNECTION_NAME")
+        connection_name = config.BING_CONNECTION_NAME
 
         # Raise exception if required environment variable is missing
         if not connection_name:
@@ -60,11 +60,11 @@ class SearchConfig:
 
     @classmethod
     def from_env(cls) -> "SearchConfig":
-        connection_name = os.getenv("AZURE_AI_SEARCH_CONNECTION_NAME")
-        index_name = os.getenv("AZURE_AI_SEARCH_INDEX_NAME")
-        endpoint = os.getenv("AZURE_AI_SEARCH_ENDPOINT")
-        api_key = os.getenv("AZURE_AI_SEARCH_API_KEY")
-        
+        connection_name = config.AZURE_AI_SEARCH_CONNECTION_NAME
+        index_name = config.AZURE_AI_SEARCH_INDEX_NAME
+        endpoint = config.AZURE_AI_SEARCH_ENDPOINT
+        api_key = config.AZURE_AI_SEARCH_API_KEY
+
         # Raise exception if any required environment variable is missing
         if not all([connection_name, index_name, endpoint]):
             raise ValueError(f"{cls.__name__} Missing required Azure Search environment variables")

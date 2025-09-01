@@ -7,7 +7,6 @@ from typing import Optional
 
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
-from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
 from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
                                            TeamSelectionRequest)

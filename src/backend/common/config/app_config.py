@@ -55,7 +55,7 @@ class AppConfig:
         self.AZURE_BING_CONNECTION_NAME = self._get_optional(
             "AZURE_BING_CONNECTION_NAME"
         )
-
+        self.SUPPORTED_MODELS = self._get_optional("SUPPORTED_MODELS")
         # Frontend settings
         self.FRONTEND_SITE_NAME = self._get_optional(
             "FRONTEND_SITE_NAME", "http://127.0.0.1:3000"
@@ -74,6 +74,15 @@ class AppConfig:
         # Optional MCP server endpoint (for local MCP server or remote)
         # Example: http://127.0.0.1:8000/mcp
         self.MCP_SERVER_ENDPOINT = self._get_optional("MCP_SERVER_ENDPOINT")
+        self.MCP_SERVER_NAME = self._get_optional("MCP_SERVER_NAME")
+        self.MCP_SERVER_DESCRIPTION = self._get_optional("MCP_SERVER_DESCRIPTION")
+        self.TENANT_ID = self._get_optional("TENANT_ID")
+        self.CLIENT_ID = self._get_optional("CLIENT_ID")
+        self.AZURE_AI_SEARCH_CONNECTION_NAME = self._get_optional("AZURE_AI_SEARCH_CONNECTION_NAME")
+        self.AZURE_AI_SEARCH_INDEX_NAME = self._get_optional("AZURE_AI_SEARCH_INDEX_NAME")
+        self.AZURE_AI_SEARCH_ENDPOINT = self._get_optional("AZURE_AI_SEARCH_ENDPOINT")
+        self.AZURE_AI_SEARCH_API_KEY = self._get_optional("AZURE_AI_SEARCH_API_KEY")
+        self.BING_CONNECTION_NAME = self._get_optional("BING_CONNECTION_NAME")  
 
         test_team_json = self._get_optional("TEST_TEAM_JSON")
 

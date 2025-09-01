@@ -54,8 +54,7 @@ class FoundryService:
 
         try:
             # Get Azure Management API token (not Cognitive Services token)
-            credential = config.get_azure_credentials()
-            token = credential.get_token(config.AZURE_MANAGEMENT_SCOPE)
+            token = config.get_access_token()
 
             # Extract Azure OpenAI resource name from endpoint URL
             openai_endpoint = config.AZURE_OPENAI_ENDPOINT

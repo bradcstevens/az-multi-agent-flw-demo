@@ -9,7 +9,7 @@ from semantic_kernel.connectors.azure_ai_search import AzureAISearchCollection
 from v3.magentic_agents.common.lifecycle import MCPEnabledBase
 from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
 from v3.magentic_agents.reasoning_search import ReasoningSearch
-
+from common.config.app_config import config
 
 class ReasoningAgentTemplate(MCPEnabledBase):
     """
@@ -47,7 +47,7 @@ class ReasoningAgentTemplate(MCPEnabledBase):
         chat = AzureChatCompletion(
             deployment_name=self._model_deployment_name,
             endpoint=self._openai_endpoint,
-            ad_token_provider=ad_token_provider
+            ad_token_provider=config.get_access_token()
         )
         self.kernel.add_service(chat)
 
