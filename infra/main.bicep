@@ -709,13 +709,16 @@ module maintenanceConfiguration 'br/public:avm/res/maintenance/maintenance-confi
 }
 
 var dataCollectionRulesResourceName = 'dcr-${solutionSuffix}'
+var dataCollectionRulesLocation = useExistingLogAnalytics
+  ? existingLogAnalyticsWorkspace!.location
+  : logAnalyticsWorkspace!.outputs.location
 module windowsVmDataCollectionRules 'br/public:avm/res/insights/data-collection-rule:0.6.1' = if (enablePrivateNetworking && enableMonitoring) {
   name: take('avm.res.insights.data-collection-rule.${dataCollectionRulesResourceName}', 64)
   params: {
     name: dataCollectionRulesResourceName
     tags: tags
     enableTelemetry: enableTelemetry
-    location: location
+    location: dataCollectionRulesLocation
     dataCollectionRuleProperties: {
       kind: 'Windows'
       dataSources: {
