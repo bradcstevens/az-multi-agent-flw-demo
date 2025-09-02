@@ -8,8 +8,9 @@ from typing import Optional
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (GeneratePlanRequest, InputTask, PlanStatus,
-                                           TeamSelectionRequest, Plan)
+from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
+                                           Plan, PlanStatus,
+                                           TeamSelectionRequest)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
 from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
@@ -130,7 +131,7 @@ async def init_team(
         )
         raise HTTPException(status_code=400, detail=f"Error starting request: {e}") from e
 
-@app_v3.post("/create_plan")
+@app_v3.post("/process_request")
 async def process_request(background_tasks: BackgroundTasks, input_task: InputTask, request: Request):
     """
     Create a new plan without full processing.
