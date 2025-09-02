@@ -47,40 +47,56 @@ class WebSocketService {
     private ws: WebSocket | null = null;
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
-    private reconnectDelay = 1000;
+    private reconnectDelay = 12000; // Changed from 1000ms to 12000ms (12 seconds)
     private listeners: Map<string, Set<(message: StreamMessage) => void>> = new Map();
     private planSubscriptions: Set<string> = new Set();
+    private reconnectTimer: NodeJS.Timeout | null = null; // Add timer tracking
+    private isConnecting = false; // Add connection state tracking
 
     /**
      * Connect to WebSocket server
      */
     connect(): Promise<void> {
         return new Promise((resolve, reject) => {
+            // Prevent multiple simultaneous connection attempts
+            if (this.isConnecting) {
+                console.log('Connection attempt already in progress');
+                return;
+            }
+
+            // Clear any existing reconnection timer
+            if (this.reconnectTimer) {
+                clearTimeout(this.reconnectTimer);
+                this.reconnectTimer = null;
+            }
+
             try {
+                this.isConnecting = true;
+                
                 // Get WebSocket URL from environment or default to localhost
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsHost = process.env.REACT_APP_WS_HOST || '127.0.0.1:8000';
                 const processId = crypto.randomUUID(); // Generate unique process ID for this session
 
-                // const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}`;
                 // Build WebSocket URL with authentication headers as query parameters
-            const userId = getUserId(); // Import this from config
-            const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}?user_id=${encodeURIComponent(userId)}`;
+                const userId = getUserId(); // Import this from config
+                const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}?user_id=${encodeURIComponent(userId)}`;
 
                 console.log('Connecting to WebSocket:', wsUrl);
                 
                 this.ws = new WebSocket(wsUrl);
 
                 this.ws.onopen = () => {
-                    console.log('WebSocket connected');
+                    console.log('WebSocket connected successfully');
                     this.reconnectAttempts = 0;
+                    this.isConnecting = false;
                     this.emit('connection_status', { connected: true });
                     resolve();
                 };
 
                 this.ws.onmessage = (event) => {
                     try {
-                        const message: StreamMessage =  JSON.parse(event.data);
+                        const message: StreamMessage = JSON.parse(event.data);
                         this.handleMessage(message);
                     } catch (error) {
                         console.error('Error parsing WebSocket message:', error, 'Raw data:', event.data);
@@ -88,19 +104,26 @@ class WebSocketService {
                     }
                 };
 
-                this.ws.onclose = () => {
-                    console.log('WebSocket disconnected');
+                this.ws.onclose = (event) => {
+                    console.log('WebSocket disconnected', event.code, event.reason);
+                    this.isConnecting = false;
                     this.emit('connection_status', { connected: false });
-                    this.attemptReconnect();
+                    
+                    // Only attempt reconnect if it wasn't a manual disconnect
+                    if (event.code !== 1000) { // 1000 = normal closure
+                        this.attemptReconnect();
+                    }
                 };
 
                 this.ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
+                    this.isConnecting = false;
                     this.emit('error', { error: 'WebSocket connection failed' });
                     reject(error);
                 };
 
             } catch (error) {
+                this.isConnecting = false;
                 reject(error);
             }
         });
@@ -110,11 +133,22 @@ class WebSocketService {
      * Disconnect from WebSocket server
      */
     disconnect(): void {
+        console.log('Manually disconnecting WebSocket');
+        
+        // Clear any pending reconnection attempts
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        
+        this.reconnectAttempts = this.maxReconnectAttempts; // Prevent reconnection
+        
         if (this.ws) {
-            this.ws.close();
+            this.ws.close(1000, 'Manual disconnect'); // Use normal closure code
             this.ws = null;
         }
         this.planSubscriptions.clear();
+        this.isConnecting = false;
     }
 
     /**
@@ -209,9 +243,6 @@ class WebSocketService {
     /**
      * Handle incoming WebSocket messages
      */
-    /**
- * Handle incoming WebSocket messages
- */
     private handleMessage(message: StreamMessage): void {
         console.log('WebSocket message received:', message);
 
@@ -234,19 +265,30 @@ class WebSocketService {
      */
     private attemptReconnect(): void {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.log('Max reconnection attempts reached');
+            console.log('Max reconnection attempts reached - stopping reconnect attempts');
             this.emit('error', { error: 'Max reconnection attempts reached' });
             return;
         }
 
+        // Prevent multiple simultaneous reconnection attempts
+        if (this.isConnecting || this.reconnectTimer) {
+            console.log('Reconnection attempt already in progress');
+            return;
+        }
+
         this.reconnectAttempts++;
+        // Use exponential backoff: 12s, 24s, 48s, 96s, 192s
         const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
         
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+        console.log(`Scheduling reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay/1000}s`);
         
-        setTimeout(() => {
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            console.log(`Attempting reconnection (attempt ${this.reconnectAttempts})`);
+            
             this.connect()
                 .then(() => {
+                    console.log('Reconnection successful - re-subscribing to plans');
                     // Re-subscribe to all plans
                     this.planSubscriptions.forEach(planId => {
                         this.subscribeToPlan(planId);
@@ -254,6 +296,8 @@ class WebSocketService {
                 })
                 .catch((error) => {
                     console.error('Reconnection failed:', error);
+                    // The connect() method will trigger another reconnection attempt
+                    // through the onclose handler if needed
                 });
         }, delay);
     }
@@ -277,27 +321,27 @@ class WebSocketService {
     }
 
     /**
- * Send plan approval response
- */
+     * Send plan approval response
+     */
     sendPlanApprovalResponse(response: PlanApprovalResponseData): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        console.error('WebSocket not connected - cannot send plan approval response');
-        this.emit('error', { error: 'Cannot send plan approval response - WebSocket not connected' });
-        return;
-    }
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected - cannot send plan approval response');
+            this.emit('error', { error: 'Cannot send plan approval response - WebSocket not connected' });
+            return;
+        }
 
-    try {
-        const message = {
-            type: 'plan_approval_response',
-            data: response
-        };
-        this.ws.send(JSON.stringify(message));
-        console.log('Plan approval response sent:', response);
-    } catch (error) {
-        console.error('Failed to send plan approval response:', error);
-        this.emit('error', { error: 'Failed to send plan approval response' });
+        try {
+            const message = {
+                type: 'plan_approval_response',
+                data: response
+            };
+            this.ws.send(JSON.stringify(message));
+            console.log('Plan approval response sent:', response);
+        } catch (error) {
+            console.error('Failed to send plan approval response:', error);
+            this.emit('error', { error: 'Failed to send plan approval response' });
+        }
     }
-}
 }
 
 // Export singleton instance
