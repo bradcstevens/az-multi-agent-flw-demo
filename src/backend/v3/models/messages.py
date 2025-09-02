@@ -83,6 +83,7 @@ class FinalResultMessage:
     summary: str | None = None
     context: dict | None = None
 
+@dataclass(slots=True)
 class HumanFeedback(KernelBaseModel):
     """Message containing human feedback on a step."""
 
@@ -93,7 +94,7 @@ class HumanFeedback(KernelBaseModel):
     human_feedback: Optional[str] = None
     updated_action: Optional[str] = None
 
-
+@dataclass(slots=True)
 class HumanClarification(KernelBaseModel):
     """Message containing human clarification on a plan."""
 
@@ -101,6 +102,7 @@ class HumanClarification(KernelBaseModel):
     session_id: str
     human_clarification: str
 
+@dataclass(slots=True)
 class ApprovalRequest(KernelBaseModel):
     """Message sent to HumanAgent to request approval for a step."""
 
@@ -110,3 +112,11 @@ class ApprovalRequest(KernelBaseModel):
     user_id: str
     action: str
     agent_name: str
+
+@dataclass(slots=True)
+class HumanClarification(KernelBaseModel):
+    """Message containing human clarification on a plan."""
+
+    plan_id: str
+    session_id: str
+    human_clarification: str

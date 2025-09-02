@@ -1,6 +1,7 @@
 import os
 import sys
 from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -48,8 +49,8 @@ def test_input_task_invalid_json():
     response = client.post("/input_task", data=invalid_json, headers=headers)
 
 
-def test_create_plan_endpoint_success():
-    """Test the /api/create_plan endpoint with valid input."""
+def test_process_request_endpoint_success():
+    """Test the /api/process_request endpoint with valid input."""
     headers = {"Authorization": "Bearer mock-token"}
     
     # Mock the RAI success function
@@ -66,7 +67,7 @@ def test_create_plan_endpoint_success():
             "description": "Create a marketing plan for our new product"
         }
         
-        response = client.post("/api/create_plan", json=test_input, headers=headers)
+        response = client.post("/api/process_request", json=test_input, headers=headers)
         
         # Print response details for debugging
         print(f"Response status: {response.status_code}")
@@ -85,8 +86,8 @@ def test_create_plan_endpoint_success():
         mock_memory_store.add_plan.assert_called_once()
 
 
-def test_create_plan_endpoint_rai_failure():
-    """Test the /api/create_plan endpoint when RAI check fails."""
+def test_process_request_endpoint_rai_failure():
+    """Test the /api/process_request endpoint when RAI check fails."""
     headers = {"Authorization": "Bearer mock-token"}
     
     # Mock the RAI failure
@@ -98,7 +99,7 @@ def test_create_plan_endpoint_rai_failure():
             "description": "This is an unsafe description"
         }
         
-        response = client.post("/api/create_plan", json=test_input, headers=headers)
+        response = client.post("/api/process_request", json=test_input, headers=headers)
         
         # Check response
         assert response.status_code == 400
@@ -107,8 +108,8 @@ def test_create_plan_endpoint_rai_failure():
         assert "safety validation" in data["detail"]
 
 
-def test_create_plan_endpoint_harmful_content():
-    """Test the /api/create_plan endpoint with harmful content that should fail RAI."""
+def test_process_request_endpoint_harmful_content():
+    """Test the /api/process_request endpoint with harmful content that should fail RAI."""
     headers = {"Authorization": "Bearer mock-token"}
     
     # Mock the RAI failure for harmful content
@@ -120,7 +121,7 @@ def test_create_plan_endpoint_harmful_content():
             "description": "I want to kill my neighbors cat"
         }
         
-        response = client.post("/api/create_plan", json=test_input, headers=headers)
+        response = client.post("/api/process_request", json=test_input, headers=headers)
         
         # Print response details for debugging
         print(f"Response status: {response.status_code}")
@@ -133,8 +134,8 @@ def test_create_plan_endpoint_harmful_content():
         assert "safety validation" in data["detail"]
 
 
-def test_create_plan_endpoint_real_rai_check():
-    """Test the /api/create_plan endpoint with real RAI check (no mocking)."""
+def test_process_request_endpoint_real_rai_check():
+    """Test the /api/process_request endpoint with real RAI check (no mocking)."""
     headers = {"Authorization": "Bearer mock-token"}
     
     # Don't mock RAI - let it run the real check
@@ -150,7 +151,7 @@ def test_create_plan_endpoint_real_rai_check():
             "description": "I want to kill my neighbors cat"
         }
         
-        response = client.post("/api/create_plan", json=test_input, headers=headers)
+        response = client.post("/api/process_request", json=test_input, headers=headers)
         
         # Print response details for debugging
         print(f"Real RAI Response status: {response.status_code}")

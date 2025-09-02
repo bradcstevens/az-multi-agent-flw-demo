@@ -18,7 +18,7 @@ BE: Create a teams container in Cosmos and move all loaded team definitions ther
 Implement saving of plan to cosmos -> history in...
 
 ================ Request submit flow ======================
-on request submission call "/create_plan" (process_request)
+on request submission call "/process_request" (process_request)
 This will return immediately - move to other page and display spinner -> "creating plan"
 Socket will start receiving messages ->
 Stream plan output into main window
@@ -30,7 +30,7 @@ Send PlanApprovalResponse message when user answers
 If not approved 
 	BE: plan will cancel on backend 
 	FE: - enable input again for fresh request
-	Call input_request API on backend again (just like inputing any request)
+	Call input_request API on backend again (just like inputting any request)
 
 If approved:
 	Display plan steps in right pane if approved
