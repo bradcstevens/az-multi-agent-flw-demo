@@ -6,10 +6,14 @@ Extends StandardMagenticManager to add approval gates before plan execution.
 import re
 from typing import Any, List, Optional
 
+import v3.models.messages as messages
 from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
     MagenticContext, StandardMagenticManager)
+from semantic_kernel.agents.orchestration.prompts._magentic_prompts import \
+    ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT
 from semantic_kernel.contents import ChatMessageContent
+from v3.config.settings import connection_config, current_user_id
 from v3.models.models import MPlan, MStep
 
 
@@ -22,12 +26,26 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
     # Define Pydantic fields to avoid validation errors
     approval_enabled: bool = True
     magentic_plan: Optional[MPlan] = None
+    current_user_id: Optional[str] = None 
+
     def __init__(self, *args, **kwargs):
         # Remove any custom kwargs before passing to parent
-        super().__init__(*args, **kwargs)
-        
 
-    async def plan(self, magentic_context) -> Any:
+        # Use object.__setattr__ to bypass Pydantic validation
+        # object.__setattr__(self, 'current_user_id', None)
+
+        custom_addition = """
+To address this request we have assembled the following team:
+
+{{$team}}
+
+Please check with the team members to list all relevant tools they have access to, and their required parameters."""
+
+        kwargs['task_ledger_facts_prompt'] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + custom_addition
+        
+        super().__init__(*args, **kwargs)
+
+    async def plan(self, magentic_context: MagenticContext) -> Any:
         """
         Override the plan method to create the plan first, then ask for approval before execution.
         """
@@ -38,70 +56,85 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         elif not isinstance(task_text, str):
             task_text = str(task_text)
         
-        print(f"\n🎯 Human-in-the-Loop Magentic Manager Creating Plan:")
+        print(f"\n Human-in-the-Loop Magentic Manager Creating Plan:")
         print(f"   Task: {task_text}")
         print("-" * 60)
         
         # First, let the parent create the actual plan
-        print("📋 Creating execution plan...")
+        print(" Creating execution plan...")
         plan = await super().plan(magentic_context)
-
         self.magentic_plan = self.plan_to_obj( magentic_context, self.task_ledger)
+
+        # Request approval from the user before executing the plan
+        approval_message = messages.PlanApprovalRequest(
+            plan=self.magentic_plan,
+            status="PENDING_APPROVAL",
+            context={
+                "task": task_text,
+                "participant_descriptions": magentic_context.participant_descriptions
+            } if hasattr(magentic_context, 'participant_descriptions') else {}
+        )
+
+        # Send the current plan to the frontend via WebSocket
+        #await connection_config.send_status_update_async(approval_message,)
         
-        # If planning failed or returned early, just return the result
-        if isinstance(plan, ChatMessageContent):
-            # Now show the actual plan and ask for approval
-            plan_approved = await self._get_plan_approval_with_details(
-                task_text, 
-                magentic_context.participant_descriptions, 
-                plan
-            )
-            if not plan_approved:
-                print("❌ Plan execution cancelled by user")
-                return ChatMessageContent(
-                    role="assistant",
-                    content="Plan execution was cancelled by the user."
-                )
-            
-            # If we get here, plan is approved - return the plan for execution
-            print("✅ Plan approved - proceeding with execution...")
+        # Send the approval request to the user's WebSocket
+        # The user_id will be automatically retrieved from context
+        await connection_config.send_status_update_async({
+            "type": "plan_approval_request", 
+            "data": approval_message
+        })
+        
+        # Wait for user approval (you'll need to implement this)
+        approval_response = await self._wait_for_user_approval()
+        
+        if approval_response and approval_response.approved:
+            print("Plan approved - proceeding with execution...")
             return plan
-        
-        # If plan is not a ChatMessageContent, still show it and ask for approval
-        if self._approval_settings['enabled']:
-            plan_approved = await self._get_plan_approval_with_details(
-                task_text, 
-                magentic_context.participant_descriptions, 
-                plan
-            )
-            if not plan_approved:
-                print("❌ Plan execution cancelled by user")
-                return ChatMessageContent(
-                    role="assistant",
-                    content="Plan execution was cancelled by the user."
-                )
-        
-        # If we get here, plan is approved - return the plan for execution
-        print("✅ Plan approved - proceeding with execution...")
-        return plan
+        else:
+            print("Plan execution cancelled by user")
+            await connection_config.send_status_update_async({
+                "type": "plan_approval_response", 
+                "data": approval_response
+            })
+            raise Exception("Plan execution cancelled by user") 
+            # return ChatMessageContent(
+            #     role="assistant",
+            #     content="Plan execution was cancelled by the user."
+            # )
+            
+    
+    async def _wait_for_user_approval(self) -> Optional[messages.PlanApprovalResponse]:
+        """Wait for user approval response."""
+        user_id = current_user_id.get()
+        # Temporarily use console input for approval - will switch to WebSocket or API in future
+        response = input("\nApprove this execution plan? [y/n]: ").strip().lower()
+        if response in ['y', 'yes']:
+            return messages.PlanApprovalResponse(approved=True)
+        elif response in ['n', 'no']:
+            return messages.PlanApprovalResponse(approved=False)
+        else:
+            print("Invalid input. Please enter 'y' for yes or 'n' for no.")
+            return await self._wait_for_user_approval()
+
     
     async def prepare_final_answer(self, magentic_context: MagenticContext) -> ChatMessageContent:
         """
         Override to ensure final answer is prepared after all steps are executed.
         """
-        print("\n📝 Magentic Manager - Preparing final answer...")
+        print("\n Magentic Manager - Preparing final answer...")
 
         return await super().prepare_final_answer(magentic_context)
     
     async def _get_plan_approval_with_details(self, task: str, participant_descriptions: dict, plan: Any) -> bool:
         while True:
-            approval = input("\n❓ Approve this execution plan? [y/n/details]: ").strip().lower()
+            approval = input("\ Approve this execution plan? [y/n/details]: ").strip().lower()
             
             if approval in ['y', 'yes']:
-                print("✅ Plan approved by user")
+                print(" Plan approved by user")
                 return True
             elif approval in ['n', 'no']:
-                print("❌ Plan rejected by user")
+                print(" Plan rejected by user")
                 return False
             # elif approval in ['d', 'details']:
             #     self._show_detailed_plan_info(task, participant_descriptions, plan)

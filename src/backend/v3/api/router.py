@@ -1,36 +1,134 @@
+import asyncio
+import contextvars
 import json
 import logging
 import uuid
 from typing import Optional
 
+import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
-from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
-                                           Plan, PlanStatus)
+from common.models.messages_kernel import (GeneratePlanRequest, InputTask, PlanStatus,
+                                           TeamSelectionRequest, Plan)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
 from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
                      HTTPException, Request, UploadFile, WebSocket,
                      WebSocketDisconnect)
 from kernel_agents.agent_factory import AgentFactory
-from pydantic import BaseModel
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
+from v3.config.settings import connection_config, current_user_id, team_config
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
-
-class TeamSelectionRequest(BaseModel):
-    """Request model for team selection."""
-    team_id: str
-    session_id: Optional[str] = None
-
+router = APIRouter()
+logger = logging.getLogger(__name__)
 
 app_v3 = APIRouter(
     prefix="/api/v3",
     responses={404: {"description": "Not found"}},
 )
 
+@app_v3.websocket("/socket/{process_id}")
+async def start_comms(websocket: WebSocket, process_id: str):
+    """ Web-Socket endpoint for real-time process status updates. """
+        
+    # Always accept the WebSocket connection first
+    await websocket.accept()
+
+    user_id = None
+    try:
+        # WebSocket headers are different, try to get user info
+        headers = dict(websocket.headers)
+        authenticated_user = get_authenticated_user_details(request_headers=headers)
+        user_id = authenticated_user.get("user_principal_id")
+        if not user_id:
+            user_id = "00000000-0000-0000-0000-000000000000"
+    except Exception as e:
+        logging.warning(f"Could not extract user from WebSocket headers: {e}")
+        user_id = "00000000-0000-0000-0000-000000000000"
+
+    current_user_id.set(user_id)
+
+    # Add to the connection manager for backend updates
+    connection_config.add_connection(process_id=process_id, connection=websocket, user_id=user_id)
+    track_event_if_configured("WebSocketConnectionAccepted", {"process_id": process_id, "user_id": user_id})
+
+    # Keep the connection open - FastAPI will close the connection if this returns
+    try:
+        # Keep the connection open - FastAPI will close the connection if this returns
+        while True:
+            # no expectation that we will receive anything from the client but this keeps
+            # the connection open and does not take cpu cycle
+            try:
+                message = await websocket.receive_text()
+                logging.debug(f"Received WebSocket message from {user_id}: {message}")
+            except asyncio.TimeoutError:
+                pass
+            except WebSocketDisconnect:
+                track_event_if_configured("WebSocketDisconnect", {"process_id": process_id, "user_id": user_id})
+                logging.info(f"Client disconnected from batch {process_id}")
+                break
+    except Exception as e:
+        # Fixed logging syntax - removed the error= parameter
+        logging.error(f"Error in WebSocket connection: {str(e)}")
+    finally:
+        # Always clean up the connection
+        await connection_config.close_connection(user_id)
+
+@app_v3.get("/init_team")
+async def init_team(
+    request: Request,
+):
+    """ Initialize the user's current team of agents """
+
+    # Need to store this user state in cosmos db, retrieve it here, and initialize the team
+    # current in-memory store is in team_config from settings.py
+    # For now I will set the initial install team ids as 00000000-0000-0000-0000-000000000001 (HR),
+    # 00000000-0000-0000-0000-000000000002 (Marketing), and 00000000-0000-0000-0000-000000000003 (Retail),
+    # and use this value to initialize to HR each time.
+    init_team_id = "00000000-0000-0000-0000-000000000001"
+
+    try:
+      authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+      user_id = authenticated_user["user_principal_id"]
+      if not user_id:
+          track_event_if_configured(
+              "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+          )
+          raise HTTPException(status_code=400, detail="no user")
+      
+      # Initialize memory store and service
+      memory_store = await DatabaseFactory.get_database(user_id=user_id)
+      team_service = TeamService(memory_store)
+
+      # Verify the team exists and user has access to it
+      team_configuration = await team_service.get_team_configuration(init_team_id, user_id)
+      if team_configuration is None:
+          raise HTTPException(
+              status_code=404, 
+              detail=f"Team configuration '{init_team_id}' not found or access denied"
+          )
+      
+      # Set as current team in memory
+      team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
+      
+      # Initialize agent team for this user session
+      await OrchestrationManager.get_current_or_new_orchestration(user_id=user_id, team_config=team_configuration)
+
+      return {
+          "status": "Request started successfully",
+          "team_id": init_team_id
+      }
+
+    except Exception as e:
+        track_event_if_configured(
+            "InitTeamFailed",
+            {
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=400, detail=f"Error starting request: {e}") from e
 
 @app_v3.post("/create_plan")
 async def process_request(background_tasks: BackgroundTasks, input_task: InputTask, request: Request):
@@ -82,30 +180,32 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
               type: string
               description: Error message
     """
-    if not await rai_success(input_task.description, False):
-        track_event_if_configured(
-            "RAI failed",
-            {
-                "status": "Plan not created - RAI check failed",
-                "description": input_task.description,
-                "session_id": input_task.session_id,
-            },
-        )
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error_type": "RAI_VALIDATION_FAILED",
-                "message": "Content Safety Check Failed",
-                "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
-                "suggestions": [
-                    "Remove any potentially harmful, inappropriate, or unsafe content",
-                    "Use more professional and constructive language",
-                    "Focus on legitimate business or educational objectives",
-                    "Ensure your request complies with content policies",
-                ],
-                "user_action": "Please revise your request and try again",
-            },
-        )
+
+
+    # if not await rai_success(input_task.description, False):
+    #     track_event_if_configured(
+    #         "RAI failed",
+    #         {
+    #             "status": "Plan not created - RAI check failed",
+    #             "description": input_task.description,
+    #             "session_id": input_task.session_id,
+    #         },
+    #     )
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail={
+    #             "error_type": "RAI_VALIDATION_FAILED",
+    #             "message": "Content Safety Check Failed",
+    #             "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+    #             "suggestions": [
+    #                 "Remove any potentially harmful, inappropriate, or unsafe content",
+    #                 "Use more professional and constructive language",
+    #                 "Focus on legitimate business or educational objectives",
+    #                 "Ensure your request complies with content policies",
+    #             ],
+    #             "user_action": "Please revise your request and try again",
+    #         },
+    #     )
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -116,21 +216,71 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         )
         raise HTTPException(status_code=400, detail="no user")
 
-    if not input_task.team_id:
-        track_event_if_configured(
-            "TeamIDNofound", {"status_code": 400, "detail": "no team id"}
-        )
-        raise HTTPException(status_code=400, detail="no team id")
+    # if not input_task.team_id:
+    #     track_event_if_configured(
+    #         "TeamIDNofound", {"status_code": 400, "detail": "no team id"}
+    #     )
+    #     raise HTTPException(status_code=400, detail="no team id")
 
     if not input_task.session_id:
         input_task.session_id = str(uuid.uuid4())
+    try:
+        plan_id = str(uuid.uuid4())
+        # Initialize memory store and service
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        plan = Plan(
+            id=plan_id,
+            plan_id=plan_id,
+            user_id=user_id,
+            session_id=input_task.session_id,
+            team_id=None,  #TODO add current_team_id
+            initial_goal=input_task.description,
+            overall_status=PlanStatus.in_progress,
+        )
+        await memory_store.add_plan(plan)
+
+
+        track_event_if_configured(
+            "PlanCreated",
+            {
+                "status": "success",
+                "plan_id": plan.plan_id,
+                "session_id": input_task.session_id,
+                "user_id": user_id,
+                "team_id": "", #TODO add current_team_id
+                "description": input_task.description,
+            },
+        )
+    except Exception as e:
+        print(f"Error creating plan: {e}")
+        track_event_if_configured(
+            "PlanCreationFailed",
+            {
+                "status": "error",
+                "description": input_task.description,
+                "session_id": input_task.session_id,
+                "user_id": user_id,
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=500, detail="Failed to create plan")
 
     try:
-        background_tasks.add_task(OrchestrationManager.run_orchestration, user_id, input_task)
+        current_user_id.set(user_id)  # Set context
+        current_context = contextvars.copy_context()  # Capture context
+        # background_tasks.add_task(
+        #     lambda: current_context.run(lambda:OrchestrationManager().run_orchestration, user_id, input_task)
+        # )
+
+        async def run_with_context():
+            return await current_context.run(OrchestrationManager().run_orchestration, user_id, input_task)
+
+        background_tasks.add_task(run_with_context)
 
         return {
             "status": "Request started successfully",
             "session_id": input_task.session_id,
+            "plan_id": plan_id,
         }
 
     except Exception as e:
@@ -143,6 +293,10 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
             },
         )
         raise HTTPException(status_code=400, detail=f"Error starting request: {e}") from e
+
+@app_v3.post("/api/human_feedback")
+async def human_feedback_endpoint(human_feedback: messages.HumanFeedback, request: Request):
+    pass
 
 
 @app_v3.post("/upload_team_config")
@@ -515,6 +669,9 @@ async def delete_team_config_endpoint(team_id: str, request: Request):
         )
 
     try:
+        # To do: Check if the team is the users current team, or if it is 
+        # used in any active sessions/plans.  Refuse request if so.
+
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
         team_service = TeamService(memory_store)
@@ -569,7 +726,7 @@ async def get_model_deployments_endpoint(request: Request):
 
     try:
         team_service = TeamService()
-        deployments = await team_service.list_model_deployments()
+        deployments = [] #await team_service.extract_models_from_agent()
         summary = await team_service.get_deployment_status_summary()
         return {"deployments": deployments, "summary": summary}
     except Exception as e:
@@ -580,53 +737,7 @@ async def get_model_deployments_endpoint(request: Request):
 @app_v3.post("/select_team")
 async def select_team_endpoint(selection: TeamSelectionRequest, request: Request):
     """
-    Update team selection for a plan or session.
-    
-    Used when users change teams on the plan page.
-
-    ---
-    tags:
-      - Team Selection
-    parameters:
-      - name: user_principal_id
-        in: header
-        type: string
-        required: true
-        description: User ID extracted from the authentication header
-      - name: body
-        in: body
-        required: true
-        schema:
-          type: object
-          properties:
-            team_id:
-              type: string
-              description: The ID of the team to select
-            session_id:
-              type: string
-              description: Optional session ID to associate with the team selection
-    responses:
-      200:
-        description: Team selection updated successfully
-        schema:
-          type: object
-          properties:
-            status:
-              type: string
-            message:
-              type: string
-            team_id:
-              type: string
-            team_name:
-              type: string
-            session_id:
-              type: string
-      400:
-        description: Invalid request
-      401:
-        description: Missing or invalid user information
-      404:
-        description: Team configuration not found
+    Select the current team for the user session.
     """
     # Validate user authentication
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
@@ -645,7 +756,7 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
         team_service = TeamService(memory_store)
 
         # Verify the team exists and user has access to it
-        team_config = await team_service.get_team_configuration(selection.team_id, user_id)
+        team_configuration = await team_service.get_team_configuration(selection.team_id, user_id)
         if team_config is None:
             raise HTTPException(
                 status_code=404, 
@@ -655,8 +766,8 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
         # Generate session ID if not provided
         session_id = selection.session_id or str(uuid.uuid4())
 
-        # Here you could store the team selection in user preferences, session data, etc.
-        # For now, we'll just validate and return the selection
+        # save to in-memory config for current user
+        team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
         
         # Track the team selection event
         track_event_if_configured(
@@ -664,7 +775,7 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
             {
                 "status": "success",
                 "team_id": selection.team_id,
-                "team_name": team_config.name,
+                "team_name": team_configuration.name,
                 "user_id": user_id,
                 "session_id": session_id,
             },
@@ -672,12 +783,12 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
 
         return {
             "status": "success",
-            "message": f"Team '{team_config.name}' selected successfully",
+            "message": f"Team '{team_configuration.name}' selected successfully",
             "team_id": selection.team_id,
-            "team_name": team_config.name,
+            "team_name": team_configuration.name,
             "session_id": session_id,
-            "agents_count": len(team_config.agents),
-            "team_description": team_config.description,
+            "agents_count": len(team_configuration.agents),
+            "team_description": team_configuration.description,
         }
 
     except HTTPException:

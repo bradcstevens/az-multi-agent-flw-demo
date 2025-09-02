@@ -98,18 +98,25 @@ class Session(BaseDataModel):
     current_status: str
     message_to_user: Optional[str] = None
 
+class UserCurrentTeam(BaseDataModel):
+    """Represents the current team of a user."""
+
+    data_type: Literal["user_current_team"] = Field("user_current_team", Literal=True)
+    user_id: str
+    team_id: str
 
 class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
     data_type: Literal["plan"] = Field("plan", Literal=True)
-    team_id: str
+    plan_id: str 
     session_id: str
     user_id: str
     initial_goal: str
     overall_status: PlanStatus = PlanStatus.in_progress
     source: str = AgentType.PLANNER.value
     summary: Optional[str] = None
+    team_id: Optional[str] = None
     human_clarification_request: Optional[str] = None
     human_clarification_response: Optional[str] = None
 
@@ -156,12 +163,15 @@ class TeamAgent(KernelBaseModel):
     input_key: str
     type: str
     name: str
+    deployment_name: str
     system_message: str = ""
     description: str = ""
     icon: str
     index_name: str = ""
     use_rag: bool = False
     use_mcp: bool = False
+    use_bing: bool = False
+    use_reasoning: bool = False
     coding_tools: bool = False
 
 
@@ -175,6 +185,10 @@ class StartingTask(KernelBaseModel):
     creator: str
     logo: str
 
+class TeamSelectionRequest(KernelBaseModel):
+    """Request model for team selection."""
+    team_id: str
+    session_id: Optional[str] = None
 
 class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""
@@ -242,7 +256,7 @@ class InputTask(KernelBaseModel):
 
     session_id: str
     description: str  # Initial goal
-    team_id: str
+    # team_id: str
 
 
 class UserLanguage(KernelBaseModel):

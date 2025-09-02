@@ -1,9 +1,12 @@
 import React from 'react';
 import './App.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { HomePage, PlanPage, PlanCreatePage } from './pages';
+import { HomePage, PlanPage } from './pages';
+import { useWebSocket } from './hooks/useWebSocket';
 
 function App() {
+    const { isConnected, isConnecting, error } = useWebSocket();
+    
   return (
     <Router>
       <Routes>

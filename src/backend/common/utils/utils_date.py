@@ -1,8 +1,10 @@
 import json
 import locale
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Optional
+
+import regex as re
 from dateutil import parser
 
 

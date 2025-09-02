@@ -17,18 +17,19 @@ from common.models.messages_kernel import (AgentMessage, AgentType,
                                            InputTask, Plan, PlanStatus,
                                            PlanWithSteps, Step, UserLanguage)
 from common.utils.event_utils import track_event_if_configured
-from common.utils.utils_date import format_dates_in_messages
+
 # Updated import for KernelArguments
 from common.utils.utils_kernel import rai_success
-from common.utils.websocket_streaming import (websocket_streaming_endpoint,
-                                              ws_manager)
+
 # FastAPI imports
-from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
+from fastapi import (FastAPI, HTTPException, Query, Request, WebSocket,
+                     WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
 from v3.api.router import app_v3
+
 # Semantic Kernel imports
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
@@ -69,7 +70,10 @@ frontend_url = config.FRONTEND_SITE_NAME
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        frontend_url
+        "http://localhost:3000",    # Add this for local development
+        "https://localhost:3000",   # Add this if using HTTPS locally
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
     ],  # Allow all origins for development; restrict in production
     allow_credentials=True,
     allow_methods=["*"],
@@ -81,14 +85,6 @@ app.add_middleware(HealthCheckMiddleware, password="", checks={})
 # v3 endpoints
 app.include_router(app_v3)
 logging.info("Added health check middleware")
-
-
-# WebSocket streaming endpoint
-@app.websocket("/ws/streaming")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time plan execution streaming"""
-    await websocket_streaming_endpoint(websocket)
-
 
 @app.post("/api/user_browser_language")
 async def user_browser_language_endpoint(user_language: UserLanguage, request: Request):
@@ -122,128 +118,128 @@ async def user_browser_language_endpoint(user_language: UserLanguage, request: R
     return {"status": "Language received successfully"}
 
 
-@app.post("/api/input_task")
-async def input_task_endpoint(input_task: InputTask, request: Request):
-    """
-    Receive the initial input task from the user.
-    """
-    # Fix 1: Properly await the async rai_success function
-    if not await rai_success(input_task.description, True):
-        print("RAI failed")
+# @app.post("/api/input_task")
+# async def input_task_endpoint(input_task: InputTask, request: Request):
+#     """
+#     Receive the initial input task from the user.
+#     """
+#     # Fix 1: Properly await the async rai_success function
+#     if not await rai_success(input_task.description, True):
+#         print("RAI failed")
 
-        track_event_if_configured(
-            "RAI failed",
-            {
-                "status": "Plan not created - RAI validation failed",
-                "description": input_task.description,
-                "session_id": input_task.session_id,
-            },
-        )
+#         track_event_if_configured(
+#             "RAI failed",
+#             {
+#                 "status": "Plan not created - RAI validation failed",
+#                 "description": input_task.description,
+#                 "session_id": input_task.session_id,
+#             },
+#         )
 
-        return {
-            "status": "RAI_VALIDATION_FAILED",
-            "message": "Content Safety Check Failed",
-            "detail": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
-            "suggestions": [
-                "Remove any potentially harmful, inappropriate, or unsafe content",
-                "Use more professional and constructive language",
-                "Focus on legitimate business or educational objectives",
-                "Ensure your request complies with content policies",
-            ],
-        }
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
+#         return {
+#             "status": "RAI_VALIDATION_FAILED",
+#             "message": "Content Safety Check Failed",
+#             "detail": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+#             "suggestions": [
+#                 "Remove any potentially harmful, inappropriate, or unsafe content",
+#                 "Use more professional and constructive language",
+#                 "Focus on legitimate business or educational objectives",
+#                 "Ensure your request complies with content policies",
+#             ],
+#         }
+#     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+#     user_id = authenticated_user["user_principal_id"]
 
-    if not user_id:
-        track_event_if_configured(
-            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
-        )
-        raise HTTPException(status_code=400, detail="no user")
+#     if not user_id:
+#         track_event_if_configured(
+#             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+#         )
+#         raise HTTPException(status_code=400, detail="no user")
 
-    # Generate session ID if not provided
-    if not input_task.session_id:
-        input_task.session_id = str(uuid.uuid4())
+#     # Generate session ID if not provided
+#     if not input_task.session_id:
+#         input_task.session_id = str(uuid.uuid4())
 
-    try:
-        # Create all agents instead of just the planner agent
-        # This ensures other agents are created first and the planner has access to them
-        memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        client = None
-        try:
-            client = config.get_ai_project_client()
-        except Exception as client_exc:
-            logging.error(f"Error creating AIProjectClient: {client_exc}")
+#     try:
+#         # Create all agents instead of just the planner agent
+#         # This ensures other agents are created first and the planner has access to them
+#         memory_store = await DatabaseFactory.get_database(user_id=user_id)
+#         client = None
+#         try:
+#             client = config.get_ai_project_client()
+#         except Exception as client_exc:
+#             logging.error(f"Error creating AIProjectClient: {client_exc}")
 
-        agents = await AgentFactory.create_all_agents(
-            session_id=input_task.session_id,
-            user_id=user_id,
-            memory_store=memory_store,
-            client=client,
-        )
+#         agents = await AgentFactory.create_all_agents(
+#             session_id=input_task.session_id,
+#             user_id=user_id,
+#             memory_store=memory_store,
+#             client=client,
+#         )
 
-        group_chat_manager = agents[AgentType.GROUP_CHAT_MANAGER.value]
+#         group_chat_manager = agents[AgentType.GROUP_CHAT_MANAGER.value]
 
-        # Convert input task to JSON for the kernel function, add user_id here
+#         # Convert input task to JSON for the kernel function, add user_id here
 
-        # Use the planner to handle the task
-        await group_chat_manager.handle_input_task(input_task)
+#         # Use the planner to handle the task
+#         await group_chat_manager.handle_input_task(input_task)
 
-        # Get plan from memory store
-        plan = await memory_store.get_plan_by_session(input_task.session_id)
+#         # Get plan from memory store
+#         plan = await memory_store.get_plan_by_session(input_task.session_id)
 
-        if not plan:  # If the plan is not found, raise an error
-            track_event_if_configured(
-                "PlanNotFound",
-                {
-                    "status": "Plan not found",
-                    "session_id": input_task.session_id,
-                    "description": input_task.description,
-                },
-            )
-            raise HTTPException(status_code=404, detail="Plan not found")
-        # Log custom event for successful input task processing
-        track_event_if_configured(
-            "InputTaskProcessed",
-            {
-                "status": f"Plan created with ID: {plan.id}",
-                "session_id": input_task.session_id,
-                "plan_id": plan.id,
-                "description": input_task.description,
-            },
-        )
-        if client:
-            try:
-                client.close()
-            except Exception as e:
-                logging.error(f"Error sending to AIProjectClient: {e}")
-        return {
-            "status": f"Plan created with ID: {plan.id}",
-            "session_id": input_task.session_id,
-            "plan_id": plan.id,
-            "description": input_task.description,
-        }
+#         if not plan:  # If the plan is not found, raise an error
+#             track_event_if_configured(
+#                 "PlanNotFound",
+#                 {
+#                     "status": "Plan not found",
+#                     "session_id": input_task.session_id,
+#                     "description": input_task.description,
+#                 },
+#             )
+#             raise HTTPException(status_code=404, detail="Plan not found")
+#         # Log custom event for successful input task processing
+#         track_event_if_configured(
+#             "InputTaskProcessed",
+#             {
+#                 "status": f"Plan created with ID: {plan.id}",
+#                 "session_id": input_task.session_id,
+#                 "plan_id": plan.id,
+#                 "description": input_task.description,
+#             },
+#         )
+#         if client:
+#             try:
+#                 client.close()
+#             except Exception as e:
+#                 logging.error(f"Error sending to AIProjectClient: {e}")
+#         return {
+#             "status": f"Plan created with ID: {plan.id}",
+#             "session_id": input_task.session_id,
+#             "plan_id": plan.id,
+#             "description": input_task.description,
+#         }
 
-    except Exception as e:
-        # Extract clean error message for rate limit errors
-        error_msg = str(e)
-        if "Rate limit is exceeded" in error_msg:
-            match = re.search(
-                r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg
-            )
-            if match:
-                error_msg = "Application temporarily unavailable due to quota limits. Please try again later."
+#     except Exception as e:
+#         # Extract clean error message for rate limit errors
+#         error_msg = str(e)
+#         if "Rate limit is exceeded" in error_msg:
+#             match = re.search(
+#                 r"Rate limit is exceeded\. Try again in (\d+) seconds?\.", error_msg
+#             )
+#             if match:
+#                 error_msg = "Application temporarily unavailable due to quota limits. Please try again later."
 
-        track_event_if_configured(
-            "InputTaskError",
-            {
-                "session_id": input_task.session_id,
-                "description": input_task.description,
-                "error": str(e),
-            },
-        )
-        raise HTTPException(
-            status_code=400, detail=f"Error creating plan: {error_msg}"
-        ) from e
+#         track_event_if_configured(
+#             "InputTaskError",
+#             {
+#                 "session_id": input_task.session_id,
+#                 "description": input_task.description,
+#                 "error": str(e),
+#             },
+#         )
+#         raise HTTPException(
+#             status_code=400, detail=f"Error creating plan: {error_msg}"
+#         ) from e
 
 
 @app.post("/api/human_feedback")
@@ -670,11 +666,9 @@ async def get_plans(
             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
         )
         raise HTTPException(status_code=400, detail="no user")
+  
 
-    # Initialize agent team for this user session
-    await OrchestrationManager.get_current_orchestration(user_id=user_id)
-
-    # Replace the following with code to get plan run history from the database
+    #### <To do: Francia> Replace the following with code to get plan run history from the database
 
     # # Initialize memory context
     # memory_store = await DatabaseFactory.get_database(user_id=user_id)
@@ -730,8 +724,7 @@ async def get_plans(
     #     list_of_plans_with_steps.append(plan_with_steps)
 
     return []
-
-
+    
 @app.get("/api/steps/{plan_id}", response_model=List[Step])
 async def get_steps_by_plan(plan_id: str, request: Request) -> List[Step]:
     """
@@ -895,80 +888,80 @@ async def get_agent_tools():
     return []
 
 
-@app.post("/api/test/streaming/{plan_id}")
-async def test_streaming_updates(plan_id: str):
-    """
-    Test endpoint to simulate streaming updates for a plan.
-    This is for testing the WebSocket streaming functionality.
-    """
-    from common.utils.websocket_streaming import (send_agent_message,
-                                                  send_plan_update,
-                                                  send_step_update)
+# @app.post("/api/test/streaming/{plan_id}")
+# async def test_streaming_updates(plan_id: str):
+#     """
+#     Test endpoint to simulate streaming updates for a plan.
+#     This is for testing the WebSocket streaming functionality.
+#     """
+#     from common.utils.websocket_streaming import (send_agent_message,
+#                                                   send_plan_update,
+#                                                   send_step_update)
 
-    try:
-        # Simulate a series of streaming updates
-        await send_agent_message(
-            plan_id=plan_id,
-            agent_name="Data Analyst",
-            content="Starting analysis of the data...",
-            message_type="thinking",
-        )
+#     try:
+#         # Simulate a series of streaming updates
+#         await send_agent_message(
+#             plan_id=plan_id,
+#             agent_name="Data Analyst",
+#             content="Starting analysis of the data...",
+#             message_type="thinking",
+#         )
 
-        await asyncio.sleep(1)
+#         await asyncio.sleep(1)
 
-        await send_plan_update(
-            plan_id=plan_id,
-            step_id="step_1",
-            agent_name="Data Analyst",
-            content="Analyzing customer data patterns...",
-            status="in_progress",
-            message_type="action",
-        )
+#         await send_plan_update(
+#             plan_id=plan_id,
+#             step_id="step_1",
+#             agent_name="Data Analyst",
+#             content="Analyzing customer data patterns...",
+#             status="in_progress",
+#             message_type="action",
+#         )
 
-        await asyncio.sleep(2)
+#         await asyncio.sleep(2)
 
-        await send_agent_message(
-            plan_id=plan_id,
-            agent_name="Data Analyst",
-            content="Found 3 key insights in the customer data. Processing recommendations...",
-            message_type="result",
-        )
+#         await send_agent_message(
+#             plan_id=plan_id,
+#             agent_name="Data Analyst",
+#             content="Found 3 key insights in the customer data. Processing recommendations...",
+#             message_type="result",
+#         )
 
-        await asyncio.sleep(1)
+#         await asyncio.sleep(1)
 
-        await send_step_update(
-            plan_id=plan_id,
-            step_id="step_1",
-            status="completed",
-            content="Data analysis completed successfully!",
-        )
+#         await send_step_update(
+#             plan_id=plan_id,
+#             step_id="step_1",
+#             status="completed",
+#             content="Data analysis completed successfully!",
+#         )
 
-        await send_agent_message(
-            plan_id=plan_id,
-            agent_name="Business Advisor",
-            content="Reviewing the analysis results and preparing strategic recommendations...",
-            message_type="thinking",
-        )
+#         await send_agent_message(
+#             plan_id=plan_id,
+#             agent_name="Business Advisor",
+#             content="Reviewing the analysis results and preparing strategic recommendations...",
+#             message_type="thinking",
+#         )
 
-        await asyncio.sleep(2)
+#         await asyncio.sleep(2)
 
-        await send_plan_update(
-            plan_id=plan_id,
-            step_id="step_2",
-            agent_name="Business Advisor",
-            content="Based on the data analysis, I recommend focusing on customer retention strategies for the identified high-value segments.",
-            status="completed",
-            message_type="result",
-        )
+#         await send_plan_update(
+#             plan_id=plan_id,
+#             step_id="step_2",
+#             agent_name="Business Advisor",
+#             content="Based on the data analysis, I recommend focusing on customer retention strategies for the identified high-value segments.",
+#             status="completed",
+#             message_type="result",
+#         )
 
-        return {
-            "status": "success",
-            "message": f"Test streaming updates sent for plan {plan_id}",
-        }
+#         return {
+#             "status": "success",
+#             "message": f"Test streaming updates sent for plan {plan_id}",
+#         }
 
-    except Exception as e:
-        logging.error(f"Error sending test streaming updates: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+#     except Exception as e:
+#         logging.error(f"Error sending test streaming updates: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 # Run the app

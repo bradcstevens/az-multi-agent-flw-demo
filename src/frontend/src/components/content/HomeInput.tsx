@@ -17,6 +17,7 @@ import { TeamConfig } from "../../models/Team";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
 import { RAIErrorCard, RAIErrorData } from "../errors";
+import { apiService } from "../../api/apiService";
 
 import ChatInput from "@/coral/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
@@ -83,13 +84,16 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     textareaRef.current.style.height = "auto";
                 }
 
-                if (response.plan_id && response.plan_id !== null) {
+                if (response.session_id && response.session_id !== null) {
                     showToast("Plan created!", "success");
                     dismissToast(id);
 
                     // Navigate to create page (no team ID in URL anymore)
                     console.log('HomeInput: Navigating to plan creation with team:', selectedTeam?.name);
-                    navigate(`/plan/${response.plan_id}`);
+                     console.log('HomeInput: Navigating to plan creation with session:', response.session_id);
+                      console.log('HomeInput: Plan created with session:', response.session_id);
+
+                    navigate(`/plan/${response.session_id}`);
                 } else {
                     showToast("Failed to create plan", "error");
                     dismissToast(id);

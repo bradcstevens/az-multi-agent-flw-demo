@@ -60,29 +60,29 @@ class MCPEnabledBase:
         """Subclasses must build self._agent here."""
         raise NotImplementedError
 
-    # Internals
-    def _build_mcp_headers(self) -> dict:
-        if not self.mcp_cfg.client_id:
-            return {}
-        self.cred = InteractiveBrowserCredential(
-            tenant_id=self.mcp_cfg.tenant_id or None,
-            client_id=self.mcp_cfg.client_id,
-        )
-        tok = self.cred.get_token(f"api://{self.mcp_cfg.client_id}/access_as_user")
-        return {
-            "Authorization": f"Bearer {tok.token}",
-            "Content-Type": "application/json",
-        }
+    # For use when implementing bearer token auth
+    # def _build_mcp_headers(self) -> dict:
+    #     if not self.mcp_cfg.client_id:
+    #         return {}
+    #     self.cred = InteractiveBrowserCredential(
+    #         tenant_id=self.mcp_cfg.tenant_id or None,
+    #         client_id=self.mcp_cfg.client_id,
+    #     )
+    #     tok = self.cred.get_token(f"api://{self.mcp_cfg.client_id}/access_as_user")
+    #     return {
+    #         "Authorization": f"Bearer {tok.token}",
+    #         "Content-Type": "application/json",
+    #     }
 
     async def _enter_mcp_if_configured(self) -> None:
         if not self.mcp_cfg:
             return
-        headers = self._build_mcp_headers()
+        #headers = self._build_mcp_headers()
         plugin = MCPStreamableHttpPlugin(
             name=self.mcp_cfg.name,
             description=self.mcp_cfg.description,
             url=self.mcp_cfg.url,
-            headers=headers,
+            #headers=headers,
         )
         # Enter MCP async context via the stack to ensure correct LIFO cleanup
         if self._stack is None:

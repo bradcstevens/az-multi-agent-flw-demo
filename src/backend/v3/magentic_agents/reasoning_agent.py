@@ -2,6 +2,7 @@ import logging
 import os
 
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+from common.config.app_config import config
 from semantic_kernel import Kernel
 from semantic_kernel.agents import ChatCompletionAgent  # pylint: disable=E0611
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
@@ -37,17 +38,11 @@ class ReasoningAgentTemplate(MCPEnabledBase):
     async def _after_open(self) -> None:
         self.kernel = Kernel()
 
-        # Token provider for SK chat completion
-        sync_cred = SyncDefaultAzureCredential()
-
-        def ad_token_provider() -> str:
-            token = sync_cred.get_token("https://cognitiveservices.azure.com/.default")
-            return token.token
 
         chat = AzureChatCompletion(
             deployment_name=self._model_deployment_name,
             endpoint=self._openai_endpoint,
-            ad_token_provider=ad_token_provider
+            ad_token_provider= await config.get_access_token()
         )
         self.kernel.add_service(chat)
 

@@ -19,6 +19,46 @@ export class TeamService {
         }
     }
 
+    /**
+     * Initialize user's team with default HR team configuration
+     * This calls the backend /init_team endpoint which sets up the default team
+     */
+    static async initializeTeam(): Promise<{
+        success: boolean;
+        data?: {
+            status: string;
+            team_id: string;
+        };
+        error?: string;
+    }> {
+        try {
+            console.log('Calling /v3/init_team endpoint...');
+            const response = await apiClient.get('/v3/init_team');
+            
+            console.log('Team initialization response:', response);
+            
+            return {
+                success: true,
+                data: response
+            };
+        } catch (error: any) {
+            console.error('Team initialization failed:', error);
+            
+            let errorMessage = 'Failed to initialize team';
+            
+            if (error.response?.data?.detail) {
+                errorMessage = error.response.data.detail;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
+            return {
+                success: false,
+                error: errorMessage
+            };
+        }
+    }
+
     static getStoredTeam(): TeamConfig | null {
         if (typeof window === 'undefined' || !window.localStorage) return null;
         try {

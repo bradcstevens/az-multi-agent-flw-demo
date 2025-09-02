@@ -4,18 +4,24 @@
 import logging
 import uuid
 from collections.abc import AsyncIterable
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
+import v3.models.messages as agent_messages
+from pydantic import Field
 from semantic_kernel.agents import (  # pylint: disable=no-name-in-module
     AgentResponseItem, AgentThread)
 from semantic_kernel.agents.agent import Agent
-from semantic_kernel.contents import AuthorRole, ChatMessageContent
+from semantic_kernel.contents import (AuthorRole, ChatMessageContent,
+                                      StreamingChatMessageContent)
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.contents.history_reducer.chat_history_reducer import \
     ChatHistoryReducer
 from semantic_kernel.exceptions.agent_exceptions import \
     AgentThreadOperationException
 from typing_extensions import override
+from v3.callbacks.response_handlers import (agent_response_callback,
+                                            streaming_agent_response_callback)
+from v3.config.settings import current_user_id
 
 
 class DummyAgentThread(AgentThread):
@@ -82,15 +88,51 @@ class ProxyAgentResponseItem:
 
 class ProxyAgent(Agent):
     """Simple proxy agent that prompts for human clarification."""
+
+    # Declare as Pydantic field
+    user_id: Optional[str] = Field(default=None, description="User ID for WebSocket messaging")
     
-    def __init__(self):
+    def __init__(self, user_id: str = None, **kwargs):
+        # Get user_id from parameter or context, fallback to empty string
+        effective_user_id = user_id or current_user_id.get() or ""
         super().__init__(
-            name="ProxyAgent", 
+            name="ProxyAgent",
             description="""Call this agent when you need to clarify requests by asking the human user 
             for more information. Ask it for more details about any unclear requirements, missing information, 
-            or if you need the user to elaborate on any aspect of the task."""
+            or if you need the user to elaborate on any aspect of the task.""",
+            user_id=effective_user_id,
+            **kwargs
         )
         self.instructions = ""
+
+    def _create_message_content(self, content: str, thread_id: str = None) -> ChatMessageContent:
+        """Create a ChatMessageContent with proper metadata."""
+        return ChatMessageContent(
+            role=AuthorRole.ASSISTANT,
+            content=content,
+            name=self.name,
+            metadata={"thread_id": thread_id} if thread_id else {}
+        )
+
+    async def _trigger_response_callbacks(self, message_content: ChatMessageContent):
+        """Manually trigger the same response callbacks used by other agents."""
+                # Get current user_id dynamically instead of using stored value
+        current_user = current_user_id.get() or self.user_id or ""
+
+        # Trigger the standard agent response callback
+        agent_response_callback(message_content, current_user)
+
+    async def _trigger_streaming_callbacks(self, content: str, is_final: bool = False):
+        """Manually trigger streaming callbacks for real-time updates."""
+        # Get current user_id dynamically instead of using stored value
+        current_user = current_user_id.get() or self.user_id or ""
+        streaming_message = StreamingChatMessageContent(
+            role=AuthorRole.ASSISTANT,
+            content=content,
+            name=self.name,
+            choice_index=0
+        )
+        await streaming_agent_response_callback(streaming_message, is_final, current_user)
     
     async def invoke(self, message: str,*, thread: AgentThread | None = None,**kwargs) -> AsyncIterator[ChatMessageContent]:
         """Ask human user for clarification about the message."""
@@ -101,12 +143,12 @@ class ProxyAgent(Agent):
             construct_thread=lambda: DummyAgentThread(),
             expected_type=DummyAgentThread,
         )
-        # Replace with websocket call when available
-        print(f"\n🤔 ProxyAgent: Another agent is asking for clarification about:")
-        print(f"   Request: {message}")
-        print("-" * 60)
+        # Send clarification request via response handlers
+        clarification_request = f"I need clarification about: {message}"
+        clarification_message = self._create_message_content(clarification_request, thread.id)
+        await self._trigger_response_callbacks(clarification_message)
         
-        # Get human input
+        # Get human input - replace this with awaiting a websocket call or API handler when available
         human_response = input("Please provide clarification: ").strip()
         
         if not human_response:
@@ -114,12 +156,10 @@ class ProxyAgent(Agent):
         
         response = f"Human clarification: {human_response}"
 
-        chat_message = ChatMessageContent(
-            role=AuthorRole.ASSISTANT,
-            content=response,
-            name=self.name,
-            metadata={"thread_id": thread.id}
-        )
+        # Send response via response handlers
+        response_message = self._create_message_content(response, thread.id)
+
+        chat_message = response_message
         
         yield AgentResponseItem(
             message=chat_message,
@@ -144,10 +184,10 @@ class ProxyAgent(Agent):
         else:
             message = str(messages)
 
-        # Replace with websocket call when available
-        print(f"\nProxyAgent: Another agent is asking for clarification about:")
-        print(f"   Request: {message}")
-        print("-" * 60)
+        # Send clarification request via streaming callbacks
+        clarification_request = f"I need clarification about: {message}"
+        self._create_message_content(clarification_request, thread.id)
+        await self._trigger_streaming_callbacks(clarification_request)
         
         # Get human input - replace with websocket call when available
         human_response = input("Please provide clarification: ").strip()
@@ -156,13 +196,8 @@ class ProxyAgent(Agent):
             human_response = "No additional clarification provided."
         
         response = f"Human clarification: {human_response}"
-        
-        chat_message = ChatMessageContent(
-            role=AuthorRole.ASSISTANT,
-            content=response,
-            name=self.name,
-            metadata={"thread_id": thread.id}
-        )
+
+        chat_message = self._create_message_content(response, thread.id)
         
         yield AgentResponseItem(
             message=chat_message,
@@ -184,6 +219,6 @@ class ProxyAgent(Agent):
             content="No clarification provided."
         )
 
-async def create_proxy_agent():
+async def create_proxy_agent(user_id: str = None):
     """Factory function for human proxy agent."""
-    return ProxyAgent()
+    return ProxyAgent(user_id=user_id)

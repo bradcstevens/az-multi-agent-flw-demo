@@ -120,16 +120,62 @@ export function getUserId(): string {
  */
 export function headerBuilder(headers?: Record<string, string>): Record<string, string> {
     let userId = getUserId();
-    console.log('headerBuilder: Using user ID:', userId);
+    //console.log('headerBuilder: Using user ID:', userId);
     let defaultHeaders = {
         "x-ms-client-principal-id": String(userId) || "",  // Custom header
     };
-    console.log('headerBuilder: Created headers:', defaultHeaders);
+    //console.log('headerBuilder: Created headers:', defaultHeaders);
     return {
         ...defaultHeaders,
         ...(headers ? headers : {})
     };
 }
+
+/**
+ * Initialize team on the backend - takes about 20 seconds
+ * @returns Promise with team initialization response
+ */
+// export async function initializeTeam(): Promise<{
+//     status: string;
+//     team_id: string;
+// }> {
+//     const apiUrl = getApiUrl();
+//     if (!apiUrl) {
+//         throw new Error('API URL not configured');
+//     }
+
+//     const headers = headerBuilder({
+//         'Content-Type': 'application/json',
+//     });
+
+//     console.log('initializeTeam: Starting team initialization...');
+    
+//     try {
+//         const response = await fetch(`${apiUrl}/init_team`, {
+//             method: 'GET',
+//             headers,
+//         });
+
+//         if (!response.ok) {
+//             const errorText = await response.text();
+//             throw new Error(errorText || `HTTP error! status: ${response.status}`);
+//         }
+
+//         const data = await response.json();
+//         console.log('initializeTeam: Team initialization completed:', data);
+        
+//         // Validate the expected response format
+//         if (data.status !== 'Request started successfully' || !data.team_id) {
+//             throw new Error('Invalid response format from init_team endpoint');
+//         }
+        
+//         return data;
+//     } catch (error) {
+//         console.error('initializeTeam: Error initializing team:', error);
+//         throw error;
+//     }
+// }
+
 export const toBoolean = (value: any): boolean => {
     if (typeof value !== 'string') {
         return false;
@@ -145,5 +191,6 @@ export default {
     setEnvData,
     config,
     USER_ID,
-    API_URL
+    API_URL,
+    //initializeTeam 
 };

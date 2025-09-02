@@ -1,7 +1,7 @@
 {
   "id": "3",
   "team_id": "team-3",
-  "name": "Retail Customer Success Team",
+  "name": "Human Resources Team",
   "status": "visible",
   "created": "",
   "created_by": "",
@@ -43,7 +43,7 @@
       "input_key": "",
       "type": "",
       "name": "ProxyAgent",
-      "deployment_name": "",
+      "deployment_name": "gpt-4.1",
       "icon": "",
       "system_message": "",
       "description": "",
