@@ -280,7 +280,7 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         return {
             "status": "Request started successfully",
             "session_id": input_task.session_id,
-            "plan_id": input_task.plan_id,
+            "plan_id": plan_id,
         }
 
     except Exception as e:
