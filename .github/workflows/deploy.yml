@@ -129,19 +129,14 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
             --template-file infra/main.bicep \
             --parameters \
-              environmentName=${{ env.SOLUTION_PREFIX }} \
-              solutionLocation="${{ env.AZURE_LOCATION }}" \
-              modelDeploymentType="GlobalStandard" \
+              solutionName=${{ env.SOLUTION_PREFIX }} \
+              location="${{ env.AZURE_LOCATION }}" \
+              gptModelDeploymentType="GlobalStandard" \
               gptModelName="gpt-4o" \
               gptModelVersion="2024-08-06" \
               imageTag="${IMAGE_TAG}" \
-              useWafAlignedArchitecture=false \
-              aiDeploymentsLocation='${{ env.AZURE_LOCATION }}' \
+              azureAiServiceLocation='${{ env.AZURE_LOCATION }}' \
               gptModelCapacity=150 \
-              logAnalyticsWorkspaceConfiguration='{"dataRetentionInDays": 30, "existingWorkspaceResourceId": ""}' \
-              applicationInsightsConfiguration='{"retentionInDays": 30}' \
-              virtualNetworkConfiguration='{"enabled": false}' \
-              webServerFarmConfiguration='{"skuCapacity": 1, "skuName": "B2"}' \
             --output json
 
       - name: Extract Web App and API App URLs

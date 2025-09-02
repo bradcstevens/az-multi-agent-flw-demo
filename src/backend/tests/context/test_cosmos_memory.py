@@ -25,6 +25,7 @@ app_config_mod.config = types.SimpleNamespace(
     COSMOSDB_CONTAINER="mock-container",
     COSMOSDB_ENDPOINT="https://mock-endpoint",
     COSMOSDB_DATABASE="mock-database",
+    AZURE_CLIENT_ID="mock-client-id",
 )
 sys.modules.setdefault("app_config", app_config_mod)
 

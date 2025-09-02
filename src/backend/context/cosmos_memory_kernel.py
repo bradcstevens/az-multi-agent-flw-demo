@@ -73,7 +73,7 @@ class CosmosMemoryContext(MemoryStoreBase):
             if not self._database:
                 # Create Cosmos client
                 cosmos_client = CosmosClient(
-                    self._cosmos_endpoint, credential=get_azure_credential()
+                    self._cosmos_endpoint, credential=get_azure_credential(config.AZURE_CLIENT_ID)
                 )
                 self._database = cosmos_client.get_database_client(
                     self._cosmos_database
