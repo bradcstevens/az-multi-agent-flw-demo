@@ -15,7 +15,7 @@ from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
                                                     SearchConfig)
 from v3.magentic_agents.proxy_agent import ProxyAgent
 from v3.magentic_agents.reasoning_agent import ReasoningAgentTemplate
-
+from common.config.app_config import config
 
 class UnsupportedModelError(Exception):
     """Raised when an unsupported model is specified."""
@@ -65,7 +65,7 @@ class MagenticAgentFactory:
             return ProxyAgent(user_id=user_id)
         
         # Validate supported models
-        supported_models = json.loads(os.getenv("SUPPORTED_MODELS"))
+        supported_models = json.loads(config.SUPPORTED_MODELS)
 
         if deployment_name not in supported_models:
             raise UnsupportedModelError(f"Model '{deployment_name}' not supported. Supported: {supported_models}")
@@ -95,7 +95,7 @@ class MagenticAgentFactory:
         # Create appropriate agent
         if use_reasoning:
             # Get reasoning specific configuration
-            azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+            azure_openai_endpoint = config.AZURE_OPENAI_ENDPOINT
 
             agent = ReasoningAgentTemplate(
                 agent_name=agent_obj.name,

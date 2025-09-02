@@ -202,12 +202,12 @@ param containerAppConfiguration containerAppConfigurationType = {
   enabled: true
   name: 'ca-${solutionPrefix}'
   location: solutionLocation
-  tags: tags
+  tags: union(tags, { 'azd-service-name': 'backend' })
   environmentResourceId: null //Default value set on module configuration
   concurrentRequests: '100'
   containerCpu: '2.0'
   containerMemory: '4.0Gi'
-  containerImageRegistryDomain: 'biabcontainerreg.azurecr.io'
+  containerImageRegistryDomain: ''
   containerImageName: 'macaebackend'
   containerImageTag: imageTag
   containerName: 'backend'
@@ -235,7 +235,7 @@ param webSiteConfiguration webSiteConfigurationType = {
   containerImageName: 'macaefrontend'
   containerImageTag: imageTag
   containerName: 'backend'
-  tags: tags
+  tags: union(tags, { 'azd-service-name': 'frontend' })
   environmentResourceId: null //Default value set on module configuration
 }
 
@@ -920,7 +920,6 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.12.0' = if (co
     capabilitiesToAdd: [
       'EnableServerless'
     ]
-    
     sqlRoleAssignmentsPrincipalIds: concat(
       [containerApp.outputs.?systemAssignedMIPrincipalId],
       [deployingUserPrincipalId]
@@ -940,6 +939,32 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.12.0' = if (co
     ]
   }
 }
+
+// ========== Container Registry ========== //
+module containerRegistry 'br/public:avm/res/container-registry/registry:0.9.1' = {
+  name: 'registryDeployment'
+  params: {
+    name: 'cr${replace(solutionPrefix,'-','')}'
+    acrAdminUserEnabled: false
+    acrSku: 'Basic'
+    azureADAuthenticationAsArmPolicyStatus: 'enabled'
+    exportPolicyStatus: 'enabled'
+    location: solutionLocation
+    softDeletePolicyDays: 7
+    softDeletePolicyStatus: 'disabled'
+    tags: tags
+    networkRuleBypassOptions: 'AzureServices'
+    roleAssignments: [
+      {
+        roleDefinitionIdOrName: acrPullRole
+        principalType: 'ServicePrincipal'
+        principalId: userAssignedIdentity.outputs.principalId
+      }
+    ]
+  }
+}
+
+var acrPullRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 
 // ========== Backend Container App Environment ========== //
 // WAF best practices for container apps: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-container-apps
@@ -1002,10 +1027,17 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
         }
       ]
     }
+    registries: [
+      {
+        server: containerRegistry.outputs.loginServer
+        identity: userAssignedIdentity.outputs.resourceId
+      }
+    ]
     containers: [
       {
         name: containerAppConfiguration.?containerName ?? 'backend'
-        image: '${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
+        image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+        //image: '${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
         resources: {
           //TODO: Make cpu and memory parameterized
           cpu: containerAppConfiguration.?containerCpu ?? '2.0'
@@ -1076,34 +1108,19 @@ module containerApp 'br/public:avm/res/app/container-app:0.14.2' = if (container
             name: 'APP_ENV'
             value: 'Prod'
           }
-          {
-            name: 'AZURE_STORAGE_BLOB_URL'
-            value: avmStorageAccount.outputs.serviceEndpoints.blob
-          }
-          {
-            name: 'AZURE_STORAGE_CONTAINER_NAME'
-            value: storageContainerName
-          }
-          {
-            name: 'AZURE_SEARCH_ENDPOINT'
-            value: searchService.outputs.endpoint
-          }
-          {
-            name: 'AZURE_SEARCH_CONNECTION_NAME'
-            value: aiSearchConnectionName
-          }
         ]
       }
     ]
   }
 }
 
+
 var containerAppMcpResourceName = 'ca-mcp-${solutionPrefix}'
 module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = if (containerAppEnabled) {
   name: take('avm.res.app.container-app.${containerAppMcpResourceName}', 64)
   params: {
     name: containerAppMcpResourceName
-    tags: containerAppConfiguration.?tags ?? tags
+    tags: union(tags, { 'azd-service-name': 'mcp' })
     location: containerAppConfiguration.?location ?? solutionLocation
     enableTelemetry: enableTelemetry
     environmentResourceId: containerAppConfiguration.?environmentResourceId ?? containerAppEnvironment.outputs.resourceId
@@ -1135,10 +1152,16 @@ module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = if (contai
         }
       ]
     }
+     registries: [
+      {
+        server: containerRegistry.outputs.loginServer
+        identity: userAssignedIdentity.outputs.resourceId
+      }
+    ]
     containers: [
       {
         name: 'mcp'
-        image: 'macaemcpacrdk.azurecr.io/macae-mac-app:t9' //'${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
+        image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' //'${containerAppConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${containerAppConfiguration.?containerImageName ?? 'macaebackend'}:${containerAppConfiguration.?containerImageTag ?? 'latest'}'
         resources: {
           //TODO: Make cpu and memory parameterized
           cpu: containerAppConfiguration.?containerCpu ?? '2.0'
@@ -1226,207 +1249,30 @@ module webSite 'br/public:avm/res/web/site:0.15.1' = if (webSiteEnabled) {
     name: webSiteName
     tags: webSiteConfiguration.?tags ?? tags
     location: webSiteConfiguration.?location ?? solutionLocation
-    kind: 'app,linux,container'
+    kind: 'app,linux'
+    //kind: 'app,linux,container'
     enableTelemetry: enableTelemetry
     serverFarmResourceId: webSiteConfiguration.?environmentResourceId ?? webServerFarm.?outputs.resourceId
     appInsightResourceId: applicationInsights.outputs.resourceId
     diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspaceId }]
     publicNetworkAccess: 'Enabled' //TODO: use Azure Front Door WAF or Application Gateway WAF instead
     siteConfig: {
-      linuxFxVersion: 'DOCKER|${webSiteConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${webSiteConfiguration.?containerImageName ?? 'macaefrontend'}:${webSiteConfiguration.?containerImageTag ?? 'latest'}'
+      //linuxFxVersion: 'DOCKER|${webSiteConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}/${webSiteConfiguration.?containerImageName ?? 'macaefrontend'}:${webSiteConfiguration.?containerImageTag ?? 'latest'}',
+      linuxFxVersion: 'python|3.11'
+      appCommandLine: 'python3 -m uvicorn frontend_server:app --host 0.0.0.0 --port 8000'
     }
     appSettingsKeyValuePairs: {
       SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
-      DOCKER_REGISTRY_SERVER_URL: 'https://${webSiteConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}'
-      WEBSITES_PORT: '3000'
-      WEBSITES_CONTAINER_START_TIME_LIMIT: '1800' // 30 minutes, adjust as needed
+      //DOCKER_REGISTRY_SERVER_URL: 'https://${webSiteConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}'
+      WEBSITES_PORT: '8000'
+     // WEBSITES_CONTAINER_START_TIME_LIMIT: '1800' // 30 minutes, adjust as needed
       BACKEND_API_URL: 'https://${containerApp.outputs.fqdn}'
       AUTH_ENABLED: 'false'
       APP_ENV: 'Prod'
+      ENABLE_ORYX_BUILD: 'True'
     }
   }
 }
-
-
-// ========== Storage Account ========== //
-
-module privateDnsZonesStorageAccount 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (virtualNetworkEnabled) {
-  name: take('avm.res.network.private-dns-zone.storage-account.${solutionPrefix}', 64)
-  params: {
-    name: 'privatelink.blob.core.windows.net'
-    enableTelemetry: enableTelemetry
-    virtualNetworkLinks: [
-      {
-        name: 'vnetlink-storage-account'
-        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
-      }
-    ]
-    tags: tags
-  }
-}
-
-var storageAccountName = replace('st${solutionPrefix}', '-', '')
-param storageContainerName string = 'sample-dataset'
-module avmStorageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
-  name: take('avm.res.storage.storage-account.${storageAccountName}', 64)
-  params: {
-    name: storageAccountName
-    location: solutionLocation
-    managedIdentities: { systemAssigned: true }
-    minimumTlsVersion: 'TLS1_2'
-    enableTelemetry: enableTelemetry
-    tags: tags
-    accessTier: 'Hot'
-    supportsHttpsTrafficOnly: true
-
-    roleAssignments: [
-      {
-        principalId: userAssignedIdentity.outputs.principalId
-        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-        principalType: 'ServicePrincipal'
-      }
-      {
-        principalId: deployingUserPrincipalId
-        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-        principalType: 'User'
-      }
-    ]
-
-    // WAF aligned networking
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: virtualNetworkEnabled ? 'Deny' : 'Allow'
-    }
-    allowBlobPublicAccess: false
-    publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
-
-    // Private endpoints for blob
-    privateEndpoints: virtualNetworkEnabled
-      ? [
-          {
-            name: 'pep-blob-${solutionPrefix}'
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                {
-                  name: 'storage-dns-zone-group-blob'
-                  privateDnsZoneResourceId: privateDnsZonesStorageAccount.outputs.resourceId
-                }
-              ]
-            }
-            subnetResourceId: virtualNetwork.outputs.subnetResourceIds[0]
-            service: 'blob'
-          }
-        ]
-      : []
-    blobServices: {
-      automaticSnapshotPolicyEnabled: true
-      containerDeleteRetentionPolicyDays: 10
-      containerDeleteRetentionPolicyEnabled: true
-      containers: [
-        {
-          name: storageContainerName
-          publicAccess: 'None'
-        }
-      ]
-      deleteRetentionPolicyDays: 9
-      deleteRetentionPolicyEnabled: true
-      lastAccessTimeTrackingPolicyEnabled: true
-    }
-  }
-}
-
-// ========== Search Service ========== //
-
-module privateDnsZonesSearchService 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (virtualNetworkEnabled) {
-  name: take('avm.res.network.private-dns-zone.search-service.${solutionPrefix}', 64)
-  params: {
-    name: 'privatelink.search.windows.net'
-    enableTelemetry: enableTelemetry
-    virtualNetworkLinks: [
-      {
-        name: 'vnetlink-search-service'
-        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
-      }
-    ]
-    tags: tags
-  }
-}
-
-var searchServiceName = 'srch-${solutionPrefix}'
-module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
-  name: take('avm.res.search.search-service.${solutionPrefix}', 64)
-  params: {
-    name: searchServiceName
-    authOptions: {
-      aadOrApiKey: {
-        aadAuthFailureMode: 'http401WithBearerChallenge'
-      }
-    }
-    disableLocalAuth: false
-    hostingMode: 'default'
-    managedIdentities: {
-      systemAssigned: true
-    }
-    publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
-    networkRuleSet: {
-      bypass: 'AzureServices'
-    }
-    partitionCount: 1
-    replicaCount: 1
-    sku: 'standard'
-    tags: tags
-    roleAssignments: [
-      {
-        principalId: userAssignedIdentity.outputs.principalId
-        roleDefinitionIdOrName: 'Search Index Data Contributor'
-        principalType: 'ServicePrincipal'
-      }
-      {
-        principalId: deployingUserPrincipalId
-        roleDefinitionIdOrName: 'Search Index Data Contributor'
-        principalType: 'User'
-      }
-    ]
-    privateEndpoints: virtualNetworkEnabled
-      ? [
-          {
-            name: 'pep-search-${solutionPrefix}'
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                {
-                  privateDnsZoneResourceId: privateDnsZonesSearchService.outputs.resourceId
-                }
-              ]
-            }
-            subnetResourceId: virtualNetwork.outputs.subnetResourceIds[0]
-            service: 'searchService'
-          }
-        ]
-      : []
-  }
-}
-
-// ========== Search Service - AI Project Connection ========== //
-
-var aiSearchConnectionName = 'aifp-srch-connection-${solutionPrefix}'
-var aifSubscriptionId = useExistingFoundryProject ? split(existingFoundryProjectResourceId, '/')[2] : subscription().subscriptionId
-var aifResourceGroup = useExistingFoundryProject ? split(existingFoundryProjectResourceId, '/')[4] : resourceGroup().name
-module aiSearchFoundryConnection 'modules/aifp_search_connection.bicep' = if (aiFoundryAIservicesEnabled) {
-  name: take('aifp-srch-connection.${solutionPrefix}', 64)
-  scope: resourceGroup(aifSubscriptionId, aifResourceGroup)
-  params: {
-    aiFoundryProjectName: aiFoundryAiProjectName
-    aiFoundryName: aiFoundryAiServicesResourceName
-    aifSearchConnectionName: aiSearchConnectionName
-    searchServiceResourceId: searchService.outputs.resourceId
-    searchServiceLocation: searchService.outputs.location
-    searchServiceName: searchService.outputs.name
-  }
-  dependsOn: [
-    aiFoundryAiServices
-  ]
-}
-
 
 // ============ //
 // Outputs      //
@@ -1437,11 +1283,23 @@ module aiSearchFoundryConnection 'modules/aifp_search_connection.bicep' = if (ai
 @description('The default url of the website to connect to the Multi-Agent Custom Automation Engine solution.')
 output webSiteDefaultHostname string = webSite.outputs.defaultHostname
 
-output AZURE_STORAGE_BLOB_URL string = avmStorageAccount.outputs.serviceEndpoints.blob
-output AZURE_STORAGE_ACCOUNT_NAME string = storageAccountName
-output AZURE_STORAGE_CONTAINER_NAME string = storageContainerName
-output AZURE_SEARCH_ENDPOINT string = searchService.outputs.endpoint
-output AZURE_SEARCH_NAME string = searchService.outputs.name
+
+
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
+
+// @description('The name of the resource.')
+// output name string = <Resource>.name
+
+// @description('The location the resource was deployed into.')
+// output location string = <Resource>.location
+
+// ================ //
+// Definitions      //
+// ================ //
+//
+// Add your User-defined-types here, if any
+//
+
 
 @export()
 @description('The type for the Multi-Agent Custom Automation Engine Log Analytics Workspace resource configuration.')

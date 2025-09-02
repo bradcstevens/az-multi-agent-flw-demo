@@ -7,10 +7,9 @@ from typing import Optional
 
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
-from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
-                                           TeamSelectionRequest)
+from common.models.messages_kernel import (GeneratePlanRequest, InputTask, PlanStatus,
+                                           TeamSelectionRequest, Plan)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
 from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
@@ -55,7 +54,7 @@ async def start_comms(websocket: WebSocket, process_id: str):
     connection_config.add_connection(process_id=process_id, connection=websocket, user_id=user_id)
     track_event_if_configured("WebSocketConnectionAccepted", {"process_id": process_id, "user_id": user_id})
 
-      # Keep the connection open - FastAPI will close the connection if this returns
+    # Keep the connection open - FastAPI will close the connection if this returns
     try:
         # Keep the connection open - FastAPI will close the connection if this returns
         while True:
@@ -217,14 +216,54 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         )
         raise HTTPException(status_code=400, detail="no user")
 
-    if not input_task.team_id:
-        track_event_if_configured(
-            "TeamIDNofound", {"status_code": 400, "detail": "no team id"}
-        )
-        raise HTTPException(status_code=400, detail="no team id")
+    # if not input_task.team_id:
+    #     track_event_if_configured(
+    #         "TeamIDNofound", {"status_code": 400, "detail": "no team id"}
+    #     )
+    #     raise HTTPException(status_code=400, detail="no team id")
 
     if not input_task.session_id:
         input_task.session_id = str(uuid.uuid4())
+    try:
+        plan_id = str(uuid.uuid4())
+        # Initialize memory store and service
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        plan = Plan(
+            id=plan_id,
+            plan_id=plan_id,
+            user_id=user_id,
+            session_id=input_task.session_id,
+            team_id=None,  #TODO add current_team_id
+            initial_goal=input_task.description,
+            overall_status=PlanStatus.in_progress,
+        )
+        await memory_store.add_plan(plan)
+
+
+        track_event_if_configured(
+            "PlanCreated",
+            {
+                "status": "success",
+                "plan_id": plan.plan_id,
+                "session_id": input_task.session_id,
+                "user_id": user_id,
+                "team_id": "", #TODO add current_team_id
+                "description": input_task.description,
+            },
+        )
+    except Exception as e:
+        print(f"Error creating plan: {e}")
+        track_event_if_configured(
+            "PlanCreationFailed",
+            {
+                "status": "error",
+                "description": input_task.description,
+                "session_id": input_task.session_id,
+                "user_id": user_id,
+                "error": str(e),
+            },
+        )
+        raise HTTPException(status_code=500, detail="Failed to create plan")
 
     try:
         current_user_id.set(user_id)  # Set context
@@ -241,6 +280,7 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         return {
             "status": "Request started successfully",
             "session_id": input_task.session_id,
+            "plan_id": plan_id,
         }
 
     except Exception as e:

@@ -20,6 +20,7 @@ from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
 from v3.config.settings import (config, connection_config, current_user_id,
                                 orchestration_config)
+from common.config.app_config import config
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
 from v3.orchestration.human_approval_manager import \
     HumanApprovalMagenticManager
@@ -43,21 +44,15 @@ class OrchestrationManager:
             temperature=0.1
         )
 
-        # Create a token provider function for Azure OpenAI
-        credential = SyncDefaultAzureCredential()
-
-        def get_token():
-            token = credential.get_token("https://cognitiveservices.azure.com/.default")
-            return token.token
 
         # 1. Create a Magentic orchestration with Azure OpenAI
         magentic_orchestration = MagenticOrchestration(
             members=agents,
             manager=HumanApprovalMagenticManager(
                 chat_completion_service=AzureChatCompletion(
-                    deployment_name=os.getenv("AZURE_OPENAI_MODEL_NAME"),
-                    endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-                    ad_token_provider=get_token  # Use token provider function
+                    deployment_name=config.AZURE_OPENAI_DEPLOYMENT_NAME,
+                    endpoint=config.AZURE_OPENAI_ENDPOINT,
+                    ad_token_provider=config.get_access_token()
                 ),
                 execution_settings=execution_settings
             ),
