@@ -1,9 +1,10 @@
-from typing import Any, Dict, List
 import logging
 import re
-from azure.ai.projects.aio import AIProjectClient
+from typing import Any, Dict, List
+
 #from git import List
 import aiohttp
+from azure.ai.projects.aio import AIProjectClient
 from common.config.app_config import config
 
 
@@ -54,7 +55,7 @@ class FoundryService:
 
         try:
             # Get Azure Management API token (not Cognitive Services token)
-            token = config.get_access_token()
+            token = await config.get_access_token()
 
             # Extract Azure OpenAI resource name from endpoint URL
             openai_endpoint = config.AZURE_OPENAI_ENDPOINT

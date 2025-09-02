@@ -34,7 +34,7 @@ class AzureConfig:
         # Create credential
         self.credential = config.get_azure_credentials()
 
-    def create_chat_completion_service(self, use_reasoning_model: bool=False):
+    async def create_chat_completion_service(self, use_reasoning_model: bool=False):
         """Create Azure Chat Completion service."""
         model_name = (
             self.reasoning_model if use_reasoning_model else self.standard_model
@@ -43,7 +43,7 @@ class AzureConfig:
         return AzureChatCompletion(
             deployment_name=model_name,
             endpoint=self.endpoint,
-            ad_token_provider=config.get_access_token(),
+            ad_token_provider= await config.get_access_token(),
         )
 
     def create_execution_settings(self):

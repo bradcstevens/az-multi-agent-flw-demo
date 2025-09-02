@@ -8,6 +8,7 @@ from contextvars import ContextVar
 from typing import List, Optional
 
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+from common.config.app_config import config
 from common.models.messages_kernel import TeamConfiguration
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.agents.runtime import InProcessRuntime
@@ -20,7 +21,6 @@ from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
 from v3.config.settings import (config, connection_config, current_user_id,
                                 orchestration_config)
-from common.config.app_config import config
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
 from v3.orchestration.human_approval_manager import \
     HumanApprovalMagenticManager
@@ -44,7 +44,12 @@ class OrchestrationManager:
             temperature=0.1
         )
 
+        credential = SyncDefaultAzureCredential()
 
+        def get_token():
+            token = credential.get_token("https://cognitiveservices.azure.com/.default")
+            return token.token
+        
         # 1. Create a Magentic orchestration with Azure OpenAI
         magentic_orchestration = MagenticOrchestration(
             members=agents,
@@ -52,7 +57,7 @@ class OrchestrationManager:
                 chat_completion_service=AzureChatCompletion(
                     deployment_name=config.AZURE_OPENAI_DEPLOYMENT_NAME,
                     endpoint=config.AZURE_OPENAI_ENDPOINT,
-                    ad_token_provider=config.get_access_token()
+                    ad_token_provider=get_token  # Use token provider function
                 ),
                 execution_settings=execution_settings
             ),

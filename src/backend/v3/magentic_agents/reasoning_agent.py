@@ -2,6 +2,7 @@ import logging
 import os
 
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+from common.config.app_config import config
 from semantic_kernel import Kernel
 from semantic_kernel.agents import ChatCompletionAgent  # pylint: disable=E0611
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
@@ -9,7 +10,7 @@ from semantic_kernel.connectors.azure_ai_search import AzureAISearchCollection
 from v3.magentic_agents.common.lifecycle import MCPEnabledBase
 from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
 from v3.magentic_agents.reasoning_search import ReasoningSearch
-from common.config.app_config import config
+
 
 class ReasoningAgentTemplate(MCPEnabledBase):
     """
@@ -41,7 +42,7 @@ class ReasoningAgentTemplate(MCPEnabledBase):
         chat = AzureChatCompletion(
             deployment_name=self._model_deployment_name,
             endpoint=self._openai_endpoint,
-            ad_token_provider=config.get_access_token()
+            ad_token_provider= await config.get_access_token()
         )
         self.kernel.add_service(chat)
 
