@@ -172,6 +172,42 @@ class AppConfig:
         """
         return name in os.environ and os.environ[name].lower() in ["true", "1"]
 
+    def get_cosmos_database_client(self):
+        """Get a Cosmos DB client for the configured database.
+
+        Returns:
+            A Cosmos DB database client
+        """
+        try:
+            if self._cosmos_client is None:
+                self._cosmos_client = CosmosClient(
+                    self.COSMOSDB_ENDPOINT, credential=get_azure_credential(self.AZURE_CLIENT_ID)
+                )
+
+            if self._cosmos_database is None:
+                self._cosmos_database = self._cosmos_client.get_database_client(
+                    self.COSMOSDB_DATABASE
+                )
+
+            return self._cosmos_database
+        except Exception as exc:
+            logging.error(
+                "Failed to create CosmosDB client: %s. CosmosDB is required for this application.",
+                exc,
+            )
+            raise
+
+    def create_kernel(self):
+        """Creates a new Semantic Kernel instance.
+
+        Returns:
+            A new Semantic Kernel instance
+        """
+        # Create a new kernel instance without manually configuring OpenAI services
+        # The agents will be created using Azure AI Agent Project pattern instead
+        kernel = Kernel()
+        return kernel
+
     def get_ai_project_client(self):
         """Create and return an AIProjectClient for Azure AI Foundry using from_connection_string.
 
@@ -182,7 +218,7 @@ class AppConfig:
             return self._ai_project_client
 
         try:
-            credential = self.get_azure_credential()
+            credential = get_azure_credential(self.AZURE_CLIENT_ID)
             if credential is None:
                 raise RuntimeError(
                     "Unable to acquire Azure credentials; ensure Managed Identity is configured"

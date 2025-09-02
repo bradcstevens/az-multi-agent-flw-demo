@@ -26,17 +26,41 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 This will allow the scripts to run for the current session without permanently changing your system's policy.
 
+### **Azure Developer CLI (azd) Requirement**
+
+Ensure that you are using the latest version of the [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview).
+The `azd` version must be **1.18.0 or higher**.
+
+Upgrade commands by OS:
+
+* **Windows (using winget):**
+
+  ```bash
+  winget install microsoft.azd
+  ```
+
+* **Linux (using apt):**
+
+  ```bash
+  curl -fsSL https://aka.ms/install-azd.sh | bash
+  ```
+
+* **macOS (using Homebrew):**
+
+  ```bash
+  brew update && brew tap azure/azd && brew install azd
+  ```
+
 ## Deployment Options & Steps
 
 ### Sandbox or WAF Aligned Deployment Options
 
 The [`infra`](../infra) folder of the Multi Agent Solution Accelerator contains the [`main.bicep`](../infra/main.bicep) Bicep script, which defines all Azure infrastructure components for this solution.
 
-When running `azd up`, you’ll now be prompted to choose between a **WAF-aligned configuration** and a **sandbox configuration** using a simple selection:
+By default, the `azd up` command uses the [`main.parameters.json`](../infra/main.parameters.json) file to deploy the solution. This file is pre-configured for a **sandbox environment** — ideal for development and proof-of-concept scenarios, with minimal security and cost controls for rapid iteration.
 
-- A **sandbox environment** — ideal for development and proof-of-concept scenarios, with minimal security and cost controls for rapid iteration.
+For **production deployments**, the repository also provides [`main.waf.parameters.json`](../infra/main.waf.parameters.json), which applies a [Well-Architected Framework (WAF) aligned](https://learn.microsoft.com/en-us/azure/well-architected/) configuration. This option enables additional Azure best practices for reliability, security, cost optimization, operational excellence, and performance efficiency, such as:
 
-- A **production deployments environment**, which applies a [Well-Architected Framework (WAF) aligned](https://learn.microsoft.com/en-us/azure/well-architected/) configuration. This option enables additional Azure best practices for reliability, security, cost optimization, operational excellence, and performance efficiency, such as:
   - Enhanced network security (e.g., Network protection with private endpoints)
   - Stricter access controls and managed identities
   - Logging, monitoring, and diagnostics enabled by default
@@ -44,24 +68,26 @@ When running `azd up`, you’ll now be prompted to choose between a **WAF-aligne
 
 **How to choose your deployment configuration:**
 
-When prompted during `azd up`:
+* Use the default `main.parameters.json` file for a **sandbox/dev environment**
+* For a **WAF-aligned, production-ready deployment**, copy the contents of `main.waf.parameters.json` into `main.parameters.json` before running `azd up`
 
-![useWAFAlignedArchitecture](images/macae_waf_prompt.png)
+---
 
-- Select **`true`** to deploy a **WAF-aligned, production-ready environment**  
-- Select **`false`** to deploy a **lightweight sandbox/dev environment**
+### VM Credentials Configuration
+
+By default, the solution sets the VM administrator username and password from environment variables.
+If you do not configure these values, a randomly generated GUID will be used for both the username and password.
+
+To set your own VM credentials before deployment, use:
+
+```sh
+azd env set AZURE_ENV_VM_ADMIN_USERNAME <your-username>
+azd env set AZURE_ENV_VM_ADMIN_PASSWORD <your-password>
+```
 
 > [!TIP]
 > Always review and adjust parameter values (such as region, capacity, security settings and log analytics workspace configuration) to match your organization’s requirements before deploying. For production, ensure you have sufficient quota and follow the principle of least privilege for all identities and role assignments.
 
-> To reuse an existing Log Analytics workspace, update the existingWorkspaceResourceId field under the logAnalyticsWorkspaceConfiguration parameter in the .bicep file with the resource ID of your existing workspace.
-For example: 
-```
-param logAnalyticsWorkspaceConfiguration = {
-  dataRetentionInDays: 30
-  existingWorkspaceResourceId: '/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>'
-}
-```
 
 > [!IMPORTANT]
 > The WAF-aligned configuration is under active development. More Azure Well-Architected recommendations will be added in future updates.
@@ -219,6 +245,10 @@ Once you've opened the project in [Codespaces](#github-codespaces), [Dev Contain
 
 7. If you are done trying out the application, you can delete the resources by running `azd down`.
 
+
+### 🛠️ Troubleshooting
+ If you encounter any issues during the deployment process, please refer [troubleshooting](../docs/TroubleShootingSteps.md) document for detailed steps and solutions.
+
 # Local setup
 
 > **Note for macOS Developers**: If you are using macOS on Apple Silicon (ARM64) the DevContainer will **not** work. This is due to a limitation with the Azure Functions Core Tools (see [here](https://github.com/Azure/azure-functions-core-tools/issues/3112)).
@@ -324,12 +354,17 @@ The files for the dev container are located in `/.devcontainer/` folder.
    - Update the `.env` file with the required values from your Azure resource group in Azure Portal App Service environment variables.
    - Alternatively, if resources were
    provisioned using `azd provision` or `azd up`, a `.env` file is automatically generated in the `.azure/<env-name>/.env`
-   file. To get your `<env-name>` run `azd env list` to see which env is default.
+   file. You can copy the contents of this file into your backend `.env` file.
+
+    _**Note**: To get your `<env-name>` run `azd env list` to see which env is default._
 
 6. **Fill in the `.env` file:**
 
    - Use the output from the deployment or check the Azure Portal under "Deployments" in the resource group.
    - Make sure to set APP_ENV to "**dev**" in `.env` file.
+   - For local development, make sure to include below env variables in the `.env`
+     - `BACKEND_API_URL=http://localhost:8000`
+     - `FRONTEND_SITE_NAME=http://127.0.0.1:3000` .
 
 7. **(Optional) Set up a virtual environment:**
 

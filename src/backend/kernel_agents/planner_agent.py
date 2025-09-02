@@ -539,7 +539,7 @@ class PlannerAgent(BaseAgent):
             if agent_name in self._available_agents:
                 tools_list.append(tools)
 
-        tools_str = str(tools_list)
+        tools_str = tools_list
 
         # Return a dictionary with template variables
         return {
