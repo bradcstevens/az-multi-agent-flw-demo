@@ -54,7 +54,7 @@ async def start_comms(websocket: WebSocket, process_id: str):
     connection_config.add_connection(process_id=process_id, connection=websocket, user_id=user_id)
     track_event_if_configured("WebSocketConnectionAccepted", {"process_id": process_id, "user_id": user_id})
 
-      # Keep the connection open - FastAPI will close the connection if this returns
+    # Keep the connection open - FastAPI will close the connection if this returns
     try:
         # Keep the connection open - FastAPI will close the connection if this returns
         while True:
@@ -224,6 +224,8 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
 
     if not input_task.session_id:
         input_task.session_id = str(uuid.uuid4())
+    if not input_task.plan_id:
+        input_task.plan_id = str(uuid.uuid4())
 
     try:
         current_user_id.set(user_id)  # Set context
@@ -240,6 +242,7 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         return {
             "status": "Request started successfully",
             "session_id": input_task.session_id,
+            "plan_id": input_task.plan_id,
         }
 
     except Exception as e:

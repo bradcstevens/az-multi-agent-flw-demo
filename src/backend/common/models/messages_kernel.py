@@ -248,6 +248,7 @@ class InputTask(KernelBaseModel):
     """Message representing the initial input task from the user."""
 
     session_id: str
+    plan_id: str
     description: str  # Initial goal
     team_id: str
 
