@@ -106,17 +106,17 @@ class AppConfig:
             )  # CodeQL [SM05139] Okay use of DefaultAzureCredential as it is only used in development
         else:
             return ManagedIdentityCredential(client_id=client_id)
-
+        
     def get_azure_credentials(self):
         """Retrieve Azure credentials, either from environment variables or managed identity."""
         if self._azure_credentials is None:
-            self._azure_credentials = self.get_azure_credential()
+            self._azure_credentials = self.get_azure_credential(self.AZURE_CLIENT_ID)
         return self._azure_credentials
 
     async def get_access_token(self) -> str:
         """Get Azure access token for API calls."""
         try:
-            credential = self.get_azure_credentials()
+            credential = self.get_azure_credentials(self.AZURE_CLIENT_ID)
             token = credential.get_token(self.AZURE_COGNITIVE_SERVICES)
             return token.token
         except Exception as e:

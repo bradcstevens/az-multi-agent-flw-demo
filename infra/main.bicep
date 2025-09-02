@@ -32,6 +32,10 @@ param solutionUniqueText string = take(uniqueString(subscription().id, resourceG
 ])
 param location string
 
+//Get the current deployer's information
+var deployerInfo = deployer()
+var deployingUserPrincipalId = deployerInfo.objectId
+
 // Restricting deployment to only supported Azure OpenAI regions validated with GPT-4o model
 @allowed(['australiaeast', 'eastus2', 'francecentral', 'japaneast', 'norwayeast', 'swedencentral', 'uksouth', 'westus'])
 @metadata({
@@ -1415,9 +1419,6 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
   }
 }
 
-var webServerFarmEnabled = webServerFarmConfiguration.?enabled ?? true
-var webServerFarmResourceName = webServerFarmConfiguration.?name ?? 'asp-${solutionPrefix}'
-
 // ========== Frontend server farm ========== //
 // WAF best practices for Web Application Services: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/app-service-web-apps
 // PSRule for Web Server Farm: https://azure.github.io/PSRule.Rules.Azure/en/rules/resource/#app-service
@@ -1459,23 +1460,35 @@ module webSite 'modules/web-sites.bicep' = {
       linuxFxVersion: 'DOCKER|${frontendContainerRegistryHostname}/${frontendContainerImageName}:${frontendContainerImageTag}'
       minTlsVersion: '1.2'
     }
-    appSettingsKeyValuePairs: {
-      SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
-      DOCKER_REGISTRY_SERVER_URL: 'https://${webSiteConfiguration.?containerImageRegistryDomain ?? 'biabcontainerreg.azurecr.io'}'
-      WEBSITES_PORT: '3000'
-      WEBSITES_CONTAINER_START_TIME_LIMIT: '1800' // 30 minutes, adjust as needed
-      BACKEND_API_URL: 'https://${containerApp.outputs.fqdn}'
-      AUTH_ENABLED: 'false'
-      APP_ENV: 'Prod'
-    }
+    configs: [
+      {
+        name: 'appsettings'
+        properties: {
+          SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
+          DOCKER_REGISTRY_SERVER_URL: 'https://${frontendContainerRegistryHostname}'
+          WEBSITES_PORT: '3000'
+          WEBSITES_CONTAINER_START_TIME_LIMIT: '1800' // 30 minutes, adjust as needed
+          BACKEND_API_URL: 'https://${containerApp.outputs.fqdn}'
+          AUTH_ENABLED: 'false'
+        }
+        // WAF aligned configuration for Monitoring
+        applicationInsightResourceId: enableMonitoring ? applicationInsights!.outputs.resourceId : null
+      }
+    ]
+    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
+    // WAF aligned configuration for Private Networking
+    vnetRouteAllEnabled: enablePrivateNetworking ? true : false
+    vnetImagePullEnabled: enablePrivateNetworking ? true : false
+    virtualNetworkSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.subnetResourceIds[4] : null
+    publicNetworkAccess: 'Enabled' // Always enabling the public network access for Web App
   }
 }
 
 
 // ========== Storage Account ========== //
 
-module privateDnsZonesStorageAccount 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (virtualNetworkEnabled) {
-  name: take('avm.res.network.private-dns-zone.storage-account.${solutionPrefix}', 64)
+module privateDnsZonesStorageAccount 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (enablePrivateNetworking ) {
+  name: take('avm.res.network.private-dns-zone.storage-account.${solutionSuffix}', 64)
   params: {
     name: 'privatelink.blob.core.windows.net'
     enableTelemetry: enableTelemetry
@@ -1489,13 +1502,13 @@ module privateDnsZonesStorageAccount 'br/public:avm/res/network/private-dns-zone
   }
 }
 
-var storageAccountName = replace('st${solutionPrefix}', '-', '')
+var storageAccountName = replace('st${solutionSuffix}', '-', '')
 param storageContainerName string = 'sample-dataset'
 module avmStorageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
   name: take('avm.res.storage.storage-account.${storageAccountName}', 64)
   params: {
     name: storageAccountName
-    location: solutionLocation
+    location: location
     managedIdentities: { systemAssigned: true }
     minimumTlsVersion: 'TLS1_2'
     enableTelemetry: enableTelemetry
@@ -1519,16 +1532,16 @@ module avmStorageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
     // WAF aligned networking
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: virtualNetworkEnabled ? 'Deny' : 'Allow'
+      defaultAction: enablePrivateNetworking  ? 'Deny' : 'Allow'
     }
     allowBlobPublicAccess: false
-    publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking  ? 'Disabled' : 'Enabled'
 
     // Private endpoints for blob
-    privateEndpoints: virtualNetworkEnabled
+    privateEndpoints: enablePrivateNetworking 
       ? [
           {
-            name: 'pep-blob-${solutionPrefix}'
+            name: 'pep-blob-${solutionSuffix}'
             privateDnsZoneGroup: {
               privateDnsZoneGroupConfigs: [
                 {
@@ -1561,8 +1574,8 @@ module avmStorageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
 
 // ========== Search Service ========== //
 
-module privateDnsZonesSearchService 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (virtualNetworkEnabled) {
-  name: take('avm.res.network.private-dns-zone.search-service.${solutionPrefix}', 64)
+module privateDnsZonesSearchService 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (enablePrivateNetworking ) {
+  name: take('avm.res.network.private-dns-zone.search-service.${solutionSuffix}', 64)
   params: {
     name: 'privatelink.search.windows.net'
     enableTelemetry: enableTelemetry
@@ -1576,9 +1589,9 @@ module privateDnsZonesSearchService 'br/public:avm/res/network/private-dns-zone:
   }
 }
 
-var searchServiceName = 'srch-${solutionPrefix}'
+var searchServiceName = 'srch-${solutionSuffix}'
 module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
-  name: take('avm.res.search.search-service.${solutionPrefix}', 64)
+  name: take('avm.res.search.search-service.${solutionSuffix}', 64)
   params: {
     name: searchServiceName
     authOptions: {
@@ -1591,7 +1604,7 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
     managedIdentities: {
       systemAssigned: true
     }
-    publicNetworkAccess: virtualNetworkEnabled ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking  ? 'Disabled' : 'Enabled'
     networkRuleSet: {
       bypass: 'AzureServices'
     }
@@ -1611,10 +1624,10 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
         principalType: 'User'
       }
     ]
-    privateEndpoints: virtualNetworkEnabled
+    privateEndpoints: enablePrivateNetworking 
       ? [
           {
-            name: 'pep-search-${solutionPrefix}'
+            name: 'pep-search-${solutionSuffix}'
             privateDnsZoneGroup: {
               privateDnsZoneGroupConfigs: [
                 {
@@ -1632,11 +1645,11 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
 
 // ========== Search Service - AI Project Connection ========== //
 
-var aiSearchConnectionName = 'aifp-srch-connection-${solutionPrefix}'
-var aifSubscriptionId = useExistingFoundryProject ? split(existingFoundryProjectResourceId, '/')[2] : subscription().subscriptionId
-var aifResourceGroup = useExistingFoundryProject ? split(existingFoundryProjectResourceId, '/')[4] : resourceGroup().name
-module aiSearchFoundryConnection 'modules/aifp_search_connection.bicep' = if (aiFoundryAIservicesEnabled) {
-  name: take('aifp-srch-connection.${solutionPrefix}', 64)
+var aiSearchConnectionName = 'aifp-srch-connection-${solutionSuffix}'
+var aifSubscriptionId = useExistingAiFoundryAiProject  ? split(existingAiFoundryAiProjectResourceId, '/')[2] : subscription().subscriptionId
+var aifResourceGroup = useExistingAiFoundryAiProject  ? split(existingAiFoundryAiProjectResourceId, '/')[4] : resourceGroup().name
+module aiSearchFoundryConnection 'modules/aifp_search_connection.bicep' = {
+  name: take('aifp-srch-connection.${solutionSuffix}', 64)
   scope: resourceGroup(aifSubscriptionId, aifResourceGroup)
   params: {
     aiFoundryProjectName: aiFoundryAiProjectName
