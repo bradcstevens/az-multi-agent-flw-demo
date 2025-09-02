@@ -8,8 +8,8 @@ from typing import Optional
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
-                                           TeamSelectionRequest)
+from common.models.messages_kernel import (GeneratePlanRequest, InputTask, PlanStatus,
+                                           TeamSelectionRequest, Plan)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
 from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
@@ -224,8 +224,8 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
 
     if not input_task.session_id:
         input_task.session_id = str(uuid.uuid4())
-    if not input_task.plan_id:
-        input_task.plan_id = str(uuid.uuid4())
+ 
+    plan_id = str(uuid.uuid4())
 
     try:
         current_user_id.set(user_id)  # Set context
@@ -233,7 +233,15 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         # background_tasks.add_task(
         #     lambda: current_context.run(lambda:OrchestrationManager().run_orchestration, user_id, input_task)
         # )
-
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        plan = Plan(
+            id=plan_id,
+            user_id=user_id,
+            team_id="", #TODO add current_team_id
+            initial_goal=input_task.description,
+            overall_status=PlanStatus.in_progress,
+        )
+        await memory_store.add_plan(plan)
         async def run_with_context():
             return await current_context.run(OrchestrationManager().run_orchestration, user_id, input_task)
 

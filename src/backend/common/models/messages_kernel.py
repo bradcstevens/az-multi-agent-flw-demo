@@ -98,6 +98,12 @@ class Session(BaseDataModel):
     current_status: str
     message_to_user: Optional[str] = None
 
+class UserCurrentTeam(BaseDataModel):
+    """Represents the current team of a user."""
+
+    data_type: Literal["user_current_team"] = Field("user_current_team", Literal=True)
+    user_id: str
+    team_id: str
 
 class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
@@ -248,9 +254,8 @@ class InputTask(KernelBaseModel):
     """Message representing the initial input task from the user."""
 
     session_id: str
-    plan_id: str
     description: str  # Initial goal
-    team_id: str
+    # team_id: str
 
 
 class UserLanguage(KernelBaseModel):
