@@ -2,7 +2,7 @@ import logging
 import re
 from typing import Any, Dict, List
 
-#from git import List
+# from git import List
 import aiohttp
 from azure.ai.projects.aio import AIProjectClient
 from common.config.app_config import config
@@ -44,7 +44,6 @@ class FoundryService:
     # -----------------------
     # Model validation methods
     # -----------------------
-
     async def list_model_deployments(self) -> List[Dict[str, Any]]:
         """
         List all model deployments in the Azure AI project using the REST API.
@@ -55,19 +54,23 @@ class FoundryService:
 
         try:
             # Get Azure Management API token (not Cognitive Services token)
-            token = await config.get_access_token()
+            credential = config.get_azure_credentials()
+            token = credential.get_token(config.AZURE_MANAGEMENT_SCOPE)
+
 
             # Extract Azure OpenAI resource name from endpoint URL
             openai_endpoint = config.AZURE_OPENAI_ENDPOINT
             # Extract resource name from URL like "https://aisa-macae-d3x6aoi7uldi.openai.azure.com/"
-            match = re.search(r'https://([^.]+)\.openai\.azure\.com', openai_endpoint)
+            match = re.search(r"https://([^.]+)\.openai\.azure\.com", openai_endpoint)
             if not match:
-                self.logger.error(f"Could not extract resource name from endpoint: {openai_endpoint}")
+                self.logger.error(
+                    f"Could not extract resource name from endpoint: {openai_endpoint}"
+                )
                 return []
-            
+
             openai_resource_name = match.group(1)
             self.logger.info(f"Using Azure OpenAI resource: {openai_resource_name}")
-            
+
             # Query Azure OpenAI resource deployments
             url = (
                 f"https://management.azure.com/subscriptions/{self.subscription_id}/"
