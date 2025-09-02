@@ -109,13 +109,14 @@ class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
     data_type: Literal["plan"] = Field("plan", Literal=True)
-    team_id: str
+    plan_id: str 
     session_id: str
     user_id: str
     initial_goal: str
     overall_status: PlanStatus = PlanStatus.in_progress
     source: str = AgentType.PLANNER.value
     summary: Optional[str] = None
+    team_id: Optional[str] = None
     human_clarification_request: Optional[str] = None
     human_clarification_response: Optional[str] = None
 
