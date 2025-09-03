@@ -315,7 +315,7 @@ module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-id
 // WAF recommendations for networking and connectivity: https://learn.microsoft.com/en-us/azure/well-architected/security/networking
 var networkSecurityGroupBackendResourceName = 'nsg-${solutionSuffix}-backend'
 module networkSecurityGroupBackend 'br/public:avm/res/network/network-security-group:0.5.1' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.network-security-group.${networkSecurityGroupBackendResourceName}', 64)
+  name: take('avm.res.network.network-security-group.backend.${networkSecurityGroupBackendResourceName}', 64)
   params: {
     name: networkSecurityGroupBackendResourceName
     location: location
@@ -345,7 +345,7 @@ module networkSecurityGroupBackend 'br/public:avm/res/network/network-security-g
 
 var networkSecurityGroupBastionResourceName = 'nsg-${solutionSuffix}-bastion'
 module networkSecurityGroupBastion 'br/public:avm/res/network/network-security-group:0.5.1' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.network-security-group.${networkSecurityGroupBastionResourceName}', 64)
+  name: take('avm.res.network.network-security-group.bastion${networkSecurityGroupBastionResourceName}', 64)
   params: {
     name: networkSecurityGroupBastionResourceName
     location: location
@@ -501,7 +501,7 @@ module networkSecurityGroupBastion 'br/public:avm/res/network/network-security-g
 
 var networkSecurityGroupAdministrationResourceName = 'nsg-${solutionSuffix}-administration'
 module networkSecurityGroupAdministration 'br/public:avm/res/network/network-security-group:0.5.1' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.network-security-group.${networkSecurityGroupAdministrationResourceName}', 64)
+  name: take('avm.res.network.network-security-group.administration.${networkSecurityGroupAdministrationResourceName}', 64)
   params: {
     name: networkSecurityGroupAdministrationResourceName
     location: location
@@ -531,7 +531,7 @@ module networkSecurityGroupAdministration 'br/public:avm/res/network/network-sec
 
 var networkSecurityGroupContainersResourceName = 'nsg-${solutionSuffix}-containers'
 module networkSecurityGroupContainers 'br/public:avm/res/network/network-security-group:0.5.1' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.network-security-group.${networkSecurityGroupContainersResourceName}', 64)
+  name: take('avm.res.network.network-security-group.containers.${networkSecurityGroupContainersResourceName}', 64)
   params: {
     name: networkSecurityGroupContainersResourceName
     location: location
@@ -561,7 +561,7 @@ module networkSecurityGroupContainers 'br/public:avm/res/network/network-securit
 
 var networkSecurityGroupWebsiteResourceName = 'nsg-${solutionSuffix}-website'
 module networkSecurityGroupWebsite 'br/public:avm/res/network/network-security-group:0.5.1' = if (enablePrivateNetworking) {
-  name: take('avm.res.network.network-security-group.${networkSecurityGroupWebsiteResourceName}', 64)
+  name: take('avm.res.network.network-security-group.website.${networkSecurityGroupWebsiteResourceName}', 64)
   params: {
     name: networkSecurityGroupWebsiteResourceName
     location: location
@@ -924,6 +924,8 @@ var privateDnsZones = [
   'privatelink.openai.azure.com'
   'privatelink.services.ai.azure.com'
   'privatelink.documents.azure.com'
+  'privatelink.blob.core.windows.net'
+  'privatelink.search.windows.net'
 ]
 
 // DNS Zone Index Constants
@@ -932,6 +934,8 @@ var dnsZoneIndex = {
   openAI: 1
   aiServices: 2
   cosmosDb: 3
+  blob: 4
+  search: 5
 }
 
 // List of DNS zone indices that correspond to AI-related services.
@@ -973,10 +977,10 @@ module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.7.1' = [
 var useExistingAiFoundryAiProject = !empty(existingAiFoundryAiProjectResourceId)
 var aiFoundryAiServicesResourceGroupName = useExistingAiFoundryAiProject
   ? split(existingAiFoundryAiProjectResourceId, '/')[4]
-  : 'rg-${solutionSuffix}'
+  : resourceGroup().name
 var aiFoundryAiServicesSubscriptionId = useExistingAiFoundryAiProject
   ? split(existingAiFoundryAiProjectResourceId, '/')[2]
-  : subscription().id
+  : subscription().subscriptionId
 var aiFoundryAiServicesResourceName = useExistingAiFoundryAiProject
   ? split(existingAiFoundryAiProjectResourceId, '/')[8]
   : 'aif-${solutionSuffix}'
@@ -1091,6 +1095,16 @@ module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-service
         principalId: userAssignedIdentity.outputs.principalId
         principalType: 'ServicePrincipal'
       }
+      {
+        roleDefinitionIdOrName: '53ca6127-db72-4b80-b1b0-d745d6d5456d' // Azure AI User
+        principalId: deployingUserPrincipalId
+        principalType: 'User'
+      }
+      {
+        roleDefinitionIdOrName: '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer
+        principalId: deployingUserPrincipalId
+        principalType: 'User'
+      }
     ]
     // WAF aligned configuration for Monitoring
     diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
@@ -1146,6 +1160,9 @@ var aiFoundryAiProjectName = useExistingAiFoundryAiProject
 var aiFoundryAiProjectEndpoint = useExistingAiFoundryAiProject
   ? existingAiFoundryAiServicesProject!.properties.endpoints['AI Foundry API']
   : aiFoundryAiServicesProject!.outputs.apiEndpoint
+var aiFoundryAiProjectPrincipalId = useExistingAiFoundryAiProject
+  ? existingAiFoundryAiServicesProject!.identity.principalId
+  : aiFoundryAiServicesProject!.outputs.principalId
 
 // ========== Cosmos DB ========== //
 // WAF best practices for Cosmos DB: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/cosmos-db
@@ -1187,7 +1204,10 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.15.0' = {
           'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
           'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
         ]
-        assignments: [{ principalId: userAssignedIdentity.outputs.principalId }]
+        assignments: [
+          { principalId: userAssignedIdentity.outputs.principalId }
+          { principalId: deployingUserPrincipalId }
+        ]
       }
     ]
     // WAF aligned configuration for Monitoring
@@ -1488,7 +1508,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           } 
           {
             name: 'AZURE_AI_SEARCH_INDEX_NAME'
-            value: '' 
+            value: aiSearchIndexName
           } 
           {
             name: 'AZURE_AI_SEARCH_ENDPOINT'
@@ -1712,21 +1732,6 @@ module webSite 'modules/web-sites.bicep' = {
 
 // ========== Storage Account ========== //
 
-module privateDnsZonesStorageAccount 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (enablePrivateNetworking ) {
-  name: take('avm.res.network.private-dns-zone.storage-account.${solutionSuffix}', 64)
-  params: {
-    name: 'privatelink.blob.core.windows.net'
-    enableTelemetry: enableTelemetry
-    virtualNetworkLinks: [
-      {
-        name: 'vnetlink-storage-account'
-        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
-      }
-    ]
-    tags: tags
-  }
-}
-
 var storageAccountName = replace('st${solutionSuffix}', '-', '')
 param storageContainerName string = 'sample-dataset'
 module avmStorageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
@@ -1767,15 +1772,16 @@ module avmStorageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
       ? [
           {
             name: 'pep-blob-${solutionSuffix}'
+            customNetworkInterfaceName: 'nic-blob-${solutionSuffix}'
             privateDnsZoneGroup: {
               privateDnsZoneGroupConfigs: [
                 {
                   name: 'storage-dns-zone-group-blob'
-                  privateDnsZoneResourceId: privateDnsZonesStorageAccount.outputs.resourceId
+                  privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.blob]!.outputs.resourceId
                 }
               ]
             }
-            subnetResourceId: virtualNetwork.outputs.subnetResourceIds[0]
+            subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
             service: 'blob'
           }
         ]
@@ -1799,22 +1805,8 @@ module avmStorageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
 
 // ========== Search Service ========== //
 
-module privateDnsZonesSearchService 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (enablePrivateNetworking ) {
-  name: take('avm.res.network.private-dns-zone.search-service.${solutionSuffix}', 64)
-  params: {
-    name: 'privatelink.search.windows.net'
-    enableTelemetry: enableTelemetry
-    virtualNetworkLinks: [
-      {
-        name: 'vnetlink-search-service'
-        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
-      }
-    ]
-    tags: tags
-  }
-}
-
 var searchServiceName = 'srch-${solutionSuffix}'
+var aiSearchIndexName = 'sample-dataset-index'
 module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
   name: take('avm.res.search.search-service.${solutionSuffix}', 64)
   params: {
@@ -1835,7 +1827,7 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
     }
     partitionCount: 1
     replicaCount: 1
-    sku: 'standard'
+    sku: enableScalability ? 'standard' : 'basic'
     tags: tags
     roleAssignments: [
       {
@@ -1848,19 +1840,30 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
         roleDefinitionIdOrName: 'Search Index Data Contributor'
         principalType: 'User'
       }
+      {
+        principalId: aiFoundryAiProjectPrincipalId
+        roleDefinitionIdOrName: 'Search Index Data Reader'
+        principalType: 'ServicePrincipal'
+      }
+      {
+        principalId: aiFoundryAiProjectPrincipalId
+        roleDefinitionIdOrName: 'Search Service Contributor'
+        principalType: 'ServicePrincipal'
+      }
     ]
     privateEndpoints: enablePrivateNetworking 
       ? [
           {
             name: 'pep-search-${solutionSuffix}'
+            customNetworkInterfaceName: 'nic-search-${solutionSuffix}'
             privateDnsZoneGroup: {
               privateDnsZoneGroupConfigs: [
                 {
-                  privateDnsZoneResourceId: privateDnsZonesSearchService.outputs.resourceId
+                  privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.search]!.outputs.resourceId
                 }
               ]
             }
-            subnetResourceId: virtualNetwork.outputs.subnetResourceIds[0]
+            subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
             service: 'searchService'
           }
         ]
@@ -1871,11 +1874,9 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
 // ========== Search Service - AI Project Connection ========== //
 
 var aiSearchConnectionName = 'aifp-srch-connection-${solutionSuffix}'
-var aifSubscriptionId = useExistingAiFoundryAiProject  ? split(existingAiFoundryAiProjectResourceId, '/')[2] : subscription().subscriptionId
-var aifResourceGroup = useExistingAiFoundryAiProject  ? split(existingAiFoundryAiProjectResourceId, '/')[4] : resourceGroup().name
-module aiSearchFoundryConnection 'modules/aifp_search_connection.bicep' = {
+module aiSearchFoundryConnection 'modules/aifp-connections.bicep' = {
   name: take('aifp-srch-connection.${solutionSuffix}', 64)
-  scope: resourceGroup(aifSubscriptionId, aifResourceGroup)
+  scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
   params: {
     aiFoundryProjectName: aiFoundryAiProjectName
     aiFoundryName: aiFoundryAiServicesResourceName
@@ -1919,8 +1920,9 @@ output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.logi
 output AZURE_STORAGE_BLOB_URL string = avmStorageAccount.outputs.serviceEndpoints.blob
 output AZURE_STORAGE_ACCOUNT_NAME string = storageAccountName
 output AZURE_STORAGE_CONTAINER_NAME string = storageContainerName
-output AZURE_SEARCH_ENDPOINT string = searchService.outputs.endpoint
-output AZURE_SEARCH_NAME string = searchService.outputs.name
+output AZURE_AI_SEARCH_ENDPOINT string = searchService.outputs.endpoint
+output AZURE_AI_SEARCH_NAME string = searchService.outputs.name
+output AZURE_AI_SEARCH_INDEX_NAME string = aiSearchIndexName
 
 output COSMOSDB_ENDPOINT string = 'https://${cosmosDbResourceName}.documents.azure.com:443/'
 output COSMOSDB_DATABASE string = cosmosDbDatabaseName
@@ -1939,5 +1941,5 @@ output AZURE_AI_MODEL_DEPLOYMENT_NAME string = aiFoundryAiServicesModelDeploymen
 output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = aiFoundryAiServicesModelDeployment.name
 output AZURE_AI_AGENT_ENDPOINT string = aiFoundryAiProjectEndpoint
 output APP_ENV string = 'Prod'
-output AI_FOUNDRY_RESOURCE_ID string = aiFoundryAiServices.outputs.resourceId
+output AI_FOUNDRY_RESOURCE_ID string = !useExistingAiFoundryAiProject ? aiFoundryAiServices.outputs.resourceId : existingAiFoundryAiProjectResourceId
 output COSMOSDB_ACCOUNT_NAME string = cosmosDbResourceName
