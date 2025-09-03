@@ -55,7 +55,7 @@ class WebSocketService {
     /**
      * Connect to WebSocket server
      */
-    connect(): Promise<void> {
+    connect(plan_id?: string): Promise<void> {
         return new Promise((resolve, reject) => {
             if (this.isConnecting) {
                 console.log('Connection attempt already in progress');
@@ -70,14 +70,14 @@ class WebSocketService {
 
             try {
                 this.isConnecting = true;
-                
+
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsHost = process.env.REACT_APP_WS_HOST || '127.0.0.1:8000';
                 const processId = crypto.randomUUID();
 
                 const authHeaders = headerBuilder();
                 const userId = authHeaders['x-ms-client-principal-id'];
-                
+
                 if (!userId) {
                     console.error('No user ID available for WebSocket connection');
                     this.isConnecting = false;
@@ -86,12 +86,12 @@ class WebSocketService {
                 }
 
                 // Use query parameter for WebSocket authentication (as backend expects)
-                const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}?user_id=${encodeURIComponent(userId)}`;
+                const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}?user_id=${encodeURIComponent(userId)}${plan_id ? `&plan_id=${encodeURIComponent(plan_id)}` : ''}`;
 
                 console.log('Connecting to WebSocket:', wsUrl);
-                
+
                 this.ws = new WebSocket(wsUrl);
-                
+
                 this.ws.onopen = () => {
                     console.log('WebSocket connected successfully');
                     this.reconnectAttempts = 0;
@@ -114,7 +114,7 @@ class WebSocketService {
                     console.log('WebSocket disconnected', event.code, event.reason);
                     this.isConnecting = false;
                     this.emit('connection_status', { connected: false });
-                    
+
                     if (event.code !== 1000) {
                         this.attemptReconnect();
                     }
@@ -139,14 +139,14 @@ class WebSocketService {
      */
     disconnect(): void {
         console.log('Manually disconnecting WebSocket');
-        
+
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
-        
+
         this.reconnectAttempts = this.maxReconnectAttempts;
-        
+
         if (this.ws) {
             this.ws.close(1000, 'Manual disconnect');
             this.ws = null;
@@ -164,7 +164,7 @@ class WebSocketService {
                 type: 'subscribe_plan',
                 plan_id: planId
             };
-            
+
             this.ws.send(JSON.stringify(message));
             this.planSubscriptions.add(planId);
             console.log(`Subscribed to plan updates: ${planId}`);
@@ -180,7 +180,7 @@ class WebSocketService {
                 type: 'unsubscribe_plan',
                 plan_id: planId
             };
-            
+
             this.ws.send(JSON.stringify(message));
             this.planSubscriptions.delete(planId);
             console.log(`Unsubscribed from plan updates: ${planId}`);
@@ -194,7 +194,7 @@ class WebSocketService {
         if (!this.listeners.has(eventType)) {
             this.listeners.set(eventType, new Set());
         }
-        
+
         this.listeners.get(eventType)!.add(callback);
 
         return () => {
@@ -277,13 +277,13 @@ class WebSocketService {
 
         this.reconnectAttempts++;
         const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-        
-        console.log(`Scheduling reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay/1000}s`);
-        
+
+        console.log(`Scheduling reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay / 1000}s`);
+
         this.reconnectTimer = setTimeout(() => {
             this.reconnectTimer = null;
             console.log(`Attempting reconnection (attempt ${this.reconnectAttempts})`);
-            
+
             this.connect()
                 .then(() => {
                     console.log('Reconnection successful - re-subscribing to plans');

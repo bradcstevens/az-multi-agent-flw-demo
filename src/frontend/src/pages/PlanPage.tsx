@@ -68,7 +68,7 @@ const PlanPage: React.FC = () => {
             // Only connect if not already connected
             if (!webSocketService.isConnected()) {
                 try {
-                    await webSocketService.connect();
+                    await webSocketService.connect(planId);
                     setWsConnected(true);
                 } catch (error) {
                     console.error('Failed to connect to WebSocket:', error);
@@ -91,7 +91,7 @@ const PlanPage: React.FC = () => {
             if (message.data && message.data.plan_id === planId) {
                 console.log('Plan update received:', message.data);
                 setStreamingMessages(prev => [...prev, message.data as StreamingPlanUpdate]);
-                
+
                 // Refresh plan data for major updates
                 if (message.data.status === 'completed' && loadPlanDataRef.current) {
                     loadPlanDataRef.current(false);
@@ -130,7 +130,7 @@ const PlanPage: React.FC = () => {
     }, [planId]);
 
     // Subscribe to plan updates when planId changes
-      useEffect(() => {
+    useEffect(() => {
         if (planId && wsConnected && !planId.startsWith('sid_')) {
             // Only subscribe if we have a real plan_id (not session_id)
             console.log('Subscribing to plan updates for:', planId);
@@ -162,7 +162,7 @@ const PlanPage: React.FC = () => {
                 console.log('Default team loaded from storage:', defaultTeam.name);
                 return;
             }
-            
+
             try {
                 const teams = await TeamService.getUserTeams();
                 console.log('All teams loaded:', teams);
@@ -188,7 +188,7 @@ const PlanPage: React.FC = () => {
             (plan) => plan.plan.id === planId
         );
         setPlanData(currentPlan || null);
-    }, [allPlans,planId]);
+    }, [allPlans, planId]);
 
     const loadPlanData = useCallback(
         async (navigate: boolean = true) => {
@@ -204,18 +204,18 @@ const PlanPage: React.FC = () => {
                 }
 
                 setError(null);
-                const data = await PlanDataService.fetchPlanData(planId,navigate);
+                const data = await PlanDataService.fetchPlanData(planId, navigate);
 
-               setAllPlans(currentPlans => {
-                const plans = [...currentPlans];
-                const existingIndex = plans.findIndex(p => p.plan.id === data.plan.id);
-                if (existingIndex !== -1) {
-                    plans[existingIndex] = data;
-                } else {
-                    plans.push(data);
-                }
-                return plans;
-            });
+                setAllPlans(currentPlans => {
+                    const plans = [...currentPlans];
+                    const existingIndex = plans.findIndex(p => p.plan.id === data.plan.id);
+                    if (existingIndex !== -1) {
+                        plans[existingIndex] = data;
+                    } else {
+                        plans.push(data);
+                    }
+                    return plans;
+                });
             } catch (err) {
                 console.log("Failed to load plan data:", err);
                 setError(
@@ -257,7 +257,7 @@ const PlanPage: React.FC = () => {
                 await loadPlanData(false);
             } catch (error: any) {
                 dismissToast(id);
-                
+
                 // Check if this is an RAI validation error
                 let errorDetail = null;
                 try {
@@ -315,73 +315,73 @@ const PlanPage: React.FC = () => {
 
     useEffect(() => {
 
-        const initializePlanLoading  = async () => {
-        if (!planId) return;
-        
-        // Check if this looks like a session_id (starts with "sid_")
-        if (planId.startsWith('sid_')) {
-            console.log('Detected session_id, resolving to plan_id:', planId);
-            
-            try {
-                // Try to find the plan by session_id
-                const plans = await apiService.getPlans();
-                const matchingPlan = plans.find(plan => plan.session_id === planId);
-                
-                if (matchingPlan) {
-                    // Found the plan! Replace URL with correct plan_id
-                    console.log('Resolved session_id to plan_id:', matchingPlan.id);
-                    navigate(`/plan/${matchingPlan.id}`, { replace: true });
-                    return; // Navigation will trigger reload with correct ID
-                } else {
-                    // Plan not created yet, start polling
-                    console.log('Plan not found yet, starting polling for session:', planId);
-                    let attempts = 0;
-                    const maxAttempts = 20; // Poll for up to 20 seconds
-                    
-                    const pollForPlan = async () => {
-                        attempts++;
-                        if (attempts > maxAttempts) {
-                            console.error('Plan creation timed out after polling');
-                            setError(new Error('Plan creation is taking longer than expected. Please check your task list or try creating a new plan.'));
-                            setLoading(false);
-                            return;
-                        }
-                        
-                        try {
-                            const plans = await apiService.getPlans();
-                            const plan = plans.find(p => p.session_id === planId);
-                            
-                            if (plan) {
-                                console.log(`Found plan after ${attempts} attempts:`, plan.id);
-                                navigate(`/plan/${plan.id}`, { replace: true });
-                            } else {
-                                // Wait and try again
-                                setTimeout(pollForPlan, 1000); // Poll every second
-                            }
-                        } catch (error) {
-                            console.error('Polling error:', error);
-                            if (attempts < maxAttempts) {
-                                setTimeout(pollForPlan, 2000); // Wait longer on error
-                            }
-                        }
-                    };
-                    
-                    pollForPlan();
-                }
-            } catch (error) {
-                console.error('Session resolution error:', error);
-                setError(error instanceof Error ? error : new Error('Failed to resolve plan from session'));
-                setLoading(false);
-            }
-        } else {
-          
-            console.log('Using plan_id directly:', planId);
-            loadPlanData(true);
-        }
-    };
+        const initializePlanLoading = async () => {
+            if (!planId) return;
 
-    initializePlanLoading ();
-}, [planId, navigate, loadPlanData]);
+            // Check if this looks like a session_id (starts with "sid_")
+            if (planId.startsWith('sid_')) {
+                console.log('Detected session_id, resolving to plan_id:', planId);
+
+                try {
+                    // Try to find the plan by session_id
+                    const plans = await apiService.getPlans();
+                    const matchingPlan = plans.find(plan => plan.session_id === planId);
+
+                    if (matchingPlan) {
+                        // Found the plan! Replace URL with correct plan_id
+                        console.log('Resolved session_id to plan_id:', matchingPlan.id);
+                        navigate(`/plan/${matchingPlan.id}`, { replace: true });
+                        return; // Navigation will trigger reload with correct ID
+                    } else {
+                        // Plan not created yet, start polling
+                        console.log('Plan not found yet, starting polling for session:', planId);
+                        let attempts = 0;
+                        const maxAttempts = 20; // Poll for up to 20 seconds
+
+                        const pollForPlan = async () => {
+                            attempts++;
+                            if (attempts > maxAttempts) {
+                                console.error('Plan creation timed out after polling');
+                                setError(new Error('Plan creation is taking longer than expected. Please check your task list or try creating a new plan.'));
+                                setLoading(false);
+                                return;
+                            }
+
+                            try {
+                                const plans = await apiService.getPlans();
+                                const plan = plans.find(p => p.session_id === planId);
+
+                                if (plan) {
+                                    console.log(`Found plan after ${attempts} attempts:`, plan.id);
+                                    navigate(`/plan/${plan.id}`, { replace: true });
+                                } else {
+                                    // Wait and try again
+                                    setTimeout(pollForPlan, 1000); // Poll every second
+                                }
+                            } catch (error) {
+                                console.error('Polling error:', error);
+                                if (attempts < maxAttempts) {
+                                    setTimeout(pollForPlan, 2000); // Wait longer on error
+                                }
+                            }
+                        };
+
+                        pollForPlan();
+                    }
+                } catch (error) {
+                    console.error('Session resolution error:', error);
+                    setError(error instanceof Error ? error : new Error('Failed to resolve plan from session'));
+                    setLoading(false);
+                }
+            } else {
+
+                console.log('Using plan_id directly:', planId);
+                loadPlanData(true);
+            }
+        };
+
+        initializePlanLoading();
+    }, [planId, navigate, loadPlanData]);
 
     const handleNewTaskButton = () => {
         NewTaskService.handleNewTaskFromPlan(navigate);
@@ -418,32 +418,32 @@ const PlanPage: React.FC = () => {
     /**
      * Handle team upload completion - refresh team list
      */
-   const handleTeamUpload = useCallback(async () => {
-    try {
-        const teams = await TeamService.getUserTeams();
-        console.log('Teams refreshed after upload:', teams.length);
+    const handleTeamUpload = useCallback(async () => {
+        try {
+            const teams = await TeamService.getUserTeams();
+            console.log('Teams refreshed after upload:', teams.length);
 
-        if (teams.length > 0) {
-            // Always keep "Human Resources Team" as default, even after new uploads
-            const hrTeam = teams.find(team => team.name === "Human Resources Team");
-            const defaultTeam = hrTeam || teams[0];
-            setSelectedTeam(defaultTeam);
-            console.log('Default team after upload:', defaultTeam.name);
-            
-            dispatchToast(
-                <Toast>
-                    <ToastTitle>Team Uploaded Successfully!</ToastTitle>
-                    <ToastBody>
-                        Team uploaded. {defaultTeam.name} remains your default team.
-                    </ToastBody>
-                </Toast>,
-                { intent: "success" }
-            );
+            if (teams.length > 0) {
+                // Always keep "Human Resources Team" as default, even after new uploads
+                const hrTeam = teams.find(team => team.name === "Human Resources Team");
+                const defaultTeam = hrTeam || teams[0];
+                setSelectedTeam(defaultTeam);
+                console.log('Default team after upload:', defaultTeam.name);
+
+                dispatchToast(
+                    <Toast>
+                        <ToastTitle>Team Uploaded Successfully!</ToastTitle>
+                        <ToastBody>
+                            Team uploaded. {defaultTeam.name} remains your default team.
+                        </ToastBody>
+                    </Toast>,
+                    { intent: "success" }
+                );
+            }
+        } catch (error) {
+            console.error('Error refreshing teams after upload:', error);
         }
-    } catch (error) {
-        console.error('Error refreshing teams after upload:', error);
-    }
-}, [dispatchToast]);
+    }, [dispatchToast]);
 
     if (!planId) {
         return (
@@ -456,9 +456,9 @@ const PlanPage: React.FC = () => {
     return (
         <CoralShellColumn>
             <CoralShellRow>
-                <PlanPanelLeft 
-                    onNewTaskButton={handleNewTaskButton} 
-                    reloadTasks={reloadLeftList} 
+                <PlanPanelLeft
+                    onNewTaskButton={handleNewTaskButton}
+                    reloadTasks={reloadLeftList}
                     restReload={() => setReloadLeftList(false)}
                     onTeamSelect={handleTeamSelect}
                     onTeamUpload={handleTeamUpload}
@@ -487,7 +487,7 @@ const PlanPage: React.FC = () => {
                                     />
                                 </PanelRightToggles>
                             </ContentToolbar>
-                            
+
                             {/* Show RAI error if present */}
                             {raiError && (
                                 <div style={{ padding: '16px 24px 0' }}>
@@ -500,7 +500,7 @@ const PlanPage: React.FC = () => {
                                     />
                                 </div>
                             )}
-                            
+
                             <PlanChat
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}

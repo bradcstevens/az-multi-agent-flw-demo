@@ -97,7 +97,7 @@ export function getUserInfoGlobal() {
     }
 
     if (!USER_INFO) {
-        console.info('User info not yet configured');
+        // console.info('User info not yet configured');
         return null;
     }
 
@@ -149,7 +149,7 @@ export function headerBuilder(headers?: Record<string, string>): Record<string, 
 //     });
 
 //     console.log('initializeTeam: Starting team initialization...');
-    
+
 //     try {
 //         const response = await fetch(`${apiUrl}/init_team`, {
 //             method: 'GET',
@@ -163,12 +163,12 @@ export function headerBuilder(headers?: Record<string, string>): Record<string, 
 
 //         const data = await response.json();
 //         console.log('initializeTeam: Team initialization completed:', data);
-        
+
 //         // Validate the expected response format
 //         if (data.status !== 'Request started successfully' || !data.team_id) {
 //             throw new Error('Invalid response format from init_team endpoint');
 //         }
-        
+
 //         return data;
 //     } catch (error) {
 //         console.error('initializeTeam: Error initializing team:', error);

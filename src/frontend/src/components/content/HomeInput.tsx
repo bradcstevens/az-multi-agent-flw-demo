@@ -13,11 +13,9 @@ import "../../styles/prism-material-oceanic.css";
 import "./../../styles/HomeInput.css";
 
 import { HomeInputProps, iconMap, QuickTask } from "../../models/homeInput";
-import { TeamConfig } from "../../models/Team";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
 import { RAIErrorCard, RAIErrorData } from "../errors";
-import { apiService } from "../../api/apiService";
 
 import ChatInput from "@/coral/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
@@ -78,29 +76,24 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     input.trim(),
                     selectedTeam?.team_id
                 );
+                console.log("Plan created:", response);
                 setInput("");
 
                 if (textareaRef.current) {
                     textareaRef.current.style.height = "auto";
                 }
 
-                if (response.session_id && response.session_id !== null) {
+                if (response.plan_id && response.plan_id !== null) {
                     showToast("Plan created!", "success");
                     dismissToast(id);
 
-                    // Navigate to create page (no team ID in URL anymore)
-                    console.log('HomeInput: Navigating to plan creation with team:', selectedTeam?.name);
-                     console.log('HomeInput: Navigating to plan creation with session:', response.session_id);
-                      console.log('HomeInput: Plan created with session:', response.session_id);
-
-                    navigate(`/plan/${response.session_id}`);
+                    navigate(`/plan/${response.plan_id}`);
                 } else {
                     showToast("Failed to create plan", "error");
                     dismissToast(id);
                 }
             } catch (error: any) {
                 dismissToast(id);
-
                 // Check if this is an RAI validation error
                 let errorDetail = null;
                 try {

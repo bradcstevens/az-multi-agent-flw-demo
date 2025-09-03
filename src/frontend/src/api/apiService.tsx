@@ -118,8 +118,8 @@ export class APIService {
     //     return apiClient.post(API_ENDPOINTS.PROCESS_REQUEST, inputTask);
     // }
 
-    async createPlan(inputTask: InputTask): Promise<{ status: string; session_id: string }> {
-    return apiClient.post(API_ENDPOINTS.PROCESS_REQUEST, inputTask);
+    async createPlan(inputTask: InputTask): Promise<InputTaskResponse> {
+        return apiClient.post(API_ENDPOINTS.PROCESS_REQUEST, inputTask);
     }
 
     /**

@@ -206,7 +206,7 @@ export class TaskService {
   static async createPlan(
     description: string,
     teamId?: string
-  ): Promise<{ status: string; session_id: string }> {
+  ): Promise<InputTaskResponse> {
     const sessionId = this.generateSessionId();
 
     const inputTask: InputTask = {
