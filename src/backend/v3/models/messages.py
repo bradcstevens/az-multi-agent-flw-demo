@@ -43,24 +43,26 @@ class PlanApprovalRequest:
     """Request for plan approval from the frontend."""
     plan: MPlan
     status: PlanStatus
-
     context: dict | None = None
 
 @dataclass(slots=True)
 class PlanApprovalResponse:
     """Response for plan approval from the frontend."""
+    plan_id: str
     approved: bool
     feedback: str | None = None
 
 @dataclass(slots=True)
 class ReplanApprovalRequest:
     """Request for replan approval from the frontend."""
+    new_plan: MPlan
     reason: str
     context: dict | None = None
 
 @dataclass(slots=True)
 class ReplanApprovalResponse:   
     """Response for replan approval from the frontend."""
+    plan_id: str
     approved: bool
     feedback: str | None = None
 
@@ -73,8 +75,8 @@ class UserClarificationRequest:
 @dataclass(slots=True)
 class UserClarificationResponse:
     """Response for user clarification from the frontend."""
-    def __init__(self, answer: str):
-        self.answer = answer
+    plan_id: str | None
+    answer: str = ""
 
 @dataclass(slots=True)
 class FinalResultMessage:
@@ -112,11 +114,3 @@ class ApprovalRequest(KernelBaseModel):
     user_id: str
     action: str
     agent_name: str
-
-@dataclass(slots=True)
-class HumanClarification(KernelBaseModel):
-    """Message containing human clarification on a plan."""
-
-    plan_id: str
-    session_id: str
-    human_clarification: str

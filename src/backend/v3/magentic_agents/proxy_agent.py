@@ -6,7 +6,6 @@ import uuid
 from collections.abc import AsyncIterable
 from typing import AsyncIterator, Optional
 
-import v3.models.messages as agent_messages
 from pydantic import Field
 from semantic_kernel.agents import (  # pylint: disable=no-name-in-module
     AgentResponseItem, AgentThread)
@@ -22,6 +21,8 @@ from typing_extensions import override
 from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
 from v3.config.settings import current_user_id
+from v3.models.messages import (UserClarificationRequest,
+                                UserClarificationResponse)
 
 
 class DummyAgentThread(AgentThread):
@@ -145,6 +146,7 @@ class ProxyAgent(Agent):
         )
         # Send clarification request via response handlers
         clarification_request = f"I need clarification about: {message}"
+        
         clarification_message = self._create_message_content(clarification_request, thread.id)
         await self._trigger_response_callbacks(clarification_message)
         
