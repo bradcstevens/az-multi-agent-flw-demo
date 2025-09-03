@@ -30,6 +30,7 @@ from ..models.messages_kernel import (
     AgentMessage,
     TeamConfiguration,
     DataType,
+    UserCurrentTeam,
 )
 
 
@@ -431,3 +432,7 @@ class CosmosDBClient(DatabaseBase):
             team: The TeamConfiguration to update
         """
         await self.update_item(team)
+    
+    async def set_user_default_team(current_team: UserCurrentTeam) -> bool:
+
+

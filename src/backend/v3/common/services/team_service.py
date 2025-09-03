@@ -218,6 +218,45 @@ class TeamService:
             self.logger.error("Error retrieving team configuration: %s", str(e))
             return None
 
+    async def delete_user_current_team(self, user_id: str) -> bool:
+        """
+        Delete the current team for a user.
+
+        Args:
+            user_id: User ID to delete the current team for
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            await self.memory_context.delete_user_current_team(user_id)
+            self.logger.info("Successfully deleted current team for user %s", user_id)
+            return True
+
+        except Exception as e:
+            self.logger.error("Error deleting current team: %s", str(e))
+            return False
+
+    async def set_default_team(self, user_id: str, team_id: str) -> bool:
+        """
+        Set a default team for a user.
+
+        Args:
+            user_id: User ID to set the default team for
+            team_id: Team ID to set as default
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            await self.memory_context.set_user_default_team(user_id, team_id)
+            self.logger.info("Successfully set default team for user %s: %s", user_id, team_id)
+            return True
+
+        except Exception as e:
+            self.logger.error("Error setting default team: %s", str(e))
+            return False
+
     async def get_all_team_configurations(
         self, user_id: str
     ) -> List[TeamConfiguration]:

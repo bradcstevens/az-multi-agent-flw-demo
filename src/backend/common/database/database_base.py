@@ -9,6 +9,7 @@ from ..models.messages_kernel import (
     Plan,
     Step,
     TeamConfiguration,
+    UserCurrentTeam,
 )
 
 
@@ -80,6 +81,7 @@ class DatabaseBase(ABC):
         """Add a plan to the database."""
         pass
 
+    
     @abstractmethod
     async def update_plan(self, plan: Plan) -> None:
         """Update a plan in the database."""
@@ -184,7 +186,13 @@ class DatabaseBase(ABC):
         """Async context manager exit."""
         await self.close()
 
-    # Convenience aliases
+    @abstractmethod
     async def get_steps_for_plan(self, plan_id: str) -> List[Step]:
         """Convenience method aliasing get_steps_by_plan for compatibility."""
         pass
+
+    @abstractmethod
+    async def set_user_default_team(self, UserCurrentTeam: UserCurrentTeam) -> bool:
+        """Set the default team for a user."""
+        pass
+
