@@ -1413,6 +1413,189 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
             name: 'APP_ENV'
             value: 'Prod'
           }
+          {
+            name: 'AZURE_COGNITIVE_SERVICES'
+            value: 'https://cognitiveservices.azure.com/.default' 
+          }
+          {
+            name: 'AZURE_BING_CONNECTION_NAME'
+            value: '' 
+          }
+          {
+            name: 'REASONING_MODEL_NAME'
+            value: '' 
+          }
+          {
+            name: 'MCP_SERVER_ENDPOINT'
+            value: '' 
+          }
+          {
+            name: 'MCP_SERVER_NAME'
+            value: 'MACAE MCP Server' 
+          }
+          {
+            name: 'MCP_SERVER_DESCRIPTION'
+            value: '' 
+          }
+          {
+            name: 'AZURE_TENANT_ID'
+            value: tenant().tenantId
+          }
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: userAssignedIdentity!.outputs.clientId
+          }
+          {
+            name: 'SUPPORTED_MODELS'
+            value: '' 
+          } 
+          {
+            name: 'AZURE_AI_SEARCH_CONNECTION_NAME'
+            value: aiSearchConnectionName
+          } 
+          {
+            name: 'AZURE_AI_SEARCH_INDEX_NAME'
+            value: '' 
+          } 
+          {
+            name: 'AZURE_AI_SEARCH_ENDPOINT'
+            value: searchService.outputs.endpoint 
+          } 
+          {
+            name: 'AZURE_AI_SEARCH_API_KEY'
+            value: ''
+          } 
+          {
+            name: 'BING_CONNECTION_NAME'
+            value: '' 
+          } 
+          {
+            name: 'AZURE_STORAGE_BLOB_URL'
+            value: avmStorageAccount.outputs.serviceEndpoints.blob
+          }
+          {
+            name: 'AZURE_STORAGE_CONTAINER_NAME'
+            value: storageContainerName
+          }
+          {
+            name: 'AZURE_SEARCH_ENDPOINT'
+            value: searchService.outputs.endpoint
+          }
+        ]
+      }
+    ]
+  }
+}
+
+// ========== MCP Container App Service ========== //
+// WAF best practices for container apps: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-container-apps
+// PSRule for Container App: https://azure.github.io/PSRule.Rules.Azure/en/rules/resource/#container-app
+var containerAppMcpResourceName  = 'ca-mcp-${solutionSuffix}'
+module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = {
+  name: take('avm.res.app.container-app.${containerAppMcpResourceName}', 64)
+  params: {
+    name: containerAppMcpResourceName
+    tags: tags
+    location: location
+    enableTelemetry: enableTelemetry
+    environmentResourceId: containerAppEnvironment.outputs.resourceId
+    managedIdentities: { userAssignedResourceIds: [userAssignedIdentity.outputs.resourceId] }
+    ingressTargetPort: 9000
+    ingressExternal: true
+    activeRevisionsMode: 'Single'
+    corsPolicy: {
+      allowedOrigins: [
+        'https://${webSiteResourceName}.azurewebsites.net'
+        'http://${webSiteResourceName}.azurewebsites.net'
+      ]
+    }
+    // WAF aligned configuration for Scalability
+    scaleSettings: {
+      maxReplicas: enableScalability ? 3 : 1
+      minReplicas: enableScalability ? 2 : 1
+      rules: [
+        {
+          name: 'http-scaler'
+          http: {
+            metadata: {
+              concurrentRequests: '100'
+            }
+          }
+        }
+      ]
+    }
+    containers: [
+      {
+        name: 'mcp'
+        //image: '${backendContainerRegistryHostname}/${backendContainerImageName}:${backendContainerImageTag}'
+        image: 'macaemcpacrdk.azurecr.io/macae-mac-app:t9'
+        //TODO: configure probes for container app
+        // probes: [
+        //   {
+        //     httpGet: {
+        //       httpHeaders: [
+        //         {
+        //           name: 'Custom-Header'
+        //           value: 'Awesome'
+        //         }
+        //       ]
+        //       path: '/health'
+        //       port: 8080
+        //     }
+        //     initialDelaySeconds: 3
+        //     periodSeconds: 3
+        //     type: 'Liveness'
+        //   }
+        // ]
+        resources: {
+          cpu: '2.0'
+          memory: '4.0Gi'
+        }
+        env: [
+          {
+            name: 'MCP_HOST'
+            value: '0.0.0.0'
+          }
+          {
+            name: 'MCP_PORT'
+            value: '9000'
+          }
+          {
+            name: 'MCP_DEBUG'
+            value: 'false'
+          }
+          {
+            name: 'MCP_SERVER_NAME'
+            value: 'MACAE MCP Server'
+          }
+          {
+            name: 'MCP_ENABLE_AUTH'
+            value: 'true'
+          }
+          {
+            name: 'AZURE_TENANT_ID'
+            value: tenant().tenantId
+          }
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: userAssignedIdentity!.outputs.clientId
+          }
+          {
+            name: 'AZURE_JWKS_URI'
+            value: 'https://login.microsoftonline.com/${tenant().tenantId}/discovery/v2.0/keys'
+          }
+          {
+            name: 'AZURE_ISSUER'
+            value: 'https://sts.windows.net/${tenant().tenantId}/'
+          }
+          {
+            name: 'AZURE_AUDIENCE'
+            value: 'api://${userAssignedIdentity!.outputs.clientId}'
+          }
+          {
+            name: 'DATASET_PATH'
+            value: './datasets'
+          }
         ]
       }
     ]
