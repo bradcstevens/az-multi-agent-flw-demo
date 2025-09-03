@@ -112,11 +112,3 @@ class ApprovalRequest(KernelBaseModel):
     user_id: str
     action: str
     agent_name: str
-
-@dataclass(slots=True)
-class HumanClarification(KernelBaseModel):
-    """Message containing human clarification on a plan."""
-
-    plan_id: str
-    session_id: str
-    human_clarification: str
