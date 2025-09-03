@@ -27,32 +27,15 @@ class MStep(BaseModel):
     def agent(self, value):
         self._agent = value if value is not None else ""
 
+
 class MPlan(BaseModel):
+    """model of a plan"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    session_id: Optional[str] = None
-    team_id: Optional[str] = None
-    user_id: Optional[str] = None
+    user_id: str = ""
+    team_id: str = ""
+    plan_id: str = ""
     overall_status: PlanStatus = PlanStatus.CREATED
-    progress: int = 0  # 0-100 percentage
-    current_step: Optional[str] = None
-    result: Optional[str] = None
-    error_message: Optional[str] = None
-    created_at: datetime = Field(datetime.now(timezone.utc))
-    updated_at: datetime = Field(datetime.now(timezone.utc))
-    estimated_completion: Optional[datetime] = None
-    user_request: Optional[str] = None
+    user_request: str = ""
     team: List[str] = []
-    facts: Optional[str] = None
-    steps: List[MStep] = Field(default_factory=list)
-
-# class MPlan(BaseModel):
-#     """model of a plan"""
-#     session_id: str = ""
-#     user_id: str = ""
-#     team_id: str = ""
-#     plan_id: str = ""
-#     user_request: str = ""
-#     team: List[str] = []
-#     facts: str = ""
-#     steps: List[MStep] = []
-
+    facts: str = ""
+    steps: List[MStep] = []

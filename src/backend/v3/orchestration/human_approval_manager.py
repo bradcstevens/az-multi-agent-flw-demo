@@ -3,6 +3,7 @@ Human-in-the-loop Magentic Manager for employee onboarding orchestration.
 Extends StandardMagenticManager to add approval gates before plan execution.
 """
 
+import asyncio
 import re
 from typing import Any, List, Optional
 
@@ -13,7 +14,8 @@ from semantic_kernel.agents.orchestration.magentic import (
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import \
     ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT
 from semantic_kernel.contents import ChatMessageContent
-from v3.config.settings import connection_config, current_user_id
+from v3.config.settings import (connection_config, current_user_id,
+                                orchestration_config)
 from v3.models.models import MPlan, MStep
 
 
@@ -104,18 +106,23 @@ Please check with the team members to list all relevant tools they have access t
             # )
             
     
-    async def _wait_for_user_approval(self) -> Optional[messages.PlanApprovalResponse]:
+    async def _wait_for_user_approval(self, plan_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
         """Wait for user approval response."""
-        user_id = current_user_id.get()
         # Temporarily use console input for approval - will switch to WebSocket or API in future
-        response = input("\nApprove this execution plan? [y/n]: ").strip().lower()
-        if response in ['y', 'yes']:
-            return messages.PlanApprovalResponse(approved=True)
-        elif response in ['n', 'no']:
-            return messages.PlanApprovalResponse(approved=False)
-        else:
-            print("Invalid input. Please enter 'y' for yes or 'n' for no.")
-            return await self._wait_for_user_approval()
+        # response = input("\nApprove this execution plan? [y/n]: ").strip().lower()
+        # if response in ['y', 'yes']:
+        #     return messages.PlanApprovalResponse(approved=True, plan_id=plan_id if plan_id else "input")
+        # elif response in ['n', 'no']:
+        #     return messages.PlanApprovalResponse(approved=False, plan_id=plan_id if plan_id else "input")
+        # else:
+        #     print("Invalid input. Please enter 'y' for yes or 'n' for no.")
+        #     return await self._wait_for_user_approval()
+        # In future, implement actual waiting for WebSocket or API response here
+        if plan_id not in orchestration_config.approvals:
+            orchestration_config.approvals[plan_id] = None
+        while orchestration_config.approvals[plan_id] is None:
+            await asyncio.sleep(0.2)
+        return messages.PlanApprovalResponse(approved=orchestration_config.approvals[plan_id], plan_id=plan_id)
 
     
     async def prepare_final_answer(self, magentic_context: MagenticContext) -> ChatMessageContent:
