@@ -4,6 +4,7 @@ param(
     [string]$StorageAccount,
     [string]$BlobContainer,
     [string]$AiSearch,
+    [string]$AiSearchIndex,
     [string]$ResourceGroup
 )
 
@@ -17,7 +18,11 @@ if (-not $BlobContainer) {
 }
 
 if (-not $AiSearch) {
-    $AiSearch = $(azd env get-value AZURE_SEARCH_NAME)
+    $AiSearch = $(azd env get-value AZURE_AI_SEARCH_NAME)
+}
+
+if (-not $AiSearchIndex) {
+    $AiSearchIndex = $(azd env get-value AZURE_AI_SEARCH_INDEX_NAME)
 }
 
 if (-not $ResourceGroup) {
@@ -28,7 +33,7 @@ $AzSubscriptionId = $(azd env get-value AZURE_SUBSCRIPTION_ID)
 
 # Check if all required arguments are provided
 if (-not $StorageAccount -or -not $BlobContainer -or -not $AiSearch) {
-    Write-Host "Usage: .\infra\scripts\Process-Sample-Data.ps1 -StorageAccount <StorageAccount> -BlobContainer <StorageContainerName> -AiSearch <AISearchName> [-ResourceGroup <ResourceGroup>]"
+    Write-Host "Usage: .\infra\scripts\Process-Sample-Data.ps1 -StorageAccount <StorageAccountName> -BlobContainer <StorageContainerName> -AiSearch <AISearchName> [-AiSearchIndex <AISearchIndexName>] [-ResourceGroup <ResourceGroupName>]"
     exit 1
 }
 
@@ -219,7 +224,7 @@ Write-Host "Requirements installed"
 
 # Run the Python script to index data
 Write-Host "Running the python script to index data"
-$process = Start-Process -FilePath $pythonCmd -ArgumentList "infra/scripts/index_datasets.py", $StorageAccount, $BlobContainer, $AiSearch -Wait -NoNewWindow -PassThru
+$process = Start-Process -FilePath $pythonCmd -ArgumentList "infra/scripts/index_datasets.py", $StorageAccount, $BlobContainer, $AiSearch, $AiSearchIndex -Wait -NoNewWindow -PassThru
 
 if ($process.ExitCode -ne 0) {
     Write-Host "Error: Indexing python script execution failed."

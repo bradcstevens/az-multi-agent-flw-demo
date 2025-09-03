@@ -38,5 +38,8 @@ output name string = aiProject.name
 @description('Required. Resource ID of the AI project.')
 output resourceId string = aiProject.id
 
+@description('Required. Principal ID of the AI project managed identity.')
+output principalId string = aiProject.identity.principalId
+
 @description('Required. API endpoint for the AI project.')
 output apiEndpoint string = aiProject!.properties.endpoints['AI Foundry API']
