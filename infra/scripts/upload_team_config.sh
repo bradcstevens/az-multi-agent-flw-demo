@@ -1,27 +1,27 @@
 #!/bin/bash
 
 # Variables
-storageAccount="$1"
-blobContainer="$2"
-aiSearch="$3"
-aiSearchIndex="$4"
-resourceGroup="$5"
+cosmosdbName=$1
+databaseName=$2
+containerName=$3
+directoryPath=$4
+resourceGroup=$5
 
 # get parameters from azd env, if not provided
-if [ -z "$storageAccount" ]; then
-    storageAccount=$(azd env get-value AZURE_STORAGE_ACCOUNT_NAME)
+if [ -z "$cosmosdbName" ]; then
+    cosmosdbName=$(azd env get-value COSMOSDB_ACCOUNT_NAME)
 fi
 
-if [ -z "$blobContainer" ]; then
-    blobContainer=$(azd env get-value AZURE_STORAGE_CONTAINER_NAME)
+if [ -z "$databaseName" ]; then
+    databaseName=$(azd env get-value COSMOSDB_DATABASE)
 fi
 
-if [ -z "$aiSearch" ]; then
-    aiSearch=$(azd env get-value AZURE_AI_SEARCH_NAME)
+if [ -z "$containerName" ]; then
+    containerName=$(azd env get-value COSMOSDB_CONTAINER)
 fi
 
-if [ -z "$aiSearchIndex" ]; then
-    aiSearchIndex=$(azd env get-value AZURE_AI_SEARCH_INDEX_NAME)
+if [ -z "$directoryPath" ]; then
+    directoryPath="data/agent_teams"
 fi
 
 if [ -z "$resourceGroup" ]; then
@@ -31,8 +31,9 @@ fi
 azSubscriptionId=$(azd env get-value AZURE_SUBSCRIPTION_ID)
 
 # Check if all required arguments are provided
-if [ -z "$storageAccount" ] || [ -z "$blobContainer" ] || [ -z "$aiSearch" ]; then
-    echo "Usage: $0 <StorageAccountName> <StorageContainerName> <AISearchName> [AISearchIndexName] [ResourceGroupName]"
+if [ -z "$cosmosdbName" ] || [ -z "$databaseName" ] || [ -z "$containerName" ] || [ -z "$directoryPath" ]; then
+    echo "Error: Missing required arguments."
+    echo "Usage: $0 <cosmosdbName> <databaseName> <containerName> <directoryPath> [resourceGroupName]"
     exit 1
 fi
 
@@ -87,49 +88,25 @@ else
     az account set --subscription "$currentSubscriptionId"
 fi
 
-stIsPublicAccessDisabled=false
-srchIsPublicAccessDisabled=false
-#Enable Public Access for resources
+userPrincipalId=$(az ad signed-in-user show --query id -o tsv)
+
+cosmosIsPublicAccessDisabled=false
+#Enable Public Access for cosmos
 if [ -n "$resourceGroup" ]; then
-    stPublicAccess=$(az storage account show --name "$storageAccount" --resource-group "$resourceGroup" --query "publicNetworkAccess" -o tsv)
-    srchPublicAccess=$(az search service show --name "$aiSearch" --resource-group "$resourceGroup" --query "publicNetworkAccess" -o tsv)
-    if [ "$stPublicAccess" == "Disabled" ]; then
-        stIsPublicAccessDisabled=true
-        echo "Enabling public access for storage account: $storageAccount"
-        az storage account update --name "$storageAccount" --public-network-access enabled --default-action Allow --output none
+    cosmosPublicAccess=$(az cosmosdb show --name "$cosmosdbName" --resource-group "$resourceGroup" --query "publicNetworkAccess" -o tsv)
+    if [ "$cosmosPublicAccess" == "Disabled" ]; then
+        cosmosIsPublicAccessDisabled=true
+        echo "Enabling public access for cosmos DB: $cosmosdbName"
+        az cosmosdb update --name "$cosmosdbName" --resource-group "$resourceGroup" --public-network-access enabled --output none
         if [ $? -ne 0 ]; then
-            echo "Error: Failed to enable public access for storage account."
+            echo "Error: Failed to enable public access for CosmosDB."
             exit 1
         fi
-        echo "Public access enabled for storage account: $storageAccount"
+        echo "Public access enabled for CosmosDB: $cosmosdbName"
     else
-        echo "Public access is already enabled for storage account: $storageAccount"
+        echo "Public access is already enabled for CosmosDB: $cosmosdbName"
     fi
-
-    if [ "$srchPublicAccess" == "Disabled" ]; then
-        srchIsPublicAccessDisabled=true
-        echo "Enabling public access for search service: $aiSearch"
-        az search service update --name "$aiSearch" --resource-group "$resourceGroup" --public-network-access enabled --output none
-        if [ $? -ne 0 ]; then
-            echo "Error: Failed to enable public access for search service."
-            exit 1
-        fi
-        echo "Public access enabled for search service: $aiSearch"
-    else
-        echo "Public access is already enabled for search service: $aiSearch"
-    fi
-
 fi
-
-
-#Upload sample files to blob storage
-echo "Uploading sample files to blob storage..."
-az storage blob upload-batch --account-name "$storageAccount" --destination "$blobContainer" --source "data/datasets" --auth-mode login --pattern '*' --overwrite --output none
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to upload files to blob storage."
-    exit 1
-fi
-echo "Files uploaded successfully to blob storage."
 
 # Determine the correct Python command
 if command -v python && python --version &> /dev/null; then
@@ -165,32 +142,20 @@ echo "Installing requirements"
 pip install --quiet -r infra/scripts/requirements.txt
 echo "Requirements installed"
 
-echo "Running the python script to index data"
-$PYTHON_CMD infra/scripts/index_datasets.py "$storageAccount" "$blobContainer" "$aiSearch" "$aiSearchIndex"
+echo "Running the python script to upload team configuration"
+$PYTHON_CMD infra/scripts/team-config-scripts/upload_team_config.py "$cosmosdbName" "$databaseName" "$containerName" "$directoryPath" "$userPrincipalId"
 if [ $? -ne 0 ]; then
-    echo "Error: Indexing python script execution failed."
+    echo "Error: Team configuration upload failed."
     exit 1
 fi
 
-#disable public access for resources
-if [ "$stIsPublicAccessDisabled" = true ]; then
-    echo "Disabling public access for storage account: $storageAccount"
-    az storage account update --name "$storageAccount" --public-network-access disabled --default-action Deny --output none
+#disable public access for cosmos
+if [ "$cosmosIsPublicAccessDisabled" = true ]; then
+    echo "Disabling public access for CosmosDB: $cosmosdbName"
+    az cosmosdb update --name "$cosmosdbName" --resource-group "$resourceGroup" --public-network-access disabled --output none
     if [ $? -ne 0 ]; then
-        echo "Error: Failed to disable public access for storage account."
+        echo "Error: Failed to disable public access for CosmosDB."
         exit 1
     fi
-    echo "Public access disabled for storage account: $storageAccount"
+    echo "Public access disabled for CosmosDB: $cosmosdbName"
 fi
-
-if [ "$srchIsPublicAccessDisabled" = true ]; then
-    echo "Disabling public access for search service: $aiSearch"
-    az search service update --name "$aiSearch" --resource-group "$resourceGroup" --public-network-access disabled --output none
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to disable public access for search service."
-        exit 1
-    fi
-    echo "Public access disabled for search service: $aiSearch"
-fi
-
-echo "Script executed successfully. Sample Data Processed Successfully."

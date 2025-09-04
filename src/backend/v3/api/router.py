@@ -184,30 +184,30 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
     """
 
 
-    # if not await rai_success(input_task.description, False):
-    #     track_event_if_configured(
-    #         "RAI failed",
-    #         {
-    #             "status": "Plan not created - RAI check failed",
-    #             "description": input_task.description,
-    #             "session_id": input_task.session_id,
-    #         },
-    #     )
-    #     raise HTTPException(
-    #         status_code=400,
-    #         detail={
-    #             "error_type": "RAI_VALIDATION_FAILED",
-    #             "message": "Content Safety Check Failed",
-    #             "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
-    #             "suggestions": [
-    #                 "Remove any potentially harmful, inappropriate, or unsafe content",
-    #                 "Use more professional and constructive language",
-    #                 "Focus on legitimate business or educational objectives",
-    #                 "Ensure your request complies with content policies",
-    #             ],
-    #             "user_action": "Please revise your request and try again",
-    #         },
-    #     )
+    if not await rai_success(input_task.description, False):
+        track_event_if_configured(
+            "RAI failed",
+            {
+                "status": "Plan not created - RAI check failed",
+                "description": input_task.description,
+                "session_id": input_task.session_id,
+            },
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "RAI_VALIDATION_FAILED",
+                "message": "Content Safety Check Failed",
+                "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+                "suggestions": [
+                    "Remove any potentially harmful, inappropriate, or unsafe content",
+                    "Use more professional and constructive language",
+                    "Focus on legitimate business or educational objectives",
+                    "Ensure your request complies with content policies",
+                ],
+                "user_action": "Please revise your request and try again",
+            },
+        )
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]

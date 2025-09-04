@@ -1455,11 +1455,11 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'REASONING_MODEL_NAME'
-            value: '' 
+            value: 'o3' 
           }
           {
             name: 'MCP_SERVER_ENDPOINT'
-            value: '' 
+            value: 'https://${containerAppMcp.outputs.fqdn}/mcp'
           }
           {
             name: 'MCP_SERVER_NAME'
@@ -1467,7 +1467,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'MCP_SERVER_DESCRIPTION'
-            value: '' 
+            value: 'MACAE MCP Server Description' 
           }
           {
             name: 'AZURE_TENANT_ID'
@@ -1479,7 +1479,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'SUPPORTED_MODELS'
-            value: '' 
+            value: '["o3","o4-mini","gpt-4.1","gpt-4.1-mini"]' 
           } 
           {
             name: 'AZURE_AI_SEARCH_API_KEY'
@@ -1881,3 +1881,12 @@ output AZURE_AI_AGENT_ENDPOINT string = aiFoundryAiProjectEndpoint
 output APP_ENV string = 'Prod'
 output AI_FOUNDRY_RESOURCE_ID string = !useExistingAiFoundryAiProject ? aiFoundryAiServices.outputs.resourceId : existingAiFoundryAiProjectResourceId
 output COSMOSDB_ACCOUNT_NAME string = cosmosDbResourceName
+output AZURE_SEARCH_ENDPOINT string =searchService.outputs.endpoint
+output AZURE_CLIENT_ID string  = userAssignedIdentity!.outputs.clientId
+output AZURE_TENANT_ID string = tenant().tenantId
+output AZURE_AI_SEARCH_CONNECTION_NAME string  = searchService.outputs.name
+output AZURE_COGNITIVE_SERVICES string = 'https://cognitiveservices.azure.com/.default'
+output REASONING_MODEL_NAME string = 'o3'
+output MCP_SERVER_NAME string = 'MACAE MCP Server'
+output MCP_SERVER_DESCRIPTION string = 'MACAE MCP Server Description'
+output SUPPORTED_MODELS string = '["o3","o4-mini","gpt-4.1","gpt-4.1-mini"]'
