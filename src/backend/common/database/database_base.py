@@ -192,7 +192,15 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def set_user_default_team(self, UserCurrentTeam: UserCurrentTeam) -> bool:
-        """Set the default team for a user."""
+    async def get_current_team(self, user_id: str, team_id: str) -> UserCurrentTeam:
+        """Retrieve the current team for a user."""
         pass
 
+    @abstractmethod
+    async def set_current_team(self, current_team: UserCurrentTeam) -> None:
+        pass
+
+    @abstractmethod
+    async def update_current_team(self, current_team: UserCurrentTeam) -> None:
+        """Update the current team for a user."""
+        pass    

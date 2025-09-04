@@ -5,15 +5,21 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from azure.core.credentials import AzureKeyCredential
-from azure.core.exceptions import (ClientAuthenticationError,
-                                   HttpResponseError, ResourceNotFoundError)
-from azure.identity import DefaultAzureCredential
+from azure.core.exceptions import (
+    ClientAuthenticationError,
+    HttpResponseError,
+    ResourceNotFoundError,
+)
+
 from azure.search.documents.indexes import SearchIndexClient
 from common.config.app_config import config
 from common.database.database_base import DatabaseBase
-from common.models.messages_kernel import (StartingTask, TeamAgent,
-                                           TeamConfiguration)
+from common.models.messages_kernel import (
+    StartingTask,
+    TeamAgent,
+    TeamConfiguration,
+    UserCurrentTeam,
+)
 from v3.common.services.foundry_service import FoundryService
 
 
@@ -237,7 +243,7 @@ class TeamService:
             self.logger.error("Error deleting current team: %s", str(e))
             return False
 
-    async def set_default_team(self, user_id: str, team_id: str) -> bool:
+    async def handle_team_selection(self, user_id: str, team_id: str) -> bool:
         """
         Set a default team for a user.
 
@@ -249,9 +255,16 @@ class TeamService:
             True if successful, False otherwise
         """
         try:
-            await self.memory_context.set_user_default_team(user_id, team_id)
-            self.logger.info("Successfully set default team for user %s: %s", user_id, team_id)
-            return True
+            current_team = await self.memory_context.get_current_team(user_id, team_id)
+
+            if current_team is None:
+                current_team = UserCurrentTeam(user_id=user_id, team_id=team_id)
+                await self.memory_context.set_current_team(current_team)
+                return True
+            else:
+                current_team.team_id = team_id
+                await self.memory_context.update_current_team(current_team)
+                return True
 
         except Exception as e:
             self.logger.error("Error setting default team: %s", str(e))
@@ -384,7 +397,7 @@ class TeamService:
             missing_models: List[str] = []
             for model in required_models:
                 # Temporary bypass for known deployed models
-                if model.lower() in ['gpt-4o', 'o3', 'gpt-4', 'gpt-35-turbo']:
+                if model.lower() in ["gpt-4o", "o3", "gpt-4", "gpt-35-turbo"]:
                     continue
                 if model not in available_models:
                     missing_models.append(model)

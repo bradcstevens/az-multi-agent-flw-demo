@@ -43,6 +43,7 @@ class CosmosDBClient(DatabaseBase):
         "step": Step,
         "agent_message": AgentMessage,
         "team_config": TeamConfiguration,
+        "user_current_team": UserCurrentTeam,
     }
 
     def __init__(
@@ -432,7 +433,33 @@ class CosmosDBClient(DatabaseBase):
             team: The TeamConfiguration to update
         """
         await self.update_item(team)
-    
-    async def set_user_default_team(current_team: UserCurrentTeam) -> bool:
+
+    async def get_current_team(self, user_id: str, team_id: str) -> UserCurrentTeam:
+        """Retrieve the current team for a user."""
+        await self._ensure_initialized()
+        if self.container is None:
+            return None
+
+        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.is_default=true"
+        parameters = [
+            {"name": "@user_id", "value": user_id},
+            {"name": "@team_id", "value": team_id},
+        ]
+
+        items = self.container.query_items(query=query, parameters=parameters)
+        async for item in items:
+            return UserCurrentTeam(**item)
+
+        return None
+    async def set_current_team(self, current_team: UserCurrentTeam) -> None:
+        """Set the current team for a user."""
+        await self._ensure_initialized()
 
 
+        await self.container.upsert_item(current_team.dict())
+    async def update_current_team(self, current_team: UserCurrentTeam) -> None:
+        """Update the current team for a user."""
+        await self._ensure_initialized()
+
+
+        await self.container.upsert_item(current_team.dict())

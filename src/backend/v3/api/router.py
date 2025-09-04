@@ -791,14 +791,20 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
                 status_code=404, 
                 detail=f"Team configuration '{selection.team_id}' not found or access denied"
             )
-        current_team = await team_service.get_user_current_team(user_id=user_id)
-        if current_team and current_team.team_id != selection.team_id:
-            current_team.team_id = selection.team_id
-            await team_service.set_user_current_team(user_id=user_id, current_team=current_team, )
-        else:
-            current_team = UserCurrentTeam(
-                user_id=user_id,
-                team_id=selection.team_id
+        set_team = await team_service.handle_team_selection(user_id=user_id, team_id=selection.team_id)
+        if not set_team:
+            track_event_if_configured(
+            "Team selected",
+            {
+                "status": "failed",
+                "team_id": selection.team_id,
+                "team_name": team_configuration.name,
+                "user_id": user_id
+            },
+        )
+            raise HTTPException(
+                status_code=404,
+                detail=f"Team configuration '{selection.team_id}' failed to set"
             )
 
         # save to in-memory config for current user
