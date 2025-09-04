@@ -81,7 +81,7 @@ class OrchestrationManager:
         return callback
     
     @classmethod
-    async def get_current_or_new_orchestration(self, user_id: str, team_config: TeamConfiguration) -> MagenticOrchestration: # add team_switched: bool parameter
+    async def get_current_or_new_orchestration(self, user_id: str, team_config: TeamConfiguration, team_switched: bool) -> MagenticOrchestration: # add team_switched: bool parameter
         """get existing orchestration instance."""
         current_orchestration = orchestration_config.get_current_orchestration(user_id)
         if current_orchestration is None: # add check for team_switched flag

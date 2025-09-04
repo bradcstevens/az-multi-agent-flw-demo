@@ -80,6 +80,7 @@ async def start_comms(websocket: WebSocket, process_id: str):
 @app_v3.get("/init_team")
 async def init_team(
     request: Request,
+    team_switched: bool = Query(False),
 ): # add team_switched: bool parameter
     """ Initialize the user's current team of agents """
 
@@ -89,7 +90,7 @@ async def init_team(
     # 00000000-0000-0000-0000-000000000002 (Marketing), and 00000000-0000-0000-0000-000000000003 (Retail),
     # and use this value to initialize to HR each time.
     init_team_id = "00000000-0000-0000-0000-000000000001"
-
+    print(f"Init team called, team_switched={team_switched}")
     try:
       authenticated_user = get_authenticated_user_details(request_headers=request.headers)
       user_id = authenticated_user["user_principal_id"]
@@ -119,7 +120,7 @@ async def init_team(
       team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
       
       # Initialize agent team for this user session
-      await OrchestrationManager.get_current_or_new_orchestration(user_id=user_id, team_config=team_configuration)
+      await OrchestrationManager.get_current_or_new_orchestration(user_id=user_id, team_config=team_configuration, team_switched=team_switched)
 
       return {
           "status": "Request started successfully",
