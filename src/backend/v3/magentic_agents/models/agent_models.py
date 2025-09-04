@@ -2,7 +2,9 @@
 
 import os
 from dataclasses import dataclass
+
 from common.config.app_config import config
+
 
 @dataclass(slots=True)
 class MCPConfig:
@@ -18,8 +20,8 @@ class MCPConfig:
         url = config.MCP_SERVER_ENDPOINT
         name = config.MCP_SERVER_NAME
         description = config.MCP_SERVER_DESCRIPTION
-        tenant_id = config.TENANT_ID
-        client_id = config.CLIENT_ID
+        tenant_id = config.AZURE_TENANT_ID
+        client_id = config.AZURE_CLIENT_ID
 
         # Raise exception if any required environment variable is missing
         if not all([url, name, description, tenant_id, client_id]):
