@@ -119,7 +119,7 @@ class Plan(BaseDataModel):
     team_id: Optional[str] = None
     human_clarification_request: Optional[str] = None
     human_clarification_response: Optional[str] = None
-
+    
 
 class Step(BaseDataModel):
     """Represents an individual step (task) within a plan."""

@@ -5,7 +5,7 @@ import {
     Title2,
 } from "@fluentui/react-components";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useCallback, useRef, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 import "./../../styles/Chat.css";
@@ -22,6 +22,7 @@ import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
 import PromptCard from "@/coral/components/PromptCard";
 import { Send } from "@/coral/imports/bundleicons";
 import { Clipboard20Regular } from "@fluentui/react-icons";
+import webSocketService from '../../services/WebSocketService';
 
 // Icon mapping function to convert string icons to FluentUI icons
 const getIconFromString = (iconString: string | React.ReactNode): React.ReactNode => {
@@ -45,6 +46,11 @@ const HomeInput: React.FC<HomeInputProps> = ({
     const location = useLocation(); // ✅ location.state used to control focus
     const { showToast, dismissToast } = useInlineToaster();
 
+    // Generate session ID for this task submission
+    const sessionId = React.useMemo(() => {
+        return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }, []);
+
     useEffect(() => {
         if (location.state?.focusInput) {
             textareaRef.current?.focus();
@@ -65,68 +71,91 @@ const HomeInput: React.FC<HomeInputProps> = ({
         return cleanup;
     }, []);
 
-    const handleSubmit = async () => {
-        if (input.trim()) {
-            setSubmitting(true);
-            setRAIError(null); // Clear any previous RAI errors
-            let id = showToast("Creating a plan", "progress");
+        const handleSubmit = useCallback(async () => {
+        if (!input.trim()) return;
+        
+        setSubmitting(true);
+        setRAIError(null); // Clear any previous RAI errors
+        let id = showToast("Creating a plan", "progress");
 
-            try {
-                const response = await TaskService.createPlan(
-                    input.trim(),
-                    selectedTeam?.team_id
-                );
-                console.log("Plan created:", response);
+        try {
+            const requestBody = {
+                session_id: sessionId,
+                description: input.trim(),
+                team_id: selectedTeam?.team_id || null
+            };
+
+            console.log('🚀 Submitting task to v3 backend:', requestBody);
+
+            // Use v3 API endpoint
+            const response = await fetch('/api/v3/process_request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody),
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ v3 Backend response:', result);
+                
+                dismissToast(id);
                 setInput("");
-
+                
                 if (textareaRef.current) {
                     textareaRef.current.style.height = "auto";
                 }
 
-                if (response.plan_id && response.plan_id !== null) {
-                    showToast("Plan created!", "success");
-                    dismissToast(id);
-
-                    navigate(`/plan/${response.plan_id}`);
-                } else {
-                    showToast("Failed to create plan", "error");
-                    dismissToast(id);
-                }
-            } catch (error: any) {
-                dismissToast(id);
-                // Check if this is an RAI validation error
-                let errorDetail = null;
-                try {
-                    // Try to parse the error detail if it's a string
-                    if (typeof error?.response?.data?.detail === 'string') {
-                        errorDetail = JSON.parse(error.response.data.detail);
-                    } else {
-                        errorDetail = error?.response?.data?.detail;
+                if (result.plan_id) {
+                    showToast('Task submitted successfully! Creating plan...', 'success');
+                    
+                    // Connect WebSocket with process_id from v3 response
+                    try {
+                        await webSocketService.connect(sessionId, result.plan_id);
+                    } catch (wsError) {
+                        console.warn('WebSocket connection failed:', wsError);
+                        // Continue with navigation even if WebSocket fails
                     }
-                } catch (parseError) {
-                    // If parsing fails, use the original error
+                    
+                    navigate(`/plan/${result.plan_id}`);
+                } else {
+                    throw new Error('No plan_id received from backend');
+                }
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to submit task');
+            }
+        } catch (error: any) {
+            dismissToast(id);
+            console.error('❌ Task submission failed:', error);
+            
+            // Handle RAI validation errors
+            let errorDetail = null;
+            try {
+                if (typeof error?.response?.data?.detail === 'string') {
+                    errorDetail = JSON.parse(error.response.data.detail);
+                } else {
                     errorDetail = error?.response?.data?.detail;
                 }
-
-                // Handle RAI validation errors with better UX
-                if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
-                    setRAIError(errorDetail);
-                } else {
-                    // Handle other errors with toast messages
-                    const errorMessage = errorDetail?.description ||
-                        errorDetail?.message ||
-                        error?.response?.data?.message ||
-                        error?.message ||
-                        "Something went wrong";
-                    showToast(errorMessage, "error");
-                }
-
-            } finally {
-                setInput("");
-                setSubmitting(false);
+            } catch (parseError) {
+                errorDetail = error?.response?.data?.detail;
             }
+
+            if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
+                setRAIError(errorDetail);
+            } else {
+                const errorMessage = errorDetail?.description ||
+                    errorDetail?.message ||
+                    error?.response?.data?.message ||
+                    error?.message ||
+                    "Something went wrong";
+                showToast(errorMessage, "error");
+            }
+        } finally {
+            setSubmitting(false);
         }
-    };
+    }, [input, sessionId, selectedTeam?.team_id, showToast, dismissToast, navigate]);
 
     const handleQuickTaskClick = (task: QuickTask) => {
         setInput(task.description);

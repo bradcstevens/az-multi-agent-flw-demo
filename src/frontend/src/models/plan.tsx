@@ -151,6 +151,7 @@ export interface ParsedPlanData {
     id: number;
     action: string;
     cleanAction: string;
+    agent?: string; 
   }>;
   context: {
     task: string;
