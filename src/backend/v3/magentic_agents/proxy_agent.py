@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 """ Proxy agent that prompts for human clarification."""
 
+import asyncio
 import logging
 import uuid
 from collections.abc import AsyncIterable
@@ -20,7 +21,8 @@ from semantic_kernel.exceptions.agent_exceptions import \
 from typing_extensions import override
 from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
-from v3.config.settings import current_user_id
+from v3.config.settings import (connection_config, current_user_id,
+                                orchestration_config)
 from v3.models.messages import (UserClarificationRequest,
                                 UserClarificationResponse)
 
@@ -144,24 +146,30 @@ class ProxyAgent(Agent):
             construct_thread=lambda: DummyAgentThread(),
             expected_type=DummyAgentThread,
         )
-        # Send clarification request via response handlers
+
+        # Send clarification request via streaming callbacks
         clarification_request = f"I need clarification about: {message}"
+
+        clarification_message = UserClarificationRequest(
+            question=clarification_request,
+            request_id=str(uuid.uuid4())  # Unique ID for the request
+        )
+
+        # Send the approval request to the user's WebSocket
+        await connection_config.send_status_update_async({
+            "type": "user_clarification_request", 
+            "data": clarification_message
+        })
         
-        clarification_message = self._create_message_content(clarification_request, thread.id)
-        await self._trigger_response_callbacks(clarification_message)
-        
-        # Get human input - replace this with awaiting a websocket call or API handler when available
-        human_response = input("Please provide clarification: ").strip()
+        # Get human input
+        human_response = await self._wait_for_user_clarification(clarification_message.request_id)
         
         if not human_response:
             human_response = "No additional clarification provided."
         
         response = f"Human clarification: {human_response}"
 
-        # Send response via response handlers
-        response_message = self._create_message_content(response, thread.id)
-
-        chat_message = response_message
+        chat_message = self._create_message_content(response, thread.id)
         
         yield AgentResponseItem(
             message=chat_message,
@@ -188,11 +196,23 @@ class ProxyAgent(Agent):
 
         # Send clarification request via streaming callbacks
         clarification_request = f"I need clarification about: {message}"
-        self._create_message_content(clarification_request, thread.id)
-        await self._trigger_streaming_callbacks(clarification_request)
+        #self._create_message_content(clarification_request, thread.id)
+        # await self._trigger_streaming_callbacks(clarification_request)
+
+        clarification_message = UserClarificationRequest(
+            question=clarification_request,
+            request_id=str(uuid.uuid4())  # Unique ID for the request
+        )
+
+        # Send the approval request to the user's WebSocket
+        # The user_id will be automatically retrieved from context
+        await connection_config.send_status_update_async({
+            "type": "user_clarification_request", 
+            "data": clarification_message
+        })
         
         # Get human input - replace with websocket call when available
-        human_response = input("Please provide clarification: ").strip()
+        human_response = await self._wait_for_user_clarification(clarification_message.request_id)
         
         if not human_response:
             human_response = "No additional clarification provided."
@@ -206,6 +226,15 @@ class ProxyAgent(Agent):
             thread=thread
         )
 
+    async def _wait_for_user_clarification(self, request_id:str) -> Optional[UserClarificationResponse]: 
+        """Wait for user clarification response."""
+        # To do: implement timeout and error handling
+        if request_id not in orchestration_config.clarifications:
+            orchestration_config.clarifications[request_id] = None
+        while orchestration_config.clarifications[request_id] is None:
+            await asyncio.sleep(0.2)
+        return UserClarificationResponse(request_id=request_id,answer=orchestration_config.clarifications[request_id])
+    
     async def get_response(self, chat_history, **kwargs):
         """Get response from the agent - required by Agent base class."""
         # Extract the latest user message
@@ -220,6 +249,7 @@ class ProxyAgent(Agent):
             role=AuthorRole.ASSISTANT,
             content="No clarification provided."
         )
+    
 
 async def create_proxy_agent(user_id: str = None):
     """Factory function for human proxy agent."""
