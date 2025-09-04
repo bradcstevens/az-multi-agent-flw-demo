@@ -10,7 +10,7 @@ from auth.auth_utils import get_authenticated_user_details
 from common.database.database_factory import DatabaseFactory
 from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
                                            Plan, PlanStatus,
-                                           TeamSelectionRequest)
+                                           TeamSelectionRequest, UserCurrentTeam)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
 from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
@@ -813,9 +813,21 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
                 status_code=404, 
                 detail=f"Team configuration '{selection.team_id}' not found or access denied"
             )
-
-        # Generate session ID if not provided
-        session_id = selection.session_id or str(uuid.uuid4())
+        set_team = await team_service.handle_team_selection(user_id=user_id, team_id=selection.team_id)
+        if not set_team:
+            track_event_if_configured(
+            "Team selected",
+            {
+                "status": "failed",
+                "team_id": selection.team_id,
+                "team_name": team_configuration.name,
+                "user_id": user_id
+            },
+        )
+            raise HTTPException(
+                status_code=404,
+                detail=f"Team configuration '{selection.team_id}' failed to set"
+            )
 
         # save to in-memory config for current user
         team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
@@ -827,8 +839,7 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
                 "status": "success",
                 "team_id": selection.team_id,
                 "team_name": team_configuration.name,
-                "user_id": user_id,
-                "session_id": session_id,
+                "user_id": user_id
             },
         )
 
@@ -837,7 +848,6 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
             "message": f"Team '{team_configuration.name}' selected successfully",
             "team_id": selection.team_id,
             "team_name": team_configuration.name,
-            "session_id": session_id,
             "agents_count": len(team_configuration.agents),
             "team_description": team_configuration.description,
         }
