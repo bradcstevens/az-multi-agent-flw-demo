@@ -52,6 +52,7 @@ class PlanApprovalResponse:
     plan_dot_id: str
     approved: bool
     feedback: str | None = None
+    plan_id: str | None = None
 
 @dataclass(slots=True)
 class ReplanApprovalRequest:
