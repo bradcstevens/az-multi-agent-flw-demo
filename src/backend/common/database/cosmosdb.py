@@ -454,12 +454,10 @@ class CosmosDBClient(DatabaseBase):
     async def set_current_team(self, current_team: UserCurrentTeam) -> None:
         """Set the current team for a user."""
         await self._ensure_initialized()
+        await self.add_item(current_team)
 
 
-        await self.container.upsert_item(current_team.dict())
     async def update_current_team(self, current_team: UserCurrentTeam) -> None:
         """Update the current team for a user."""
         await self._ensure_initialized()
-
-
-        await self.container.upsert_item(current_team.dict())
+        await self.update_item(current_team)
