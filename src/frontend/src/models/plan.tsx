@@ -142,25 +142,37 @@ export interface PlanChatProps {
 }
 
 export interface ParsedPlanData {
-  id: string;
-  status: string;
-  user_request: string;
-  team: string[];
-  facts: string;
-  steps: Array<{
-    id: number;
-    action: string;
-    cleanAction: string;
-    agent?: string; 
-  }>;
-  context: {
-    task: string;
-    participant_descriptions: Record<string, string>;
-  };
-  // Additional fields from m_plan
-  user_id?: string;
-  team_id?: string;
-  plan_id?: string;
-  overall_status?: string;
-  raw_data?: any; 
+    id: string;
+    status: string;
+    user_request: string;
+    team: string[];
+    facts: string;
+    steps: Array<{
+        id: number;
+        action: string;
+        cleanAction: string;
+        agent?: string;
+    }>;
+    context: {
+        task: string;
+        participant_descriptions: Record<string, string>;
+    };
+    // Additional fields from m_plan
+    user_id?: string;
+    team_id?: string;
+    plan_id?: string;
+    overall_status?: string;
+    raw_data?: any;
+}
+
+export interface PlanApprovalRequest {
+    plan_dot_id: string;
+    plan_id: string;
+    approved: boolean;
+    feedback?: string;
+}
+
+export interface PlanApprovalResponse {
+    status: string;
+    message?: string;
 }

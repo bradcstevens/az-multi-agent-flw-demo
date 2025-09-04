@@ -48,14 +48,14 @@ const PlanPage: React.FC = () => {
         null
     );
     const [reloadLeftList, setReloadLeftList] = useState(true);
-    
+
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
-    
+
     // RAI Error state
     const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
-    
+
     // Team config state
     const [teamConfig, setTeamConfig] = useState<TeamConfig | null>(null);
     const [loadingTeamConfig, setLoadingTeamConfig] = useState(true);
@@ -68,10 +68,6 @@ const PlanPage: React.FC = () => {
     // Use ref to store the function to avoid stale closure issues
     const loadPlanDataRef = useRef<() => Promise<ProcessedPlanData[]>>();
 
-    // Generate stable session ID
-    const sessionId = useMemo(() => {
-        return planData?.plan?.session_id || 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    }, [planData?.plan?.session_id]);
 
     // Loading message rotation effect
     useEffect(() => {
@@ -89,11 +85,11 @@ const PlanPage: React.FC = () => {
     // WebSocket connection with proper error handling and v3 backend compatibility
     useEffect(() => {
         if (planId && !loading) {
-            console.log('🔌 Connecting WebSocket:', { sessionId, planId });
+            console.log('🔌 Connecting WebSocket:', { planId });
 
             const connectWebSocket = async () => {
                 try {
-                    await webSocketService.connect(sessionId, planId);
+                    await webSocketService.connect(planId);
                     console.log('✅ WebSocket connected successfully');
                 } catch (error) {
                     console.error('❌ WebSocket connection failed:', error);
@@ -102,12 +98,12 @@ const PlanPage: React.FC = () => {
             };
 
             connectWebSocket();
-            
+
             const handleConnectionChange = (connected: boolean) => {
                 setWsConnected(connected);
                 console.log('🔗 WebSocket connection status:', connected);
             };
-            
+
             const handleStreamingMessage = (message: StreamMessage) => {
                 console.log('📨 Received streaming message:', message);
                 if (message.data && message.data.plan_id) {
@@ -131,7 +127,7 @@ const PlanPage: React.FC = () => {
             const unsubscribeConnection = webSocketService.on('connection_status', (message) => {
                 handleConnectionChange(message.data?.connected || false);
             });
-            
+
             const unsubscribeStreaming = webSocketService.on('agent_message', handleStreamingMessage);
             const unsubscribePlanApproval = webSocketService.on('plan_approval_response', handlePlanApprovalResponse);
             const unsubscribePlanApprovalRequest = webSocketService.on('plan_approval_request', handlePlanApprovalRequest);
@@ -147,7 +143,7 @@ const PlanPage: React.FC = () => {
                 webSocketService.disconnect();
             };
         }
-    }, [planId, sessionId, loading]);
+    }, [planId, loading]);
 
     useEffect(() => {
         const loadTeamConfig = async () => {
@@ -164,7 +160,7 @@ const PlanPage: React.FC = () => {
                 setLoadingTeamConfig(false);
             }
         };
-        
+
         loadTeamConfig();
     }, []);
 
@@ -193,7 +189,7 @@ const PlanPage: React.FC = () => {
                         // Try to find the plan by session_id
                         const plansWithSteps = await apiService.getPlans();
                         const matchingPlan = plansWithSteps.find((p: PlanWithSteps) => p.session_id === planId);
-                        
+
                         if (matchingPlan) {
                             actualPlanId = matchingPlan.id;
                             planResult = convertToProcessedPlanData(matchingPlan);
@@ -213,7 +209,7 @@ const PlanPage: React.FC = () => {
                     planResult = await PlanDataService.fetchPlanData(actualPlanId, useCache);
                     console.log("Plan data loaded successfully");
                 }
-                
+
                 const allPlansWithSteps = await apiService.getPlans();
                 const allPlansData = allPlansWithSteps.map(convertToProcessedPlanData);
                 setAllPlans(allPlansData);
@@ -258,42 +254,15 @@ const PlanPage: React.FC = () => {
             if (!planData?.plan) return;
             setSubmitting(true);
             let id = showToast("Submitting clarification", "progress");
-            
-            try {
-                // For v3 backend, we might need to use different clarification method
-                // Check if we're dealing with v3 backend by looking for session patterns
-                const isV3Backend = sessionId.startsWith('session_') || planData.plan.session_id?.startsWith('session_');
-                
-                if (isV3Backend) {
-                    console.log('🚀 Submitting v3 clarification:', {
-                        request_id: planData.plan.id,
-                        answer: chatInput.trim()
-                    });
-                    
-                    // Use v3 clarification endpoint
-                    const response = await fetch('/api/v3/user_clarification', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            request_id: planData.plan.id,
-                            answer: chatInput.trim()
-                        }),
-                    });
 
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Failed to submit clarification');
-                    }
-                } else {
-                    // Use legacy method for non-v3 backends
-                    await PlanDataService.submitClarification(
-                        planData.plan.id,
-                        planData.plan.session_id,
-                        chatInput
-                    );
-                }
+            try {
+                // Use legacy method for non-v3 backends
+                await PlanDataService.submitClarification(
+                    planData.plan.id,
+                    planData.plan.session_id,
+                    chatInput
+                );
+
 
                 setInput("");
                 dismissToast(id);
@@ -333,10 +302,10 @@ const PlanPage: React.FC = () => {
                 } else {
                     // Handle other types of errors
                     showToast(
-                        error?.response?.data?.detail?.message || 
-                        error?.response?.data?.detail || 
-                        error?.message || 
-                        "Failed to submit clarification", 
+                        error?.response?.data?.detail?.message ||
+                        error?.response?.data?.detail ||
+                        error?.message ||
+                        "Failed to submit clarification",
                         "error"
                     );
                 }
@@ -357,18 +326,18 @@ const PlanPage: React.FC = () => {
                 `${approve ? "Approving" : "Rejecting"} step`,
                 "progress"
             );
-            
+
             try {
                 // For v3 backend, we might need to use plan approval instead of step approval
                 const isV3Backend = sessionId.startsWith('session_') || planData.plan.session_id?.startsWith('session_');
-                
+
                 if (isV3Backend) {
                     console.log('🚀 Submitting v3 plan approval:', {
                         plan_dot_id: planData.plan.id,
                         approved: approve,
                         feedback: `Step ${step.id} ${approve ? 'approved' : 'rejected'} by user`
                     });
-                    
+
                     // Use v3 plan approval endpoint
                     const response = await fetch('/api/v3/plan_approval', {
                         method: 'POST',
@@ -401,7 +370,7 @@ const PlanPage: React.FC = () => {
             } catch (error: any) {
                 dismissToast(id);
                 showToast(
-                    error?.message || `Failed to ${approve ? "approve" : "reject"} step`, 
+                    error?.message || `Failed to ${approve ? "approve" : "reject"} step`,
                     "error"
                 );
                 console.error(`Failed to ${approve ? 'approve' : 'reject'} step:`, error);
@@ -452,8 +421,8 @@ const PlanPage: React.FC = () => {
             <CoralShellColumn>
                 <CoralShellRow>
                     <Content>
-                        <div style={{ 
-                            textAlign: "center", 
+                        <div style={{
+                            textAlign: "center",
                             padding: "40px 20px",
                             color: 'var(--colorNeutralForeground2)'
                         }}>
@@ -522,7 +491,7 @@ const PlanPage: React.FC = () => {
                             )}
 
                             <PlanChat
-                               planData={planData}
+                                planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}
                                 loading={loading}
                                 setInput={setInput}
@@ -538,7 +507,7 @@ const PlanPage: React.FC = () => {
 
                 <PlanPanelRight
                     planData={planData}
-                    OnApproveStep={handleApproveStep} 
+                    OnApproveStep={handleApproveStep}
                     submittingChatDisableInput={submittingChatDisableInput}
                     processingSubtaskId={processingSubtaskId}
                     loading={loading}

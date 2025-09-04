@@ -9,21 +9,10 @@ import {
     Step,
     StepStatus,
     AgentType,
-    PlanMessage
+    PlanMessage,
+    PlanApprovalRequest,
+    PlanApprovalResponse
 } from '../models';
-
-
-interface PlanApprovalRequest {
-    plan_dot_id: string;
-    plan_id: string;
-    approved: boolean; 
-    feedback?: string;
-}
-
-interface PlanApprovalResponse {
-    status: string;
-    message?: string;
-}
 
 // Constants for endpoints
 const API_ENDPOINTS = {
@@ -37,7 +26,7 @@ const API_ENDPOINTS = {
     AGENT_MESSAGES: '/agent_messages',
     MESSAGES: '/messages',
     USER_BROWSER_LANGUAGE: '/user_browser_language',
-    PLAN_APPROVAL: '/v3/plan_approval' 
+    PLAN_APPROVAL: '/v3/plan_approval'
 };
 
 // Simple cache implementation
@@ -260,25 +249,25 @@ export class APIService {
         return fetcher();
     }
 
-      /**
-     * Approve a plan for execution 
-     * @param planApprovalData Plan approval data
-     * @returns Promise with approval response
-     */
+    /**
+   * Approve a plan for execution 
+   * @param planApprovalData Plan approval data
+   * @returns Promise with approval response
+   */
     async approvePlan(planApprovalData: PlanApprovalRequest): Promise<PlanApprovalResponse> {
         const requestKey = `approve-plan-${planApprovalData.plan_dot_id}`;
-        
+
         return this._requestTracker.trackRequest(requestKey, async () => {
             console.log('📤 Approving plan via v3 API:', planApprovalData);
-            
+
             const response = await apiClient.post(API_ENDPOINTS.PLAN_APPROVAL, planApprovalData);
-            
+
             // Invalidate cache since plan execution will start
             this._cache.invalidate(new RegExp(`^plans_`));
             if (planApprovalData.plan_id) {
                 this._cache.invalidate(new RegExp(`^plan.*_${planApprovalData.plan_id}`));
             }
-            
+
             console.log('✅ Plan approval successful:', response);
             return response;
         });
@@ -292,26 +281,26 @@ export class APIService {
      */
     async getFinalPlanResults(planId: string, useCache = true): Promise<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }> {
         const cacheKey = `final_plan_results_${planId}`;
-        
+
         const fetcher = async () => {
             console.log('📤 Fetching final plan results for plan_id:', planId);
-            
+
             // ✅ Call /api/plans?plan_id={plan_id} to get executed plan
-            const data = await apiClient.get(API_ENDPOINTS.PLANS, { 
-                params: { plan_id: planId } 
+            const data = await apiClient.get(API_ENDPOINTS.PLANS, {
+                params: { plan_id: planId }
             });
-            
+
             if (!data || !Array.isArray(data) || data.length === 0) {
                 throw new Error(`No plan results found for plan_id: ${planId}`);
             }
-            
+
             const plan = data[0] as PlanWithSteps;
             const messages = data[1] || [];
-            
+
             if (useCache) {
                 this._cache.set(cacheKey, { plan_with_steps: plan, messages }, 30000);
             }
-            
+
             console.log('✅ Final plan results received:', { plan, messages });
             return { plan_with_steps: plan, messages };
         };
@@ -319,7 +308,7 @@ export class APIService {
         if (useCache) {
             const cachedData = this._cache.get<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }>(cacheKey);
             if (cachedData) return cachedData;
-            
+
             return this._requestTracker.trackRequest(cacheKey, fetcher);
         }
 
@@ -406,7 +395,7 @@ export class APIService {
         return response;
     }
 
-    
+
 
     /**
      * Approve one or more steps
@@ -496,7 +485,7 @@ export class APIService {
     }
 
 
-    
+
 
     /**
      * Delete all messages
