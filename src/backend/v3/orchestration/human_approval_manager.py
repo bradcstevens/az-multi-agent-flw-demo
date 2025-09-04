@@ -3,6 +3,7 @@ Human-in-the-loop Magentic Manager for employee onboarding orchestration.
 Extends StandardMagenticManager to add approval gates before plan execution.
 """
 
+import asyncio
 import re
 from typing import Any, List, Optional
 
@@ -13,7 +14,8 @@ from semantic_kernel.agents.orchestration.magentic import (
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import \
     ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT
 from semantic_kernel.contents import ChatMessageContent
-from v3.config.settings import connection_config, current_user_id
+from v3.config.settings import (connection_config, current_user_id,
+                                orchestration_config)
 from v3.models.models import MPlan, MStep
 
 
@@ -65,6 +67,8 @@ Please check with the team members to list all relevant tools they have access t
         plan = await super().plan(magentic_context)
         self.magentic_plan = self.plan_to_obj( magentic_context, self.task_ledger)
 
+        self.magentic_plan.user_id = current_user_id.get()
+
         # Request approval from the user before executing the plan
         approval_message = messages.PlanApprovalRequest(
             plan=self.magentic_plan,
@@ -74,9 +78,6 @@ Please check with the team members to list all relevant tools they have access t
                 "participant_descriptions": magentic_context.participant_descriptions
             } if hasattr(magentic_context, 'participant_descriptions') else {}
         )
-
-        # Send the current plan to the frontend via WebSocket
-        #await connection_config.send_status_update_async(approval_message,)
         
         # Send the approval request to the user's WebSocket
         # The user_id will be automatically retrieved from context
@@ -85,8 +86,8 @@ Please check with the team members to list all relevant tools they have access t
             "data": approval_message
         })
         
-        # Wait for user approval (you'll need to implement this)
-        approval_response = await self._wait_for_user_approval()
+        # Wait for user approval
+        approval_response = await self._wait_for_user_approval(approval_message.plan.id)
         
         if approval_response and approval_response.approved:
             print("Plan approved - proceeding with execution...")
@@ -104,18 +105,15 @@ Please check with the team members to list all relevant tools they have access t
             # )
             
     
-    async def _wait_for_user_approval(self) -> Optional[messages.PlanApprovalResponse]:
+    async def _wait_for_user_approval(self, plan_dot_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
         """Wait for user approval response."""
-        user_id = current_user_id.get()
-        # Temporarily use console input for approval - will switch to WebSocket or API in future
-        response = input("\nApprove this execution plan? [y/n]: ").strip().lower()
-        if response in ['y', 'yes']:
-            return messages.PlanApprovalResponse(approved=True)
-        elif response in ['n', 'no']:
-            return messages.PlanApprovalResponse(approved=False)
-        else:
-            print("Invalid input. Please enter 'y' for yes or 'n' for no.")
-            return await self._wait_for_user_approval()
+        
+        # To do: implement timeout and error handling
+        if plan_dot_id not in orchestration_config.approvals:
+            orchestration_config.approvals[plan_dot_id] = None
+        while orchestration_config.approvals[plan_dot_id] is None:
+            await asyncio.sleep(0.2)
+        return messages.PlanApprovalResponse(approved=orchestration_config.approvals[plan_dot_id], plan_dot_id=plan_dot_id)
 
     
     async def prepare_final_answer(self, magentic_context: MagenticContext) -> ChatMessageContent:

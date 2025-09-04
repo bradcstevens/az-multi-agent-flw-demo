@@ -7,7 +7,6 @@ import asyncio
 import contextvars
 import json
 import logging
-import uuid
 from typing import Dict, Optional
 
 from common.config.app_config import config
@@ -76,10 +75,11 @@ class OrchestrationConfig:
     """Configuration for orchestration settings."""
 
     def __init__(self):
-        self.orchestrations = {}
-        self.plans = {}       # job_id -> current plan
-        self.approvals = {}   # job_id -> True/False/None
-        self.sockets = {}     # job_id -> WebSocket
+        self.orchestrations: Dict[str, MagenticOrchestration] = {} # user_id -> orchestration instance
+        self.plans: Dict[str, any] = {} # plan_id -> plan details
+        self.approvals: Dict[str, bool] = {} # plan_dot_id -> approval status
+        self.sockets: Dict[str, WebSocket] = {} # user_id -> WebSocket
+        self.clarifications: Dict[str, str] = {} # plan_dot_id -> clarification response
 
     def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
         """get existing orchestration instance."""
