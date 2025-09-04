@@ -5,24 +5,21 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import (
     ClientAuthenticationError,
     HttpResponseError,
     ResourceNotFoundError,
 )
-from azure.identity import DefaultAzureCredential
+
 from azure.search.documents.indexes import SearchIndexClient
-
-from common.models.messages_kernel import (
-    TeamConfiguration,
-    TeamAgent,
-    StartingTask,
-)
-
-
 from common.config.app_config import config
 from common.database.database_base import DatabaseBase
+from common.models.messages_kernel import (
+    StartingTask,
+    TeamAgent,
+    TeamConfiguration,
+    UserCurrentTeam,
+)
 from v3.common.services.foundry_service import FoundryService
 
 
@@ -141,12 +138,15 @@ class TeamService:
             input_key=agent_data["input_key"],
             type=agent_data["type"],
             name=agent_data["name"],
+            deployment_name=agent_data.get("deployment_name", ""),
+            icon=agent_data["icon"],
             system_message=agent_data.get("system_message", ""),
             description=agent_data.get("description", ""),
-            icon=agent_data["icon"],
-            index_name=agent_data.get("index_name", ""),
             use_rag=agent_data.get("use_rag", False),
             use_mcp=agent_data.get("use_mcp", False),
+            use_bing=agent_data.get("use_bing", False),
+            use_reasoning=agent_data.get("use_reasoning", False),
+            index_name=agent_data.get("index_name", ""),
             coding_tools=agent_data.get("coding_tools", False),
         )
 
@@ -204,25 +204,71 @@ class TeamService:
         """
         try:
             # Get the specific configuration using the team-specific method
-            team_config = await self.memory_context.get_team_by_id(team_id)
+            team_config = await self.memory_context.get_team(team_id)
 
             if team_config is None:
                 return None
 
             # Verify the configuration belongs to the user
-            if team_config.user_id != user_id:
-                self.logger.warning(
-                    "Access denied: config %s does not belong to user %s",
-                    team_id,
-                    user_id,
-                )
-                return None
+            # if team_config.user_id != user_id:
+            #     self.logger.warning(
+            #         "Access denied: config %s does not belong to user %s",
+            #         team_id,
+            #         user_id,
+            #     )
+            #     return None
 
             return team_config
 
         except (KeyError, TypeError, ValueError) as e:
             self.logger.error("Error retrieving team configuration: %s", str(e))
             return None
+
+    async def delete_user_current_team(self, user_id: str) -> bool:
+        """
+        Delete the current team for a user.
+
+        Args:
+            user_id: User ID to delete the current team for
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            await self.memory_context.delete_user_current_team(user_id)
+            self.logger.info("Successfully deleted current team for user %s", user_id)
+            return True
+
+        except Exception as e:
+            self.logger.error("Error deleting current team: %s", str(e))
+            return False
+
+    async def handle_team_selection(self, user_id: str, team_id: str) -> bool:
+        """
+        Set a default team for a user.
+
+        Args:
+            user_id: User ID to set the default team for
+            team_id: Team ID to set as default
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            current_team = await self.memory_context.get_current_team(user_id, team_id)
+
+            if current_team is None:
+                current_team = UserCurrentTeam(user_id=user_id, team_id=team_id)
+                await self.memory_context.set_current_team(current_team)
+                return True
+            else:
+                current_team.team_id = team_id
+                await self.memory_context.update_current_team(current_team)
+                return True
+
+        except Exception as e:
+            self.logger.error("Error setting default team: %s", str(e))
+            return False
 
     async def get_all_team_configurations(
         self, user_id: str
@@ -351,7 +397,7 @@ class TeamService:
             missing_models: List[str] = []
             for model in required_models:
                 # Temporary bypass for known deployed models
-                if model.lower() in ['gpt-4o', 'o3', 'gpt-4', 'gpt-35-turbo']:
+                if model.lower() in ["gpt-4o", "o3", "gpt-4", "gpt-35-turbo"]:
                     continue
                 if model not in available_models:
                     missing_models.append(model)

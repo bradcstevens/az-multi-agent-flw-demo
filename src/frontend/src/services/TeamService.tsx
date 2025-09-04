@@ -19,6 +19,46 @@ export class TeamService {
         }
     }
 
+    /**
+     * Initialize user's team with default HR team configuration
+     * This calls the backend /init_team endpoint which sets up the default team
+     */
+    static async initializeTeam(): Promise<{
+        success: boolean;
+        data?: {
+            status: string;
+            team_id: string;
+        };
+        error?: string;
+    }> {
+        try {
+            console.log('Calling /v3/init_team endpoint...');
+            const response = await apiClient.get('/v3/init_team');
+
+            console.log('Team initialization response:', response);
+
+            return {
+                success: true,
+                data: response
+            };
+        } catch (error: any) {
+            console.error('Team initialization failed:', error);
+
+            let errorMessage = 'Failed to initialize team';
+
+            if (error.response?.data?.detail) {
+                errorMessage = error.response.data.detail;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
+            return {
+                success: false,
+                error: errorMessage
+            };
+        }
+    }
+
     static getStoredTeam(): TeamConfig | null {
         if (typeof window === 'undefined' || !window.localStorage) return null;
         try {
@@ -130,7 +170,7 @@ export class TeamService {
     /**
      * Select a team for a plan/session
      */
-    static async selectTeam(teamId: string, sessionId?: string): Promise<{
+    static async selectTeam(teamId: string): Promise<{
         success: boolean;
         data?: any;
         error?: string;
@@ -138,7 +178,6 @@ export class TeamService {
         try {
             const response = await apiClient.post('/v3/select_team', {
                 team_id: teamId,
-                session_id: sessionId
             });
 
             return {
@@ -147,7 +186,7 @@ export class TeamService {
             };
         } catch (error: any) {
             let errorMessage = 'Failed to select team';
-            
+
             if (error.response?.data?.detail) {
                 errorMessage = error.response.data.detail;
             } else if (error.message) {

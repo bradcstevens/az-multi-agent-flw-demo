@@ -2,6 +2,7 @@ import logging
 import os
 
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+from common.config.app_config import config
 from semantic_kernel import Kernel
 from semantic_kernel.agents import ChatCompletionAgent  # pylint: disable=E0611
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
@@ -17,37 +18,39 @@ class ReasoningAgentTemplate(MCPEnabledBase):
     No Azure AI Agents client is needed here. We only need a token provider for SK.
     """
 
-    def __init__(self, agent_name: str, 
-                 agent_description: str, 
-                 agent_instructions: str,
-                 model_deployment_name: str,
-                 azure_openai_endpoint: str,
-                 search_config: SearchConfig | None = None,
-                 mcp_config: MCPConfig | None = None) -> None:
+    def __init__(
+        self,
+        agent_name: str,
+        agent_description: str,
+        agent_instructions: str,
+        model_deployment_name: str,
+        azure_openai_endpoint: str,
+        search_config: SearchConfig | None = None,
+        mcp_config: MCPConfig | None = None,
+    ) -> None:
         super().__init__(mcp=mcp_config)
         self.agent_name = agent_name
         self.agent_description = agent_description
         self.agent_instructions = agent_instructions
         self._model_deployment_name = model_deployment_name
         self._openai_endpoint = azure_openai_endpoint
-        self.search_config = search_config 
+        self.search_config = search_config
         self.reasoning_search: ReasoningSearch | None = None
         self.logger = logging.getLogger(__name__)
+
+    def ad_token_provider(self) -> str:
+        credential = config.get_azure_credentials()
+        token = credential.get_token(config.AZURE_COGNITIVE_SERVICES)
+        return token.token
 
     async def _after_open(self) -> None:
         self.kernel = Kernel()
 
-        # Token provider for SK chat completion
-        sync_cred = SyncDefaultAzureCredential()
-
-        def ad_token_provider() -> str:
-            token = sync_cred.get_token("https://cognitiveservices.azure.com/.default")
-            return token.token
-
+        # Add Azure OpenAI Chat Completion service
         chat = AzureChatCompletion(
             deployment_name=self._model_deployment_name,
             endpoint=self._openai_endpoint,
-            ad_token_provider=ad_token_provider
+            ad_token_provider=self.ad_token_provider,
         )
         self.kernel.add_service(chat)
 
@@ -68,34 +71,36 @@ class ReasoningAgentTemplate(MCPEnabledBase):
             kernel=self.kernel,
             name=self.agent_name,
             description=self.agent_description,
-            instructions=self.agent_instructions
+            instructions=self.agent_instructions,
         )
-    
+
     async def invoke(self, message: str):
         """Invoke the agent with a message."""
         if not self._agent:
             raise RuntimeError("Agent not initialized. Call open() first.")
-        
+
         async for response in self._agent.invoke(message):
             yield response
-        
+
+
 # Backward‑compatible factory
 async def create_reasoning_agent(
-            agent_name: str, 
-            agent_description: str, 
-            agent_instructions: str,
-            model_deployment_name: str,
-            azure_openai_endpoint: str,
-            search_config: SearchConfig | None = None,
-            mcp_config: MCPConfig | None = None) -> ReasoningAgentTemplate:
+    agent_name: str,
+    agent_description: str,
+    agent_instructions: str,
+    model_deployment_name: str,
+    azure_openai_endpoint: str,
+    search_config: SearchConfig | None = None,
+    mcp_config: MCPConfig | None = None,
+) -> ReasoningAgentTemplate:
     agent = ReasoningAgentTemplate(
-        agent_name=agent_name, 
-        agent_description=agent_description, 
+        agent_name=agent_name,
+        agent_description=agent_description,
         agent_instructions=agent_instructions,
         model_deployment_name=model_deployment_name,
         azure_openai_endpoint=azure_openai_endpoint,
-        search_config= search_config,
-        mcp_config=mcp_config
+        search_config=search_config,
+        mcp_config=mcp_config,
     )
     await agent.open()
     return agent

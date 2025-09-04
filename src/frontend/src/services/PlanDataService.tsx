@@ -43,18 +43,22 @@ export class PlanDataService {
     messages: PlanMessage[]
   ): ProcessedPlanData {
     // Extract unique agents from steps
+    console.log("Processing plan data for plan ID:", plan);
     const uniqueAgents = new Set<AgentType>();
-    plan.steps.forEach((step) => {
-      if (step.agent) {
-        uniqueAgents.add(step.agent);
-      }
-    });
+    if (plan.steps && plan.steps.length > 0) {
+      plan.steps.forEach((step) => {
+        if (step.agent) {
+          uniqueAgents.add(step.agent);
+        }
+      });
+    }
+
 
     // Convert Set to Array for easier handling
     const agents = Array.from(uniqueAgents);
 
     // Get all steps
-    const steps = plan.steps;
+    const steps = plan.steps ?? [];
 
     // Check if human_clarification_request is not null
     const hasClarificationRequest =

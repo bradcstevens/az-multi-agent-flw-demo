@@ -4,32 +4,38 @@ Configuration settings for the MCP server.
 
 import os
 from typing import Optional
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings
 
 
 class MCPServerConfig(BaseSettings):
     """MCP Server configuration."""
+    
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"  # This will ignore extra environment variables
+    )
 
     # Server settings
-    host: str = Field(default="0.0.0.0", env="MCP_HOST")
-    port: int = Field(default=9000, env="MCP_PORT")
-    debug: bool = Field(default=False, env="MCP_DEBUG")
+    host: str = Field(default="0.0.0.0")
+    port: int = Field(default=9000)
+    debug: bool = Field(default=False)
 
     # Authentication settings
-    tenant_id: Optional[str] = Field(default=None, env="AZURE_TENANT_ID")
-    client_id: Optional[str] = Field(default=None, env="AZURE_CLIENT_ID")
-    jwks_uri: Optional[str] = Field(default=None, env="AZURE_JWKS_URI")
-    issuer: Optional[str] = Field(default=None, env="AZURE_ISSUER")
-    audience: Optional[str] = Field(default=None, env="AZURE_AUDIENCE")
+    tenant_id: Optional[str] = Field(default=None)
+    client_id: Optional[str] = Field(default=None)
+    jwks_uri: Optional[str] = Field(default=None)
+    issuer: Optional[str] = Field(default=None)
+    audience: Optional[str] = Field(default=None)
 
     # MCP specific settings
-    server_name: str = Field(default="MACAE MCP Server", env="MCP_SERVER_NAME")
-    enable_auth: bool = Field(default=True, env="MCP_ENABLE_AUTH")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    server_name: str = Field(default="MACAE MCP Server")
+    enable_auth: bool = Field(default=True)
+    
+    # Dataset path - added to handle the environment variable
+    dataset_path: str = Field(default="./datasets")
 
 
 # Global configuration instance

@@ -13,7 +13,6 @@ import "../../styles/prism-material-oceanic.css";
 import "./../../styles/HomeInput.css";
 
 import { HomeInputProps, iconMap, QuickTask } from "../../models/homeInput";
-import { TeamConfig } from "../../models/Team";
 import { TaskService } from "../../services/TaskService";
 import { NewTaskService } from "../../services/NewTaskService";
 import { RAIErrorCard, RAIErrorData } from "../errors";
@@ -77,6 +76,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     input.trim(),
                     selectedTeam?.team_id
                 );
+                console.log("Plan created:", response);
                 setInput("");
 
                 if (textareaRef.current) {
@@ -87,8 +87,6 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     showToast("Plan created!", "success");
                     dismissToast(id);
 
-                    // Navigate to create page (no team ID in URL anymore)
-                    console.log('HomeInput: Navigating to plan creation with team:', selectedTeam?.name);
                     navigate(`/plan/${response.plan_id}`);
                 } else {
                     showToast("Failed to create plan", "error");
@@ -96,7 +94,6 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 }
             } catch (error: any) {
                 dismissToast(id);
-
                 // Check if this is an RAI validation error
                 let errorDetail = null;
                 try {
