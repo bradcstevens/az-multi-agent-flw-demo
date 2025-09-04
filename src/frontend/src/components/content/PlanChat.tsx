@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   Textarea,
   Button,
@@ -18,6 +18,8 @@ import {
   ArrowDownRegular,
   PlayRegular,
   CheckmarkRegular,
+  DismissRegular,
+  SendRegular,
 } from "@fluentui/react-icons";
 import { PlanChatProps, ChatMessage, ParsedPlanData } from "../../models/plan";
 import { TaskService } from "../../services/TaskService";
@@ -32,7 +34,7 @@ import LoadingMessage, { loadingMessages } from "../../coral/components/LoadingM
 import Octo from "../../coral/imports/Octopus.png";
 import InlineToaster from "../toast/InlineToaster";
 
-// streaming message types - inherit from StreamingPlanUpdate and override message_type
+// Enhanced streaming message types
 interface RobustStreamingMessage extends Omit<StreamingPlanUpdate, 'message_type'> {
   message_type: 'thinking' | 'action' | 'result' | 'clarification_needed' | 'plan_approval_request' | 'final_result' | 'orchestration_update' | 'step_started' | 'step_completed';
   step_id?: string;
@@ -66,7 +68,7 @@ interface GroupedMessage {
   is_orchestration?: boolean;
 }
 
-// orchestration status
+// Orchestration status
 interface OrchestrationStatus {
   status: 'idle' | 'planning' | 'executing' | 'completed' | 'error';
   current_step: number;
@@ -75,10 +77,81 @@ interface OrchestrationStatus {
   active_agents: string[];
 }
 
-// Extended PlanChatProps to include plan data communication to PlanPanelRight
+// Extended PlanChatProps
 interface ExtendedPlanChatProps extends PlanChatProps {
-  onPlanReceived?: (planData: ParsedPlanData) => void; // Communicate plan to parent/PlanPanelRight
+  onPlanReceived?: (planData: ParsedPlanData) => void;
 }
+
+// ✅ OPTIMIZATION: Move helper functions outside component to prevent recreation
+const normalizeTimestamp = (timestamp?: string | number): string => {
+  if (!timestamp) return new Date().toISOString();
+  if (typeof timestamp === 'number') {
+    return new Date(timestamp * 1000).toISOString();
+  }
+  return timestamp;
+};
+
+const formatAgentDisplayName = (agentName?: string): string | null => {
+  if (!agentName || agentName.trim() === '' || agentName.toLowerCase() === 'system') {
+    return null;
+  }
+  
+  const cleaned = agentName.trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+};
+
+const getAgentTag = (agentName?: string, source?: string): string | null => {
+  if (agentName && agentName.trim() !== '' && agentName.toLowerCase() !== 'system') {
+    return agentName.toUpperCase();
+  }
+  
+  if (source && source !== AgentType.HUMAN) {
+    return source.toUpperCase();
+  }
+  
+  return null;
+};
+
+// ✅ OPTIMIZATION: Optimized grouping function outside component
+const groupStreamingMessagesOptimized = (messages: StreamingPlanUpdate[]): GroupedMessage[] => {
+  const groups: { [key: string]: GroupedMessage } = {};
+
+  messages.forEach((msg) => {
+    const robustMsg = msg as RobustStreamingMessage;
+    
+    // Create unique key for grouping
+    const groupKey = `${robustMsg.agent_name || 'system'}_${robustMsg.step_id || 'general'}_${robustMsg.message_type || 'action'}`;
+    
+    if (!groups[groupKey]) {
+      groups[groupKey] = {
+        id: groupKey,
+        agent_name: robustMsg.agent_name || 'Assistant',
+        messages: [],
+        status: robustMsg.status || 'in_progress',
+        latest_timestamp: normalizeTimestamp(robustMsg.timestamp),
+        step_id: robustMsg.step_id,
+        message_type: robustMsg.message_type,
+        is_orchestration: robustMsg.agent_name?.toLowerCase().includes('orchestrator') || 
+                        robustMsg.agent_name?.toLowerCase().includes('planner') ||
+                        robustMsg.message_type === 'orchestration_update'
+      };
+    }
+
+    groups[groupKey].messages.push(robustMsg);
+    
+    // Update status to latest
+    const msgTimestamp = normalizeTimestamp(robustMsg.timestamp);
+    const groupTimestamp = groups[groupKey].latest_timestamp;
+    if (msgTimestamp > groupTimestamp) {
+      groups[groupKey].status = robustMsg.status || groups[groupKey].status;
+      groups[groupKey].latest_timestamp = msgTimestamp;
+    }
+  });
+
+  return Object.values(groups).sort((a, b) => 
+    new Date(a.latest_timestamp).getTime() - new Date(b.latest_timestamp).getTime()
+  );
+};
 
 const PlanChat: React.FC<ExtendedPlanChatProps> = ({
   planData,
@@ -90,31 +163,30 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
   streamingMessages = [],
   wsConnected = false,
   onPlanApproval,
-  onPlanReceived, 
+  onPlanReceived,
 }) => {
   const navigate = useNavigate();
   const messages = planData?.messages || [];
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [inputHeight, setInputHeight] = useState(0);
-  const [groupedStreamingMessages, setGroupedStreamingMessages] = useState<GroupedMessage[]>([]);
   
-  // Add state for plan approval requests
+  // Plan approval states
   const [planApprovalRequest, setPlanApprovalRequest] = useState<ParsedPlanData | null>(null);
   const [processingApproval, setProcessingApproval] = useState(false);
   const [planApproved, setPlanApproved] = useState(false);
   
-  // Add state for human clarification - only show after approve is clicked
+  // Clarification states
   const [userFeedback, setUserFeedback] = useState('');
   const [showClarificationInput, setShowClarificationInput] = useState(false);
 
-  // loading states
-  const [isInitialLoading, setIsInitialLoading] = useState(true); // Full-screen loading
-  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false); // Inline loading
+  // Loading states
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
   const [hasStreamingStarted, setHasStreamingStarted] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
   const [planExecuting, setPlanExecuting] = useState(false);
   
-  // orchestration tracking
+  // Orchestration tracking
   const [orchestrationStatus, setOrchestrationStatus] = useState<OrchestrationStatus>({
     status: 'idle',
     current_step: 0,
@@ -122,105 +194,67 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
     active_agents: []
   });
   
-  // Track final results and completion
+  // Final results tracking
   const [finalResults, setFinalResults] = useState<RobustStreamingMessage[]>([]);
   const [planCompleted, setPlanCompleted] = useState(false);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
 
-  // Helper function to normalize timestamp
-  const normalizeTimestamp = (timestamp?: string | number): string => {
-    if (!timestamp) return new Date().toISOString();
-    if (typeof timestamp === 'number') {
-      // Backend sends float timestamp, convert to ISO string
-      return new Date(timestamp * 1000).toISOString();
-    }
-    return timestamp;
-  };
+  // ✅ OPTIMIZATION: Memoize grouped messages to prevent unnecessary recalculations
+  const groupedStreamingMessages = useMemo(() => {
+    if (streamingMessages.length === 0) return [];
+    return groupStreamingMessagesOptimized(streamingMessages);
+  }, [streamingMessages]);
 
-  // Helper function to get clean agent display name
-  const getAgentDisplayName = (agentName: string): string => {
-    if (!agentName) return 'Assistant';
-    
-    // Special handling for orchestrator/system agents
-    if (agentName.toLowerCase().includes('orchestrator') || 
-        agentName.toLowerCase() === 'system' ||
-        agentName.toLowerCase().includes('planner')) {
-      return 'BOT';
-    }
-    
-    // Clean up the agent name for display
-    let cleanName = TaskService.cleanTextToSpaces(agentName);
-    
-    // If it's a generic agent type, make it more readable
-    if (cleanName.toLowerCase().includes('agent')) {
-      cleanName = cleanName.replace(/agent/gi, '').trim();
-    }
-    
-    // Capitalize first letter of each word
-    return cleanName.replace(/\b\w/g, l => l.toUpperCase()) || 'Assistant';
-  };
-
-  //  user's original task as dialogue
-  const renderUserTaskDialogue = () => {
-    // user's original task
+  // ✅ NEW: Render task submission dialogue showing what was sent to backend
+  const renderTaskSubmissionDialogue = () => {
     const userTask = planApprovalRequest?.user_request || 
                      planData?.plan?.description ||
-                     // Fallback: look for first human message
                      messages.find(msg => msg.source === AgentType.HUMAN)?.content;
 
     if (!userTask || userTask.trim() === '') return null;
 
     return (
-      <div key="user-task-dialogue" className="message user" style={{ marginBottom: '24px' }}>
+      <div key="task-submission" className="message user" style={{ marginBottom: '24px' }}>
         <div className="plan-chat-header" style={{ marginBottom: '12px' }}>
           <div className="plan-chat-speaker" style={{ 
             justifyContent: 'flex-end',
             gap: '8px',
             alignItems: 'center'
           }}>
-            {/* <Tag
+            <Body1 className="speaker-name">You</Body1>
+            <Tag
               size="extra-small"
               shape="rounded"
-              appearance="brand"
-              icon={<PersonRegular />}
+              appearance="outline"
+              icon={<CheckmarkCircleRegular />}
+              color="success"
             >
-              YOU
+              Task Submitted
             </Tag>
-            <Body1 className="speaker-name">You</Body1> */}
           </div>
         </div>
 
         <Body1>
-          <div className="plan-chat-message-content" style={{ padding: '16px 20px' }}>
-            <div style={{ 
-              padding: '0',
-              lineHeight: 1.6,
-              marginBottom: '12px'
-            }}>
-              <Text size={300}>
-                {userTask}
-              </Text>
-            </div>
-
-            {/* <div style={{ 
-              marginTop: '12px',
-              fontSize: '12px',
-              color: 'var(--colorNeutralForeground3)',
-              fontStyle: 'italic'
-            }}>
-              Original task request
-            </div> */}
+          <div className="plan-chat-message-content" style={{ 
+            padding: '16px 20px',
+            lineHeight: 1.6,
+            backgroundColor: 'var(--colorNeutralBackground2)',
+            borderRadius: '8px',
+            border: '1px solid var(--colorNeutralStroke2)'
+          }}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {userTask}
+            </ReactMarkdown>
           </div>
         </Body1>
       </div>
     );
   };
 
-  //  Initialize with full-screen loading
+  // Initialize with full-screen loading
   useEffect(() => {
-    // Start with full-screen loading on page load
     if (!hasStreamingStarted && streamingMessages.length === 0 && !planApprovalRequest && messages.length === 0) {
       setIsInitialLoading(true);
     } else {
@@ -228,7 +262,7 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
     }
   }, [hasStreamingStarted, streamingMessages.length, planApprovalRequest, messages.length]);
 
-  // Loading message rotation effect
+  // Loading message rotation
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isInitialLoading || showLoadingSpinner) {
@@ -241,14 +275,13 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
     return () => clearInterval(interval);
   }, [isInitialLoading, showLoadingSpinner]);
 
-  //  Real-time streaming with robust orchestration tracking
+  // ✅ OPTIMIZATION: Simplified streaming processing - removed grouping here
   useEffect(() => {
     console.log('🔍 Processing streaming messages:', streamingMessages.length);
     
     if (streamingMessages.length > 0) {
-      // Hide full-screen loading as soon as we get ANY streaming message
       if (!hasStreamingStarted) {
-        console.log('🚀 Streaming started, hiding full-screen loading');
+        console.log('🚀 Streaming started');
         setHasStreamingStarted(true);
         setIsInitialLoading(false);
         setShowLoadingSpinner(false);
@@ -259,7 +292,7 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
       const robustMessages = streamingMessages.map(msg => ({
         ...msg,
         message_type: msg.message_type || 'action',
-        is_final: false, // Will be determined by status and content
+        is_final: false,
       } as RobustStreamingMessage));
       
       // Track orchestration status
@@ -280,7 +313,7 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
         }));
       }
       
-      // Filter out undefined values from active agents array
+      // Filter active agents
       const activeAgents = [...new Set(
         robustMessages
           .filter(msg => msg.agent_name && msg.agent_name !== 'system')
@@ -293,7 +326,7 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
         active_agents: activeAgents
       }));
       
-      //  Track final results
+      // Track final results
       const finalResultMessages = robustMessages.filter(msg => 
         msg.message_type === 'final_result' || 
         (msg.message_type === 'result' && msg.status === 'completed')
@@ -302,7 +335,6 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
       if (finalResultMessages.length > 0) {
         setFinalResults(finalResultMessages);
         
-        // Check if plan is completed
         const hasCompletionMessage = finalResultMessages.some(msg => 
           msg.content?.toLowerCase().includes('completed') ||
           msg.content?.toLowerCase().includes('finished') ||
@@ -314,71 +346,44 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
           setOrchestrationStatus(prev => ({ ...prev, status: 'completed' }));
         }
       }
-      
-      console.log('🤖 Active agents:', activeAgents);
-      console.log('🎯 Orchestration status:', orchestrationStatus.status);
     }
-  }, [streamingMessages, hasStreamingStarted, orchestrationStatus.status]);
+  }, [streamingMessages, hasStreamingStarted]);
 
-  // Add WebSocket listener for plan approval requests
+  // WebSocket plan approval listener
   useEffect(() => {
-    console.log('🔌 PlanChat setting up plan approval listener');
+    console.log('🔌 Setting up plan approval listener');
     
-    // Handle v3 plan approval requests
     const unsubscribePlanApprovalRequest = webSocketService.onPlanApprovalRequest((approvalRequest: any) => {
-      console.log('📥 Received plan approval request immediately:', approvalRequest);
+      console.log('📥 Received plan approval request:', approvalRequest);
       
       let parsedPlanData: ParsedPlanData | null = null;
       
       if (approvalRequest.parsedData) {
         parsedPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest);
         if (parsedPlanData) {
-          console.log('✅ Parsed plan data - showing immediately:', parsedPlanData);
           setPlanApprovalRequest(parsedPlanData);
-          
-          // Send plan data to PlanPanelRight via parent
           onPlanReceived?.(parsedPlanData);
-          
-          // Reset states
-          setPlanExecuting(false);
-          setIsInitialLoading(false); // Hide full-screen loading
-          setShowLoadingSpinner(false);
-          setHasStreamingStarted(false);
-          setPlanApproved(false);
-          setPlanCompleted(false);
-          setFinalResults([]);
-          setOrchestrationStatus({
-            status: 'idle',
-            current_step: 0,
-            total_steps: parsedPlanData.steps?.length || 0,
-            active_agents: []
-          });
-        } else {
-          console.error('❌ Failed to parse plan approval request');
         }
       } else {
-        console.log('✅ Direct plan approval data - showing immediately');
         parsedPlanData = approvalRequest;
         setPlanApprovalRequest(approvalRequest);
-        
-        // Send plan data to PlanPanelRight via parent
         onPlanReceived?.(approvalRequest);
-        
-        // Reset states
-        setPlanExecuting(false);
-        setIsInitialLoading(false); // Hide full-screen loading
-        setShowLoadingSpinner(false);
-        setHasStreamingStarted(false);
-        setPlanApproved(false);
-        setPlanCompleted(false);
-        setFinalResults([]);
-        setOrchestrationStatus({
-          status: 'idle',
-          current_step: 0,
-          total_steps: approvalRequest.steps?.length || 0,
-          active_agents: []
-        });
       }
+      
+      // Reset states
+      setPlanExecuting(false);
+      setIsInitialLoading(false);
+      setShowLoadingSpinner(false);
+      setHasStreamingStarted(false);
+      setPlanApproved(false);
+      setPlanCompleted(false);
+      setFinalResults([]);
+      setOrchestrationStatus({
+        status: 'idle',
+        current_step: 0,
+        total_steps: parsedPlanData?.steps?.length || 0,
+        active_agents: []
+      });
       
       setUserFeedback('');
       setShowClarificationInput(false);
@@ -386,36 +391,32 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
     });
 
     return () => {
-      console.log('🔌 PlanChat cleaning up plan approval listeners');
       unsubscribePlanApprovalRequest();
     };
   }, [onPlanReceived]);
 
-  // Handle sending final plan approval to backend
+  // Handle final plan approval
   const handleSendFinalPlan = useCallback(async () => {
     if (!planApprovalRequest) return;
     
     console.log('🚀 Starting plan execution...');
     setProcessingApproval(true);
     setPlanExecuting(true);
-    setShowLoadingSpinner(true); // Use inline loading for post-approval
+    setShowLoadingSpinner(true);
     setHasStreamingStarted(false);
     setOrchestrationStatus(prev => ({ ...prev, status: 'planning' }));
     
     try {
-       const approvalResponse = {
+      const approvalResponse = {
         plan_id: planApprovalRequest.id,
         session_id: planData?.plan?.session_id || '',
         approved: true,
         feedback: userFeedback || 'Plan approved by user'
       };
 
-      console.log('🚀 Sending FINAL plan approval to backend:', approvalResponse);
-
-      // Send final approval response via WebSocket
       webSocketService.sendPlanApprovalResponse(approvalResponse);
 
-       await fetch('/api/v3/plan_approval', {
+      await fetch('/api/v3/plan_approval', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -425,21 +426,15 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
         })
       });
       
-      console.log('📡 Subscribing to plan for streaming messages:', planApprovalRequest.id);
       webSocketService.subscribeToPlan(planApprovalRequest.id);
-      
-      // Notify parent component that plan was approved
       onPlanApproval?.(true);
       
-      // Clear clarification UI state but keep approval request
       setUserFeedback('');
       setShowClarificationInput(false);
       setPlanApproved(true);
       
-      console.log('✅ Final plan approved and sent to backend:', planApprovalRequest.id);
-      
     } catch (error) {
-      console.error('❌ Failed to send final plan approval:', error);
+      console.error('❌ Failed to send plan approval:', error);
       setShowLoadingSpinner(false);
       setPlanExecuting(false);
       setHasStreamingStarted(false);
@@ -449,13 +444,12 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
     }
   }, [planApprovalRequest, planData?.plan?.session_id, userFeedback, onPlanApproval]);
 
-  // Handle initial approve button click - show clarification input
+  // Handle approve button click
   const handleApproveTaskPlan = useCallback(() => {
-    console.log('👍 User clicked "Approve Task Plan" - showing clarification input');
     setShowClarificationInput(true);
   }, []);
 
-  // Handle reject button click - redirect to homepage
+  // Handle reject button click
   const handleRejectPlan = useCallback(async () => {
     if (!planApprovalRequest) return;
     
@@ -470,9 +464,7 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
         user_response: 'Plan rejected by user'
       };
 
-      console.log('❌ Sending plan rejection to backend:', rejectionResponse);
       webSocketService.sendPlanApprovalResponse(rejectionResponse);
-      
       onPlanApproval?.(false);
       navigate('/');
       
@@ -484,24 +476,29 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
     }
   }, [planApprovalRequest, planData?.plan?.session_id, onPlanApproval, navigate]);
 
-  // Render ChatGPT-style "Agent is working..." message
+  // Render agent working message
   const renderAgentWorkingMessage = () => {
     if (!planApproved || !planExecuting || orchestrationStatus.active_agents.length === 0) return null;
 
-    const workingAgent = getAgentDisplayName(orchestrationStatus.active_agents[0]);
+    const activeAgent = orchestrationStatus.active_agents[0];
+    const displayName = formatAgentDisplayName(activeAgent);
+    const agentTag = getAgentTag(activeAgent);
 
     return (
       <div key="agent-working" className="message assistant agent-working" style={{ marginBottom: '24px' }}>
         <div className="plan-chat-header" style={{ marginBottom: '12px' }}>
           <div className="plan-chat-speaker" style={{ gap: '8px', alignItems: 'center' }}>
-            <Body1 className="speaker-name">BOT</Body1>
-            <Tag
-              size="extra-small"
-              shape="rounded"
-              appearance="brand"
-            >
-              ORCHESTRATOR
-            </Tag>
+            {displayName && <Body1 className="speaker-name">{displayName}</Body1>}
+            {agentTag && (
+              <Tag
+                size="extra-small"
+                shape="rounded"
+                appearance="brand"
+                className="agent-tag"
+              >
+                {agentTag}
+              </Tag>
+            )}
             <Tag
               size="extra-small"
               shape="rounded"
@@ -513,27 +510,21 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
           </div>
         </div>
         <Body1>
-          <div className="plan-chat-message-content" style={{ padding: '16px 20px' }}>
+          <div className="plan-chat-message-content" style={{ 
+            padding: '16px 20px',
+            backgroundColor: 'var(--colorNeutralBackground1)',
+            borderRadius: '8px',
+            border: '1px solid var(--colorNeutralStroke2)'
+          }}>
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '12px',
-              padding: '12px 0'
+              color: 'var(--colorNeutralForeground2)',
+              fontStyle: 'italic'
             }}>
-              <LoadingMessage 
-                loadingMessage={`${workingAgent} is working on the final result...`}
-                iconSrc={Octo}
-                iconWidth={20}
-                iconHeight={20}
-              />
-            </div>
-            <div style={{ 
-              color: 'var(--colorNeutralForeground3)',
-              fontStyle: 'italic',
-              fontSize: '12px',
-              marginTop: '8px'
-            }}>
-              Plan execution in progress. You'll see real-time updates as agents complete their tasks.
+              <Spinner size="tiny" />
+              {displayName ? `${displayName} is working` : 'Agent is working'} on your plan...
             </div>
           </div>
         </Body1>
@@ -541,13 +532,13 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
     );
   };
 
-  // Render full-screen loading overlay
+  // Render full-screen loading
   const renderFullScreenLoading = () => {
     if (!isInitialLoading) return null;
 
     return (
       <div style={{
-        position: 'fixed',
+        position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
@@ -557,7 +548,8 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000
+        zIndex: 100,
+        borderRadius: '12px'
       }}>
         <div style={{ 
           textAlign: 'center',
@@ -571,11 +563,12 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
             iconHeight={60}
           />
           <div style={{ 
-            marginTop: '20px',
+            marginTop: '24px',
             color: 'var(--colorNeutralForeground2)',
-            fontSize: '16px'
+            fontSize: '18px',
+            fontWeight: 500
           }}>
-            Preparing your multi-agent workspace...
+            Analyzing your request...
           </div>
           <div style={{ 
             marginTop: '12px',
@@ -583,14 +576,14 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
             fontSize: '14px',
             fontStyle: 'italic'
           }}>
-            Our orchestrator is assembling the perfect team for your task
+           
           </div>
         </div>
       </div>
     );
   };
 
-  // ✅ Render octopus loading spinner (inline)
+  // Render loading spinner
   const renderLoadingSpinner = () => {
     if (!showLoadingSpinner) return null;
 
@@ -598,355 +591,39 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
       <div key="loading-spinner" className="message assistant" style={{ marginBottom: '24px' }}>
         <div className="plan-chat-header" style={{ marginBottom: '12px' }}>
           <div className="plan-chat-speaker" style={{ gap: '8px', alignItems: 'center' }}>
-            <Body1 className="speaker-name">BOT</Body1>
+            <Body1 className="speaker-name">Orchestrator</Body1>
             <Tag
               size="extra-small"
               shape="rounded"
-              style={{ 
-                backgroundColor: 'var(--colorPaletteYellowBackground2)',
-                color: 'var(--colorPaletteYellowForeground2)',
-                border: '1px solid var(--colorPaletteYellowBorder2)'
-              }}
+              appearance="brand"
+              className="agent-tag"
             >
-              Working
+              ORCHESTRATOR
             </Tag>
           </div>
         </div>
         <Body1>
-          <div className="plan-chat-message-content" style={{ padding: '16px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0' }}>
-              <LoadingMessage 
-                loadingMessage={loadingMessage}
-                iconSrc={Octo}
-                iconWidth={24}
-                iconHeight={24}
-              />
-            </div>
-            <div style={{ 
-              color: 'var(--colorNeutralForeground2)',
-              fontStyle: 'italic',
-              fontSize: '14px',
-              marginTop: '8px'
-            }}>
-              {planApproved ? 'Orchestrator is coordinating agents...' : 'Preparing your plan...'}
-            </div>
+          <div className="plan-chat-message-content" style={{ 
+            padding: '16px 20px',
+            backgroundColor: 'var(--colorNeutralBackground1)',
+            borderRadius: '8px',
+            border: '1px solid var(--colorNeutralStroke2)'
+          }}>
+            <LoadingMessage 
+              loadingMessage={loadingMessage}
+              iconSrc={Octo}
+              iconWidth={24}
+              iconHeight={24}
+            />
           </div>
         </Body1>
       </div>
     );
   };
 
-  // ✅ FIXED: Clean up the renderPlanApprovalRequest function
-  const renderPlanApprovalRequest = () => {
-    if (!planApprovalRequest) return null;
+  // ✅ REMOVED: renderPlanApprovalRequest - plan approval request removed as requested
 
-    const getRespondingAgent = (): { displayName: string; agentType: string } => {
-      if (planApprovalRequest.team && planApprovalRequest.team.length > 0) {
-        const planner = planApprovalRequest.team.find(agent => 
-          agent.toLowerCase().includes('planner') || 
-          agent.toLowerCase().includes('plan')
-        );
-        
-        if (planner) {
-          return {
-            displayName: getAgentDisplayName(planner),
-            agentType: planner.toUpperCase().replace(/[^A-Z0-9]/g, '_')
-          };
-        }
-        
-        const firstAgent = planApprovalRequest.team[0];
-        return {
-          displayName: getAgentDisplayName(firstAgent),
-          agentType: firstAgent.toUpperCase().replace(/[^A-Z0-9]/g, '_')
-        };
-      }
-      
-      return { displayName: 'BOT', agentType: 'BOT' };
-    };
-
-    const respondingAgent = getRespondingAgent();
-
-    return (
-      <>
-        {/* Assistant's response with plan */}
-        <div key="plan-approval" className="message assistant approval-request" style={{ marginBottom: '24px' }}>
-          <div className="plan-chat-header" style={{ marginBottom: '12px' }}>
-            <div className="plan-chat-speaker" style={{ gap: '8px', alignItems: 'center' }}>
-              <Body1 className="speaker-name">{respondingAgent.displayName}</Body1>
-              <Tag
-                size="extra-small"
-                shape="rounded"
-                appearance="brand"
-                className="agent-tag"
-              >
-                {respondingAgent.agentType}
-              </Tag>
-              <Tag
-                size="extra-small"
-                shape="rounded"
-                appearance="outline"
-                icon={planApproved ? <CheckmarkCircleRegular /> : <ClockRegular />}
-              >
-                {planApproved ? 'Approved' : 'Plan Ready'}
-              </Tag>
-            </div>
-          </div>
-
-          <Body1>
-            <div className="plan-chat-message-content" style={{ padding: '20px 24px' }}>
-              <div style={{ marginBottom: '24px' }}>
-                <Text size={400} weight="semibold" style={{ display: 'block', marginBottom: '12px' }}>
-                  Plan Created! 🎯
-                </Text>
-                <Text size={300}>
-                  I've created a plan with {planApprovalRequest.steps?.length || 0} steps to help you accomplish your goal. 
-                  Would you like me to proceed with executing this plan?
-                </Text>
-
-                {/* ✅ ENHANCED: Show actual plan steps in PlanChat (detailed view) */}
-                {planApprovalRequest.steps && planApprovalRequest.steps.length > 0 && !planApproved && (
-                  <div style={{ marginTop: '24px', marginBottom: '24px' }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      marginBottom: '16px',
-                      gap: '12px' 
-                    }}>
-                      <Text size={300} weight="semibold">
-                        Plan Overview ({planApprovalRequest.steps.length} steps):
-                      </Text>
-                      <Text size={200} style={{ 
-                        color: 'var(--colorNeutralForeground3)',
-                        fontStyle: 'italic'
-                      }}>
-                        Also available in the right panel
-                      </Text>
-                    </div>
-                    
-                    {/* Show detailed plan steps */}
-                    <div style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '12px',
-                      padding: '20px',
-                      backgroundColor: 'var(--colorNeutralBackground2)',
-                      borderRadius: '8px',
-                      border: '1px solid var(--colorNeutralStroke2)',
-                      marginBottom: '16px'
-                    }}>
-                      {planApprovalRequest.steps.map((step, index) => (
-                        <div key={step.id || index} style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '16px',
-                          padding: '16px',
-                          backgroundColor: 'var(--colorNeutralBackground1)',
-                          borderRadius: '6px',
-                          border: '1px solid var(--colorNeutralStroke2)'
-                        }}>
-                          <span style={{ 
-                            backgroundColor: 'var(--colorBrandBackground)', 
-                            color: 'var(--colorNeutralForegroundOnBrand)',
-                            borderRadius: '50%',
-                            width: '28px',
-                            height: '28px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            flexShrink: 0,
-                            marginTop: '2px'
-                          }}>
-                            {step.id}
-                          </span>
-                          
-                          <div style={{ flex: 1 }}>
-                            <Text size={300} style={{ 
-                              color: 'var(--colorNeutralForeground1)',
-                              lineHeight: 1.5,
-                              marginBottom: step.agent ? '8px' : '0'
-                            }}>
-                              {step.cleanAction}
-                            </Text>
-                            
-                            {/* Show assigned agent if available */}
-                            {step.agent && (
-                              <Tag
-                                size="extra-small"
-                                appearance="outline"
-                                style={{ 
-                                  fontSize: '10px',
-                                  height: '20px',
-                                  minHeight: '20px',
-                                  marginTop: '4px'
-                                }}
-                              >
-                                {getAgentDisplayName(step.agent)}
-                              </Tag>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ marginBottom: '24px', fontStyle: 'italic', color: 'var(--colorNeutralForeground2)' }}>
-                  {planApproved ? 'Plan approved and execution started. Monitor progress above.' : 'If the plan looks good, we can move forward with execution.'}
-                </div>
-              </div>
-
-              {/* Human clarification input */}
-              {showClarificationInput && !planApproved && (
-                <div style={{ 
-                  marginTop: '24px',
-                  marginBottom: '24px',
-                  padding: '20px',
-                  backgroundColor: 'var(--colorNeutralBackground2)',
-                  borderRadius: '8px',
-                  border: '1px solid var(--colorNeutralStroke2)'
-                }}>
-                  <h4 style={{ 
-                    margin: '0 0 12px 0', 
-                    fontSize: '14px', 
-                    fontWeight: 600,
-                    color: 'var(--colorNeutralForeground1)'
-                  }}>
-                    Any additional feedback or modifications? (optional)
-                  </h4>
-                  <p style={{ 
-                    margin: '0 0 16px 0', 
-                    fontSize: '12px', 
-                    color: 'var(--colorNeutralForeground2)',
-                    lineHeight: 1.4
-                  }}>
-                    Add any additional context or clarifications for the agents executing this plan.
-                  </p>
-                  <Textarea
-                    value={userFeedback}
-                    onChange={(_, data) => setUserFeedback(data.value)}
-                    placeholder="Any additional context or clarifications for the agents..."
-                    rows={3}
-                    style={{ width: '100%', marginBottom: '16px' }}
-                  />
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '12px', 
-                    alignItems: 'center',
-                    justifyContent: 'flex-start'
-                  }}>
-                    <Button
-                      appearance="primary"
-                      size="medium"
-                      onClick={handleSendFinalPlan}
-                      disabled={processingApproval}
-                      icon={processingApproval ? <Spinner size="tiny" /> : <CheckmarkCircleRegular />}
-                      style={{ minWidth: '140px' }}
-                    >
-                      {processingApproval ? 'Starting Plan...' : 'Start Plan'}
-                    </Button>
-                    <Button
-                      appearance="subtle"
-                      size="medium"
-                      onClick={() => {
-                        setShowClarificationInput(false);
-                        setUserFeedback('');
-                      }}
-                      disabled={processingApproval}
-                      style={{ minWidth: '80px' }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* ✅ ENHANCED: Buttons properly aligned with better spacing */}
-              {!showClarificationInput && !planApproved && (
-                <div className="assistant-footer" style={{ marginTop: '32px' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '16px', 
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    flexWrap: 'wrap',
-                    padding: '20px 0 0 0',
-                    borderTop: '1px solid var(--colorNeutralStroke2)'
-                  }}>
-                    <Button
-                      appearance="primary"
-                      size="medium"
-                      onClick={handleApproveTaskPlan}
-                      disabled={processingApproval}
-                      icon={<CheckmarkCircleRegular />}
-                      style={{ minWidth: '160px', height: '36px' }}
-                    >
-                      Approve Task Plan
-                    </Button>
-                    <Button
-                      appearance="outline"
-                      size="medium"
-                      onClick={handleRejectPlan}
-                      disabled={processingApproval}
-                      style={{ 
-                        minWidth: '120px',
-                        height: '36px',
-                        borderColor: 'var(--colorPaletteRedBorder1)',
-                        color: 'var(--colorPaletteRedForeground1)'
-                      }}
-                    >
-                      Reject Plan
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Show grayed out buttons after selection with better spacing */}
-              {planApproved && (
-                <div className="assistant-footer" style={{ marginTop: '32px' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '16px', 
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    flexWrap: 'wrap',
-                    padding: '20px 0 0 0',
-                    borderTop: '1px solid var(--colorNeutralStroke2)',
-                    opacity: 0.6
-                  }}>
-                    <Button
-                      appearance="primary"
-                      size="medium"
-                      disabled={true}
-                      icon={<CheckmarkCircleRegular />}
-                      style={{ minWidth: '160px', height: '36px' }}
-                    >
-                      ✓ Plan Approved
-                    </Button>
-                    <Button
-                      appearance="outline"
-                      size="medium"
-                      disabled={true}
-                      style={{ 
-                        minWidth: '120px',
-                        height: '36px',
-                        opacity: 0.5
-                      }}
-                    >
-                      Reject Plan
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Body1>
-        </div>
-      </>
-    );
-  };
-
-  // ✅ Render final results summary
+  // Render final results
   const renderFinalResults = () => {
     if (finalResults.length === 0) return null;
 
@@ -954,7 +631,7 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
       <div key="final-results" className="message assistant final-results" style={{ marginBottom: '24px' }}>
         <div className="plan-chat-header" style={{ marginBottom: '12px' }}>
           <div className="plan-chat-speaker" style={{ gap: '8px', alignItems: 'center' }}>
-            <Body1 className="speaker-name">BOT</Body1>
+            <Body1 className="speaker-name">Orchestrator</Body1>
             <Tag
               size="extra-small"
               shape="rounded"
@@ -976,8 +653,13 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
         </div>
 
         <Body1>
-          <div className="plan-chat-message-content" style={{ padding: '20px 24px' }}>
-            <div style={{ marginBottom: '20px' }}>
+          <div className="plan-chat-message-content" style={{ 
+            padding: '16px 20px',
+            backgroundColor: 'var(--colorNeutralBackground1)',
+            borderRadius: '8px',
+            border: '1px solid var(--colorNeutralStroke2)'
+          }}>
+            <div style={{ marginBottom: '16px' }}>
               <Text size={400} weight="semibold" style={{ 
                 display: 'block', 
                 marginBottom: '12px',
@@ -993,179 +675,94 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
                 lineHeight: 1.6
               }}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {TaskService.cleanHRAgent(result.content || '')}
+                  {result.content || ''}
                 </ReactMarkdown>
               </div>
             ))}
-
-            <div className="assistant-footer" style={{ marginTop: '24px' }}>
-              <div className="assistant-actions" style={{ 
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
-                <div>
-                  <Button
-                    onClick={() => {
-                      const allContent = finalResults.map(r => r.content).join('\n\n');
-                      navigator.clipboard.writeText(allContent);
-                    }}
-                    title="Copy Final Results"
-                    appearance="subtle"
-                    style={{ height: 32, width: 32 }}
-                    icon={<Copy />}
-                  />
-                </div>
-                <Tag
-                  icon={<DiamondRegular />}
-                  appearance="filled"
-                  size="extra-small"
-                  color="success"
-                >
-                  Final execution summary
-                </Tag>
-              </div>
-            </div>
           </div>
         </Body1>
       </div>
     );
   };
 
-  // ✅ ENHANCED: Group streaming messages with better orchestration handling
-  const groupStreamingMessages = useCallback((messages: StreamingPlanUpdate[]): GroupedMessage[] => {
-    const groups: { [key: string]: GroupedMessage } = {};
+  // ✅ OPTIMIZATION: Optimized auto-scroll with debouncing
+  const scrollToBottom = useCallback(() => {
+    messagesContainerRef.current?.scrollTo({
+      top: messagesContainerRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+    setShowScrollButton(false);
+  }, []);
 
-    messages.forEach((msg) => {
-        const robustMsg = msg as RobustStreamingMessage;
-        
-        // Create a unique key for grouping (agent + step + message type)
-        const groupKey = `${robustMsg.agent_name || 'system'}_${robustMsg.step_id || 'general'}_${robustMsg.message_type || 'action'}`;
-        
-        if (!groups[groupKey]) {
-          groups[groupKey] = {
-            id: groupKey,
-            agent_name: robustMsg.agent_name || 'Assistant',
-            messages: [],
-            status: robustMsg.status || 'in_progress',
-            latest_timestamp: normalizeTimestamp(robustMsg.timestamp),
-            step_id: robustMsg.step_id,
-            message_type: robustMsg.message_type,
-            is_orchestration: robustMsg.agent_name?.toLowerCase().includes('orchestrator') || 
-                            robustMsg.agent_name?.toLowerCase().includes('planner') ||
-                            robustMsg.message_type === 'orchestration_update'
-          };
-        }
-
-        groups[groupKey].messages.push(robustMsg);
-        
-         // Update status to latest
-        const msgTimestamp = normalizeTimestamp(robustMsg.timestamp);
-        const groupTimestamp = groups[groupKey].latest_timestamp;
-        if (msgTimestamp > groupTimestamp) {
-          groups[groupKey].status = robustMsg.status || groups[groupKey].status;
-          groups[groupKey].latest_timestamp = msgTimestamp;
-        }
-      });
-
-      return Object.values(groups).sort((a, b) => 
-        new Date(a.latest_timestamp).getTime() - new Date(b.latest_timestamp).getTime()
-      );
-    }, []);
-
-    // Update grouped messages in real-time
-    useEffect(() => {
-      if (streamingMessages.length > 0) {
-        const grouped = groupStreamingMessages(streamingMessages);
-        setGroupedStreamingMessages(grouped);
-        setTimeout(() => scrollToBottom(), 50);
-      } else {
-        setGroupedStreamingMessages([]);
-      }
-    }, [streamingMessages, groupStreamingMessages]);
-
-    // Auto-scroll behavior
-    useEffect(() => {
-      scrollToBottom();
-    }, [messages, groupedStreamingMessages, planApprovalRequest, showLoadingSpinner, finalResults]);
+  // ✅ OPTIMIZATION: Debounced scroll to bottom
+  useEffect(() => {
+    const timeoutId = setTimeout(() => scrollToBottom(), 100);
+    return () => clearTimeout(timeoutId);
+  }, [groupedStreamingMessages, planApprovalRequest, showLoadingSpinner, finalResults, scrollToBottom]);
 
   useEffect(() => {
-      const container = messagesContainerRef.current;
-      if (!container) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
 
-      const handleScroll = () => {
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        setShowScrollButton(scrollTop + clientHeight < scrollHeight - 100);
-      };
-
-      container.addEventListener("scroll", handleScroll);
-      return () => container.removeEventListener("scroll", handleScroll);
-    }, []);
-
-    useEffect(() => {
-      if (inputContainerRef.current) {
-        setInputHeight(inputContainerRef.current.offsetHeight);
-      }
-    }, [input]);
-
-    const scrollToBottom = () => {
-      messagesContainerRef.current?.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-      setShowScrollButton(false);
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      setShowScrollButton(scrollTop + clientHeight < scrollHeight - 100);
     };
 
-    // Get status icon for streaming messages
-    const getStatusIcon = (status: string) => {
-      switch (status) {
-        case 'completed':
-          return <CheckmarkCircleRegular style={{ color: 'var(--colorPaletteGreenForeground1)' }} />;
-        case 'error':
-          return <ErrorCircleRegular style={{ color: 'var(--colorPaletteRedForeground1)' }} />;
-        case 'in_progress':
-          return <Spinner size="extra-tiny" />;
-        default:
-          return <ClockRegular />;
-      }
-    };
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
 
-    // ✅ Enhanced message type text for tags
-    const getMessageTypeText = (messageType?: string, status?: string): string => {
-      if (messageType === 'thinking') return 'Thinking';
-      if (messageType === 'action') return 'Action';
-      if (messageType === 'result') return 'Result';
-      if (messageType === 'clarification_needed') return 'Needs Input';
-      if (messageType === 'final_result') return 'Final Result';
-      if (messageType === 'orchestration_update') return 'Orchestration';
-      if (messageType === 'step_started') return 'Step Started';
-      if (messageType === 'step_completed') return 'Step Complete';
-      
-      // Fallback based on status
-      switch (status) {
-        case 'completed':
-          return 'Completed';
-        case 'error':
-          return 'Error';
-        case 'in_progress':
-          return 'In Progress';
-        default:
-          return 'Live';
-      }
-    };
-
-    if (!planData && !loading) {
-      return (
-        <ContentNotFound subtitle="The requested page could not be found." />
-      );
+  useEffect(() => {
+    if (inputContainerRef.current) {
+      setInputHeight(inputContainerRef.current.offsetHeight);
     }
+  }, [input]);
 
-  // ✅ ENHANCED: Render a grouped streaming message with orchestration awareness
+  // Get status icon for streaming messages
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckmarkCircleRegular style={{ color: 'var(--colorPaletteGreenForeground1)' }} />;
+      case 'error':
+        return <ErrorCircleRegular style={{ color: 'var(--colorPaletteRedForeground1)' }} />;
+      case 'in_progress':
+        return <Spinner size="extra-tiny" />;
+      default:
+        return <ClockRegular />;
+    }
+  };
+
+  // Get message type text for tags
+  const getMessageTypeText = (messageType?: string, status?: string): string => {
+    if (messageType === 'thinking') return 'Thinking';
+    if (messageType === 'action') return 'Action';
+    if (messageType === 'result') return 'Result';
+    if (messageType === 'clarification_needed') return 'Needs Input';
+    if (messageType === 'final_result') return 'Final Result';
+    if (messageType === 'orchestration_update') return 'Orchestration';
+    if (messageType === 'step_started') return 'Step Started';
+    if (messageType === 'step_completed') return 'Step Complete';
+    
+    // Fallback based on status
+    switch (status) {
+      case 'completed':
+        return 'Completed';
+      case 'error':
+        return 'Error';
+      case 'in_progress':
+        return 'In Progress';
+      default:
+        return 'Live';
+    }
+  };
+
+  // Render grouped streaming message with full WebSocket data
   const renderGroupedStreamingMessage = (group: GroupedMessage) => {
     const latestMessage = group.messages[group.messages.length - 1] as RobustStreamingMessage;
     const hasMultipleMessages = group.messages.length > 1;
-    const displayName = getAgentDisplayName(group.agent_name);
+    const displayName = formatAgentDisplayName(group.agent_name);
+    const agentTag = getAgentTag(group.agent_name);
     const isFinalResult = latestMessage.message_type === 'final_result' || 
                          (latestMessage.message_type === 'result' && latestMessage.status === 'completed');
     
@@ -1178,18 +775,18 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
       <div key={group.id} className="message assistant streaming-message" style={{ marginBottom: '24px' }}>
         <div className="plan-chat-header" style={{ marginBottom: '12px' }}>
           <div className="plan-chat-speaker" style={{ gap: '8px', alignItems: 'center' }}>
-            <Body1 className="speaker-name">
-              {displayName}
-            </Body1>
-            <Tag
-              size="extra-small"
-              shape="rounded"
-              appearance={isFinalResult ? "filled" : "brand"}
-              className="agent-tag"
-              color={isFinalResult ? "success" : undefined}
-            >
-              {displayName.toUpperCase()}
-            </Tag>
+            {displayName && <Body1 className="speaker-name">{displayName}</Body1>}
+            {agentTag && (
+              <Tag
+                size="extra-small"
+                shape="rounded"
+                appearance={isFinalResult ? "filled" : "brand"}
+                className="agent-tag"
+                color={isFinalResult ? "success" : undefined}
+              >
+                {agentTag}
+              </Tag>
+            )}
             <Tag
               size="extra-small"
               shape="rounded"
@@ -1203,116 +800,107 @@ const PlanChat: React.FC<ExtendedPlanChatProps> = ({
         </div>
 
         <Body1>
-          <div className="plan-chat-message-content" style={{ padding: '16px 20px' }}>
+          <div className="plan-chat-message-content" style={{ 
+            padding: '16px 20px',
+            backgroundColor: 'var(--colorNeutralBackground1)',
+            borderRadius: '8px',
+            border: '1px solid var(--colorNeutralStroke2)'
+          }}>
             {hasMultipleMessages ? (
+              // Display all messages in the group
               group.messages.map((msg, msgIndex) => (
                 <div key={`${group.id}-msg-${msgIndex}`} style={{ 
-                  marginBottom: msgIndex < group.messages.length - 1 ? '12px' : '0',
+                  marginBottom: msgIndex < group.messages.length - 1 ? '16px' : '0',
                   lineHeight: 1.6
                 }}>
+                  <div style={{ 
+                    marginBottom: '8px', 
+                    fontSize: '12px', 
+                    color: 'var(--colorNeutralForeground3)',
+                    fontWeight: '500'
+                  }}>
+                    {new Date(normalizeTimestamp(msg.timestamp)).toLocaleTimeString()}
+                    {msg.step_id && ` • Step ${msg.step_id}`}
+                  </div>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {TaskService.cleanHRAgent(msg.content || '')}
+                    {msg.content || ''}
                   </ReactMarkdown>
                 </div>
               ))
             ) : (
+              // Single message
               <div style={{ lineHeight: 1.6 }}>
+                <div style={{ 
+                  marginBottom: '8px', 
+                  fontSize: '12px', 
+                  color: 'var(--colorNeutralForeground3)',
+                  fontWeight: '500'
+                }}>
+                  {new Date(normalizeTimestamp(latestMessage.timestamp)).toLocaleTimeString()}
+                  {latestMessage.step_id && ` • Step ${latestMessage.step_id}`}
+                </div>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {TaskService.cleanHRAgent(latestMessage.content || '')}
+                  {latestMessage.content || ''}
                 </ReactMarkdown>
               </div>
             )}
-
-            <div className="assistant-footer" style={{ marginTop: '16px' }}>
-              <div className="assistant-actions" style={{ 
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
-                <div>
-                  <Button
-                    onClick={() =>
-                      latestMessage.content &&
-                      navigator.clipboard.writeText(latestMessage.content)
-                    }
-                    title="Copy Response"
-                    appearance="subtle"
-                    style={{ height: 32, width: 32 }}
-                    icon={<Copy />}
-                  />
-                </div>
-
-                <Tag
-                  icon={<DiamondRegular />}
-                  appearance="filled"
-                  size="extra-small"
-                  color={isFinalResult ? "success" : undefined}
-                >
-                  {isFinalResult ? `Final result from ${displayName.toLowerCase()}` : `Live updates from ${displayName.toLowerCase()}`}
-                </Tag>
-              </div>
-            </div>
           </div>
         </Body1>
       </div>
     );
   };
 
-// ✅ Enhanced agent working detection
-const agentsWorking = streamingMessages.length > 0 && !planCompleted;
+  // Enhanced agent working detection
+  const agentsWorking = streamingMessages.length > 0 && !planCompleted;
 
-const getWorkingAgentName = (): string | null => {
-  if (!agentsWorking || orchestrationStatus.active_agents.length === 0) return null;
-  return getAgentDisplayName(orchestrationStatus.active_agents[0]);
-};
+  const getWorkingAgentName = (): string | null => {
+    if (!agentsWorking || orchestrationStatus.active_agents.length === 0) return null;
+    return formatAgentDisplayName(orchestrationStatus.active_agents[0]);
+  };
 
-const workingAgentName = getWorkingAgentName();
+  const workingAgentName = getWorkingAgentName();
 
-// Check if we need clarification
-const needsClarification = groupedStreamingMessages.some(group => 
-  group.messages.some(msg => (msg as RobustStreamingMessage).message_type === 'clarification_needed')
-);
+  // Check if we need clarification
+  const needsClarification = groupedStreamingMessages.some(group => 
+    group.messages.some(msg => (msg as RobustStreamingMessage).message_type === 'clarification_needed')
+  );
 
-// ✅ Enhanced input control
-const shouldDisableInput = !planData?.enableChat || 
-  submittingChatDisableInput || 
-  (agentsWorking && !needsClarification) || 
-  (!!planApprovalRequest && !planApproved) ||
-  planCompleted ||
-  isInitialLoading;
+  // Enhanced input control
+  const shouldDisableInput = !planData?.enableChat || 
+    submittingChatDisableInput || 
+    (agentsWorking && !needsClarification) || 
+    (!!planApprovalRequest && !planApproved) ||
+    planCompleted ||
+    isInitialLoading;
 
-// ✅ Enhanced placeholder text
-const getPlaceholderText = (): string => {
-  if (isInitialLoading) {
-    return "Loading...";
-  }
-  if (planCompleted) {
-    return "Plan completed! Start a new task to continue...";
-  }
-  if (planApprovalRequest && !planApproved) {
-    return "Waiting for your approval...";
-  }
-  if (needsClarification) {
-    return "Agent needs your input - please provide clarification...";
-  }
-  if (workingAgentName) {
-    return `${workingAgentName} is working on your plan...`;
-  }
-  if (orchestrationStatus.status === 'executing') {
-    return "Plan execution in progress...";
-  }
-  return "Add more info to this task...";
-};
+  // Enhanced placeholder text
+  const getPlaceholderText = (): string => {
+    if (isInitialLoading) {
+      return "Loading...";
+    }
+    if (planCompleted) {
+      return "Plan completed! Start a new task to continue...";
+    }
+    if (planApprovalRequest && !planApproved) {
+      return "Waiting for your approval...";
+    }
+    if (needsClarification) {
+      return "Agent needs your input - please provide clarification...";
+    }
+    if (workingAgentName) {
+      return `${workingAgentName} is working on your plan...`;
+    }
+    if (orchestrationStatus.status === 'executing') {
+      return "Plan execution in progress...";
+    }
+    return "Add more info to this task...";
+  };
 
-  console.log('🎯 PlanChat State:', {
-    isInitialLoading,
-    streamingMessages: streamingMessages.length,
-    orchestrationStatus: orchestrationStatus.status,
-    activeAgents: orchestrationStatus.active_agents.length,
-    planCompleted,
-    finalResults: finalResults.length
-  });
+  if (!planData && !loading) {
+    return (
+      <ContentNotFound subtitle="The requested page could not be found." />
+    );
+  }
 
   // Render full-screen loading first
   if (isInitialLoading) {
@@ -1320,32 +908,69 @@ const getPlaceholderText = (): string => {
   }
 
   return (
-    <div className="chat-container">
+    <div className="chat-container" style={{
+      // ✅ NEW: Added requested padding and layout styles
+      display: 'flex',
+      padding: '48px 0 24px 0',
+      flexDirection: 'column',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      gap: '24px',
+      alignSelf: 'stretch'
+    }}>
       <div className="messages" 
            ref={messagesContainerRef}
-           style={{ paddingBottom: `${inputHeight + 32}px`, padding: '16px' }}>
-        {/* WebSocket Connection Status */}
+           style={{ 
+             paddingBottom: `${inputHeight + 32}px`, 
+             padding: '32px', // ✅ MORE PADDING around planChat div
+             width: '100%',
+             maxWidth: '100%'
+           }}>
+        
         {wsConnected && (
-          <div className="connection-status" style={{ marginBottom: '16px', textAlign: 'center' }}>
-            <Tag
-              appearance="filled"
-              color="success"
-              size="extra-small"
-              icon={<DiamondRegular />}
-            >
-              Real-time updates active
-            </Tag>
+          <div style={{ 
+            padding: '8px 12px', 
+            backgroundColor: 'var(--colorPaletteGreenBackground3)', 
+            color: 'var(--colorPaletteGreenForeground1)',
+            borderRadius: '6px',
+            fontSize: '12px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <div style={{ 
+              width: '6px', 
+              height: '6px', 
+              backgroundColor: 'var(--colorPaletteGreenForeground1)', 
+              borderRadius: '50%' 
+            }} />
+            Connected to real-time updates
           </div>
         )}
 
         <div className="message-wrapper" style={{ maxWidth: '100%' }}>
-          {/* Always show user's original task first as dialogue */}
-          {renderUserTaskDialogue()}
+          
+          {/* ✅ NEW: Task submission dialogue - shows what was sent to backend */}
+          {renderTaskSubmissionDialogue()}
 
-          {/* ✅ Always render regular messages (chat history) - User's original task */}
+          {/* Loading spinner */}
+          {renderLoadingSpinner()}
+
+          {/* Agent working message */}
+          {renderAgentWorkingMessage()}
+
+          {/* All streaming messages - FULL WebSocket content */}
+          {groupedStreamingMessages.map(group => renderGroupedStreamingMessage(group))}
+
+          {/* Final results */}
+          {renderFinalResults()}
+
+          {/* Regular chat messages */}
           {messages.map((msg, index) => {
             const isHuman = msg.source === AgentType.HUMAN;
-            const displayName = isHuman ? 'You' : getAgentDisplayName(msg.source);
+            const displayName = isHuman ? 'You' : formatAgentDisplayName(msg.source);
+            const agentTag = isHuman ? 'YOU' : getAgentTag(undefined, msg.source);
 
             // Skip rendering the user's original task again if it's already shown above
             if (isHuman && index === 0 && planApprovalRequest?.user_request) {
@@ -1361,17 +986,17 @@ const getPlaceholderText = (): string => {
                 {!isHuman ? (
                   <div className="plan-chat-header" style={{ marginBottom: '12px' }}>
                     <div className="plan-chat-speaker" style={{ gap: '8px', alignItems: 'center' }}>
-                      <Body1 className="speaker-name">
-                        {displayName}
-                      </Body1>
-                      <Tag
-                        size="extra-small"
-                        shape="rounded"
-                        appearance="brand"
-                        className="agent-tag"
-                      >
-                        {displayName.toUpperCase()}
-                      </Tag>
+                      {displayName && <Body1 className="speaker-name">{displayName}</Body1>}
+                      {agentTag && (
+                        <Tag
+                          size="extra-small"
+                          shape="rounded"
+                          appearance="brand"
+                          className="agent-tag"
+                        >
+                          {agentTag}
+                        </Tag>
+                      )}
                       {hasStreamingProperties(msg) && msg.streaming && (
                         <Tag
                           size="extra-small"
@@ -1391,14 +1016,6 @@ const getPlaceholderText = (): string => {
                       gap: '8px',
                       alignItems: 'center'
                     }}>
-                      <Tag
-                        size="extra-small"
-                        shape="rounded"
-                        appearance="brand"
-                        icon={<PersonRegular />}
-                      >
-                        YOU
-                      </Tag>
                       <Body1 className="speaker-name">You</Body1>
                     </div>
                   </div>
@@ -1407,59 +1024,19 @@ const getPlaceholderText = (): string => {
                 <Body1>
                   <div className="plan-chat-message-content" style={{ 
                     padding: '16px 20px',
-                    lineHeight: 1.6
+                    lineHeight: 1.6,
+                    backgroundColor: isHuman ? 'var(--colorNeutralBackground2)' : 'var(--colorNeutralBackground1)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--colorNeutralStroke2)'
                   }}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {TaskService.cleanHRAgent(msg.content || '')}
+                      {msg.content}
                     </ReactMarkdown>
-
-                    {!isHuman && (
-                      <div className="assistant-footer" style={{ marginTop: '16px' }}>
-                        <div className="assistant-actions" style={{ 
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          gap: '12px'
-                        }}>
-                          <div>
-                            <Button
-                              onClick={() => navigator.clipboard.writeText(msg.content)}
-                              title="Copy Response"
-                              appearance="subtle"
-                              style={{ height: 32, width: 32 }}
-                              icon={<Copy />}
-                            />
-                          </div>
-                          <Tag
-                            icon={<DiamondRegular />}
-                            appearance="filled"
-                            size="extra-small"
-                          >
-                            {displayName.toLowerCase()}
-                          </Tag>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </Body1>
               </div>
             );
           })}
-
-          {/* ✅ Show plan approval request (detailed view stays in PlanChat) */}
-          {renderPlanApprovalRequest()}
-
-          {/* ✅ Show inline loading spinner */}
-          {renderLoadingSpinner()}
-
-          {/* Show ChatGPT-style "Agent is working..." message */}
-          {renderAgentWorkingMessage()}
-
-          {/* ✅ Show streaming messages from agents */}
-          {groupedStreamingMessages.map(group => renderGroupedStreamingMessage(group))}
-
-          {/* ✅ Show final results */}
-          {renderFinalResults()}
         </div>
       </div>
 
@@ -1505,7 +1082,7 @@ const getPlaceholderText = (): string => {
               onClick={() => OnChatSubmit(input)}
               icon={<Send />}
               disabled={shouldDisableInput}
-              style={{ height: '36px', width: '36px' }}
+              style={{ height: '40px', width: '40px' }}
             />
           </ChatInput>
         </div>
