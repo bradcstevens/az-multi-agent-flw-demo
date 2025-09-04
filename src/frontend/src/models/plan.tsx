@@ -157,4 +157,10 @@ export interface ParsedPlanData {
     task: string;
     participant_descriptions: Record<string, string>;
   };
+  // Additional fields from m_plan
+  user_id?: string;
+  team_id?: string;
+  plan_id?: string;
+  overall_status?: string;
+  raw_data?: any; 
 }
