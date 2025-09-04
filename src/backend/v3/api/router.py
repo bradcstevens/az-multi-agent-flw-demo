@@ -8,13 +8,12 @@ from typing import Optional
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
-                                           Plan, PlanStatus,
-                                           TeamSelectionRequest, UserCurrentTeam)
+from common.models.messages_kernel import (InputTask, Plan, PlanStatus,
+                                           TeamSelectionRequest)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File, Query,
-                     HTTPException, Request, UploadFile, WebSocket,
+from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
+                     HTTPException, Query, Request, UploadFile, WebSocket,
                      WebSocketDisconnect)
 from kernel_agents.agent_factory import AgentFactory
 from semantic_kernel.agents.runtime import InProcessRuntime
@@ -81,7 +80,8 @@ async def start_comms(websocket: WebSocket, process_id: str):
 @app_v3.get("/init_team")
 async def init_team(
     request: Request,
-):
+    team_switched: bool = Query(False),
+): # add team_switched: bool parameter
     """ Initialize the user's current team of agents """
 
     # Need to store this user state in cosmos db, retrieve it here, and initialize the team
@@ -90,7 +90,7 @@ async def init_team(
     # 00000000-0000-0000-0000-000000000002 (Marketing), and 00000000-0000-0000-0000-000000000003 (Retail),
     # and use this value to initialize to HR each time.
     init_team_id = "00000000-0000-0000-0000-000000000001"
-
+    print(f"Init team called, team_switched={team_switched}")
     try:
       authenticated_user = get_authenticated_user_details(request_headers=request.headers)
       user_id = authenticated_user["user_principal_id"]
@@ -120,7 +120,7 @@ async def init_team(
       team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
       
       # Initialize agent team for this user session
-      await OrchestrationManager.get_current_or_new_orchestration(user_id=user_id, team_config=team_configuration)
+      await OrchestrationManager.get_current_or_new_orchestration(user_id=user_id, team_config=team_configuration, team_switched=team_switched)
 
       return {
           "status": "Request started successfully",

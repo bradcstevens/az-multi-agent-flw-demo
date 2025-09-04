@@ -136,7 +136,7 @@ const HomePage: React.FC = () => {
             try {
                 // TODO REFRACTOR THIS CODE 
                 setIsLoadingTeam(true);
-                const initResponse = await TeamService.initializeTeam();
+                const initResponse = await TeamService.initializeTeam(true);
                 if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
                     console.log('Team initialization completed:', initResponse.data?.team_id);
 
