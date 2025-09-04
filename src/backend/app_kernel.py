@@ -697,7 +697,11 @@ async def get_plans(
 
         return [plan_with_steps, formatted_messages]
 
-    all_plans = await memory_store.get_all_plans()
+    current_team = await memory_store.get_current_team(user_id=user_id)
+    if not current_team:
+      return []
+    
+    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
     # Fetch steps for all plans concurrently
     steps_for_all_plans = await asyncio.gather(
         *[memory_store.get_steps_by_plan(plan_id=plan.id) for plan in all_plans]

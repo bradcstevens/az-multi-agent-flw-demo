@@ -32,132 +32,91 @@ const HomePage: React.FC = () => {
     const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
     const [isLoadingTeam, setIsLoadingTeam] = useState(true);
 
-    /**
-     * Load teams and set default team on component mount
-     */
-    // useEffect(() => {
-    //     const loadDefaultTeam = async () => {
-    //         let defaultTeam = TeamService.getStoredTeam();
-    //         if (defaultTeam) {
-    //             setSelectedTeam(defaultTeam);
-    //             console.log('Default team loaded from storage:', defaultTeam.name);
 
-    //             setIsLoadingTeam(false);
-    //             return true;
-    //         }
-    //         setIsLoadingTeam(true);
-    //         try {
-    //             const teams = await TeamService.getUserTeams();
-    //             console.log('All teams loaded:', teams);
-    //             if (teams.length > 0) {
-    //                 // Always prioritize "Business Operations Team" as default
-    //                 const hrTeam = teams.find(team => team.name === "Human Resources Team");
-    //                 defaultTeam = hrTeam || teams[0];
+    useEffect(() => {
+        const initTeam = async () => {
+            setIsLoadingTeam(true);
 
-    //                 TeamService.storageTeam(defaultTeam);
-    //                 setSelectedTeam(defaultTeam);
-    //                 console.log('Default team loaded:', defaultTeam.name, 'with', defaultTeam.starting_tasks?.length || 0, 'starting tasks');
-    //                 console.log('Team logo:', defaultTeam.logo);
-    //                 console.log('Team description:', defaultTeam.description);
-                
-    //             } else {
-    //                 console.log('No teams found - user needs to upload a team configuration');
-    //                 // Even if no teams are found, we clear the loading state to show the "no team" message
-    //             }
-    //         } catch (error) {
-    //             console.error('Error loading default team:', error);
-    //         } finally {
-    //             setIsLoadingTeam(false);
-    //         }
-    //     };
+            try {
+                console.log('Initializing team from backend...');
 
-    //     loadDefaultTeam();
-    // }, []);
+                // Call the backend init_team endpoint (takes ~20 seconds)
+                const initResponse = await TeamService.initializeTeam();
 
-useEffect(() => {
-    const initTeam = async () => {
-        setIsLoadingTeam(true);
-        
-        try {
-            console.log('Initializing team from backend...');
-            
-            // Call the backend init_team endpoint (takes ~20 seconds)
-            const initResponse = await TeamService.initializeTeam();
-            
-            if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
-                console.log('Team initialization completed:', initResponse.data?.team_id);
-                
-                // Now fetch the actual team details using the team_id
-                const teams = await TeamService.getUserTeams();
-                const initializedTeam = teams.find(team => team.team_id === initResponse.data?.team_id);
-                
-                if (initializedTeam) {
-                    setSelectedTeam(initializedTeam);
-                    TeamService.storageTeam(initializedTeam);
-                    
-                    console.log('Team loaded successfully:', initializedTeam.name);
-                    console.log('Team agents:', initializedTeam.agents?.length || 0);
-                    
-                    showToast(
-                        `${initializedTeam.name} team initialized successfully with ${initializedTeam.agents?.length || 0} agents`,
-                        "success"
-                    );
-                } else {
-                    // Fallback: if we can't find the specific team, use HR team or first available
-                    console.log('Specific team not found, using default selection logic');
-                    const hrTeam = teams.find(team => team.name === "Human Resources Team");
-                    const defaultTeam = hrTeam || teams[0];
-                    
-                    if (defaultTeam) {
-                        setSelectedTeam(defaultTeam);
-                        TeamService.storageTeam(defaultTeam);
+                if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
+                    console.log('Team initialization completed:', initResponse.data?.team_id);
+
+                    // Now fetch the actual team details using the team_id
+                    const teams = await TeamService.getUserTeams();
+                    const initializedTeam = teams.find(team => team.team_id === initResponse.data?.team_id);
+
+                    if (initializedTeam) {
+                        setSelectedTeam(initializedTeam);
+                        TeamService.storageTeam(initializedTeam);
+
+                        console.log('Team loaded successfully:', initializedTeam.name);
+                        console.log('Team agents:', initializedTeam.agents?.length || 0);
+
                         showToast(
-                            `${defaultTeam.name} team loaded as default`,
+                            `${initializedTeam.name} team initialized successfully with ${initializedTeam.agents?.length || 0} agents`,
                             "success"
                         );
-                    }
-                }
-                
-            } else {
-                throw new Error('Invalid response from init_team endpoint');
-            }
-            
-        } catch (error) {
-            console.error('Error initializing team from backend:', error);
-            showToast("Team initialization failed, using fallback", "warning");
-            
-            // Fallback to the old client-side method
-            try {
-                console.log('Using fallback: client-side team loading...');
-                const teams = await TeamService.getUserTeams();
-                if (teams.length > 0) {
-                    const hrTeam = teams.find(team => team.name === "Human Resources Team");
-                    const defaultTeam = hrTeam || teams[0];
-                    setSelectedTeam(defaultTeam);
-                    TeamService.storageTeam(defaultTeam);
-                    
-                    showToast(
-                        `${defaultTeam.name} team loaded (fallback mode)`,
-                        "info"
-                    );
-                } else {
-                    console.log('No teams found - user needs to upload a team configuration');
-                    showToast(
-                        "No teams found. Please upload a team configuration.",
-                        "warning"
-                    );
-                }
-            } catch (fallbackError) {
-                console.error('Fallback team loading also failed:', fallbackError);
-                showToast("Failed to load team configuration", "error");
-            }
-        } finally {
-            setIsLoadingTeam(false);
-        }
-    };
+                    } else {
+                        // Fallback: if we can't find the specific team, use HR team or first available
+                        console.log('Specific team not found, using default selection logic');
+                        const hrTeam = teams.find(team => team.name === "Human Resources Team");
+                        const defaultTeam = hrTeam || teams[0];
 
-    initTeam();
-}, []);
+                        if (defaultTeam) {
+                            setSelectedTeam(defaultTeam);
+                            TeamService.storageTeam(defaultTeam);
+                            showToast(
+                                `${defaultTeam.name} team loaded as default`,
+                                "success"
+                            );
+                        }
+                    }
+
+                } else {
+                    throw new Error('Invalid response from init_team endpoint');
+                }
+
+            } catch (error) {
+                console.error('Error initializing team from backend:', error);
+                showToast("Team initialization failed, using fallback", "warning");
+
+                // Fallback to the old client-side method
+                try {
+                    console.log('Using fallback: client-side team loading...');
+                    const teams = await TeamService.getUserTeams();
+                    if (teams.length > 0) {
+                        const hrTeam = teams.find(team => team.name === "Human Resources Team");
+                        const defaultTeam = hrTeam || teams[0];
+                        setSelectedTeam(defaultTeam);
+                        TeamService.storageTeam(defaultTeam);
+
+                        showToast(
+                            `${defaultTeam.name} team loaded (fallback mode)`,
+                            "info"
+                        );
+                    } else {
+                        console.log('No teams found - user needs to upload a team configuration');
+                        showToast(
+                            "No teams found. Please upload a team configuration.",
+                            "warning"
+                        );
+                    }
+                } catch (fallbackError) {
+                    console.error('Fallback team loading also failed:', fallbackError);
+                    showToast("Failed to load team configuration", "error");
+                }
+            } finally {
+                setIsLoadingTeam(false);
+            }
+        };
+
+        initTeam();
+    }, []);
 
     /**
     * Handle new task creation from the "New task" button
@@ -170,9 +129,11 @@ useEffect(() => {
     /**
      * Handle team selection from the Settings button
      */
-    const handleTeamSelect = useCallback((team: TeamConfig | null) => {
+    const handleTeamSelect = useCallback(async (team: TeamConfig | null) => {
         setSelectedTeam(team);
         if (team) {
+            const initResponse = await TeamService.initializeTeam();
+
             showToast(
                 `${team.name} team has been selected with ${team.agents.length} agents`,
                 "success"

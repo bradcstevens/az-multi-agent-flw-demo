@@ -259,6 +259,16 @@ class CosmosDBClient(DatabaseBase):
         ]
         return await self.query_items(query, parameters, Plan)
 
+    async def get_all_plans_by_team_id(self, team_id: str) -> List[Plan]:
+        """Retrieve all plans for a specific team."""
+        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id"
+        parameters = [
+            {"name": "@user_id", "value": self.user_id},
+            {"name": "@team_id", "value": team_id},
+            {"name": "@data_type", "value": "plan"},
+        ]
+        return await self.query_items(query, parameters, Plan)
+
     # Step Operations
     async def add_step(self, step: Step) -> None:
         """Add a step to CosmosDB."""
