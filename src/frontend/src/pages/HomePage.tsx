@@ -132,7 +132,54 @@ const HomePage: React.FC = () => {
     const handleTeamSelect = useCallback(async (team: TeamConfig | null) => {
         setSelectedTeam(team);
         if (team) {
-            const initResponse = await TeamService.initializeTeam();
+
+            try {
+                // TODO REFRACTOR THIS CODE 
+                setIsLoadingTeam(true);
+                const initResponse = await TeamService.initializeTeam();
+                if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
+                    console.log('Team initialization completed:', initResponse.data?.team_id);
+
+                    // Now fetch the actual team details using the team_id
+                    const teams = await TeamService.getUserTeams();
+                    const initializedTeam = teams.find(team => team.team_id === initResponse.data?.team_id);
+
+                    if (initializedTeam) {
+                        setSelectedTeam(initializedTeam);
+                        TeamService.storageTeam(initializedTeam);
+
+                        console.log('Team loaded successfully:', initializedTeam.name);
+                        console.log('Team agents:', initializedTeam.agents?.length || 0);
+
+                        showToast(
+                            `${initializedTeam.name} team initialized successfully with ${initializedTeam.agents?.length || 0} agents`,
+                            "success"
+                        );
+                    } else {
+                        // Fallback: if we can't find the specific team, use HR team or first available
+                        console.log('Specific team not found, using default selection logic');
+                        const hrTeam = teams.find(team => team.name === "Human Resources Team");
+                        const defaultTeam = hrTeam || teams[0];
+
+                        if (defaultTeam) {
+                            setSelectedTeam(defaultTeam);
+                            TeamService.storageTeam(defaultTeam);
+                            showToast(
+                                `${defaultTeam.name} team loaded as default`,
+                                "success"
+                            );
+                        }
+                    }
+
+                } else {
+                    throw new Error('Invalid response from init_team endpoint');
+                }
+            } catch (error) {
+                console.error('Error setting current team:', error);
+            } finally {
+                setIsLoadingTeam(false);
+            }
+
 
             showToast(
                 `${team.name} team has been selected with ${team.agents.length} agents`,
