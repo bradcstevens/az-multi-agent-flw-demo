@@ -115,7 +115,7 @@ class AppConfig:
         try:
             if self._cosmos_client is None:
                 self._cosmos_client = CosmosClient(
-                    self.COSMOSDB_ENDPOINT, credential=get_azure_credential()
+                    self.COSMOSDB_ENDPOINT, credential=get_azure_credential(self.AZURE_CLIENT_ID)
                 )
 
             if self._cosmos_database is None:
@@ -152,7 +152,7 @@ class AppConfig:
             return self._ai_project_client
 
         try:
-            credential = get_azure_credential()
+            credential = get_azure_credential(self.AZURE_CLIENT_ID)
             if credential is None:
                 raise RuntimeError(
                     "Unable to acquire Azure credentials; ensure Managed Identity is configured"

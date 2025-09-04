@@ -172,7 +172,7 @@ async def rai_success(description: str, is_task_creation: bool) -> bool:
     """
     try:
         # Use managed identity for authentication to Azure OpenAI
-        credential = get_azure_credential()
+        credential = get_azure_credential(config.AZURE_CLIENT_ID)
         access_token = credential.get_token(
             "https://cognitiveservices.azure.com/.default"
         ).token
