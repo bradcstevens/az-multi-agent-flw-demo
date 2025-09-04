@@ -4,6 +4,7 @@ import {
   AgentType,
   ProcessedPlanData,
   PlanMessage,
+  ParsedPlanData
 } from "@/models";
 import { apiService } from "@/api";
 
@@ -161,4 +162,106 @@ export class PlanDataService {
       throw error;
     }
   }
+
+ static parsePlanApprovalRequest(rawData: string): ParsedPlanData | null {
+  try {
+    // Extract plan ID
+    const idMatch = rawData.match(/id='([^']+)'/);
+    const id = idMatch ? idMatch[1] : '';
+
+    // Extract status
+    const statusMatch = rawData.match(/status='([^']+)'/);
+    const status = statusMatch ? statusMatch[1] : 'PENDING_APPROVAL';
+
+    // Extract user request text
+    const userRequestMatch = rawData.match(/text='([^']+)'/);
+    const user_request = userRequestMatch ? userRequestMatch[1].replace(/\\u200b/g, '') : '';
+
+    // Extract team members
+    const teamMatch = rawData.match(/team=\[([^\]]+)\]/);
+    let team: string[] = [];
+    if (teamMatch) {
+      team = teamMatch[1].split("'").filter((item, index) => index % 2 === 1);
+    }
+
+    // Extract facts
+    const factsMatch = rawData.match(/facts="([^"]*(?:"[^"]*"[^"]*)*?)"/);
+    const facts = factsMatch ? factsMatch[1].replace(/\\n/g, '\n') : '';
+
+    // Extract steps
+    const stepsMatch = rawData.match(/steps=\[([^\]]+MStep[^\]]*)\]/);
+    let steps: Array<{ id: number; action: string; cleanAction: string }> = [];
+    
+    if (stepsMatch) {
+      const stepMatches = stepsMatch[1].match(/MStep\(action='([^']+)'\)/g);
+      if (stepMatches) {
+        steps = stepMatches.map((stepMatch, index) => {
+          const actionMatch = stepMatch.match(/action='([^']+)'/);
+          const action = actionMatch ? actionMatch[1] : '';
+          
+          // Clean up the action text
+          let cleanAction = action
+            .replace(/^Involvement\s*/, '') // Remove "Involvement" prefix
+            .replace(/^\*\*(.*?)\*\*:?$/, '$1') // Remove markdown bold formatting
+            .trim();
+          
+          // Skip empty or duplicate "Involvement" steps
+          if (!cleanAction || cleanAction === 'Involvement') {
+            return null;
+          }
+          
+          return {
+            id: index + 1,
+            action,
+            cleanAction
+          };
+        }).filter(step => step !== null) as Array<{ id: number; action: string; cleanAction: string }>;
+      }
+    }
+
+    // Extract context
+    const contextMatch = rawData.match(/context=\{([^}]+)\}/);
+    let context = { task: '', participant_descriptions: {} };
+    
+    if (contextMatch) {
+      const taskMatch = rawData.match(/'task':\s*'([^']+)'/);
+      if (taskMatch) {
+        context.task = taskMatch[1].replace(/\\u200b/g, '');
+      }
+      
+      // Extract participant descriptions
+      const participantMatch = rawData.match(/'participant_descriptions':\s*\{([^}]+)\}/);
+      if (participantMatch) {
+        const descriptions: Record<string, string> = {};
+        const descMatches = participantMatch[1].match(/'([^']+)':\s*'([^']*)'/g);
+        if (descMatches) {
+          descMatches.forEach(match => {
+            const keyValueMatch = match.match(/'([^']+)':\s*'([^']*)'/);
+            if (keyValueMatch) {
+              descriptions[keyValueMatch[1]] = keyValueMatch[2];
+            }
+          });
+        }
+        context.participant_descriptions = descriptions;
+      }
+    }
+
+    return {
+      id,
+      status,
+      user_request,
+      team: team.filter(member => member && member.trim()),
+      facts,
+      steps: steps.filter(step => step.cleanAction.length > 0),
+      context
+    };
+
+  } catch (error) {
+    console.error('Error parsing plan approval request:', error);
+    return null;
+  }
+}
+
+
+  
 }

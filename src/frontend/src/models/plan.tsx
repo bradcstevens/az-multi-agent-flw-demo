@@ -1,13 +1,16 @@
 import { AgentType, PlanStatus, StepStatus, HumanFeedbackStatus } from './enums';
+import { StreamingPlanUpdate } from '../services/WebSocketService';
 
 /**
  * Base interface with common fields
  */
 export interface BaseModel {
-    /** Unique identifier for the model */
+    /** Unique identifier */
     id: string;
-    /** Timestamp when the model was created or updated */
-    timestamp: string;
+    /** Timestamp when created */
+    created_at: string;
+    /** Timestamp when last updated */
+    updated_at: string;
 }
 
 /**
@@ -20,17 +23,15 @@ export interface Plan extends BaseModel {
     session_id: string;
     /** User identifier */
     user_id: string;
-    /** The initial goal or task description */
-    initial_goal: string;
+    /** Plan title */
+    title: string;
+    /** Plan description */
+    description: string;
     /** Current status of the plan */
-    overall_status: PlanStatus;
-    /** Source of the plan */
-    source: string;
-    /** Optional summary of the plan */
-    summary?: string;
-    /** Optional clarification request */
+    status: PlanStatus;
+    /** Human clarification request text */
     human_clarification_request?: string;
-    /** Optional response to clarification request */
+    /** Human clarification response text */
     human_clarification_response?: string;
 }
 
@@ -40,27 +41,28 @@ export interface Plan extends BaseModel {
 export interface Step extends BaseModel {
     /** The type of data model */
     data_type: "step";
-    /** Plan identifier */
-    plan_id: string;
-    /** Session identifier (Partition key) */
+    /** Session identifier */
     session_id: string;
     /** User identifier */
     user_id: string;
-    /** Action to be performed */
-    action: string;
-    /** Agent assigned to this step */
+    /** Plan identifier this step belongs to */
+    plan_id: string;
+    /** Step title */
+    title: string;
+    /** Step description */
+    description: string;
+    /** Agent responsible for this step */
     agent: AgentType;
     /** Current status of the step */
     status: StepStatus;
-    /** Optional reply from the agent */
-    agent_reply?: string;
-    /** Optional feedback from human */
+    /** Human feedback status */
+    human_feedback_status: HumanFeedbackStatus;
+    /** Human feedback text */
     human_feedback?: string;
-    /** Optional human approval status */
-    human_approval_status?: HumanFeedbackStatus;
-    /** Optional updated action */
-    updated_action?: string;
+    /** Step order/position in the plan */
+    step_order: number;
 }
+
 export interface PlanMessage extends BaseModel {
     /** The type of data model */
     data_type: "agent_message";
@@ -113,7 +115,6 @@ export interface PlanWithSteps extends Plan {
     failed: number;
 }
 
-
 /**
  * Interface for processed plan data
  */
@@ -135,6 +136,24 @@ export interface PlanChatProps {
     setInput: any;
     submittingChatDisableInput: boolean;
     OnChatSubmit: (message: string) => void;
-    streamingMessages?: any[];
+    streamingMessages?: StreamingPlanUpdate[];
     wsConnected?: boolean;
+    onPlanApproval?: (approved: boolean) => void;
+}
+
+export interface ParsedPlanData {
+  id: string;
+  status: string;
+  user_request: string;
+  team: string[];
+  facts: string;
+  steps: Array<{
+    id: number;
+    action: string;
+    cleanAction: string;
+  }>;
+  context: {
+    task: string;
+    participant_descriptions: Record<string, string>;
+  };
 }

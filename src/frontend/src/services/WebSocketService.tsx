@@ -1,7 +1,9 @@
 import { headerBuilder } from '../api/config';
+import { PlanDataService } from './PlanDataService';
+import { ParsedPlanData } from '../models';
 
 export interface StreamMessage {
-    type: 'plan_update' | 'step_update' | 'agent_message' | 'error' | 'connection_status' | 'plan_approval_request' | 'final_result';
+    type: 'plan_update' | 'step_update' | 'agent_message' | 'error' | 'connection_status' | 'plan_approval_request' | 'final_result' | 'parsed_plan_approval_request' | 'streaming_message';
     plan_id?: string;
     session_id?: string;
     data?: any;
@@ -40,6 +42,14 @@ export interface PlanApprovalResponseData {
     session_id: string;
     approved: boolean;
     feedback?: string;
+}
+
+// New interface for structured plan approval request
+export interface ParsedPlanApprovalRequest {
+    type: 'parsed_plan_approval_request';
+    plan_id: string;
+    parsedData: ParsedPlanData;
+    rawData: string;
 }
 
 class WebSocketService {
@@ -222,6 +232,37 @@ class WebSocketService {
     }
 
     /**
+     * Connection change event handler
+     */
+    onConnectionChange(callback: (connected: boolean) => void): () => void {
+        return this.on('connection_status', (message: StreamMessage) => {
+            callback(message.data?.connected || false);
+        });
+    }
+
+    /**
+     * Streaming message event handler
+     */
+    onStreamingMessage(callback: (message: StreamingPlanUpdate) => void): () => void {
+        return this.on('agent_message', (message: StreamMessage) => {
+            if (message.data) {
+                callback(message.data);
+            }
+        });
+    }
+
+    /**
+     * Plan approval response event handler
+     */
+    onPlanApprovalResponse(callback: (response: any) => void): () => void {
+        return this.on('plan_approval_response', (message: StreamMessage) => {
+            if (message.data) {
+                callback(message.data);
+            }
+        });
+    }
+
+    /**
      * Emit event to listeners
      */
     private emit(eventType: string, data: any): void {
@@ -249,15 +290,87 @@ class WebSocketService {
     private handleMessage(message: StreamMessage): void {
         console.log('WebSocket message received:', message);
 
-        if (message.type) {
-            this.emit(message.type, message.data);
-        }
-
         if (message.type === 'plan_approval_request') {
             console.log('Plan approval request received via WebSocket:', message.data);
+            
+            // Parse the raw Python object string using PlanDataService
+            const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
+            
+            if (parsedData) {
+                // Emit a structured plan approval request
+                const structuredMessage: ParsedPlanApprovalRequest = {
+                    type: 'parsed_plan_approval_request',
+                    plan_id: parsedData.id,
+                    parsedData: parsedData,
+                    rawData: message.data
+                };
+                
+                this.emit('parsed_plan_approval_request', structuredMessage);
+                console.log('Parsed plan approval request:', structuredMessage);
+            } else {
+                console.error('Failed to parse plan approval request data');
+                this.emit('error', { error: 'Failed to parse plan approval request' });
+            }
         }
 
-        this.emit('message', message);
+        // Handle agent messages from the callback system (without plan_id)
+        else if (message.type === 'agent_message' && message.data && !message.data.plan_id) {
+            console.log('Agent callback message received:', message.data);
+            
+            // Transform the callback message format to match the expected streaming format
+            // We'll need to get the current plan_id from somewhere - let's use the current subscription
+            const currentPlanIds = Array.from(this.planSubscriptions);
+            
+            if (currentPlanIds.length > 0) {
+                const transformedMessage: StreamMessage = {
+                    ...message,
+                    data: {
+                        plan_id: currentPlanIds[0], // Use the first subscribed plan
+                        agent_name: message.data.agent_name || 'Unknown Agent',
+                        content: message.data.content || '',
+                        message_type: 'thinking',
+                        status: 'in_progress',
+                        timestamp: Date.now() / 1000
+                    }
+                };
+                
+                console.log('Transformed agent message for plan:', transformedMessage.data.plan_id);
+                this.emit(message.type, transformedMessage);
+            } else {
+                console.warn('Received agent message but no plan subscriptions active');
+            }
+        }
+
+        // Handle streaming messages from the callback system
+        else if (message.type === 'streaming_message' && message.data && !message.data.plan_id) {
+            console.log('Streaming callback message received:', message.data);
+            
+            // Transform streaming message format
+            const currentPlanIds = Array.from(this.planSubscriptions);
+            
+            if (currentPlanIds.length > 0) {
+                const transformedMessage: StreamMessage = {
+                    type: 'agent_message', // Convert streaming_message to agent_message
+                    data: {
+                        plan_id: currentPlanIds[0],
+                        agent_name: message.data.agent_name || 'Unknown Agent',
+                        content: message.data.content || '',
+                        message_type: message.data.is_final ? 'result' : 'thinking',
+                        status: message.data.is_final ? 'completed' : 'in_progress',
+                        timestamp: Date.now() / 1000
+                    }
+                };
+                
+                console.log('Transformed streaming message for plan:', transformedMessage.data.plan_id);
+                this.emit('agent_message', transformedMessage);
+            }
+        }
+
+        // Handle regular streaming messages (already have plan_id)
+        else {
+            // Emit the message as-is for other types or when plan_id is present
+            this.emit(message.type, message);
+        }
     }
 
     /**
