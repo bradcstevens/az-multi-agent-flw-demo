@@ -192,7 +192,7 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def get_current_team(self, user_id: str, team_id: str) -> UserCurrentTeam:
+    async def get_current_team(self, user_id: str) -> Optional[UserCurrentTeam]:
         """Retrieve the current team for a user."""
         pass
 

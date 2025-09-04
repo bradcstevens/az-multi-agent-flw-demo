@@ -13,7 +13,7 @@ from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
                                            TeamSelectionRequest, UserCurrentTeam)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
+from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File, Query,
                      HTTPException, Request, UploadFile, WebSocket,
                      WebSocketDisconnect)
 from kernel_agents.agent_factory import AgentFactory
@@ -103,7 +103,11 @@ async def init_team(
       # Initialize memory store and service
       memory_store = await DatabaseFactory.get_database(user_id=user_id)
       team_service = TeamService(memory_store)
-
+      user_current_team = await memory_store.get_current_team(user_id=user_id)
+      if not user_current_team:
+          await team_service.handle_team_selection(user_id=user_id, team_id=init_team_id)
+      else:
+          init_team_id = user_current_team.team_id
       # Verify the team exists and user has access to it
       team_configuration = await team_service.get_team_configuration(init_team_id, user_id)
       if team_configuration is None:
@@ -120,7 +124,8 @@ async def init_team(
 
       return {
           "status": "Request started successfully",
-          "team_id": init_team_id
+          "team_id": init_team_id,
+          "team": team_configuration
       }
 
     except Exception as e:
@@ -351,7 +356,7 @@ async def user_clarification(human_feedback: messages.UserClarificationResponse,
 
 
 @app_v3.post("/upload_team_config")
-async def upload_team_config_endpoint(request: Request, file: UploadFile = File(...)):
+async def upload_team_config_endpoint(request: Request, file: UploadFile = File(...),     team_id: Optional[str] = Query(None),):
     """
     Upload and save a team configuration JSON file.
 
@@ -487,6 +492,10 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
 
         # Save the configuration
         try:
+            print("Saving team configuration...", team_id)
+            if team_id:
+                team_config.team_id = team_id
+                team_config.id = team_id  # Ensure id is also set for updates
             team_id = await team_service.save_team_configuration(team_config)
         except ValueError as e:
             raise HTTPException(
