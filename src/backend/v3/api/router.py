@@ -13,7 +13,7 @@ from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
                                            TeamSelectionRequest, UserCurrentTeam)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File,
+from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File, Query,
                      HTTPException, Request, UploadFile, WebSocket,
                      WebSocketDisconnect)
 from kernel_agents.agent_factory import AgentFactory
@@ -103,7 +103,11 @@ async def init_team(
       # Initialize memory store and service
       memory_store = await DatabaseFactory.get_database(user_id=user_id)
       team_service = TeamService(memory_store)
-
+      user_current_team = await memory_store.get_current_team(user_id=user_id)
+      if not user_current_team:
+          await team_service.handle_team_selection(user_id=user_id, team_id=init_team_id)
+      else:
+          init_team_id = user_current_team.team_id
       # Verify the team exists and user has access to it
       team_configuration = await team_service.get_team_configuration(init_team_id, user_id)
       if team_configuration is None:
@@ -120,7 +124,8 @@ async def init_team(
 
       return {
           "status": "Request started successfully",
-          "team_id": init_team_id
+          "team_id": init_team_id,
+          "team": team_configuration
       }
 
     except Exception as e:
@@ -184,30 +189,30 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
     """
 
 
-    # if not await rai_success(input_task.description, False):
-    #     track_event_if_configured(
-    #         "RAI failed",
-    #         {
-    #             "status": "Plan not created - RAI check failed",
-    #             "description": input_task.description,
-    #             "session_id": input_task.session_id,
-    #         },
-    #     )
-    #     raise HTTPException(
-    #         status_code=400,
-    #         detail={
-    #             "error_type": "RAI_VALIDATION_FAILED",
-    #             "message": "Content Safety Check Failed",
-    #             "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
-    #             "suggestions": [
-    #                 "Remove any potentially harmful, inappropriate, or unsafe content",
-    #                 "Use more professional and constructive language",
-    #                 "Focus on legitimate business or educational objectives",
-    #                 "Ensure your request complies with content policies",
-    #             ],
-    #             "user_action": "Please revise your request and try again",
-    #         },
-    #     )
+    if not await rai_success(input_task.description, False):
+        track_event_if_configured(
+            "RAI failed",
+            {
+                "status": "Plan not created - RAI check failed",
+                "description": input_task.description,
+                "session_id": input_task.session_id,
+            },
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_type": "RAI_VALIDATION_FAILED",
+                "message": "Content Safety Check Failed",
+                "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+                "suggestions": [
+                    "Remove any potentially harmful, inappropriate, or unsafe content",
+                    "Use more professional and constructive language",
+                    "Focus on legitimate business or educational objectives",
+                    "Ensure your request complies with content policies",
+                ],
+                "user_action": "Please revise your request and try again",
+            },
+        )
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -309,10 +314,14 @@ async def plan_approval(human_feedback: messages.PlanApprovalResponse, request: 
     if user_id and human_feedback.plan_dot_id:
         if orchestration_config and human_feedback.plan_dot_id in orchestration_config.approvals:
             orchestration_config.approvals[human_feedback.plan_dot_id] = human_feedback.approved
+            orchestration_config.plans[human_feedback.plan_dot_id]["plan_id"] = human_feedback.plan_id
+            print("Plan approval received:", human_feedback)
+            print("Updated orchestration config:", orchestration_config.plans[human_feedback.plan_dot_id])
             track_event_if_configured(
                 "PlanApprovalReceived",
                 {
-                    "plan_id": human_feedback.plan_dot_id,
+                    "plan_id": human_feedback.plan_id,
+                    "plan_dot_id": human_feedback.plan_dot_id,
                     "approved": human_feedback.approved,
                     "user_id": user_id,
                     "feedback": human_feedback.feedback
@@ -351,7 +360,7 @@ async def user_clarification(human_feedback: messages.UserClarificationResponse,
 
 
 @app_v3.post("/upload_team_config")
-async def upload_team_config_endpoint(request: Request, file: UploadFile = File(...)):
+async def upload_team_config(request: Request, file: UploadFile = File(...),     team_id: Optional[str] = Query(None),):
     """
     Upload and save a team configuration JSON file.
 
@@ -487,6 +496,10 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
 
         # Save the configuration
         try:
+            print("Saving team configuration...", team_id)
+            if team_id:
+                team_config.team_id = team_id
+                team_config.id = team_id  # Ensure id is also set for updates
             team_id = await team_service.save_team_configuration(team_config)
         except ValueError as e:
             raise HTTPException(
@@ -521,7 +534,7 @@ async def upload_team_config_endpoint(request: Request, file: UploadFile = File(
 
 
 @app_v3.get("/team_configs")
-async def get_team_configs_endpoint(request: Request):
+async def get_team_configs(request: Request):
     """
     Retrieve all team configurations for the current user.
 
@@ -594,7 +607,7 @@ async def get_team_configs_endpoint(request: Request):
 
 
 @app_v3.get("/team_configs/{team_id}")
-async def get_team_config_by_id_endpoint(team_id: str, request: Request):
+async def get_team_config_by_id(team_id: str, request: Request):
     """
     Retrieve a specific team configuration by ID.
 
@@ -676,7 +689,7 @@ async def get_team_config_by_id_endpoint(team_id: str, request: Request):
 
 
 @app_v3.delete("/team_configs/{team_id}")
-async def delete_team_config_endpoint(team_id: str, request: Request):
+async def delete_team_config(team_id: str, request: Request):
     """
     Delete a team configuration by ID.
 
@@ -754,7 +767,7 @@ async def delete_team_config_endpoint(team_id: str, request: Request):
 
 
 @app_v3.get("/model_deployments")
-async def get_model_deployments_endpoint(request: Request):
+async def get_model_deployments(request: Request):
     """
     Get information about available model deployments for debugging/validation.
 
@@ -786,7 +799,7 @@ async def get_model_deployments_endpoint(request: Request):
 
 
 @app_v3.post("/select_team")
-async def select_team_endpoint(selection: TeamSelectionRequest, request: Request):
+async def select_team(selection: TeamSelectionRequest, request: Request):
     """
     Select the current team for the user session.
     """
@@ -870,7 +883,7 @@ async def select_team_endpoint(selection: TeamSelectionRequest, request: Request
 
 
 @app_v3.get("/search_indexes")
-async def get_search_indexes_endpoint(request: Request):
+async def get_search_indexes(request: Request):
     """
     Get information about available search indexes for debugging/validation.
 

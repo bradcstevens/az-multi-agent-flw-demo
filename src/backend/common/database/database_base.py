@@ -106,7 +106,10 @@ class DatabaseBase(ABC):
     async def get_all_plans(self) -> List[Plan]:
         """Retrieve all plans for the user."""
         pass
-
+    @abstractmethod
+    async def get_all_plans_by_team_id(self, team_id: str) -> List[Plan]:
+        """Retrieve all plans for a specific team."""
+        pass
     @abstractmethod
     async def get_data_by_type_and_session_id(
         self, data_type: str, session_id: str
@@ -192,7 +195,7 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def get_current_team(self, user_id: str, team_id: str) -> UserCurrentTeam:
+    async def get_current_team(self, user_id: str) -> Optional[UserCurrentTeam]:
         """Retrieve the current team for a user."""
         pass
 
