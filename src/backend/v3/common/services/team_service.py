@@ -255,7 +255,7 @@ class TeamService:
             True if successful, False otherwise
         """
         try:
-            current_team = await self.memory_context.get_current_team(user_id, team_id)
+            current_team = await self.memory_context.get_current_team(user_id)
 
             if current_team is None:
                 current_team = UserCurrentTeam(user_id=user_id, team_id=team_id)

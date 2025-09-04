@@ -259,6 +259,16 @@ class CosmosDBClient(DatabaseBase):
         ]
         return await self.query_items(query, parameters, Plan)
 
+    async def get_all_plans_by_team_id(self, team_id: str) -> List[Plan]:
+        """Retrieve all plans for a specific team."""
+        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id"
+        parameters = [
+            {"name": "@user_id", "value": self.user_id},
+            {"name": "@team_id", "value": team_id},
+            {"name": "@data_type", "value": "plan"},
+        ]
+        return await self.query_items(query, parameters, Plan)
+
     # Step Operations
     async def add_step(self, step: Step) -> None:
         """Add a step to CosmosDB."""
@@ -434,23 +444,22 @@ class CosmosDBClient(DatabaseBase):
         """
         await self.update_item(team)
 
-    async def get_current_team(self, user_id: str, team_id: str) -> UserCurrentTeam:
+    async def get_current_team(self, user_id: str) -> Optional[UserCurrentTeam]:
         """Retrieve the current team for a user."""
         await self._ensure_initialized()
         if self.container is None:
             return None
 
-        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.is_default=true"
+        query = "SELECT * FROM c WHERE c.data_type=@data_type AND c.user_id=@user_id"
         parameters = [
+            {"name": "@data_type", "value": "user_current_team"},
             {"name": "@user_id", "value": user_id},
-            {"name": "@team_id", "value": team_id},
         ]
 
-        items = self.container.query_items(query=query, parameters=parameters)
-        async for item in items:
-            return UserCurrentTeam(**item)
+        # Get the appropriate model class
+        teams = await self.query_items(query, parameters, UserCurrentTeam)
+        return teams[0] if teams else None
 
-        return None
     async def set_current_team(self, current_team: UserCurrentTeam) -> None:
         """Set the current team for a user."""
         await self._ensure_initialized()
