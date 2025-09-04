@@ -12,7 +12,7 @@ from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
     MagenticContext, StandardMagenticManager)
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import \
-    ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT
+    ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT
 from semantic_kernel.contents import ChatMessageContent
 from v3.config.settings import (connection_config, current_user_id,
                                 orchestration_config)
@@ -37,13 +37,14 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         # object.__setattr__(self, 'current_user_id', None)
 
         custom_addition = """
-To address this request we have assembled the following team:
+Before creating the final plan, please ask each agent - team member to list all relevant tools (including MCP tools, plug-ins, etc.) they have access to.  For each tool, list its required parameters.
+Obtain every required parameter that is not specified in the users request. These questions should be sent to the proxy agent.  Do not ask for information that is outside of this list of required parameters.
 
-{{$team}}
+Once this information is obtained, replan to create a final bullet-point plan to address the original request using the data and clarifications obtained.
+Each step in the plan should start with a specific agent which is responsible for executing it.
+"""
 
-Please check with the team members to list all relevant tools they have access to, and their required parameters."""
-
-        kwargs['task_ledger_facts_prompt'] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + custom_addition
+        kwargs['task_ledger_plan_prompt'] = ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT + custom_addition
         
         super().__init__(*args, **kwargs)
 
