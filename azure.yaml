@@ -1,6 +1,26 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
 name: multi-agent-custom-automation-engine-solution-accelerator
-metadata:
-  template: multi-agent-custom-automation-engine-solution-accelerator@1.0
+# metadata:
+  # template: multi-agent-custom-automation-engine-solution-accelerator@1.0
 requiredVersions:
   azd: ">=1.15.0 !=1.17.1"
+hooks:
+  postprovision:
+    windows:
+      run: |
+        Write-Host "To upload Team Configurations to Cosmos. Run the following command in PowerShell:"
+        Write-Host "infra\scripts\Upload-Team-Config.ps1" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "To index Sample Data into Azure Search. Run the following command in PowerShell:"
+        Write-Host "infra\scripts\Process-Sample-Data.ps1" -ForegroundColor Cyan
+      shell: pwsh
+      interactive: true
+    posix:
+      run: |
+        echo "To upload Team Configurations to Cosmos. Run the following command in Bash:"
+        echo "bash infra/scripts/upload_team_config.sh"
+        echo ""
+        echo "To index Sample Data into Azure Search. Run the following command in Bash:"
+        echo "bash infra/scripts/process_sample_data.sh"
+      shell: sh
+      interactive: true
