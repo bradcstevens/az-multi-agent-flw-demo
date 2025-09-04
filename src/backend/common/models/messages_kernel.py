@@ -188,7 +188,6 @@ class StartingTask(KernelBaseModel):
 class TeamSelectionRequest(KernelBaseModel):
     """Request model for team selection."""
     team_id: str
-    session_id: Optional[str] = None
 
 class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""

@@ -43,7 +43,7 @@ import {
 } from '@fluentui/react-icons';
 import { TeamConfig } from '../../models/Team';
 import { TeamService } from '../../services/TeamService';
-import styles from './TeamSelector.module.css';
+import styles from '../../styles/TeamSelector.module.css';
 
 // Icon mapping function to convert string icons to FluentUI icons
 const getIconFromString = (iconString: string): React.ReactNode => {
@@ -66,7 +66,7 @@ const getIconFromString = (iconString: string): React.ReactNode => {
     'Desktop': <Desktop20Regular />,
     'default': <Person20Regular />,
   };
-  
+
   return iconMap[iconString] || iconMap['default'] || <Person20Regular />;
 };
 
@@ -136,7 +136,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
     try {
       // Call the backend API to select the team
       const result = await TeamService.selectTeam(tempSelectedTeam.team_id, sessionId);
-      
+
       if (result.success) {
         // Successfully selected team on backend
         console.log('Team selected:', result.data);
@@ -160,7 +160,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
   };
 
   // Filter teams based on search query
-  const filteredTeams = teams.filter(team => 
+  const filteredTeams = teams.filter(team =>
     team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     team.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -173,31 +173,31 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
   const confirmDeleteTeam = async () => {
     if (!teamToDelete || deleteLoading) return;
-    
+
     if (teamToDelete.protected) {
       setError('This team is protected and cannot be deleted.');
       setDeleteConfirmOpen(false);
       setTeamToDelete(null);
       return;
     }
-    
+
     setDeleteLoading(true);
-    
+
     try {
       const success = await TeamService.deleteTeam(teamToDelete.id);
-      
+
       if (success) {
         setDeleteConfirmOpen(false);
         setTeamToDelete(null);
         setDeleteLoading(false);
-        
+
         if (tempSelectedTeam?.team_id === teamToDelete.team_id) {
           setTempSelectedTeam(null);
           if (selectedTeam?.team_id === teamToDelete.team_id) {
             onTeamSelect?.(null);
           }
         }
-        
+
         setTeams(currentTeams => currentTeams.filter(team => team.id !== teamToDelete.id));
         await loadTeams();
       } else {
@@ -207,7 +207,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
       }
     } catch (err: any) {
       let errorMessage = 'Failed to delete team configuration. Please try again.';
-      
+
       if (err.response?.status === 404) {
         errorMessage = 'Team not found. It may have already been deleted.';
       } else if (err.response?.status === 403) {
@@ -219,7 +219,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
       } else if (err.message) {
         errorMessage = `Delete failed: ${err.message}`;
       }
-      
+
       setError(errorMessage);
       setDeleteConfirmOpen(false);
       setTeamToDelete(null);
@@ -257,20 +257,20 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
       setUploadMessage('Uploading team configuration...');
       const result = await TeamService.uploadCustomTeam(file);
-      
+
       if (result.success) {
         setUploadMessage('Team uploaded successfully!');
-        
+
         // Immediately add the team to local state for instant visibility
         if (result.team) {
           setTeams(currentTeams => [...currentTeams, result.team!]);
         }
-        
+
         // Also reload teams from server in the background to ensure consistency
         setTimeout(() => {
           loadTeams().catch(console.error);
         }, 1000);
-        
+
         setUploadMessage(null);
         if (onTeamUpload) {
           await onTeamUpload();
@@ -312,7 +312,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     // Reset visual state
     event.currentTarget.classList.remove(styles.dropZoneHover);
 
@@ -346,20 +346,20 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
       setUploadMessage('Uploading team configuration...');
       const result = await TeamService.uploadCustomTeam(file);
-      
+
       if (result.success) {
         setUploadMessage('Team uploaded successfully!');
-        
+
         // Immediately add the team to local state for instant visibility
         if (result.team) {
           setTeams(currentTeams => [...currentTeams, result.team!]);
         }
-        
+
         // Also reload teams from server in the background to ensure consistency
         setTimeout(() => {
           loadTeams().catch(console.error);
         }, 1000);
-        
+
         setUploadMessage(null);
         if (onTeamUpload) {
           await onTeamUpload();
@@ -387,10 +387,10 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
   const renderTeamCard = (team: TeamConfig) => {
     const isSelected = tempSelectedTeam?.team_id === team.team_id;
-    
+
     return (
-      <div 
-        key={team.team_id} 
+      <div
+        key={team.team_id}
         className={`${styles.teamItem} ${isSelected ? styles.teamItemSelected : ''}`}
         onClick={() => setTempSelectedTeam(team)}
       >
@@ -482,13 +482,13 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
                   selectedValue={activeTab}
                   onTabSelect={(event, data) => setActiveTab(data.value as string)}
                 >
-                  <Tab 
+                  <Tab
                     value="teams"
                     className={`${styles.tab} ${activeTab === 'teams' ? styles.tabSelected : ''}`}
                   >
                     Teams
                   </Tab>
-                  <Tab 
+                  <Tab
                     value="upload"
                     className={`${styles.tab} ${activeTab === 'upload' ? styles.tabSelected : ''}`}
                   >
@@ -500,152 +500,152 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
               {/* Tab Content - Directly below tabs without separation */}
               <div className={styles.tabContentContainer}>
                 {activeTab === 'teams' && (
-                <div className={styles.teamsTabContent}>
-                  {error && (
-                    <div className={styles.errorMessage}>
-                      <Text className={styles.errorText}>{error}</Text>
-                    </div>
-                  )}
+                  <div className={styles.teamsTabContent}>
+                    {error && (
+                      <div className={styles.errorMessage}>
+                        <Text className={styles.errorText}>{error}</Text>
+                      </div>
+                    )}
 
-                  {/* Search Input */}
-                  <div className={styles.searchContainer}>
-                    <Input
-                      className={styles.searchInput}
-                      placeholder="Search teams..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      contentBefore={<Search20Regular />}
-                    />
+                    {/* Search Input */}
+                    <div className={styles.searchContainer}>
+                      <Input
+                        className={styles.searchInput}
+                        placeholder="Search teams..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        contentBefore={<Search20Regular />}
+                      />
+                    </div>
+
+                    {/* Teams List */}
+                    {loading ? (
+                      <div className={styles.loadingContainer}>
+                        <Spinner label="Loading teams..." />
+                      </div>
+                    ) : filteredTeams.length > 0 ? (
+                      <div className={styles.teamsContainer}>
+                        <RadioGroup
+                          value={tempSelectedTeam?.team_id || ''}
+                          className={styles.radioGroup}
+                        >
+                          <div className={styles.teamsList}>
+                            {filteredTeams.map((team) => renderTeamCard(team))}
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    ) : searchQuery ? (
+                      <div className={styles.noTeamsContainer}>
+                        <Text size={400} className={styles.noTeamsText}>
+                          No teams found matching "{searchQuery}"
+                        </Text>
+                      </div>
+                    ) : (
+                      <div className={styles.noTeamsContainer}>
+                        <Text size={400} className={styles.noTeamsText}>
+                          No teams available
+                        </Text>
+                        <Text size={300} className={styles.noTeamsSubtext}>
+                          Upload a JSON team configuration to get started
+                        </Text>
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  {/* Teams List */}
-                  {loading ? (
-                    <div className={styles.loadingContainer}>
-                      <Spinner label="Loading teams..." />
-                    </div>
-                  ) : filteredTeams.length > 0 ? (
-                    <div className={styles.teamsContainer}>
-                      <RadioGroup 
-                        value={tempSelectedTeam?.team_id || ''}
-                        className={styles.radioGroup}
-                      >
-                        <div className={styles.teamsList}>
-                          {filteredTeams.map((team) => renderTeamCard(team))}
-                        </div>
-                      </RadioGroup>
-                    </div>
-                  ) : searchQuery ? (
-                    <div className={styles.noTeamsContainer}>
-                      <Text size={400} className={styles.noTeamsText}>
-                        No teams found matching "{searchQuery}"
-                      </Text>
-                    </div>
-                  ) : (
-                    <div className={styles.noTeamsContainer}>
-                      <Text size={400} className={styles.noTeamsText}>
-                        No teams available
-                      </Text>
-                      <Text size={300} className={styles.noTeamsSubtext}>
-                        Upload a JSON team configuration to get started
-                      </Text>
-                    </div>
-                  )}
-                </div>
-              )}
+                {activeTab === 'upload' && (
+                  <div className={styles.uploadTabContent}>
+                    {uploadMessage && (
+                      <div className={styles.uploadMessage}>
+                        <Spinner size="extra-small" />
+                        <Text>{uploadMessage}</Text>
+                      </div>
+                    )}
 
-              {activeTab === 'upload' && (
-                <div className={styles.uploadTabContent}>
-                  {uploadMessage && (
-                    <div className={styles.uploadMessage}>
-                      <Spinner size="extra-small" />
-                      <Text>{uploadMessage}</Text>
-                    </div>
-                  )}
+                    {error && (
+                      <div className={styles.errorMessage}>
+                        <Text className={styles.errorText}>{error}</Text>
+                      </div>
+                    )}
 
-                  {error && (
-                    <div className={styles.errorMessage}>
-                      <Text className={styles.errorText}>{error}</Text>
-                    </div>
-                  )}
-
-                  {/* Drag and Drop Zone */}
-                  <div 
-                    className={styles.dropZone}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={() => document.getElementById('team-upload-input')?.click()}
-                  >
-                    <div className={styles.dropZoneContent}>
-                      {/* <div className={styles.uploadIcon}>
+                    {/* Drag and Drop Zone */}
+                    <div
+                      className={styles.dropZone}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => document.getElementById('team-upload-input')?.click()}
+                    >
+                      <div className={styles.dropZoneContent}>
+                        {/* <div className={styles.uploadIcon}>
                         ↑
                       </div> */}
-                      <Text className={styles.uploadTitle}>
-                        Drag & drop your team JSON here
-                      </Text>
-                      <Text className={styles.uploadSubtitle}>
-                        or <span className={styles.browseLink}>click to browse</span>
-                      </Text>
-                    </div>
-                    
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleFileUpload}
-                      className={styles.hiddenInput}
-                      id="team-upload-input"
-                      disabled={uploadLoading}
-                    />
-                  </div>
+                        <Text className={styles.uploadTitle}>
+                          Drag & drop your team JSON here
+                        </Text>
+                        <Text className={styles.uploadSubtitle}>
+                          or <span className={styles.browseLink}>click to browse</span>
+                        </Text>
+                      </div>
 
-                  {/* Upload Requirements */}
-                  <div className={styles.requirementsBox}>
-                    <Text className={styles.requirementsTitle}>
-                      Upload Requirements
-                    </Text>
-                    <ul className={styles.requirementsList}>
-                      <li className={styles.requirementsItem}>
-                        <Text className={styles.requirementsText}>
-                          JSON must include <strong className={styles.requirementsStrong}>name</strong>, <strong className={styles.requirementsStrong}>description</strong>, and <strong className={styles.requirementsStrong}>status</strong>
-                        </Text>
-                      </li>
-                      <li className={styles.requirementsItem}>
-                        <Text className={styles.requirementsText}>
-                          At least one agent with <strong className={styles.requirementsStrong}>name</strong>, <strong className={styles.requirementsStrong}>type</strong>, <strong className={styles.requirementsStrong}>input_key</strong>, and <strong className={styles.requirementsStrong}>deployment_name</strong>
-                        </Text>
-                      </li>
-                      <li className={styles.requirementsItem}>
-                        <Text className={styles.requirementsText}>
-                          Maximum of <strong className={styles.requirementsStrong}>6 agents</strong> per team configuration
-                        </Text>
-                      </li>
-                      <li className={styles.requirementsItem}>
-                        <Text className={styles.requirementsText}>
-                          RAG agents additionally require <strong className={styles.requirementsStrong}>index_name</strong>
-                        </Text>
-                      </li>
-                      <li className={styles.requirementsItem}>
-                        <Text className={styles.requirementsText}>
-                          Starting tasks are optional, but if provided must include <strong className={styles.requirementsStrong}>name</strong> and <strong className={styles.requirementsStrong}>prompt</strong>
-                        </Text>
-                      </li>
-                    </ul>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleFileUpload}
+                        className={styles.hiddenInput}
+                        id="team-upload-input"
+                        disabled={uploadLoading}
+                      />
+                    </div>
+
+                    {/* Upload Requirements */}
+                    <div className={styles.requirementsBox}>
+                      <Text className={styles.requirementsTitle}>
+                        Upload Requirements
+                      </Text>
+                      <ul className={styles.requirementsList}>
+                        <li className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            JSON must include <strong className={styles.requirementsStrong}>name</strong>, <strong className={styles.requirementsStrong}>description</strong>, and <strong className={styles.requirementsStrong}>status</strong>
+                          </Text>
+                        </li>
+                        <li className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            At least one agent with <strong className={styles.requirementsStrong}>name</strong>, <strong className={styles.requirementsStrong}>type</strong>, <strong className={styles.requirementsStrong}>input_key</strong>, and <strong className={styles.requirementsStrong}>deployment_name</strong>
+                          </Text>
+                        </li>
+                        <li className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            Maximum of <strong className={styles.requirementsStrong}>6 agents</strong> per team configuration
+                          </Text>
+                        </li>
+                        <li className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            RAG agents additionally require <strong className={styles.requirementsStrong}>index_name</strong>
+                          </Text>
+                        </li>
+                        <li className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            Starting tasks are optional, but if provided must include <strong className={styles.requirementsStrong}>name</strong> and <strong className={styles.requirementsStrong}>prompt</strong>
+                          </Text>
+                        </li>
+                      </ul>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
               </div>
             </DialogBody>
           </DialogContent>
           <DialogActions className={styles.dialogActions}>
-            <Button 
-              appearance="secondary" 
+            <Button
+              appearance="secondary"
               onClick={handleCancel}
               className={styles.cancelButton}
             >
               Cancel
             </Button>
-            <Button 
-              appearance="primary" 
+            <Button
+              appearance="primary"
               onClick={handleContinue}
               disabled={!tempSelectedTeam || selectionLoading}
               className={styles.continueButton}
@@ -674,8 +674,8 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
               </div>
             </DialogBody>
             <DialogActions className={styles.deleteDialogActions}>
-              <Button 
-                appearance="secondary" 
+              <Button
+                appearance="secondary"
                 disabled={deleteLoading}
                 onClick={() => {
                   setDeleteConfirmOpen(false);
@@ -685,8 +685,8 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
               >
                 Cancel
               </Button>
-              <Button 
-                appearance="primary" 
+              <Button
+                appearance="primary"
                 disabled={deleteLoading}
                 className={styles.deleteConfirmButton}
                 onClick={confirmDeleteTeam}
