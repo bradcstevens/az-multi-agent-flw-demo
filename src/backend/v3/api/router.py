@@ -306,13 +306,13 @@ async def plan_approval(human_feedback: messages.PlanApprovalResponse, request: 
             status_code=401, detail="Missing or invalid user information"
         )
     # Set the approval in the orchestration config
-    if user_id and human_feedback.plan_id:
-        if orchestration_config and human_feedback.plan_id in orchestration_config.approvals:
-            orchestration_config.approvals[human_feedback.plan_id] = human_feedback.approved
+    if user_id and human_feedback.plan_dot_id:
+        if orchestration_config and human_feedback.plan_dot_id in orchestration_config.approvals:
+            orchestration_config.approvals[human_feedback.plan_dot_id] = human_feedback.approved
             track_event_if_configured(
                 "PlanApprovalReceived",
                 {
-                    "plan_id": human_feedback.plan_id,
+                    "plan_id": human_feedback.plan_dot_id,
                     "approved": human_feedback.approved,
                     "user_id": user_id,
                     "feedback": human_feedback.feedback
@@ -320,12 +320,34 @@ async def plan_approval(human_feedback: messages.PlanApprovalResponse, request: 
             )
             return {"status": "approval recorded"}
         else:
-            logging.warning(f"No orchestration or plan found for plan_id: {human_feedback.plan_id}")
+            logging.warning(f"No orchestration or plan found for plan_id: {human_feedback.plan_dot_id}")
             raise HTTPException(status_code=404, detail="No active plan found for approval")
 
 @app_v3.post("/user_clarification")
 async def user_clarification(human_feedback: messages.UserClarificationResponse, request: Request):
-    pass
+    """ Endpoint to receive plan approval or rejection from the user. """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+    # Set the approval in the orchestration config
+    if user_id and human_feedback.request_id:
+        if orchestration_config and human_feedback.request_id in orchestration_config.clarifications:
+            orchestration_config.clarifications[human_feedback.request_id] = human_feedback.answer
+            track_event_if_configured(
+                "PlanApprovalReceived",
+                {
+                    "request_id": human_feedback.request_id,
+                    "answer": human_feedback.answer,
+                    "user_id": user_id,
+                },
+            )
+            return {"status": "clarification recorded"}
+        else:
+            logging.warning(f"No orchestration or plan found for request_id: {human_feedback.request_id}")
+            raise HTTPException(status_code=404, detail="No active plan found for clarification")
 
 
 @app_v3.post("/upload_team_config")
