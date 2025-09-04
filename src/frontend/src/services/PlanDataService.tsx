@@ -162,165 +162,162 @@ export class PlanDataService {
     }
   }
 
-  static parsePlanApprovalRequest(rawData: any): ParsedPlanData | null {
-    try {
-      console.log('🔍 Parsing plan approval request:', rawData, 'Type:', typeof rawData);
-      
-      // Check if this is already a parsed plan approval request object
-      if (rawData && typeof rawData === 'object' && rawData.type === 'parsed_plan_approval_request') {
-        console.log('✅ Data is already parsed, returning parsedData directly');
-        return rawData.parsedData || null;
-      }
-      
-      // Handle v3 backend format where rawData has a plan property
-      if (rawData && typeof rawData === 'object' && rawData.plan) {
-        console.log('📝 Processing v3 format with MPlan object:', rawData.plan);
-        const mplan = rawData.plan;
 
-        // Extract user_request from ChatMessageContent or string
-        let userRequestText = 'Plan approval required';
-        if (mplan.user_request) {
-          if (typeof mplan.user_request === 'string') {
-            userRequestText = mplan.user_request;
-          } else if (mplan.user_request.items && Array.isArray(mplan.user_request.items)) {
-            // Handle ChatMessageContent format
-            const textContent = mplan.user_request.items.find((item: any) => item.text);
-            if (textContent && textContent.text) {
-              userRequestText = textContent.text.replace(/\u200b/g, '').trim();
-            }
-          } else if (mplan.user_request.content) {
-            userRequestText = mplan.user_request.content;
+static parsePlanApprovalRequest(rawData: any): ParsedPlanData | null {
+  try {
+    console.log('🔍 Parsing plan approval request:', rawData, 'Type:', typeof rawData);
+    
+    // Already parsed object
+    if (rawData && typeof rawData === 'object' && rawData.type === 'parsed_plan_approval_request') {
+      return rawData.parsedData || null;
+    }
+
+    // v3 backend format with plan property
+    if (rawData && typeof rawData === 'object' && rawData.plan) {
+      const mplan = rawData.plan;
+      
+      // Extract user_request text
+      let userRequestText = 'Plan approval required';
+      if (mplan.user_request) {
+        if (typeof mplan.user_request === 'string') {
+          userRequestText = mplan.user_request;
+        } else if (Array.isArray(mplan.user_request.items)) {
+          const textContent = mplan.user_request.items.find((item: any) => item.text);
+          if (textContent?.text) {
+            userRequestText = textContent.text.replace(/\u200b/g, '').trim();
           }
+        } else if (mplan.user_request.content) {
+          userRequestText = mplan.user_request.content;
         }
+      }
+
+      // Parse steps with generic cleaning (remove task-specific prefixes)
+      const steps = (mplan.steps || []).map((step: any, index: number) => {
+        let action = step.action || '';
+        
+        // Generic cleanup - remove common prefixes and formatting
+        let cleanAction = action
+          .replace(/\*\*/g, '') // Remove markdown bold
+          .replace(/^Certainly!\s*/i, '') // Remove "Certainly!"
+          .replace(/^Given the team composition and the available facts,?\s*/i, '') // Remove team composition prefix
+          .replace(/^here is a (?:concise )?plan to address the original request[^.]*\.\s*/i, '') // Remove plan introduction
+          .replace(/^(?:here is|this is) a (?:concise )?(?:plan|approach|strategy)[^.]*[.:]\s*/i, '') // Remove other plan intros
+          .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ') // Convert **text**: to text:
+          .replace(/^[-•]\s*/, '') // Remove bullet points
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .trim();
 
         return {
-          id: mplan.id || mplan.plan_id || 'unknown',
-          status: rawData.status || 'PENDING_APPROVAL',
-          user_request: userRequestText,
-          team: Array.isArray(mplan.team) ? mplan.team : [],
-          facts: mplan.facts || '',
-          steps: (mplan.steps || []).map((step: any, index: number) => ({
-            id: index + 1,
-            action: step.action || '',
-            cleanAction: (step.action || '').replace(/\*\*/g, '').trim(),
-            agent: step.agent || step._agent || 'System'
-          })),
-          context: {
-            task: userRequestText,
-            participant_descriptions: rawData.context?.participant_descriptions || {}
-          }
+          id: index + 1,
+          action,
+          cleanAction,
+          agent: step.agent || step._agent || 'System'
         };
+      }).filter((step: any) => 
+        step.cleanAction.length > 3 && // Filter out very short actions
+        !step.cleanAction.match(/^(?:involvement|certainly|given|here is)/i) // Filter out meaningless steps
+      );
+
+      return {
+        id: mplan.id || mplan.plan_id || 'unknown',
+        status: mplan.overall_status || rawData.status || 'PENDING_APPROVAL',
+        user_request: userRequestText,
+        team: Array.isArray(mplan.team) ? mplan.team : [],
+        facts: mplan.facts || '',
+        steps,
+        context: {
+          task: userRequestText,
+          participant_descriptions: rawData.context?.participant_descriptions || {}
+        },
+        // Additional m_plan fields
+        user_id: mplan.user_id,
+        team_id: mplan.team_id,
+        plan_id: mplan.plan_id,
+        overall_status: mplan.overall_status,
+        raw_data: rawData // Store for debugging
+      };
+    }
+
+    // Handle string format (generic parsing)
+    if (typeof rawData === 'string') {
+      // Extract user request from text field
+      let user_request = 'Plan approval required';
+      const textMatch = rawData.match(/text="([^"]+)"/);
+      if (textMatch?.[1]) {
+        user_request = textMatch[1].replace(/\\u200b/g, '').trim();
       }
 
-      // Fallback for legacy string format parsing
-      if (typeof rawData === 'string') {
-        console.log('📝 Processing legacy string format');
-        // Extract basic plan information
-        const idMatch = rawData.match(/id='([^']+)'/);
-        const statusMatch = rawData.match(/status=<PlanStatus\.([^>]+)>/);
-        const userRequestMatch = rawData.match(/user_request='([^']+)'/);
-        const teamMatch = rawData.match(/team=\[([^\]]*)\]/);
-        const factsMatch = rawData.match(/facts='([^']*(?:'[^']*)*?)'/);
+      // Extract basic information
+      const id = rawData.match(/id='([^']+)'/)?.[1] || 'unknown';
+      const status = rawData.match(/overall_status=<PlanStatus\.([^>]+)>/)?.[1] || 'PENDING_APPROVAL';
+      const team = rawData.match(/team=\[([^\]]*)\]/)?.[1]
+        ?.split(',')
+        .map(member => member.trim().replace(/['"]/g, ''))
+        .filter(member => member.length > 0) || [];
+      
+      // Extract facts
+      const factsMatch = rawData.match(/facts="([^"]*(?:\\.[^"]*)*)"/);
+      const facts = factsMatch?.[1]?.replace(/\\n/g, '\n').replace(/\\"/g, '"') || '';
 
-        const id = idMatch?.[1] || 'unknown';
-        const status = statusMatch?.[1] || 'PENDING_APPROVAL';
-        const user_request = userRequestMatch?.[1]?.replace(/\\u200b/g, '') || 'Plan approval required';
+      // Extract steps with generic parsing
+      const stepMatches = rawData.match(/MStep\([^)]*action="([^"]+)"/g);
+      const steps = [];
+      
+      if (stepMatches) {
+        const uniqueActions = new Set();
+        let stepIndex = 1;
         
-        // Parse team members
-        let team: string[] = [];
-        if (teamMatch?.[1]) {
-          team = teamMatch[1]
-            .split(',')
-            .map(member => member.trim().replace(/['"]/g, ''))
-            .filter(member => member.length > 0);
-        }
-
-        const facts = factsMatch?.[1]?.replace(/\\u200b/g, '') || '';
-
-        // Parse steps - handle the complex nested string format
-        let steps: Array<{ id: number; action: string; cleanAction: string; agent?: string }> = [];
-        
-        // First try to match the array of MStep objects
-        const stepsMatch = rawData.match(/steps=\[(.*?)\](?=\))/s);
-        if (stepsMatch?.[1]) {
-          const stepContent = stepsMatch[1];
-          
-          // Match individual MStep objects
-          const stepMatches = stepContent.match(/MStep\(action='([^']*(?:''[^']*)*)'\)/g);
-          if (stepMatches) {
-            steps = stepMatches.map((stepStr, index) => {
-              const actionMatch = stepStr.match(/action='([^']*(?:''[^']*)*)'/);
-              let action = actionMatch?.[1]?.replace(/''/g, "'") || '';
+        for (const stepStr of stepMatches) {
+          const actionMatch = stepStr.match(/action="([^"]+)"/);
+          if (actionMatch?.[1]) {
+            let action = actionMatch[1];
+            
+            // Generic action cleaning
+            let cleanAction = action
+              .replace(/^Certainly!\s*/i, '') // Remove "Certainly!"
+              .replace(/^Given the team composition and the available facts,?\s*/i, '') // Remove team prefix
+              .replace(/^here is a (?:concise )?plan to[^.]*\.\s*/i, '') // Remove plan introduction
+              .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ') // Convert **text**: to text:
+              .replace(/^[-•]\s*/, '') // Remove bullet points
+              .replace(/\s+/g, ' ') // Normalize whitespace
+              .trim();
+            
+            // Generic filtering - avoid very short, duplicate, or meaningless steps
+            if (cleanAction.length > 5 && 
+                !uniqueActions.has(cleanAction.toLowerCase()) &&
+                !cleanAction.match(/^(?:here is|this is a|given|certainly|involvement)/i)) {
               
-              // Clean up the action text
-              const cleanAction = action
-                .replace(/\*\*/g, '')
-                .replace(/^\s*[-•]\s*/, '')
-                .trim();
-              
-              // Skip empty, duplicate, or meaningless steps
-              if (!cleanAction || 
-                  cleanAction === 'Involvement' || 
-                  cleanAction.length < 10 ||
-                  cleanAction.includes('Here is a short bullet-point plan')) {
-                return null;
-              }
-              
-              return {
-                id: index + 1,
+              uniqueActions.add(cleanAction.toLowerCase());
+              steps.push({
+                id: stepIndex++,
                 action,
                 cleanAction,
-                agent: 'System' // Default agent since not specified in string format
-              };
-            }).filter(step => step !== null) as Array<{ id: number; action: string; cleanAction: string; agent: string }>;
-          }
-        }
-
-        // Extract context
-        const contextMatch = rawData.match(/context=\{([^}]+)\}/);
-        let context = { task: '', participant_descriptions: {} };
-        
-        if (contextMatch) {
-          const taskMatch = rawData.match(/'task':\s*'([^']+)'/);
-          if (taskMatch) {
-            context.task = taskMatch[1].replace(/\\u200b/g, '');
-          }
-          
-          // Extract participant descriptions
-          const participantMatch = rawData.match(/'participant_descriptions':\s*\{([^}]+)\}/);
-          if (participantMatch) {
-            const descriptions: Record<string, string> = {};
-            const descMatches = participantMatch[1].match(/'([^']+)':\s*'([^']*)'/g);
-            if (descMatches) {
-              descMatches.forEach(match => {
-                const keyValueMatch = match.match(/'([^']+)':\s*'([^']*)'/);
-                if (keyValueMatch) {
-                  descriptions[keyValueMatch[1]] = keyValueMatch[2];
-                }
+                agent: 'System'
               });
             }
-            context.participant_descriptions = descriptions;
           }
         }
-
-        return {
-          id,
-          status,
-          user_request,
-          team: team.filter(member => member && member.trim()),
-          facts,
-          steps: steps.filter(step => step.cleanAction.length > 0),
-          context
-        };
       }
 
-      // If rawData is neither a parsed object, v3 object, nor a legacy string, return null
-      console.warn('❌ Unrecognized plan approval request format:', typeof rawData, rawData);
-      return null;
-
-    } catch (error) {
-      console.error('❌ Error parsing plan approval request:', error);
-      return null;
+      return {
+        id,
+        status,
+        user_request,
+        team,
+        facts,
+        steps,
+        context: {
+          task: user_request,
+          participant_descriptions: {}
+        },
+        raw_data: rawData
+      };
     }
+
+    return null;
+  } catch (error) {
+    console.error('Error parsing plan approval request:', error);
+    return null;
   }
+}
 }
