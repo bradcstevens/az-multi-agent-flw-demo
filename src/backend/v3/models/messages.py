@@ -1,5 +1,6 @@
 """Messages from the backend to the frontend via WebSocket."""
 
+import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional
 
@@ -48,7 +49,7 @@ class PlanApprovalRequest:
 @dataclass(slots=True)
 class PlanApprovalResponse:
     """Response for plan approval from the frontend."""
-    plan_id: str
+    plan_dot_id: str
     approved: bool
     feedback: str | None = None
 
@@ -70,12 +71,12 @@ class ReplanApprovalResponse:
 class UserClarificationRequest:
     """Request for user clarification from the frontend."""
     question: str
-    context: dict | None = None
+    request_id: str
 
 @dataclass(slots=True)
 class UserClarificationResponse:
     """Response for user clarification from the frontend."""
-    plan_id: str | None
+    request_id: str
     answer: str = ""
 
 @dataclass(slots=True)
@@ -83,7 +84,6 @@ class FinalResultMessage:
     """Final result message from the backend to the frontend."""
     result: str
     summary: str | None = None
-    context: dict | None = None
 
 @dataclass(slots=True)
 class HumanFeedback(KernelBaseModel):
