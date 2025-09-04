@@ -38,7 +38,7 @@ export const useTeamSelection = ({
     try {
       console.log('Selecting team:', team.name, 'with session ID:', sessionId);
       
-      const result = await TeamService.selectTeam(team.team_id, sessionId);
+      const result = await TeamService.selectTeam(team.team_id);
       
       if (result.success) {
         setSelectedTeam(team);

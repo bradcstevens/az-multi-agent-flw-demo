@@ -135,7 +135,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
     try {
       // Call the backend API to select the team
-      const result = await TeamService.selectTeam(tempSelectedTeam.team_id, sessionId);
+      const result = await TeamService.selectTeam(tempSelectedTeam.team_id);
 
       if (result.success) {
         // Successfully selected team on backend

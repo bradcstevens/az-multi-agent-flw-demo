@@ -69,15 +69,15 @@ class AppConfig:
         self.AZURE_AI_PROJECT_ENDPOINT = self._get_optional("AZURE_AI_PROJECT_ENDPOINT")
 
         # Azure Search settings
-        self.AZURE_SEARCH_ENDPOINT = self._get_optional("AZURE_SEARCH_ENDPOINT")
+        self.AZURE_SEARCH_ENDPOINT = self._get_optional("AZURE_AI_SEARCH_ENDPOINT")
 
         # Optional MCP server endpoint (for local MCP server or remote)
         # Example: http://127.0.0.1:8000/mcp
         self.MCP_SERVER_ENDPOINT = self._get_optional("MCP_SERVER_ENDPOINT")
         self.MCP_SERVER_NAME = self._get_optional("MCP_SERVER_NAME", "MCPGreetingServer")
         self.MCP_SERVER_DESCRIPTION = self._get_optional("MCP_SERVER_DESCRIPTION", "MCP server with greeting and planning tools")
-        self.TENANT_ID = self._get_optional("TENANT_ID")
-        self.CLIENT_ID = self._get_optional("CLIENT_ID")
+        self.TENANT_ID = self._get_optional("AZURE_TENANT_ID")
+        self.CLIENT_ID = self._get_optional("AZURE_CLIENT_ID")
         self.AZURE_AI_SEARCH_CONNECTION_NAME = self._get_optional("AZURE_AI_SEARCH_CONNECTION_NAME")
         self.AZURE_AI_SEARCH_INDEX_NAME = self._get_optional("AZURE_AI_SEARCH_INDEX_NAME")
         self.AZURE_AI_SEARCH_ENDPOINT = self._get_optional("AZURE_AI_SEARCH_ENDPOINT")
