@@ -42,7 +42,8 @@ var deployingUserPrincipalId = deployerInfo.objectId
   azd: {
     type: 'location'
     usageName: [
-      'OpenAI.GlobalStandard.4.1-mini, 50'
+      'OpenAI.GlobalStandard.o4-mini, 50'
+      'OpenAI.GlobalStandard.gpt4.1-mini, 50'
     ]
   }
 })
