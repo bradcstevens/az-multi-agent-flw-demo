@@ -79,7 +79,12 @@ Each step in the plan should start with a specific agent which is responsible fo
                 "participant_descriptions": magentic_context.participant_descriptions
             } if hasattr(magentic_context, 'participant_descriptions') else {}
         )
-        
+        try:
+            orchestration_config.plans[self.magentic_plan.id] = self.magentic_plan 
+        except Exception as e:
+            print(f"Error processing plan approval: {e}")
+
+
         # Send the approval request to the user's WebSocket
         # The user_id will be automatically retrieved from context
         await connection_config.send_status_update_async({

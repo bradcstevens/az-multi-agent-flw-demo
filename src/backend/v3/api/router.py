@@ -358,41 +358,57 @@ async def plan_approval(
             status_code=401, detail="Missing or invalid user information"
         )
     # Set the approval in the orchestration config
-    if user_id and human_feedback.m_plan_id:
-        if (
-            orchestration_config
-            and human_feedback.m_plan_id in orchestration_config.approvals
-        ):
-            orchestration_config.approvals[human_feedback.m_plan_id] = (
-                human_feedback.approved
-            )
-            orchestration_config.plans[human_feedback.m_plan_id][
-                "plan_id"
-            ] = human_feedback.plan_id
-            print("Plan approval received:", human_feedback)
-            print(
-                "Updated orchestration config:",
-                orchestration_config.plans[human_feedback.m_plan_id],
-            )
-            track_event_if_configured(
-                "PlanApprovalReceived",
-                {
-                    "plan_id": human_feedback.plan_id,
-                    "m_plan_id": human_feedback.m_plan_id,
-                    "approved": human_feedback.approved,
-                    "user_id": user_id,
-                    "feedback": human_feedback.feedback,
-                },
-            )
-            return {"status": "approval recorded"}
-        else:
-            logging.warning(
-                f"No orchestration or plan found for plan_id: {human_feedback.m_plan_id}"
-            )
-            raise HTTPException(
-                status_code=404, detail="No active plan found for approval"
-            )
-
+    try:
+        if user_id and human_feedback.m_plan_id:
+            if (
+                orchestration_config
+                and human_feedback.m_plan_id in orchestration_config.approvals
+            ):
+                orchestration_config.approvals[human_feedback.m_plan_id] = (
+                    human_feedback.approved
+                )
+                # orchestration_config.plans[human_feedback.m_plan_id][
+                #     "plan_id"
+                # ] = human_feedback.plan_id
+                print("Plan approval received:", human_feedback)
+                # print(
+                #     "Updated orchestration config:",
+                #     orchestration_config.plans[human_feedback.m_plan_id],
+                # )
+                try:
+                    plan = orchestration_config.plans[human_feedback.m_plan_id]
+                    if hasattr(plan, 'plan_id'):
+                        print(
+                            "Updated orchestration config:",
+                            orchestration_config.plans[human_feedback.m_plan_id],
+                        )
+                        plan.plan_id = human_feedback.plan_id
+                        orchestration_config.plans[human_feedback.m_plan_id] = plan
+                except Exception as e:
+                    print(f"Error processing plan approval: {e}")
+                track_event_if_configured(
+                    "PlanApprovalReceived",
+                    {
+                        "plan_id": human_feedback.plan_id,
+                        "m_plan_id": human_feedback.m_plan_id,
+                        "approved": human_feedback.approved,
+                        "user_id": user_id,
+                        "feedback": human_feedback.feedback,
+                    },
+                )
+                return {"status": "approval recorded"}
+            else:
+                logging.warning(
+                    f"No orchestration or plan found for plan_id: {human_feedback.m_plan_id}"
+                )
+                raise HTTPException(
+                    status_code=404, detail="No active plan found for approval"
+                )
+    except Exception as e:
+        logging.error(f"Error processing plan approval: {e}")
+        raise HTTPException(
+            status_code=500, detail="Internal server error"
+        )
 
 @app_v3.post("/user_clarification")
 async def user_clarification(
