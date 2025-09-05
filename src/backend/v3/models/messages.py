@@ -1,7 +1,7 @@
 """Messages from the backend to the frontend via WebSocket."""
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Literal, Optional
 
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
@@ -14,6 +14,10 @@ class AgentMessage:
     agent_name: str
     timestamp: str
     content: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the AgentMessage to a dictionary for JSON serialization."""
+        return asdict(self)
 
 @dataclass(slots=True)
 class AgentStreamStart:
@@ -32,12 +36,29 @@ class AgentMessageStreaming:
     content: str
     is_final: bool = False
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the AgentMessageStreaming to a dictionary for JSON serialization."""
+        return asdict(self)
+
 @dataclass(slots=True)
 class AgentToolMessage:
     """Message from an agent using a tool."""
     agent_name: str
+    tool_calls: List['AgentToolCall'] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the AgentToolMessage to a dictionary for JSON serialization."""
+        return asdict(self)
+    
+@dataclass(slots=True)
+class AgentToolCall:
+    """Message representing a tool call from an agent."""
     tool_name: str
-    input: str 
+    arguments: Dict[str, Any]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the AgentToolCall to a dictionary for JSON serialization."""
+        return asdict(self)
 
 @dataclass(slots=True)
 class PlanApprovalRequest:

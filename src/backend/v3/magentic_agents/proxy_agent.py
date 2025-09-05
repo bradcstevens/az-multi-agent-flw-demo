@@ -100,9 +100,7 @@ class ProxyAgent(Agent):
         effective_user_id = user_id or current_user_id.get() or ""
         super().__init__(
             name="ProxyAgent",
-            description="""Call this agent when you need to clarify requests by asking the human user 
-            for more information. Ask it for more details about any unclear requirements, missing information, 
-            or if you need the user to elaborate on any aspect of the task.""",
+            description="Call this agent when you need to clarify requests by asking the human user for more information. Ask it for more details about any unclear requirements, missing information, or if you need the user to elaborate on any aspect of the task.",
             user_id=effective_user_id,
             **kwargs
         )
@@ -196,8 +194,6 @@ class ProxyAgent(Agent):
 
         # Send clarification request via streaming callbacks
         clarification_request = f"I need clarification about: {message}"
-        #self._create_message_content(clarification_request, thread.id)
-        # await self._trigger_streaming_callbacks(clarification_request)
 
         clarification_message = UserClarificationRequest(
             question=clarification_request,
