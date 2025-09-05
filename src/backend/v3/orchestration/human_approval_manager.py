@@ -106,15 +106,15 @@ Each step in the plan should start with a specific agent which is responsible fo
             # )
             
     
-    async def _wait_for_user_approval(self, plan_dot_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
+    async def _wait_for_user_approval(self, m_plan_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
         """Wait for user approval response."""
         
         # To do: implement timeout and error handling
-        if plan_dot_id not in orchestration_config.approvals:
-            orchestration_config.approvals[plan_dot_id] = None
-        while orchestration_config.approvals[plan_dot_id] is None:
+        if m_plan_id not in orchestration_config.approvals:
+            orchestration_config.approvals[m_plan_id] = None
+        while orchestration_config.approvals[m_plan_id] is None:
             await asyncio.sleep(0.2)
-        return messages.PlanApprovalResponse(approved=orchestration_config.approvals[plan_dot_id], plan_dot_id=plan_dot_id)
+        return messages.PlanApprovalResponse(approved=orchestration_config.approvals[m_plan_id], m_plan_id=m_plan_id)
 
     
     async def prepare_final_answer(self, magentic_context: MagenticContext) -> ChatMessageContent:

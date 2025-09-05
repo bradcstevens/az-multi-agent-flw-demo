@@ -49,7 +49,7 @@ class PlanApprovalRequest:
 @dataclass(slots=True)
 class PlanApprovalResponse:
     """Response for plan approval from the frontend."""
-    plan_dot_id: str
+    m_plan_id: str
     approved: bool
     feedback: str | None = None
     plan_id: str | None = None

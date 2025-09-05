@@ -255,7 +255,7 @@ export class APIService {
    * @returns Promise with approval response
    */
     async approvePlan(planApprovalData: PlanApprovalRequest): Promise<PlanApprovalResponse> {
-        const requestKey = `approve-plan-${planApprovalData.plan_dot_id}`;
+        const requestKey = `approve-plan-${planApprovalData.m_plan_id}`;
 
         return this._requestTracker.trackRequest(requestKey, async () => {
             console.log('📤 Approving plan via v3 API:', planApprovalData);

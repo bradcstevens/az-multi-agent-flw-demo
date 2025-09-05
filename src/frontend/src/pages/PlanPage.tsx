@@ -313,74 +313,9 @@ const PlanPage: React.FC = () => {
                 setSubmitting(false);
             }
         },
-        [planData?.plan, sessionId, showToast, dismissToast, loadPlanData]
+        [planData?.plan, showToast, dismissToast, loadPlanData]
     );
 
-    // Step approval handler - updated for v3 backend compatibility
-    const handleApproveStep = useCallback(
-        async (step: Step, total: number, completed: number, approve: boolean) => {
-            if (!planData?.plan) return;
-            setSubmitting(true);
-            setProcessingSubtaskId(step.id);
-            let id = showToast(
-                `${approve ? "Approving" : "Rejecting"} step`,
-                "progress"
-            );
-
-            try {
-                // For v3 backend, we might need to use plan approval instead of step approval
-                const isV3Backend = sessionId.startsWith('session_') || planData.plan.session_id?.startsWith('session_');
-
-                if (isV3Backend) {
-                    console.log('🚀 Submitting v3 plan approval:', {
-                        plan_dot_id: planData.plan.id,
-                        approved: approve,
-                        feedback: `Step ${step.id} ${approve ? 'approved' : 'rejected'} by user`
-                    });
-
-                    // Use v3 plan approval endpoint
-                    const response = await fetch('/api/v3/plan_approval', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            plan_dot_id: planData.plan.id,
-                            approved: approve,
-                            feedback: `Step ${step.id} ${approve ? 'approved' : 'rejected'} by user`
-                        }),
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || `Failed to ${approve ? 'approve' : 'reject'} step`);
-                    }
-                } else {
-                    // Use legacy method for non-v3 backends
-                    await PlanDataService.stepStatus(step, approve);
-                }
-
-                dismissToast(id);
-                showToast(
-                    `Step ${approve ? "approved" : "rejected"} successfully`,
-                    "success"
-                );
-                await loadPlanData(false);
-                setReloadLeftList(true);
-            } catch (error: any) {
-                dismissToast(id);
-                showToast(
-                    error?.message || `Failed to ${approve ? "approve" : "reject"} step`,
-                    "error"
-                );
-                console.error(`Failed to ${approve ? 'approve' : 'reject'} step:`, error);
-            } finally {
-                setProcessingSubtaskId(null);
-                setSubmitting(false);
-            }
-        },
-        [planData?.plan, sessionId, loadPlanData, showToast, dismissToast]
-    );
 
     // ✅ Handlers for PlanPanelLeft
     const handleNewTaskButton = useCallback(() => {

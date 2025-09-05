@@ -39,7 +39,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 }) => {
   const navigate = useNavigate();
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  
+
   // States
   const [planApprovalRequest, setPlanApprovalRequest] = useState<ParsedPlanData | null>(null);
   const [processingApproval, setProcessingApproval] = useState(false);
@@ -60,9 +60,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   useEffect(() => {
     const unsubscribe = webSocketService.on('parsed_plan_approval_request', (approvalRequest: any) => {
       console.log('📋 Plan received:', approvalRequest);
-      
+
       let parsedPlanData: ParsedPlanData | null = null;
-      
+
       // Handle the different message structures
       if (approvalRequest.parsedData) {
         // Direct parsedData property
@@ -100,12 +100,12 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   // Handle plan approval
   const handleApprovePlan = useCallback(async () => {
     if (!planApprovalRequest) return;
-    
+
     setProcessingApproval(true);
-    
+
     try {
       await apiService.approvePlan({
-        plan_dot_id: planApprovalRequest.id,
+        m_plan_id: planApprovalRequest.id,
         plan_id: planApprovalRequest.id,
         approved: true,
         feedback: userFeedback || 'Plan approved by user'
@@ -120,7 +120,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
       setShowFeedbackInput(false);
       onPlanApproval?.(true);
-      
+
     } catch (error) {
       console.error('❌ Failed to approve plan:', error);
     } finally {
@@ -131,12 +131,12 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   // Handle plan rejection  
   const handleRejectPlan = useCallback(async () => {
     if (!planApprovalRequest) return;
-    
+
     setProcessingApproval(true);
-    
+
     try {
       await apiService.approvePlan({
-        plan_dot_id: planApprovalRequest.id,
+        m_plan_id: planApprovalRequest.id,
         plan_id: planApprovalRequest.id,
         approved: false,
         feedback: userFeedback || 'Plan rejected by user'
@@ -151,7 +151,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
       onPlanApproval?.(false);
       navigate('/');
-      
+
     } catch (error) {
       console.error('❌ Failed to reject plan:', error);
       navigate('/');
@@ -166,31 +166,31 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     if (initialTask && initialTask.trim() && initialTask !== 'Task submitted') {
       return initialTask.trim();
     }
-    
+
     // Check parsed plan data
     if (planApprovalRequest) {
       // Check user_request field
-      if (planApprovalRequest.user_request && 
-          planApprovalRequest.user_request.trim() && 
-          planApprovalRequest.user_request !== 'Plan approval required') {
+      if (planApprovalRequest.user_request &&
+        planApprovalRequest.user_request.trim() &&
+        planApprovalRequest.user_request !== 'Plan approval required') {
         return planApprovalRequest.user_request.trim();
       }
-      
+
       // Check context task
-      if (planApprovalRequest.context?.task && 
-          planApprovalRequest.context.task.trim() &&
-          planApprovalRequest.context.task !== 'Plan approval required') {
+      if (planApprovalRequest.context?.task &&
+        planApprovalRequest.context.task.trim() &&
+        planApprovalRequest.context.task !== 'Plan approval required') {
         return planApprovalRequest.context.task.trim();
       }
     }
-    
+
     // Check planData
-    if (planData?.plan?.description && 
-        planData.plan.description.trim() &&
-        planData.plan.description !== 'Task submitted') {
+    if (planData?.plan?.description &&
+      planData.plan.description.trim() &&
+      planData.plan.description !== 'Task submitted') {
       return planData.plan.description.trim();
     }
-    
+
     // Default fallback
     // return 'Please create a plan for me';
   };
@@ -200,10 +200,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     const userTask = getUserTask();
 
     return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'flex-start', 
-        gap: '16px', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '16px',
         marginBottom: '32px',
         padding: '0 24px'
       }}>
@@ -241,10 +241,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     if (!waitingForPlan) return null;
 
     return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'flex-start', 
-        gap: '16px', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '16px',
         marginBottom: '32px',
         padding: '0 24px'
       }}>
@@ -285,10 +285,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     if (!planApprovalRequest) return null;
 
     return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'flex-start', 
-        gap: '16px', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '16px',
         marginBottom: '32px',
         padding: '0 24px'
       }}>
@@ -308,24 +308,24 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
         {/* Plan Content */}
         <div style={{ flex: 1, maxWidth: 'calc(100% - 48px)' }}>
-          
+
           {/* Plan Header */}
-          <div style={{ 
+          <div style={{
             marginBottom: '24px',
             borderBottom: '1px solid var(--colorNeutralStroke2)',
             paddingBottom: '16px'
           }}>
-            <h3 style={{ 
-              margin: '0 0 8px 0', 
+            <h3 style={{
+              margin: '0 0 8px 0',
               fontSize: '20px',
               fontWeight: '600',
               color: 'var(--colorNeutralForeground1)'
             }}>
               📋 Plan Generated
             </h3>
-            <div style={{ 
-              display: 'flex', 
-              gap: '12px', 
+            <div style={{
+              display: 'flex',
+              gap: '12px',
               alignItems: 'center',
               fontSize: '14px',
               color: 'var(--colorNeutralForeground2)'
@@ -340,15 +340,15 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           {/* Analysis Section */}
           {planApprovalRequest.facts && (
             <div style={{ marginBottom: '28px' }}>
-              <h4 style={{ 
-                margin: '0 0 12px 0', 
+              <h4 style={{
+                margin: '0 0 12px 0',
                 fontSize: '16px',
                 fontWeight: '600',
                 color: 'var(--colorNeutralForeground1)'
               }}>
                 🔍 Analysis & Context
               </h4>
-              <div style={{ 
+              <div style={{
                 padding: '20px',
                 backgroundColor: 'var(--colorNeutralBackground2)',
                 borderRadius: '12px',
@@ -362,28 +362,28 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
               </div>
             </div>
           )}
-          
+
           {/* Action Steps */}
           {planApprovalRequest.steps && planApprovalRequest.steps.length > 0 && (
             <div style={{ marginBottom: '28px' }}>
-              <h4 style={{ 
-                margin: '0 0 16px 0', 
+              <h4 style={{
+                margin: '0 0 16px 0',
                 fontSize: '16px',
                 fontWeight: '600',
                 color: 'var(--colorNeutralForeground1)'
               }}>
                 📝 Action Plan ({planApprovalRequest.steps.length} steps)
               </h4>
-              <div style={{ 
+              <div style={{
                 backgroundColor: 'var(--colorNeutralBackground1)',
                 borderRadius: '12px',
                 border: '1px solid var(--colorNeutralStroke2)',
                 overflow: 'hidden'
               }}>
                 {planApprovalRequest.steps.map((step, index) => (
-                  <div 
-                    key={index} 
-                    style={{ 
+                  <div
+                    key={index}
+                    style={{
                       padding: '20px',
                       borderBottom: index < planApprovalRequest.steps.length - 1 ? '1px solid var(--colorNeutralStroke2)' : 'none',
                       display: 'flex',
@@ -407,7 +407,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
                       {step.id}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ 
+                      <div style={{
                         fontSize: '15px',
                         lineHeight: '1.6',
                         marginBottom: step.agent && step.agent !== 'System' ? '8px' : '0'
@@ -431,8 +431,8 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           {/* Team Assignment */}
           {planApprovalRequest.team && planApprovalRequest.team.length > 0 && (
             <div style={{ marginBottom: '28px' }}>
-              <h4 style={{ 
-                margin: '0 0 12px 0', 
+              <h4 style={{
+                margin: '0 0 12px 0',
                 fontSize: '16px',
                 fontWeight: '600',
                 color: 'var(--colorNeutralForeground1)'
@@ -450,50 +450,50 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           )}
 
           {/* Agent Capabilities */}
-          {planApprovalRequest.context?.participant_descriptions && 
-           Object.keys(planApprovalRequest.context.participant_descriptions).length > 0 && (
-            <div style={{ marginBottom: '28px' }}>
-              <h4 style={{ 
-                margin: '0 0 12px 0', 
-                fontSize: '16px',
-                fontWeight: '600',
-                color: 'var(--colorNeutralForeground1)'
-              }}>
-                 Agent Capabilities
-              </h4>
-              <div style={{ 
-                padding: '16px',
-                backgroundColor: 'var(--colorNeutralBackground2)',
-                borderRadius: '12px',
-                border: '1px solid var(--colorNeutralStroke2)',
-                fontSize: '14px'
-              }}>
-                {Object.entries(planApprovalRequest.context.participant_descriptions).map(([agent, description]) => (
-                  <div key={agent} style={{ marginBottom: '12px' }}>
-                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>{agent}:</div>
-                    <div style={{ color: 'var(--colorNeutralForeground2)' }}>{description}</div>
-                  </div>
-                ))}
+          {planApprovalRequest.context?.participant_descriptions &&
+            Object.keys(planApprovalRequest.context.participant_descriptions).length > 0 && (
+              <div style={{ marginBottom: '28px' }}>
+                <h4 style={{
+                  margin: '0 0 12px 0',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: 'var(--colorNeutralForeground1)'
+                }}>
+                  Agent Capabilities
+                </h4>
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: 'var(--colorNeutralBackground2)',
+                  borderRadius: '12px',
+                  border: '1px solid var(--colorNeutralStroke2)',
+                  fontSize: '14px'
+                }}>
+                  {Object.entries(planApprovalRequest.context.participant_descriptions).map(([agent, description]) => (
+                    <div key={agent} style={{ marginBottom: '12px' }}>
+                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>{agent}:</div>
+                      <div style={{ color: 'var(--colorNeutralForeground2)' }}>{description}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Feedback Input Section - Separate from action buttons */}
           {showFeedbackInput && (
-            <div style={{ 
+            <div style={{
               marginBottom: '20px',
               padding: '20px',
               backgroundColor: 'var(--colorNeutralBackground2)',
               borderRadius: '12px',
               border: '1px solid var(--colorNeutralStroke2)'
             }}>
-              <h5 style={{ 
-                margin: '0 0 12px 0', 
+              <h5 style={{
+                margin: '0 0 12px 0',
                 fontSize: '16px',
                 fontWeight: '600',
                 color: 'var(--colorNeutralForeground1)'
               }}>
-                 Additional Feedback
+                Additional Feedback
               </h5>
               <Textarea
                 value={userFeedback}
@@ -525,9 +525,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           )}
 
           {/* Action Buttons - Separate section */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '12px', 
+          <div style={{
+            display: 'flex',
+            gap: '12px',
             alignItems: 'center',
             padding: '20px',
             backgroundColor: 'var(--colorNeutralBackground2)',
@@ -535,7 +535,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
             border: '1px solid var(--colorNeutralStroke2)',
             marginTop: '20px'
           }}>
-            <div style={{ 
+            <div style={{
               flex: 1,
               fontSize: '14px',
               color: 'var(--colorNeutralForeground2)'
@@ -553,7 +553,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
                 onClick={() => setShowFeedbackInput(true)}
                 size="medium"
               >
-                 Add Feedback
+                Add Feedback
               </Button>
             )}
 
@@ -592,9 +592,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
       backgroundColor: 'var(--colorNeutralBackground1)'
     }}>
       {/* Messages Container */}
-      <div 
+      <div
         ref={messagesContainerRef}
-        style={{ 
+        style={{
           flex: 1,
           overflow: 'auto',
           padding: '32px 0',
@@ -615,7 +615,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
       {/* Chat Input - only show if no plan is waiting for approval */}
       {!planApprovalRequest && (
-        <div style={{ 
+        <div style={{
           padding: '20px 24px 32px',
           borderTop: '1px solid var(--colorNeutralStroke2)',
           backgroundColor: 'var(--colorNeutralBackground1)',
@@ -629,8 +629,8 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
             onEnter={() => OnChatSubmit(input)}
             disabledChat={submittingChatDisableInput || waitingForPlan}
             placeholder={
-              waitingForPlan 
-                ? "Creating plan..." 
+              waitingForPlan
+                ? "Creating plan..."
                 : "Send a message..."
             }
           >

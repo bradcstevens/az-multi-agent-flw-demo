@@ -19,7 +19,7 @@ export interface StreamingPlanUpdate {
     status?: 'in_progress' | 'completed' | 'error' | 'creating_plan' | 'pending_approval';
     message_type?: 'thinking' | 'action' | 'result' | 'clarification_needed' | 'plan_approval_request';
     timestamp?: number;
-    is_final?: boolean; 
+    is_final?: boolean;
 }
 
 export interface PlanApprovalRequestData {
@@ -85,10 +85,10 @@ class WebSocketService {
                 this.isConnecting = true;
 
                 // Use v3 WebSocket endpoint format
-                const wsUrl = processId 
+                const wsUrl = processId
                     ? `${this.baseWsUrl}/api/v3/socket/${processId}`
                     : `${this.baseWsUrl}/api/v3/socket/${sessionId}`;
-                
+
                 console.log('Connecting to WebSocket:', wsUrl);
                 this.ws = new WebSocket(wsUrl);
 
@@ -96,7 +96,7 @@ class WebSocketService {
                     console.log('WebSocket connected successfully');
                     this.isConnecting = false;
                     this.reconnectAttempts = 0;
-                    
+
                     if (this.reconnectTimer) {
                         clearTimeout(this.reconnectTimer);
                         this.reconnectTimer = null;
@@ -129,7 +129,7 @@ class WebSocketService {
                 this.ws.onerror = (event) => {
                     console.error('WebSocket error:', event);
                     this.isConnecting = false;
-                    
+
                     if (this.reconnectAttempts === 0) {
                         reject(new Error('WebSocket connection failed'));
                     }
@@ -304,10 +304,10 @@ class WebSocketService {
 
         if (message.type === 'plan_approval_request') {
             console.log('Plan approval request received via WebSocket:', message.data);
-            
+
             // Parse the raw Python object string using PlanDataService
             const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
-            
+
             if (parsedData) {
                 // Emit a structured plan approval request
                 const structuredMessage: ParsedPlanApprovalRequest = {
@@ -316,7 +316,7 @@ class WebSocketService {
                     parsedData: parsedData,
                     rawData: message.data
                 };
-                
+
                 this.emit('parsed_plan_approval_request', structuredMessage);
                 console.log('Parsed plan approval request:', structuredMessage);
             } else {
@@ -328,11 +328,11 @@ class WebSocketService {
         // Handle agent messages from the callback system (without plan_id)
         else if (message.type === 'agent_message' && message.data && !message.data.plan_id) {
             console.log('Agent callback message received:', message.data);
-            
+
             // Transform the callback message format to match the expected streaming format
             // We'll need to get the current plan_id from somewhere - let's use the current subscription
             const currentPlanIds = Array.from(this.planSubscriptions);
-            
+
             if (currentPlanIds.length > 0) {
                 const transformedMessage: StreamMessage = {
                     ...message,
@@ -345,7 +345,7 @@ class WebSocketService {
                         timestamp: Date.now() / 1000
                     }
                 };
-                
+
                 console.log('Transformed agent message for plan:', transformedMessage.data.plan_id);
                 this.emit(message.type, transformedMessage);
             } else {
@@ -356,10 +356,10 @@ class WebSocketService {
         // Handle streaming messages from the callback system
         else if (message.type === 'streaming_message' && message.data && !message.data.plan_id) {
             console.log('Streaming callback message received:', message.data);
-            
+
             // Transform streaming message format
             const currentPlanIds = Array.from(this.planSubscriptions);
-            
+
             if (currentPlanIds.length > 0) {
                 const transformedMessage: StreamMessage = {
                     type: 'agent_message', // Convert streaming_message to agent_message
@@ -372,7 +372,7 @@ class WebSocketService {
                         timestamp: Date.now() / 1000
                     }
                 };
-                
+
                 console.log('Transformed streaming message for plan:', transformedMessage.data.plan_id);
                 this.emit('agent_message', transformedMessage);
             }
@@ -453,18 +453,18 @@ class WebSocketService {
         try {
             // Send in v3 expected format
             const v3Response = {
-                plan_dot_id: response.plan_id, // v3 backend expects 'plan_dot_id'
+                m_plan_id: response.plan_id, // v3 backend expects 'm_plan_id'
                 approved: response.approved,
                 feedback: response.feedback || response.user_response || response.human_clarification || '',
             };
-            
+
             console.log('📤 Sending v3 plan approval response:', v3Response);
-            
+
             const message = {
                 type: 'plan_approval_response',
                 data: v3Response
             };
-            
+
             this.ws.send(JSON.stringify(message));
             console.log('Plan approval response sent successfully');
         } catch (error) {

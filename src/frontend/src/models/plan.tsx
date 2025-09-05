@@ -166,7 +166,7 @@ export interface ParsedPlanData {
 }
 
 export interface PlanApprovalRequest {
-    plan_dot_id: string;
+    m_plan_id: string;
     plan_id: string;
     approved: boolean;
     feedback?: string;

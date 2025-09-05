@@ -358,27 +358,27 @@ async def plan_approval(
             status_code=401, detail="Missing or invalid user information"
         )
     # Set the approval in the orchestration config
-    if user_id and human_feedback.plan_dot_id:
+    if user_id and human_feedback.m_plan_id:
         if (
             orchestration_config
-            and human_feedback.plan_dot_id in orchestration_config.approvals
+            and human_feedback.m_plan_id in orchestration_config.approvals
         ):
-            orchestration_config.approvals[human_feedback.plan_dot_id] = (
+            orchestration_config.approvals[human_feedback.m_plan_id] = (
                 human_feedback.approved
             )
-            orchestration_config.plans[human_feedback.plan_dot_id][
+            orchestration_config.plans[human_feedback.m_plan_id][
                 "plan_id"
             ] = human_feedback.plan_id
             print("Plan approval received:", human_feedback)
             print(
                 "Updated orchestration config:",
-                orchestration_config.plans[human_feedback.plan_dot_id],
+                orchestration_config.plans[human_feedback.m_plan_id],
             )
             track_event_if_configured(
                 "PlanApprovalReceived",
                 {
                     "plan_id": human_feedback.plan_id,
-                    "plan_dot_id": human_feedback.plan_dot_id,
+                    "m_plan_id": human_feedback.m_plan_id,
                     "approved": human_feedback.approved,
                     "user_id": user_id,
                     "feedback": human_feedback.feedback,
@@ -387,7 +387,7 @@ async def plan_approval(
             return {"status": "approval recorded"}
         else:
             logging.warning(
-                f"No orchestration or plan found for plan_id: {human_feedback.plan_dot_id}"
+                f"No orchestration or plan found for plan_id: {human_feedback.m_plan_id}"
             )
             raise HTTPException(
                 status_code=404, detail="No active plan found for approval"
