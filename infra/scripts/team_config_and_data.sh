@@ -49,7 +49,7 @@ isTeamConfigFailed=false
 isSampleDataFailed=false
 
 echo "Uploading team configuration..."
-bash upload_team_config.sh "$backendUrl" "$directoryPath"
+bash infra/scripts/upload_team_config.sh "$backendUrl" "$directoryPath"
 if [ $? -ne 0 ]; then
     echo "Error: Team configuration upload failed."
     isTeamConfigFailed=true
@@ -61,7 +61,7 @@ echo "----------------------------------------"
 echo ""
 
 echo "Processing sample data..."
-bash process_sample_data.sh "$storageAccount" "$blobContainer" "$aiSearch" "$aiSearchIndex" "$resourceGroup"
+bash infra/scripts/process_sample_data.sh "$storageAccount" "$blobContainer" "$aiSearch" "$aiSearchIndex" "$resourceGroup"
 if [ $? -ne 0 ]; then
     echo "Error: Sample data processing failed."
     isSampleDataFailed=true
