@@ -1,8 +1,7 @@
 
-````markdown
 # 🌐 Grounding with Bing Search — Quick Setup
 
-This guide explains how to **create a Bing Search Grounding resource** and **connect it to your Azure AI Foundry project**.
+This guide walks you through setting up Grounding with Bing Search and connecting it to your Azure AI Foundry project. This tool enables your AI agents to retrieve real-time public web data, enhancing responses with up-to-date information.
 
 ---
 
@@ -15,7 +14,6 @@ This guide explains how to **create a Bing Search Grounding resource** and **con
 
   ```bash
   az provider register --namespace Microsoft.Bing
-````
 
 ⚠️ **Important:**
 Bing Search Grounding only supports **API key authentication**.
