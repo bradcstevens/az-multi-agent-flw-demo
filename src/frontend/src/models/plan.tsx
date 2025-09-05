@@ -141,7 +141,7 @@ export interface PlanChatProps {
     onPlanApproval?: (approved: boolean) => void;
 }
 
-export interface ParsedPlanData {
+export interface MPlanData {
     id: string;
     status: string;
     user_request: string;

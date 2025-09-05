@@ -12,7 +12,7 @@ import {
   ClockRegular,
   PersonRegular,
 } from "@fluentui/react-icons";
-import { ParsedPlanData } from "../../models";
+import { MPlanData } from "../../models";
 import { TaskService } from "../../services/TaskService";
 import { Step } from "../../models/plan";
 import { PlanDataService } from "../../services/PlanDataService";
@@ -59,7 +59,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   wsConnected = false,
 }) => {
   const [groupedStreamingMessages, setGroupedStreamingMessages] = useState<GroupedMessage[]>([]);
-  const [planApprovalRequest, setPlanApprovalRequest] = useState<ParsedPlanData | null>(null);
+  const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
   const [hasStreamingStarted, setHasStreamingStarted] = useState(false);
 
   // Helper function to get clean agent display name

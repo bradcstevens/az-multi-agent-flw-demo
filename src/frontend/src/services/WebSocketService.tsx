@@ -1,6 +1,6 @@
 import { headerBuilder } from '../api/config';
 import { PlanDataService } from './PlanDataService';
-import { ParsedPlanData } from '../models';
+import { MPlanData } from '../models';
 
 export interface StreamMessage {
     type: 'plan_update' | 'step_update' | 'agent_message' | 'error' | 'connection_status' | 'plan_approval_request' | 'final_result' | 'parsed_plan_approval_request' | 'streaming_message';
@@ -49,7 +49,7 @@ export interface PlanApprovalResponseData {
 export interface ParsedPlanApprovalRequest {
     type: 'parsed_plan_approval_request';
     plan_id: string;
-    parsedData: ParsedPlanData;
+    parsedData: MPlanData;
     rawData: string;
 }
 

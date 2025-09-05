@@ -4,7 +4,7 @@ import {
   AgentType,
   ProcessedPlanData,
   PlanMessage,
-  ParsedPlanData,
+  MPlanData,
   StepStatus
 } from "@/models";
 import { apiService } from "@/api";
@@ -152,7 +152,7 @@ export class PlanDataService {
   }
 
 
-  static parsePlanApprovalRequest(rawData: any): ParsedPlanData | null {
+  static parsePlanApprovalRequest(rawData: any): MPlanData | null {
     try {
       console.log('🔍 Parsing plan approval request:', rawData, 'Type:', typeof rawData);
 

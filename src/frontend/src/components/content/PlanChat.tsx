@@ -15,15 +15,17 @@ import {
   PersonRegular,
   BotRegular,
 } from "@fluentui/react-icons";
-import { PlanChatProps, ParsedPlanData } from "../../models/plan";
+import { PlanChatProps, MPlanData } from "../../models/plan";
 import webSocketService from "../../services/WebSocketService";
 import { PlanDataService } from "../../services/PlanDataService";
 import { apiService } from "../../api/apiService";
 import { useNavigate } from "react-router-dom";
 import ChatInput from "../../coral/modules/ChatInput";
-
+import InlineToaster, {
+  useInlineToaster,
+} from "../toast/InlineToaster";
 interface SimplifiedPlanChatProps extends PlanChatProps {
-  onPlanReceived?: (planData: ParsedPlanData) => void;
+  onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
 }
 
@@ -39,9 +41,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 }) => {
   const navigate = useNavigate();
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-
+  const { showToast, dismissToast } = useInlineToaster();
   // States
-  const [planApprovalRequest, setPlanApprovalRequest] = useState<ParsedPlanData | null>(null);
+  const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
   const [processingApproval, setProcessingApproval] = useState(false);
   const [waitingForPlan, setWaitingForPlan] = useState(true);
   const [userFeedback, setUserFeedback] = useState('');
@@ -61,33 +63,33 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     const unsubscribe = webSocketService.on('parsed_plan_approval_request', (approvalRequest: any) => {
       console.log('📋 Plan received:', approvalRequest);
 
-      let parsedPlanData: ParsedPlanData | null = null;
+      let mPlanData: MPlanData | null = null;
 
       // Handle the different message structures
       if (approvalRequest.parsedData) {
         // Direct parsedData property
-        parsedPlanData = approvalRequest.parsedData;
+        mPlanData = approvalRequest.parsedData;
       } else if (approvalRequest.data && typeof approvalRequest.data === 'object') {
         // Data property with nested object
         if (approvalRequest.data.parsedData) {
-          parsedPlanData = approvalRequest.data.parsedData;
+          mPlanData = approvalRequest.data.parsedData;
         } else {
           // Try to parse the data object directly
-          parsedPlanData = approvalRequest.data;
+          mPlanData = approvalRequest.data;
         }
       } else if (approvalRequest.rawData) {
         // Parse the raw data string
-        parsedPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest.rawData);
+        mPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest.rawData);
       } else {
         // Try to parse the entire object
-        parsedPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest);
+        mPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest);
       }
 
-      if (parsedPlanData) {
-        console.log('✅ Parsed plan data:', parsedPlanData);
-        setPlanApprovalRequest(parsedPlanData);
+      if (mPlanData) {
+        console.log('✅ Parsed plan data:', mPlanData);
+        setPlanApprovalRequest(mPlanData);
         setWaitingForPlan(false);
-        onPlanReceived?.(parsedPlanData);
+        onPlanReceived?.(mPlanData);
         scrollToBottom();
       } else {
         console.error('❌ Failed to parse plan data', approvalRequest);
@@ -102,63 +104,55 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     if (!planApprovalRequest) return;
 
     setProcessingApproval(true);
-
+    let id = showToast("Submitting Approval", "progress");
     try {
       await apiService.approvePlan({
         m_plan_id: planApprovalRequest.id,
-        plan_id: planApprovalRequest.id,
+        plan_id: planData?.plan?.id,
         approved: true,
         feedback: userFeedback || 'Plan approved by user'
       });
 
-      webSocketService.sendPlanApprovalResponse({
-        plan_id: planApprovalRequest.id,
-        session_id: planData?.plan?.session_id || '',
-        approved: true,
-        feedback: userFeedback || 'Plan approved by user'
-      });
-
+      dismissToast(id);
       setShowFeedbackInput(false);
       onPlanApproval?.(true);
 
     } catch (error) {
+      dismissToast(id);
+      showToast("Failed to submit approval", "error");
       console.error('❌ Failed to approve plan:', error);
     } finally {
       setProcessingApproval(false);
     }
-  }, [planApprovalRequest, planData?.plan?.session_id, userFeedback, onPlanApproval]);
+  }, [planApprovalRequest, planData, userFeedback, onPlanApproval]);
 
   // Handle plan rejection  
   const handleRejectPlan = useCallback(async () => {
     if (!planApprovalRequest) return;
 
     setProcessingApproval(true);
-
+    let id = showToast("Submitting cancellation", "progress");
     try {
       await apiService.approvePlan({
         m_plan_id: planApprovalRequest.id,
-        plan_id: planApprovalRequest.id,
+        plan_id: planData?.plan?.id,
         approved: false,
         feedback: userFeedback || 'Plan rejected by user'
       });
 
-      webSocketService.sendPlanApprovalResponse({
-        plan_id: planApprovalRequest.id,
-        session_id: planData?.plan?.session_id || '',
-        approved: false,
-        feedback: userFeedback || 'Plan rejected by user'
-      });
-
+      dismissToast(id);
       onPlanApproval?.(false);
       navigate('/');
 
     } catch (error) {
+      dismissToast(id);
+      showToast("Failed to submit cancellation", "error");
       console.error('❌ Failed to reject plan:', error);
       navigate('/');
     } finally {
       setProcessingApproval(false);
     }
-  }, [planApprovalRequest, planData?.plan?.session_id, onPlanApproval, navigate]);
+  }, [planApprovalRequest, planData, onPlanApproval, navigate]);
 
   // Extract user task with better fallback logic
   const getUserTask = () => {
@@ -478,51 +472,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
               </div>
             )}
 
-          {/* Feedback Input Section - Separate from action buttons */}
-          {showFeedbackInput && (
-            <div style={{
-              marginBottom: '20px',
-              padding: '20px',
-              backgroundColor: 'var(--colorNeutralBackground2)',
-              borderRadius: '12px',
-              border: '1px solid var(--colorNeutralStroke2)'
-            }}>
-              <h5 style={{
-                margin: '0 0 12px 0',
-                fontSize: '16px',
-                fontWeight: '600',
-                color: 'var(--colorNeutralForeground1)'
-              }}>
-                Additional Feedback
-              </h5>
-              <Textarea
-                value={userFeedback}
-                onChange={(_, data) => setUserFeedback(data.value)}
-                placeholder="Add any specific feedback, modifications, or comments..."
-                rows={3}
-                style={{ width: '100%', marginBottom: '12px' }}
-              />
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <Button
-                  appearance="subtle"
-                  onClick={() => {
-                    setShowFeedbackInput(false);
-                    setUserFeedback('');
-                  }}
-                  size="small"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  appearance="outline"
-                  onClick={() => setShowFeedbackInput(false)}
-                  size="small"
-                >
-                  Save Feedback
-                </Button>
-              </div>
-            </div>
-          )}
 
           {/* Action Buttons - Separate section */}
           <div style={{
@@ -540,33 +489,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
               fontSize: '14px',
               color: 'var(--colorNeutralForeground2)'
             }}>
-              {userFeedback ? (
-                <span> Feedback added</span>
-              ) : (
-                <span>Ready for approval</span>
-              )}
+              <span>Ready for approval</span>
+
             </div>
-
-            {!showFeedbackInput && (
-              <Button
-                appearance="subtle"
-                onClick={() => setShowFeedbackInput(true)}
-                size="medium"
-              >
-                Add Feedback
-              </Button>
-            )}
-
-            <Button
-              appearance="outline"
-              icon={<DismissRegular />}
-              onClick={handleRejectPlan}
-              disabled={processingApproval}
-              size="medium"
-              style={{ minWidth: '100px' }}
-            >
-              Reject
-            </Button>
 
             <Button
               appearance="primary"
@@ -576,7 +501,17 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
               size="medium"
               style={{ minWidth: '140px' }}
             >
-              {processingApproval ? 'Processing...' : 'Approve & Execute'}
+              {processingApproval ? 'Processing...' : 'Approve'}
+            </Button>
+            <Button
+              appearance="outline"
+              icon={<DismissRegular />}
+              onClick={handleRejectPlan}
+              disabled={processingApproval}
+              size="medium"
+              style={{ minWidth: '100px' }}
+            >
+              Cancel
             </Button>
           </div>
         </div>
