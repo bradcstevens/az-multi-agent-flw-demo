@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import os
+
 # Azure monitoring
 import re
 import uuid
@@ -12,20 +13,35 @@ from auth.auth_utils import get_authenticated_user_details
 from azure.monitor.opentelemetry import configure_azure_monitor
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (AgentMessage, AgentType,
-                                           HumanClarification, HumanFeedback,
-                                           InputTask, Plan, PlanStatus,
-                                           PlanWithSteps, Step, UserLanguage)
+from common.models.messages_kernel import (
+    AgentMessage,
+    AgentType,
+    HumanClarification,
+    HumanFeedback,
+    InputTask,
+    Plan,
+    PlanStatus,
+    PlanWithSteps,
+    Step,
+    UserLanguage,
+)
 from common.utils.event_utils import track_event_if_configured
 
 # Updated import for KernelArguments
 from common.utils.utils_kernel import rai_success
 
 # FastAPI imports
-from fastapi import (FastAPI, HTTPException, Query, Request, WebSocket,
-                     WebSocketDisconnect)
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
+
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
 from common.utils.utils_date import format_dates_in_messages
@@ -70,12 +86,7 @@ frontend_url = config.FRONTEND_SITE_NAME
 # Add this near the top of your app.py, after initializing the app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",    # Add this for local development
-        "https://localhost:3000",   # Add this if using HTTPS locally
-        "https://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-    ],  # Allow all origins for development; restrict in production
+    allow_origins=["*"],  # Allow all origins for development; restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,6 +97,7 @@ app.add_middleware(HealthCheckMiddleware, password="", checks={})
 # v3 endpoints
 app.include_router(app_v3)
 logging.info("Added health check middleware")
+
 
 @app.post("/api/user_browser_language")
 async def user_browser_language_endpoint(user_language: UserLanguage, request: Request):
@@ -665,7 +677,6 @@ async def get_plans(
             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
         )
         raise HTTPException(status_code=400, detail="no user")
-  
 
     #### <To do: Francia> Replace the following with code to get plan run history from the database
 
@@ -699,8 +710,8 @@ async def get_plans(
 
     current_team = await memory_store.get_current_team(user_id=user_id)
     if not current_team:
-      return []
-    
+        return []
+
     all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
     # Fetch steps for all plans concurrently
     steps_for_all_plans = await asyncio.gather(
@@ -714,7 +725,8 @@ async def get_plans(
         list_of_plans_with_steps.append(plan_with_steps)
 
     return []
-    
+
+
 @app.get("/api/steps/{plan_id}", response_model=List[Step])
 async def get_steps_by_plan(plan_id: str, request: Request) -> List[Step]:
     """
