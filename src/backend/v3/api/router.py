@@ -5,6 +5,8 @@ import logging
 import uuid
 from typing import Optional
 
+from common.utils.utils_date import format_dates_in_messages
+from common.config.app_config import config
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.database.database_factory import DatabaseFactory
@@ -12,6 +14,7 @@ from common.models.messages_kernel import (
     InputTask,
     Plan,
     PlanStatus,
+    PlanWithSteps,
     TeamSelectionRequest,
 )
 from common.utils.event_utils import track_event_if_configured
@@ -273,12 +276,16 @@ async def process_request(
         plan_id = str(uuid.uuid4())
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        user_current_team = await memory_store.get_current_team(user_id=user_id)
+        team_id = None
+        if user_current_team:
+            team_id = user_current_team.team_id
         plan = Plan(
             id=plan_id,
             plan_id=plan_id,
             user_id=user_id,
             session_id=input_task.session_id,
-            team_id=None,  # TODO add current_team_id
+            team_id=team_id,
             initial_goal=input_task.description,
             overall_status=PlanStatus.in_progress,
         )
