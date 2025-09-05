@@ -316,119 +316,6 @@ export class APIService {
     }
 
 
-    /**
-     * Update a step with new status and optional feedback
-     * @param sessionId Session ID
-     * @param planId Plan ID
-     * @param stepId Step ID
-     * @param update Update object with status and optional feedback
-     * @returns Promise with the updated step
-     */
-    async updateStep(
-        sessionId: string,
-        planId: string,
-        stepId: string,
-        update: {
-            status: StepStatus;
-            human_feedback?: string;
-            updated_action?: string;
-        }
-    ): Promise<Step> {
-        const response = await this.provideStepFeedback(
-            stepId,
-            planId,
-            sessionId,
-            update.status === StepStatus.APPROVED,
-            update.human_feedback,
-            update.updated_action
-        );
-
-        // Invalidate cached data
-        this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
-        this._cache.invalidate(new RegExp(`^plans_`));
-
-        // Get fresh step data
-        const steps = await this.getSteps(planId, false); // Force fresh data
-        const updatedStep = steps.find(step => step.id === stepId);
-
-        if (!updatedStep) {
-            throw new Error(`Step with ID ${stepId} not found after update`);
-        }
-
-        return updatedStep;
-    }
-
-    /**
-     * Provide feedback for a specific step
-     * @param stepId Step ID
-     * @param planId Plan ID
-     * @param sessionId Session ID
-     * @param approved Whether the step is approved
-     * @param humanFeedback Optional human feedback
-     * @param updatedAction Optional updated action
-     * @returns Promise with response object
-     */
-    async provideStepFeedback(
-        stepId: string,
-        planId: string,
-        sessionId: string,
-        approved: boolean,
-        humanFeedback?: string,
-        updatedAction?: string
-    ): Promise<{ status: string; session_id: string; step_id: string }> {
-        const response = await apiClient.post(
-            API_ENDPOINTS.HUMAN_FEEDBACK,
-            {
-                step_id: stepId,
-                plan_id: planId,
-                session_id: sessionId,
-                approved,
-                human_feedback: humanFeedback,
-                updated_action: updatedAction
-            }
-        );
-
-        // Invalidate cached data
-        this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
-        this._cache.invalidate(new RegExp(`^plans_`));
-
-        return response;
-    }
-
-
-
-    /**
-     * Approve one or more steps
-     * @param planId Plan ID
-     * @param sessionId Session ID
-     * @param approved Whether the step(s) are approved
-     * @param stepId Optional specific step ID
-     * @param humanFeedback Optional human feedback
-     * @param updatedAction Optional updated action
-     * @returns Promise with response object
-     */
-    async stepStatus(
-        planId: string,
-        sessionId: string,
-        approved: boolean,
-        stepId?: string,
-    ): Promise<{ status: string }> {
-        const response = await apiClient.post(
-            API_ENDPOINTS.APPROVE_STEPS,
-            {
-                step_id: stepId,
-                plan_id: planId,
-                session_id: sessionId,
-                approved
-            }
-        );
-
-        // Invalidate cached data
-        this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
-        this._cache.invalidate(new RegExp(`^plans_`));
-
-        return response;
-    }
 
     /**
      * Submit clarification for a plan
@@ -523,36 +410,6 @@ export class APIService {
         return fetcher();
     }
 
-    // Utility methods
-
-    /**
-     * Check if a plan is complete (all steps are completed or failed)
-     * @param plan Plan with steps
-     * @returns Boolean indicating if plan is complete
-     */
-    isPlanComplete(plan: PlanWithSteps): boolean {
-        return plan.steps.every(step =>
-            [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
-        );
-    }
-
-    /**
-     * Get steps that are awaiting human feedback
-     * @param plan Plan with steps
-     * @returns Array of steps awaiting feedback
-     */
-    getStepsAwaitingFeedback(plan: PlanWithSteps): Step[] {
-        return plan.steps.filter(step => step.status === StepStatus.AWAITING_FEEDBACK);
-    }    /**
-     * Get steps assigned to a specific agent type
-     * @param plan Plan with steps
-     * @param agentType Agent type to filter by
-     * @returns Array of steps for the specified agent
-     */
-    getStepsForAgent(plan: PlanWithSteps, agentType: AgentType): Step[] {
-        return plan.steps.filter(step => step.agent === agentType);
-    }
-
     /**
      * Clear all cached data
      */
@@ -560,38 +417,7 @@ export class APIService {
         this._cache.clear();
     }
 
-    /**
-     * Get progress status counts for a plan
-     * @param plan Plan with steps
-     * @returns Object with counts for each step status
-     */
-    getPlanProgressStatus(plan: PlanWithSteps): Record<StepStatus, number> {
-        const result = Object.values(StepStatus).reduce((acc, status) => {
-            acc[status] = 0;
-            return acc;
-        }, {} as Record<StepStatus, number>);
 
-        plan.steps.forEach(step => {
-            result[step.status]++;
-        });
-
-        return result;
-    }
-
-    /**
-     * Get completion percentage for a plan
-     * @param plan Plan with steps
-     * @returns Completion percentage (0-100)
-     */
-    getPlanCompletionPercentage(plan: PlanWithSteps): number {
-        if (!plan.steps.length) return 0;
-
-        const completedSteps = plan.steps.filter(
-            step => [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
-        ).length;
-
-        return Math.round((completedSteps / plan.steps.length) * 100);
-    }
 
     /**
      * Send the user's browser language to the backend

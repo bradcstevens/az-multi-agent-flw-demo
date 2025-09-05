@@ -2,7 +2,7 @@ import { PlanWithSteps, PlanStatus } from "../models";
 import { Task } from "../models/taskList";
 import { apiService } from "../api/apiService";
 import { InputTask, InputTaskResponse } from "../models/inputTask";
-import { formatDate } from "@/utils/utils";
+import { PlanDataService } from "./PlanDataService";
 
 /**
  * TaskService - Service for handling task-related operations and transformations
@@ -30,7 +30,7 @@ export class TaskService {
         name: plan.title,
         completed_steps: plan.completed,
         total_steps: plan.total_steps,
-        status: apiService.isPlanComplete(plan) ? "completed" : "inprogress",
+        status: PlanDataService.isPlanComplete(plan) ? "completed" : "inprogress",
         date: new Intl.DateTimeFormat(undefined, {
           dateStyle: "long",
           // timeStyle: "short",
@@ -40,7 +40,7 @@ export class TaskService {
       // Categorize based on plan status and completion
       if (
         plan.status === PlanStatus.COMPLETED ||
-        apiService.isPlanComplete(plan)
+        PlanDataService.isPlanComplete(plan)
       ) {
         completed.push(task);
       } else {
