@@ -23,7 +23,7 @@ export class TeamService {
      * Initialize user's team with default HR team configuration
      * This calls the backend /init_team endpoint which sets up the default team
      */
-    static async initializeTeam(): Promise<{
+    static async initializeTeam(team_switched: boolean = false): Promise<{
         success: boolean;
         data?: {
             status: string;
@@ -33,7 +33,11 @@ export class TeamService {
     }> {
         try {
             console.log('Calling /v3/init_team endpoint...');
-            const response = await apiClient.get('/v3/init_team');
+            const response = await apiClient.get('/v3/init_team', {
+                params: {
+                    team_switched
+                }
+            });
 
             console.log('Team initialization response:', response);
 

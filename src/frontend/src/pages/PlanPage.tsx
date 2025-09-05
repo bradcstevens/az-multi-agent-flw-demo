@@ -1,37 +1,33 @@
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-    Text,
-    ToggleButton,
-    Toast,
-    ToastTitle,
-    ToastBody,
-    useToastController,
-} from "@fluentui/react-components";
-import { apiService } from "../api/apiService";
-import "../styles/PlanPage.css";
+import { Spinner, Text } from "@fluentui/react-components";
+import { PlanDataService } from "../services/PlanDataService";
+import { ProcessedPlanData, PlanWithSteps } from "../models";
+import PlanChat from "../components/content/PlanChat";
+import PlanPanelRight from "../components/content/PlanPanelRight";
+import PlanPanelLeft from "../components/content/PlanPanelLeft";
 import CoralShellColumn from "../coral/components/Layout/CoralShellColumn";
 import CoralShellRow from "../coral/components/Layout/CoralShellRow";
 import Content from "../coral/components/Content/Content";
-import { NewTaskService } from "../services/NewTaskService";
-import { PlanDataService } from "../services/PlanDataService";
-import { Step, ProcessedPlanData } from "@/models";
-import PlanPanelLeft from "@/components/content/PlanPanelLeft";
-import ContentToolbar from "@/coral/components/Content/ContentToolbar";
-import PlanChat from "@/components/content/PlanChat";
-import PlanPanelRight from "@/components/content/PlanPanelRight";
-import InlineToaster, {
+import ContentToolbar from "../coral/components/Content/ContentToolbar";
+import {
     useInlineToaster,
 } from "../components/toast/InlineToaster";
-import Octo from "../coral/imports/Octopus.png"; // 🐙 Animated PNG loader
-import PanelRightToggles from "@/coral/components/Header/PanelRightToggles";
-import { TaskListSquareLtr } from "@/coral/imports/bundleicons";
-import LoadingMessage, { loadingMessages } from "@/coral/components/LoadingMessage";
+import Octo from "../coral/imports/Octopus.png";
+import PanelRightToggles from "../coral/components/Header/PanelRightToggles";
+import { TaskListSquareLtr } from "../coral/imports/bundleicons";
+import LoadingMessage, { loadingMessages } from "../coral/components/LoadingMessage";
 import { RAIErrorCard, RAIErrorData } from "../components/errors";
 import { TeamConfig } from "../models/Team";
 import { TeamService } from "../services/TeamService";
-import { webSocketService, StreamMessage, StreamingPlanUpdate } from "../services/WebSocketService";
+import webSocketService, { StreamMessage, StreamingPlanUpdate } from "../services/WebSocketService";
+import { APIService } from "../api/apiService";
+import { Step } from "../models/plan";
 
+import "../styles/PlanPage.css"
+
+// Create API service instance
+const apiService = new APIService();
 
 /**
  * Page component for displaying a specific plan
@@ -41,7 +37,6 @@ const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
     const { showToast, dismissToast } = useInlineToaster();
-    const { dispatchToast } = useToastController("toast");
 
     const [input, setInput] = useState("");
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
@@ -53,179 +48,193 @@ const PlanPage: React.FC = () => {
         null
     );
     const [reloadLeftList, setReloadLeftList] = useState(true);
-    const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
-    const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
+
+    // WebSocket connection state
+    const [wsConnected, setWsConnected] = useState(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
-    const [wsConnected, setWsConnected] = useState<boolean>(false);
 
-    const loadPlanDataRef = useRef<((navigate?: boolean) => Promise<void>) | null>(null);
+    // RAI Error state
+    const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
 
-    const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
+    // Team config state
+    const [teamConfig, setTeamConfig] = useState<TeamConfig | null>(null);
+    const [loadingTeamConfig, setLoadingTeamConfig] = useState(true);
 
-    // WebSocket connection and streaming setup
+    // Plan approval state - track when plan is approved
+    const [planApproved, setPlanApproved] = useState(false);
+
+    const [loadingMessage, setLoadingMessage] = useState<string>(loadingMessages[0]);
+
+    // Use ref to store the function to avoid stale closure issues
+    const loadPlanDataRef = useRef<() => Promise<ProcessedPlanData[]>>();
+
+
+    // Loading message rotation effect
     useEffect(() => {
-        const initializeWebSocket = async () => {
-            // Only connect if not already connected
-            if (!webSocketService.isConnected()) {
-                try {
-                    await webSocketService.connect(planId);
-                    setWsConnected(true);
-                } catch (error) {
-                    console.error('Failed to connect to WebSocket:', error);
-                    setWsConnected(false);
-                }
-            } else {
-                // Already connected
-                setWsConnected(true);
-            }
-        };
-
-        initializeWebSocket();
-
-        // Set up WebSocket event listeners
-        const unsubscribeConnectionStatus = webSocketService.on('connection_status', (message: StreamMessage) => {
-            setWsConnected(message.data?.connected || false);
-        });
-
-        const unsubscribePlanUpdate = webSocketService.on('plan_update', (message: StreamMessage) => {
-            if (message.data && message.data.plan_id === planId) {
-                console.log('Plan update received:', message.data);
-                setStreamingMessages(prev => [...prev, message.data as StreamingPlanUpdate]);
-
-                // Refresh plan data for major updates
-                if (message.data.status === 'completed' && loadPlanDataRef.current) {
-                    loadPlanDataRef.current(false);
-                }
-            }
-        });
-
-        const unsubscribeStepUpdate = webSocketService.on('step_update', (message: StreamMessage) => {
-            if (message.data && message.data.plan_id === planId) {
-                console.log('Step update received:', message.data);
-                setStreamingMessages(prev => [...prev, message.data as StreamingPlanUpdate]);
-            }
-        });
-
-        const unsubscribeAgentMessage = webSocketService.on('agent_message', (message: StreamMessage) => {
-            if (message.data && message.data.plan_id === planId) {
-                console.log('Agent message received:', message.data);
-                setStreamingMessages(prev => [...prev, message.data as StreamingPlanUpdate]);
-            }
-        });
-
-        const unsubscribeError = webSocketService.on('error', (message: StreamMessage) => {
-            console.error('WebSocket error:', message.data);
-            showToast('Connection error: ' + (message.data?.error || 'Unknown error'), 'error');
-        });
-
-        // Cleanup function
-        return () => {
-            unsubscribeConnectionStatus();
-            unsubscribePlanUpdate();
-            unsubscribeStepUpdate();
-            unsubscribeAgentMessage();
-            unsubscribeError();
-            webSocketService.disconnect();
-        };
-    }, [planId]);
-
-    // Subscribe to plan updates when planId changes
-    useEffect(() => {
-        if (planId && wsConnected && !planId.startsWith('sid_')) {
-            // Only subscribe if we have a real plan_id (not session_id)
-            console.log('Subscribing to plan updates for:', planId);
-            webSocketService.subscribeToPlan(planId);
-
-            return () => {
-                webSocketService.unsubscribeFromPlan(planId);
-            };
+        let interval: NodeJS.Timeout;
+        if (loading) {
+            let index = 0;
+            interval = setInterval(() => {
+                index = (index + 1) % loadingMessages.length;
+                setLoadingMessage(loadingMessages[index]);
+            }, 3000);
         }
-    }, [planId, wsConnected]);
-
-    // 🌀 Cycle loading messages while loading
-    useEffect(() => {
-        if (!loading) return;
-        let index = 0;
-        const interval = setInterval(() => {
-            index = (index + 1) % loadingMessages.length;
-            setLoadingMessage(loadingMessages[index]);
-        }, 2000);
         return () => clearInterval(interval);
     }, [loading]);
 
-    // Load default team on component mount
+    // WebSocket connection with proper error handling and v3 backend compatibility
     useEffect(() => {
-        const loadDefaultTeam = async () => {
-            let defaultTeam = TeamService.getStoredTeam();
-            if (defaultTeam) {
-                setSelectedTeam(defaultTeam);
-                console.log('Default team loaded from storage:', defaultTeam.name);
-                return;
-            }
+        if (planId && !loading) {
+            console.log('🔌 Connecting WebSocket:', { planId });
 
-            try {
-                const teams = await TeamService.getUserTeams();
-                console.log('All teams loaded:', teams);
-                if (teams.length > 0) {
-                    // Always prioritize "Business Operations Team" as default
-                    const hrTeam = teams.find(team => team.name === "Human Resources Team");
-                    defaultTeam = hrTeam || teams[0];
-                    TeamService.storageTeam(defaultTeam);
-                    setSelectedTeam(defaultTeam);
-                    console.log('Default team loaded:', defaultTeam.name);
+            const connectWebSocket = async () => {
+                try {
+                    await webSocketService.connect(planId);
+                    console.log('✅ WebSocket connected successfully');
+                } catch (error) {
+                    console.error('❌ WebSocket connection failed:', error);
+                    // Continue without WebSocket - the app should still work
                 }
+            };
+
+            connectWebSocket();
+
+            const handleConnectionChange = (connected: boolean) => {
+                setWsConnected(connected);
+                console.log('🔗 WebSocket connection status:', connected);
+            };
+
+            const handleStreamingMessage = (message: StreamMessage) => {
+                console.log('📨 Received streaming message:', message);
+                if (message.data && message.data.plan_id) {
+                    setStreamingMessages(prev => [...prev, message.data]);
+                }
+            };
+
+            const handlePlanApprovalResponse = (message: StreamMessage) => {
+                console.log('✅ Plan approval response received:', message);
+                if (message.data && message.data.approved) {
+                    setPlanApproved(true);
+                }
+            };
+
+            const handlePlanApprovalRequest = (message: StreamMessage) => {
+                console.log('📥 Plan approval request received:', message);
+                // This is handled by PlanChat component through its own listener
+            };
+
+            // Subscribe to all relevant v3 backend events
+            const unsubscribeConnection = webSocketService.on('connection_status', (message) => {
+                handleConnectionChange(message.data?.connected || false);
+            });
+
+            const unsubscribeStreaming = webSocketService.on('agent_message', handleStreamingMessage);
+            const unsubscribePlanApproval = webSocketService.on('plan_approval_response', handlePlanApprovalResponse);
+            const unsubscribePlanApprovalRequest = webSocketService.on('plan_approval_request', handlePlanApprovalRequest);
+            const unsubscribeParsedPlanApprovalRequest = webSocketService.on('parsed_plan_approval_request', handlePlanApprovalRequest);
+
+            return () => {
+                console.log('🔌 Cleaning up WebSocket connections');
+                unsubscribeConnection();
+                unsubscribeStreaming();
+                unsubscribePlanApproval();
+                unsubscribePlanApprovalRequest();
+                unsubscribeParsedPlanApprovalRequest();
+                webSocketService.disconnect();
+            };
+        }
+    }, [planId, loading]);
+
+    useEffect(() => {
+        const loadTeamConfig = async () => {
+            try {
+                setLoadingTeamConfig(true);
+                const teams = await TeamService.getUserTeams();
+                // Get the first team as default config, or you can implement logic to get current team
+                const config = teams.length > 0 ? teams[0] : null;
+                setTeamConfig(config);
             } catch (error) {
-                console.error('Error loading default team:', error);
+                console.error('Failed to load team config:', error);
+                // Don't show error for team config loading - it's optional
+            } finally {
+                setLoadingTeamConfig(false);
             }
         };
 
-        loadDefaultTeam();
+        loadTeamConfig();
     }, []);
 
+    // Helper function to convert PlanWithSteps to ProcessedPlanData
+    const convertToProcessedPlanData = (planWithSteps: PlanWithSteps): ProcessedPlanData => {
+        return PlanDataService.processPlanData(planWithSteps, []);
+    };
 
-    useEffect(() => {
-        const currentPlan = allPlans.find(
-            (plan) => plan.plan.id === planId
-        );
-        setPlanData(currentPlan || null);
-    }, [allPlans, planId]);
-
+    // Create loadPlanData function with useCallback to memoize it
     const loadPlanData = useCallback(
-        async (navigate: boolean = true) => {
-            if (!planId) return;
+        async (useCache = true): Promise<ProcessedPlanData[]> => {
+            if (!planId) return [];
+
+            setLoading(true);
+            setError(null);
 
             try {
-                setInput(""); // Clear input on new load
-                if (navigate) {
-                    setPlanData(null);
-                    setLoading(true);
-                    setError(null);
-                    setProcessingSubtaskId(null);
+                let actualPlanId = planId;
+                let planResult: ProcessedPlanData | null = null;
+
+                // Check if this looks like a session_id (starts with "sid_" or "session_")
+                if (planId.startsWith('sid_') || planId.startsWith('session_')) {
+                    console.log('Detected session_id, resolving to plan_id:', planId);
+
+                    try {
+                        // Try to find the plan by session_id
+                        const plansWithSteps = await apiService.getPlans();
+                        const matchingPlan = plansWithSteps.find((p: PlanWithSteps) => p.session_id === planId);
+
+                        if (matchingPlan) {
+                            actualPlanId = matchingPlan.id;
+                            planResult = convertToProcessedPlanData(matchingPlan);
+                            console.log('Resolved session_id to plan_id:', actualPlanId);
+                        } else {
+                            console.error('No plan found with session_id:', planId);
+                            throw new Error('Plan not found');
+                        }
+                    } catch (sessionError) {
+                        console.error('Failed to resolve session_id to plan_id:', sessionError);
+                        throw sessionError;
+                    }
                 }
 
-                setError(null);
-                const data = await PlanDataService.fetchPlanData(planId, navigate);
+                if (actualPlanId && !planResult) {
+                    console.log("Fetching plan with ID:", actualPlanId);
+                    planResult = await PlanDataService.fetchPlanData(actualPlanId, useCache);
+                    console.log("Plan data loaded successfully");
+                }
 
-                setAllPlans(currentPlans => {
-                    const plans = [...currentPlans];
-                    const existingIndex = plans.findIndex(p => p.plan.id === data.plan.id);
-                    if (existingIndex !== -1) {
-                        plans[existingIndex] = data;
-                    } else {
-                        plans.push(data);
-                    }
-                    return plans;
-                });
+                const allPlansWithSteps = await apiService.getPlans();
+                const allPlansData = allPlansWithSteps.map(convertToProcessedPlanData);
+                setAllPlans(allPlansData);
+
+                if (planResult?.plan?.id && planResult.plan.id !== actualPlanId) {
+                    console.log('Plan ID mismatch detected, redirecting...', {
+                        requested: actualPlanId,
+                        actual: planResult.plan.id
+                    });
+                    navigate(`/plan/${planResult.plan.id}`, { replace: true });
+                }
+
+                setPlanData(planResult);
+                return allPlansData;
             } catch (err) {
                 console.log("Failed to load plan data:", err);
                 setError(
                     err instanceof Error ? err : new Error("Failed to load plan data")
                 );
+                return [];
             } finally {
                 setLoading(false);
             }
         },
-        [planId]
+        [planId, navigate]
     );
 
     // Update the ref whenever loadPlanData changes
@@ -233,9 +242,9 @@ const PlanPage: React.FC = () => {
         loadPlanDataRef.current = loadPlanData;
     }, [loadPlanData]);
 
+    // Chat submission handler - updated for v3 backend compatibility
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
-
             if (!chatInput.trim()) {
                 showToast("Please enter a clarification", "error");
                 return;
@@ -245,12 +254,16 @@ const PlanPage: React.FC = () => {
             if (!planData?.plan) return;
             setSubmitting(true);
             let id = showToast("Submitting clarification", "progress");
+
             try {
+                // Use legacy method for non-v3 backends
                 await PlanDataService.submitClarification(
                     planData.plan.id,
                     planData.plan.session_id,
                     chatInput
                 );
+
+
                 setInput("");
                 dismissToast(id);
                 showToast("Clarification submitted successfully", "success");
@@ -258,7 +271,7 @@ const PlanPage: React.FC = () => {
             } catch (error: any) {
                 dismissToast(id);
 
-                // Check if this is an RAI validation error
+                // Enhanced error handling for v3 backend
                 let errorDetail = null;
                 try {
                     // Try to parse the error detail if it's a string
@@ -274,201 +287,116 @@ const PlanPage: React.FC = () => {
 
                 // Handle RAI validation errors with better UX
                 if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
-                    setRAIError(errorDetail);
+                    const raiErrorData: RAIErrorData = {
+                        error_type: 'RAI_VALIDATION_FAILED',
+                        message: 'Content Policy Violation',
+                        description: errorDetail.message || 'Your input contains content that violates our content policy.',
+                        suggestions: errorDetail.suggestions || [
+                            'Please rephrase your message using professional language',
+                            'Avoid potentially harmful or inappropriate content',
+                            'Focus on business-appropriate requests'
+                        ],
+                        user_action: 'Please modify your input and try again.'
+                    };
+                    setRAIError(raiErrorData);
                 } else {
-                    // Handle other errors with toast messages
-                    showToast("Failed to submit clarification", "error");
+                    // Handle other types of errors
+                    showToast(
+                        error?.response?.data?.detail?.message ||
+                        error?.response?.data?.detail ||
+                        error?.message ||
+                        "Failed to submit clarification",
+                        "error"
+                    );
                 }
             } finally {
-                setInput("");
                 setSubmitting(false);
             }
         },
-        [planData, loadPlanData]
+        [planData?.plan, showToast, dismissToast, loadPlanData]
     );
 
-    const handleApproveStep = useCallback(
-        async (step: Step, total: number, completed: number, approve: boolean) => {
-            setProcessingSubtaskId(step.id);
-            const toastMessage = approve ? "Approving step" : "Rejecting step";
-            let id = showToast(toastMessage, "progress");
-            setSubmitting(true);
-            try {
-                let approveRejectDetails = await PlanDataService.stepStatus(step, approve);
-                dismissToast(id);
-                showToast(`Step ${approve ? "approved" : "rejected"} successfully`, "success");
-                if (approveRejectDetails && Object.keys(approveRejectDetails).length > 0) {
-                    await loadPlanData(false);
-                }
-                setReloadLeftList(true);
-            } catch (error) {
-                dismissToast(id);
-                showToast(`Failed to ${approve ? "approve" : "reject"} step`, "error");
-            } finally {
-                setProcessingSubtaskId(null);
-                setSubmitting(false);
-            }
-        },
-        [loadPlanData]
-    );
 
+    // ✅ Handlers for PlanPanelLeft
+    const handleNewTaskButton = useCallback(() => {
+        navigate("/", { state: { focusInput: true } });
+    }, [navigate]);
+
+    const handleTeamSelect = useCallback((team: TeamConfig | null) => {
+        setTeamConfig(team);
+    }, []);
+
+    const handleTeamUpload = useCallback(async () => {
+        // Reload team configurations
+        const teams = await TeamService.getUserTeams();
+        const config = teams.length > 0 ? teams[0] : null;
+        setTeamConfig(config);
+    }, []);
+
+    const resetReload = useCallback(() => {
+        setReloadLeftList(false);
+    }, []);
 
     useEffect(() => {
-
         const initializePlanLoading = async () => {
             if (!planId) return;
 
-            // Check if this looks like a session_id (starts with "sid_")
-            if (planId.startsWith('sid_')) {
-                console.log('Detected session_id, resolving to plan_id:', planId);
-
-                try {
-                    // Try to find the plan by session_id
-                    const plans = await apiService.getPlans();
-                    const matchingPlan = plans.find(plan => plan.session_id === planId);
-
-                    if (matchingPlan) {
-                        // Found the plan! Replace URL with correct plan_id
-                        console.log('Resolved session_id to plan_id:', matchingPlan.id);
-                        navigate(`/plan/${matchingPlan.id}`, { replace: true });
-                        return; // Navigation will trigger reload with correct ID
-                    } else {
-                        // Plan not created yet, start polling
-                        console.log('Plan not found yet, starting polling for session:', planId);
-                        let attempts = 0;
-                        const maxAttempts = 20; // Poll for up to 20 seconds
-
-                        const pollForPlan = async () => {
-                            attempts++;
-                            if (attempts > maxAttempts) {
-                                console.error('Plan creation timed out after polling');
-                                setError(new Error('Plan creation is taking longer than expected. Please check your task list or try creating a new plan.'));
-                                setLoading(false);
-                                return;
-                            }
-
-                            try {
-                                const plans = await apiService.getPlans();
-                                const plan = plans.find(p => p.session_id === planId);
-
-                                if (plan) {
-                                    console.log(`Found plan after ${attempts} attempts:`, plan.id);
-                                    navigate(`/plan/${plan.id}`, { replace: true });
-                                } else {
-                                    // Wait and try again
-                                    setTimeout(pollForPlan, 1000); // Poll every second
-                                }
-                            } catch (error) {
-                                console.error('Polling error:', error);
-                                if (attempts < maxAttempts) {
-                                    setTimeout(pollForPlan, 2000); // Wait longer on error
-                                }
-                            }
-                        };
-
-                        pollForPlan();
-                    }
-                } catch (error) {
-                    console.error('Session resolution error:', error);
-                    setError(error instanceof Error ? error : new Error('Failed to resolve plan from session'));
-                    setLoading(false);
-                }
-            } else {
-
-                console.log('Using plan_id directly:', planId);
-                loadPlanData(true);
+            try {
+                await loadPlanData(true);
+            } catch (err) {
+                console.error("Failed to initialize plan loading:", err);
             }
         };
 
         initializePlanLoading();
-    }, [planId, navigate, loadPlanData]);
+    }, [planId, loadPlanData]);
 
-    const handleNewTaskButton = () => {
-        NewTaskService.handleNewTaskFromPlan(navigate);
-    };
-
-    /**
-     * Handle team selection from the TeamSelector
-     */
-    const handleTeamSelect = useCallback((team: TeamConfig | null) => {
-        setSelectedTeam(team);
-        if (team) {
-            dispatchToast(
-                <Toast>
-                    <ToastTitle>Team Selected</ToastTitle>
-                    <ToastBody>
-                        {team.name} team has been selected with {team.agents.length} agents
-                    </ToastBody>
-                </Toast>,
-                { intent: "success" }
-            );
-        } else {
-            dispatchToast(
-                <Toast>
-                    <ToastTitle>Team Deselected</ToastTitle>
-                    <ToastBody>
-                        No team is currently selected
-                    </ToastBody>
-                </Toast>,
-                { intent: "info" }
-            );
-        }
-    }, [dispatchToast]);
-
-    /**
-     * Handle team upload completion - refresh team list
-     */
-    const handleTeamUpload = useCallback(async () => {
-        try {
-            const teams = await TeamService.getUserTeams();
-            console.log('Teams refreshed after upload:', teams.length);
-
-            if (teams.length > 0) {
-                // Always keep "Human Resources Team" as default, even after new uploads
-                const hrTeam = teams.find(team => team.name === "Human Resources Team");
-                const defaultTeam = hrTeam || teams[0];
-                setSelectedTeam(defaultTeam);
-                console.log('Default team after upload:', defaultTeam.name);
-
-                dispatchToast(
-                    <Toast>
-                        <ToastTitle>Team Uploaded Successfully!</ToastTitle>
-                        <ToastBody>
-                            Team uploaded. {defaultTeam.name} remains your default team.
-                        </ToastBody>
-                    </Toast>,
-                    { intent: "success" }
-                );
-            }
-        } catch (error) {
-            console.error('Error refreshing teams after upload:', error);
-        }
-    }, [dispatchToast]);
-
-    if (!planId) {
+    if (error) {
         return (
-            <div style={{ padding: "20px" }}>
-                <Text>Error: No plan ID provided</Text>
-            </div>
+            <CoralShellColumn>
+                <CoralShellRow>
+                    <Content>
+                        <div style={{
+                            textAlign: "center",
+                            padding: "40px 20px",
+                            color: 'var(--colorNeutralForeground2)'
+                        }}>
+                            <Text size={500}>
+                                {error.message || "An error occurred while loading the plan"}
+                            </Text>
+                        </div>
+                    </Content>
+                </CoralShellRow>
+            </CoralShellColumn>
         );
     }
 
     return (
         <CoralShellColumn>
             <CoralShellRow>
+                {/* ✅ RESTORED: PlanPanelLeft for navigation */}
                 <PlanPanelLeft
-                    onNewTaskButton={handleNewTaskButton}
                     reloadTasks={reloadLeftList}
-                    restReload={() => setReloadLeftList(false)}
+                    onNewTaskButton={handleNewTaskButton}
+                    restReload={resetReload}
                     onTeamSelect={handleTeamSelect}
                     onTeamUpload={handleTeamUpload}
-                    selectedTeam={selectedTeam}
+                    selectedTeam={teamConfig}
                 />
 
                 <Content>
-                    {/* 🐙 Only replaces content body, not page shell */}
-                    {loading ? (
+                    {loading || !planData ? (
                         <>
+                            <div style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                                justifyContent: "center",
+                                padding: "20px",
+                            }}>
+                                <Spinner size="medium" />
+                                <Text>Loading plan data...</Text>
+                            </div>
                             <LoadingMessage
                                 loadingMessage={loadingMessage}
                                 iconSrc={Octo}
@@ -478,13 +406,9 @@ const PlanPage: React.FC = () => {
                         <>
                             <ContentToolbar
                                 panelTitle="Multi-Agent Planner"
-                            // panelIcon={<ChatMultiple20Regular />}
                             >
                                 <PanelRightToggles>
-                                    <ToggleButton
-                                        appearance="transparent"
-                                        icon={<TaskListSquareLtr />}
-                                    />
+                                    <TaskListSquareLtr />
                                 </PanelRightToggles>
                             </ContentToolbar>
 
@@ -510,6 +434,7 @@ const PlanPage: React.FC = () => {
                                 input={input}
                                 streamingMessages={streamingMessages}
                                 wsConnected={wsConnected}
+                                onPlanApproval={(approved) => setPlanApproved(approved)}
                             />
                         </>
                     )}
@@ -517,10 +442,11 @@ const PlanPage: React.FC = () => {
 
                 <PlanPanelRight
                     planData={planData}
-                    OnApproveStep={handleApproveStep}
                     submittingChatDisableInput={submittingChatDisableInput}
                     processingSubtaskId={processingSubtaskId}
                     loading={loading}
+                    streamingMessages={streamingMessages}
+                    planApproved={planApproved}
                 />
             </CoralShellRow>
         </CoralShellColumn>

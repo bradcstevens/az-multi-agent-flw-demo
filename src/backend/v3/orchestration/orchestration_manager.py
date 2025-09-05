@@ -81,10 +81,17 @@ class OrchestrationManager:
         return callback
     
     @classmethod
-    async def get_current_or_new_orchestration(self, user_id: str, team_config: TeamConfiguration) -> MagenticOrchestration:
+    async def get_current_or_new_orchestration(self, user_id: str, team_config: TeamConfiguration, team_switched: bool) -> MagenticOrchestration: # add team_switched: bool parameter
         """get existing orchestration instance."""
         current_orchestration = orchestration_config.get_current_orchestration(user_id)
-        if current_orchestration is None:
+        if current_orchestration is None or team_switched: # add check for team_switched flag
+            if current_orchestration is not None and team_switched:
+                for agent in current_orchestration._members:
+                    if agent.name != "ProxyAgent":
+                        try:
+                            await agent.close()
+                        except Exception as e:
+                            print(f"Error closing agent: {e}")
             factory = MagenticAgentFactory()
             agents = await factory.get_agents(team_config_input=team_config)
             orchestration_config.orchestrations[user_id] = await self.init_orchestration(agents, user_id)

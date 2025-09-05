@@ -8,19 +8,36 @@ from typing import Optional
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (GeneratePlanRequest, InputTask,
-                                           Plan, PlanStatus,
-                                           TeamSelectionRequest, UserCurrentTeam)
+from common.models.messages_kernel import (
+    InputTask,
+    Plan,
+    PlanStatus,
+    TeamSelectionRequest,
+)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (APIRouter, BackgroundTasks, Depends, FastAPI, File, Query,
-                     HTTPException, Request, UploadFile, WebSocket,
-                     WebSocketDisconnect)
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from kernel_agents.agent_factory import AgentFactory
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
-from v3.config.settings import (connection_config, current_user_id,
-                                orchestration_config, team_config)
+from v3.config.settings import (
+    connection_config,
+    current_user_id,
+    orchestration_config,
+    team_config,
+)
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
 router = APIRouter()
@@ -31,10 +48,11 @@ app_v3 = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+
 @app_v3.websocket("/socket/{process_id}")
 async def start_comms(websocket: WebSocket, process_id: str):
-    """ Web-Socket endpoint for real-time process status updates. """
-        
+    """Web-Socket endpoint for real-time process status updates."""
+
     # Always accept the WebSocket connection first
     await websocket.accept()
 
@@ -53,8 +71,12 @@ async def start_comms(websocket: WebSocket, process_id: str):
     current_user_id.set(user_id)
 
     # Add to the connection manager for backend updates
-    connection_config.add_connection(process_id=process_id, connection=websocket, user_id=user_id)
-    track_event_if_configured("WebSocketConnectionAccepted", {"process_id": process_id, "user_id": user_id})
+    connection_config.add_connection(
+        process_id=process_id, connection=websocket, user_id=user_id
+    )
+    track_event_if_configured(
+        "WebSocketConnectionAccepted", {"process_id": process_id, "user_id": user_id}
+    )
 
     # Keep the connection open - FastAPI will close the connection if this returns
     try:
@@ -68,7 +90,10 @@ async def start_comms(websocket: WebSocket, process_id: str):
             except asyncio.TimeoutError:
                 pass
             except WebSocketDisconnect:
-                track_event_if_configured("WebSocketDisconnect", {"process_id": process_id, "user_id": user_id})
+                track_event_if_configured(
+                    "WebSocketDisconnect",
+                    {"process_id": process_id, "user_id": user_id},
+                )
                 logging.info(f"Client disconnected from batch {process_id}")
                 break
     except Exception as e:
@@ -78,11 +103,13 @@ async def start_comms(websocket: WebSocket, process_id: str):
         # Always clean up the connection
         await connection_config.close_connection(user_id)
 
+
 @app_v3.get("/init_team")
 async def init_team(
     request: Request,
-):
-    """ Initialize the user's current team of agents """
+    team_switched: bool = Query(False),
+):  # add team_switched: bool parameter
+    """Initialize the user's current team of agents"""
 
     # Need to store this user state in cosmos db, retrieve it here, and initialize the team
     # current in-memory store is in team_config from settings.py
@@ -90,43 +117,53 @@ async def init_team(
     # 00000000-0000-0000-0000-000000000002 (Marketing), and 00000000-0000-0000-0000-000000000003 (Retail),
     # and use this value to initialize to HR each time.
     init_team_id = "00000000-0000-0000-0000-000000000001"
-
+    print(f"Init team called, team_switched={team_switched}")
     try:
-      authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-      user_id = authenticated_user["user_principal_id"]
-      if not user_id:
-          track_event_if_configured(
-              "UserIdNotFound", {"status_code": 400, "detail": "no user"}
-          )
-          raise HTTPException(status_code=400, detail="no user")
-      
-      # Initialize memory store and service
-      memory_store = await DatabaseFactory.get_database(user_id=user_id)
-      team_service = TeamService(memory_store)
-      user_current_team = await memory_store.get_current_team(user_id=user_id)
-      if not user_current_team:
-          await team_service.handle_team_selection(user_id=user_id, team_id=init_team_id)
-      else:
-          init_team_id = user_current_team.team_id
-      # Verify the team exists and user has access to it
-      team_configuration = await team_service.get_team_configuration(init_team_id, user_id)
-      if team_configuration is None:
-          raise HTTPException(
-              status_code=404, 
-              detail=f"Team configuration '{init_team_id}' not found or access denied"
-          )
-      
-      # Set as current team in memory
-      team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
-      
-      # Initialize agent team for this user session
-      await OrchestrationManager.get_current_or_new_orchestration(user_id=user_id, team_config=team_configuration)
+        authenticated_user = get_authenticated_user_details(
+            request_headers=request.headers
+        )
+        user_id = authenticated_user["user_principal_id"]
+        if not user_id:
+            track_event_if_configured(
+                "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+            )
+            raise HTTPException(status_code=400, detail="no user")
 
-      return {
-          "status": "Request started successfully",
-          "team_id": init_team_id,
-          "team": team_configuration
-      }
+        # Initialize memory store and service
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        team_service = TeamService(memory_store)
+        user_current_team = await memory_store.get_current_team(user_id=user_id)
+        if not user_current_team:
+            await team_service.handle_team_selection(
+                user_id=user_id, team_id=init_team_id
+            )
+        else:
+            init_team_id = user_current_team.team_id
+        # Verify the team exists and user has access to it
+        team_configuration = await team_service.get_team_configuration(
+            init_team_id, user_id
+        )
+        if team_configuration is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Team configuration '{init_team_id}' not found or access denied",
+            )
+
+        # Set as current team in memory
+        team_config.set_current_team(
+            user_id=user_id, team_configuration=team_configuration
+        )
+
+        # Initialize agent team for this user session
+        await OrchestrationManager.get_current_or_new_orchestration(
+            user_id=user_id, team_config=team_configuration, team_switched=team_switched
+        )
+
+        return {
+            "status": "Request started successfully",
+            "team_id": init_team_id,
+            "team": team_configuration,
+        }
 
     except Exception as e:
         track_event_if_configured(
@@ -135,10 +172,15 @@ async def init_team(
                 "error": str(e),
             },
         )
-        raise HTTPException(status_code=400, detail=f"Error starting request: {e}") from e
+        raise HTTPException(
+            status_code=400, detail=f"Error starting request: {e}"
+        ) from e
+
 
 @app_v3.post("/process_request")
-async def process_request(background_tasks: BackgroundTasks, input_task: InputTask, request: Request):
+async def process_request(
+    background_tasks: BackgroundTasks, input_task: InputTask, request: Request
+):
     """
     Create a new plan without full processing.
 
@@ -187,7 +229,6 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
               type: string
               description: Error message
     """
-
 
     if not await rai_success(input_task.description, False):
         track_event_if_configured(
@@ -240,12 +281,11 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
             plan_id=plan_id,
             user_id=user_id,
             session_id=input_task.session_id,
-            team_id=None,  #TODO add current_team_id
+            team_id=None,  # TODO add current_team_id
             initial_goal=input_task.description,
             overall_status=PlanStatus.in_progress,
         )
         await memory_store.add_plan(plan)
-
 
         track_event_if_configured(
             "PlanCreated",
@@ -254,7 +294,7 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
                 "plan_id": plan.plan_id,
                 "session_id": input_task.session_id,
                 "user_id": user_id,
-                "team_id": "", #TODO add current_team_id
+                "team_id": "",  # TODO add current_team_id
                 "description": input_task.description,
             },
         )
@@ -280,7 +320,9 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
         # )
 
         async def run_with_context():
-            return await current_context.run(OrchestrationManager().run_orchestration, user_id, input_task)
+            return await current_context.run(
+                OrchestrationManager().run_orchestration, user_id, input_task
+            )
 
         background_tasks.add_task(run_with_context)
 
@@ -299,11 +341,16 @@ async def process_request(background_tasks: BackgroundTasks, input_task: InputTa
                 "error": str(e),
             },
         )
-        raise HTTPException(status_code=400, detail=f"Error starting request: {e}") from e
+        raise HTTPException(
+            status_code=400, detail=f"Error starting request: {e}"
+        ) from e
+
 
 @app_v3.post("/plan_approval")
-async def plan_approval(human_feedback: messages.PlanApprovalResponse, request: Request):
-    """ Endpoint to receive plan approval or rejection from the user. """
+async def plan_approval(
+    human_feedback: messages.PlanApprovalResponse, request: Request
+):
+    """Endpoint to receive plan approval or rejection from the user."""
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
@@ -311,30 +358,63 @@ async def plan_approval(human_feedback: messages.PlanApprovalResponse, request: 
             status_code=401, detail="Missing or invalid user information"
         )
     # Set the approval in the orchestration config
-    if user_id and human_feedback.plan_dot_id:
-        if orchestration_config and human_feedback.plan_dot_id in orchestration_config.approvals:
-            orchestration_config.approvals[human_feedback.plan_dot_id] = human_feedback.approved
-            orchestration_config.plans[human_feedback.plan_dot_id]["plan_id"] = human_feedback.plan_id
-            print("Plan approval received:", human_feedback)
-            print("Updated orchestration config:", orchestration_config.plans[human_feedback.plan_dot_id])
-            track_event_if_configured(
-                "PlanApprovalReceived",
-                {
-                    "plan_id": human_feedback.plan_id,
-                    "plan_dot_id": human_feedback.plan_dot_id,
-                    "approved": human_feedback.approved,
-                    "user_id": user_id,
-                    "feedback": human_feedback.feedback
-                },
-            )
-            return {"status": "approval recorded"}
-        else:
-            logging.warning(f"No orchestration or plan found for plan_id: {human_feedback.plan_dot_id}")
-            raise HTTPException(status_code=404, detail="No active plan found for approval")
+    try:
+        if user_id and human_feedback.m_plan_id:
+            if (
+                orchestration_config
+                and human_feedback.m_plan_id in orchestration_config.approvals
+            ):
+                orchestration_config.approvals[human_feedback.m_plan_id] = (
+                    human_feedback.approved
+                )
+                # orchestration_config.plans[human_feedback.m_plan_id][
+                #     "plan_id"
+                # ] = human_feedback.plan_id
+                print("Plan approval received:", human_feedback)
+                # print(
+                #     "Updated orchestration config:",
+                #     orchestration_config.plans[human_feedback.m_plan_id],
+                # )
+                try:
+                    plan = orchestration_config.plans[human_feedback.m_plan_id]
+                    if hasattr(plan, 'plan_id'):
+                        print(
+                            "Updated orchestration config:",
+                            orchestration_config.plans[human_feedback.m_plan_id],
+                        )
+                        plan.plan_id = human_feedback.plan_id
+                        orchestration_config.plans[human_feedback.m_plan_id] = plan
+                except Exception as e:
+                    print(f"Error processing plan approval: {e}")
+                track_event_if_configured(
+                    "PlanApprovalReceived",
+                    {
+                        "plan_id": human_feedback.plan_id,
+                        "m_plan_id": human_feedback.m_plan_id,
+                        "approved": human_feedback.approved,
+                        "user_id": user_id,
+                        "feedback": human_feedback.feedback,
+                    },
+                )
+                return {"status": "approval recorded"}
+            else:
+                logging.warning(
+                    f"No orchestration or plan found for plan_id: {human_feedback.m_plan_id}"
+                )
+                raise HTTPException(
+                    status_code=404, detail="No active plan found for approval"
+                )
+    except Exception as e:
+        logging.error(f"Error processing plan approval: {e}")
+        raise HTTPException(
+            status_code=500, detail="Internal server error"
+        )
 
 @app_v3.post("/user_clarification")
-async def user_clarification(human_feedback: messages.UserClarificationResponse, request: Request):
-    """ Endpoint to receive plan approval or rejection from the user. """
+async def user_clarification(
+    human_feedback: messages.UserClarificationResponse, request: Request
+):
+    """Endpoint to receive plan approval or rejection from the user."""
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
@@ -343,8 +423,13 @@ async def user_clarification(human_feedback: messages.UserClarificationResponse,
         )
     # Set the approval in the orchestration config
     if user_id and human_feedback.request_id:
-        if orchestration_config and human_feedback.request_id in orchestration_config.clarifications:
-            orchestration_config.clarifications[human_feedback.request_id] = human_feedback.answer
+        if (
+            orchestration_config
+            and human_feedback.request_id in orchestration_config.clarifications
+        ):
+            orchestration_config.clarifications[human_feedback.request_id] = (
+                human_feedback.answer
+            )
             track_event_if_configured(
                 "PlanApprovalReceived",
                 {
@@ -355,12 +440,20 @@ async def user_clarification(human_feedback: messages.UserClarificationResponse,
             )
             return {"status": "clarification recorded"}
         else:
-            logging.warning(f"No orchestration or plan found for request_id: {human_feedback.request_id}")
-            raise HTTPException(status_code=404, detail="No active plan found for clarification")
+            logging.warning(
+                f"No orchestration or plan found for request_id: {human_feedback.request_id}"
+            )
+            raise HTTPException(
+                status_code=404, detail="No active plan found for clarification"
+            )
 
 
 @app_v3.post("/upload_team_config")
-async def upload_team_config(request: Request, file: UploadFile = File(...),     team_id: Optional[str] = Query(None),):
+async def upload_team_config(
+    request: Request,
+    file: UploadFile = File(...),
+    team_id: Optional[str] = Query(None),
+):
     """
     Upload and save a team configuration JSON file.
 
@@ -523,7 +616,7 @@ async def upload_team_config(request: Request, file: UploadFile = File(...),    
             "team_id": team_id,
             "name": team_config.name,
             "message": "Team configuration uploaded and saved successfully",
-            "team": team_config.model_dump()  # Return the full team configuration
+            "team": team_config.model_dump(),  # Return the full team configuration
         }
 
     except HTTPException:
@@ -733,7 +826,7 @@ async def delete_team_config(team_id: str, request: Request):
         )
 
     try:
-        # To do: Check if the team is the users current team, or if it is 
+        # To do: Check if the team is the users current team, or if it is
         # used in any active sessions/plans.  Refuse request if so.
 
         # Initialize memory store and service
@@ -790,7 +883,7 @@ async def get_model_deployments(request: Request):
 
     try:
         team_service = TeamService()
-        deployments = [] #await team_service.extract_models_from_agent()
+        deployments = []  # await team_service.extract_models_from_agent()
         summary = await team_service.get_deployment_status_summary()
         return {"deployments": deployments, "summary": summary}
     except Exception as e:
@@ -820,31 +913,37 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
         team_service = TeamService(memory_store)
 
         # Verify the team exists and user has access to it
-        team_configuration = await team_service.get_team_configuration(selection.team_id, user_id)
+        team_configuration = await team_service.get_team_configuration(
+            selection.team_id, user_id
+        )
         if team_config is None:
             raise HTTPException(
-                status_code=404, 
-                detail=f"Team configuration '{selection.team_id}' not found or access denied"
+                status_code=404,
+                detail=f"Team configuration '{selection.team_id}' not found or access denied",
             )
-        set_team = await team_service.handle_team_selection(user_id=user_id, team_id=selection.team_id)
+        set_team = await team_service.handle_team_selection(
+            user_id=user_id, team_id=selection.team_id
+        )
         if not set_team:
             track_event_if_configured(
-            "Team selected",
-            {
-                "status": "failed",
-                "team_id": selection.team_id,
-                "team_name": team_configuration.name,
-                "user_id": user_id
-            },
-        )
+                "Team selected",
+                {
+                    "status": "failed",
+                    "team_id": selection.team_id,
+                    "team_name": team_configuration.name,
+                    "user_id": user_id,
+                },
+            )
             raise HTTPException(
                 status_code=404,
-                detail=f"Team configuration '{selection.team_id}' failed to set"
+                detail=f"Team configuration '{selection.team_id}' failed to set",
             )
 
         # save to in-memory config for current user
-        team_config.set_current_team(user_id=user_id, team_configuration=team_configuration)
-        
+        team_config.set_current_team(
+            user_id=user_id, team_configuration=team_configuration
+        )
+
         # Track the team selection event
         track_event_if_configured(
             "Team selected",
@@ -852,7 +951,7 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
                 "status": "success",
                 "team_id": selection.team_id,
                 "team_name": team_configuration.name,
-                "user_id": user_id
+                "user_id": user_id,
             },
         )
 

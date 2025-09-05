@@ -1,7 +1,9 @@
 import { headerBuilder } from '../api/config';
+import { PlanDataService } from './PlanDataService';
+import { MPlanData } from '../models';
 
 export interface StreamMessage {
-    type: 'plan_update' | 'step_update' | 'agent_message' | 'error' | 'connection_status' | 'plan_approval_request' | 'final_result';
+    type: 'plan_update' | 'step_update' | 'agent_message' | 'error' | 'connection_status' | 'plan_approval_request' | 'final_result' | 'parsed_plan_approval_request' | 'streaming_message';
     plan_id?: string;
     session_id?: string;
     data?: any;
@@ -17,6 +19,7 @@ export interface StreamingPlanUpdate {
     status?: 'in_progress' | 'completed' | 'error' | 'creating_plan' | 'pending_approval';
     message_type?: 'thinking' | 'action' | 'result' | 'clarification_needed' | 'plan_approval_request';
     timestamp?: number;
+    is_final?: boolean;
 }
 
 export interface PlanApprovalRequestData {
@@ -42,6 +45,14 @@ export interface PlanApprovalResponseData {
     feedback?: string;
 }
 
+// New interface for structured plan approval request
+export interface ParsedPlanApprovalRequest {
+    type: 'parsed_plan_approval_request';
+    plan_id: string;
+    parsedData: MPlanData;
+    rawData: string;
+}
+
 class WebSocketService {
     private ws: WebSocket | null = null;
     private reconnectAttempts = 0;
@@ -51,84 +62,84 @@ class WebSocketService {
     private planSubscriptions: Set<string> = new Set();
     private reconnectTimer: NodeJS.Timeout | null = null;
     private isConnecting = false;
+    private baseWsUrl = process.env.REACT_APP_BACKEND_URL?.replace('http', 'ws') || 'ws://localhost:8000';
 
     /**
      * Connect to WebSocket server
      */
-    connect(plan_id?: string): Promise<void> {
+    connect(sessionId: string, processId?: string): Promise<void> {
         return new Promise((resolve, reject) => {
             if (this.isConnecting) {
-                console.log('Connection attempt already in progress');
-                resolve();
+                console.log('Connection already in progress');
+                reject(new Error('Connection already in progress'));
                 return;
             }
 
-            if (this.reconnectTimer) {
-                clearTimeout(this.reconnectTimer);
-                this.reconnectTimer = null;
+            if (this.ws?.readyState === WebSocket.OPEN) {
+                console.log('WebSocket already connected');
+                resolve();
+                return;
             }
 
             try {
                 this.isConnecting = true;
 
-                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsHost = process.env.REACT_APP_WS_HOST || '127.0.0.1:8000';
-                const processId = crypto.randomUUID();
-
-                const authHeaders = headerBuilder();
-                const userId = authHeaders['x-ms-client-principal-id'];
-
-                if (!userId) {
-                    console.error('No user ID available for WebSocket connection');
-                    this.isConnecting = false;
-                    reject(new Error('Authentication required for WebSocket connection'));
-                    return;
-                }
-
-                // Use query parameter for WebSocket authentication (as backend expects)
-                const wsUrl = `${wsProtocol}//${wsHost}/api/v3/socket/${processId}?user_id=${encodeURIComponent(userId)}${plan_id ? `&plan_id=${encodeURIComponent(plan_id)}` : ''}`;
+                // Use v3 WebSocket endpoint format
+                const wsUrl = processId
+                    ? `${this.baseWsUrl}/api/v3/socket/${processId}`
+                    : `${this.baseWsUrl}/api/v3/socket/${sessionId}`;
 
                 console.log('Connecting to WebSocket:', wsUrl);
-
                 this.ws = new WebSocket(wsUrl);
 
-                this.ws.onopen = () => {
+                this.ws.onopen = (event) => {
                     console.log('WebSocket connected successfully');
-                    this.reconnectAttempts = 0;
                     this.isConnecting = false;
+                    this.reconnectAttempts = 0;
+
+                    if (this.reconnectTimer) {
+                        clearTimeout(this.reconnectTimer);
+                        this.reconnectTimer = null;
+                    }
+
                     this.emit('connection_status', { connected: true });
                     resolve();
                 };
 
                 this.ws.onmessage = (event) => {
                     try {
-                        const message: StreamMessage = JSON.parse(event.data);
+                        const message = JSON.parse(event.data);
                         this.handleMessage(message);
                     } catch (error) {
-                        console.error('Error parsing WebSocket message:', error, 'Raw data:', event.data);
-                        this.emit('error', { error: 'Failed to parse WebSocket message' });
+                        console.error('Failed to parse WebSocket message:', error);
                     }
                 };
 
                 this.ws.onclose = (event) => {
-                    console.log('WebSocket disconnected', event.code, event.reason);
+                    console.log(`WebSocket disconnected: ${event.code} - ${event.reason}`);
                     this.isConnecting = false;
+                    this.ws = null;
                     this.emit('connection_status', { connected: false });
 
-                    if (event.code !== 1000) {
+                    if (this.reconnectAttempts < this.maxReconnectAttempts && event.code !== 1000) {
                         this.attemptReconnect();
                     }
                 };
 
-                this.ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
+                this.ws.onerror = (event) => {
+                    console.error('WebSocket error:', event);
                     this.isConnecting = false;
-                    this.emit('error', { error: 'WebSocket connection failed' });
-                    reject(error);
+
+                    if (this.reconnectAttempts === 0) {
+                        reject(new Error('WebSocket connection failed'));
+                    }
+
+                    this.emit('error', { error: 'WebSocket connection error' });
                 };
 
             } catch (error) {
                 this.isConnecting = false;
+                console.error('Failed to create WebSocket connection:', error);
                 reject(error);
             }
         });
@@ -222,6 +233,48 @@ class WebSocketService {
     }
 
     /**
+     * Connection change event handler
+     */
+    onConnectionChange(callback: (connected: boolean) => void): () => void {
+        return this.on('connection_status', (message: StreamMessage) => {
+            callback(message.data?.connected || false);
+        });
+    }
+
+    /**
+     * Streaming message event handler
+     */
+    onStreamingMessage(callback: (message: StreamingPlanUpdate) => void): () => void {
+        return this.on('agent_message', (message: StreamMessage) => {
+            if (message.data) {
+                callback(message.data);
+            }
+        });
+    }
+
+    /**
+     * Plan approval request event handler
+     */
+    onPlanApprovalRequest(callback: (approvalRequest: ParsedPlanApprovalRequest) => void): () => void {
+        return this.on('parsed_plan_approval_request', (message: StreamMessage) => {
+            if (message.data) {
+                callback(message.data);
+            }
+        });
+    }
+
+    /**
+     * Plan approval response event handler
+     */
+    onPlanApprovalResponse(callback: (response: any) => void): () => void {
+        return this.on('plan_approval_response', (message: StreamMessage) => {
+            if (message.data) {
+                callback(message.data);
+            }
+        });
+    }
+
+    /**
      * Emit event to listeners
      */
     private emit(eventType: string, data: any): void {
@@ -249,15 +302,87 @@ class WebSocketService {
     private handleMessage(message: StreamMessage): void {
         console.log('WebSocket message received:', message);
 
-        if (message.type) {
-            this.emit(message.type, message.data);
-        }
-
         if (message.type === 'plan_approval_request') {
             console.log('Plan approval request received via WebSocket:', message.data);
+
+            // Parse the raw Python object string using PlanDataService
+            const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
+
+            if (parsedData) {
+                // Emit a structured plan approval request
+                const structuredMessage: ParsedPlanApprovalRequest = {
+                    type: 'parsed_plan_approval_request',
+                    plan_id: parsedData.id,
+                    parsedData: parsedData,
+                    rawData: message.data
+                };
+
+                this.emit('parsed_plan_approval_request', structuredMessage);
+                console.log('Parsed plan approval request:', structuredMessage);
+            } else {
+                console.error('Failed to parse plan approval request data');
+                this.emit('error', { error: 'Failed to parse plan approval request' });
+            }
         }
 
-        this.emit('message', message);
+        // Handle agent messages from the callback system (without plan_id)
+        else if (message.type === 'agent_message' && message.data && !message.data.plan_id) {
+            console.log('Agent callback message received:', message.data);
+
+            // Transform the callback message format to match the expected streaming format
+            // We'll need to get the current plan_id from somewhere - let's use the current subscription
+            const currentPlanIds = Array.from(this.planSubscriptions);
+
+            if (currentPlanIds.length > 0) {
+                const transformedMessage: StreamMessage = {
+                    ...message,
+                    data: {
+                        plan_id: currentPlanIds[0], // Use the first subscribed plan
+                        agent_name: message.data.agent_name || 'Unknown Agent',
+                        content: message.data.content || '',
+                        message_type: 'thinking',
+                        status: 'in_progress',
+                        timestamp: Date.now() / 1000
+                    }
+                };
+
+                console.log('Transformed agent message for plan:', transformedMessage.data.plan_id);
+                this.emit(message.type, transformedMessage);
+            } else {
+                console.warn('Received agent message but no plan subscriptions active');
+            }
+        }
+
+        // Handle streaming messages from the callback system
+        else if (message.type === 'streaming_message' && message.data && !message.data.plan_id) {
+            console.log('Streaming callback message received:', message.data);
+
+            // Transform streaming message format
+            const currentPlanIds = Array.from(this.planSubscriptions);
+
+            if (currentPlanIds.length > 0) {
+                const transformedMessage: StreamMessage = {
+                    type: 'agent_message', // Convert streaming_message to agent_message
+                    data: {
+                        plan_id: currentPlanIds[0],
+                        agent_name: message.data.agent_name || 'Unknown Agent',
+                        content: message.data.content || '',
+                        message_type: message.data.is_final ? 'result' : 'thinking',
+                        status: message.data.is_final ? 'completed' : 'in_progress',
+                        timestamp: Date.now() / 1000
+                    }
+                };
+
+                console.log('Transformed streaming message for plan:', transformedMessage.data.plan_id);
+                this.emit('agent_message', transformedMessage);
+            }
+        }
+
+        // Handle regular streaming messages (already have plan_id)
+        else {
+            // Emit the message as-is for other types or when plan_id is present
+            this.emit(message.type, message);
+        }
     }
 
     /**
@@ -284,16 +409,9 @@ class WebSocketService {
             this.reconnectTimer = null;
             console.log(`Attempting reconnection (attempt ${this.reconnectAttempts})`);
 
-            this.connect()
-                .then(() => {
-                    console.log('Reconnection successful - re-subscribing to plans');
-                    this.planSubscriptions.forEach(planId => {
-                        this.subscribeToPlan(planId);
-                    });
-                })
-                .catch((error) => {
-                    console.error('Reconnection failed:', error);
-                });
+            // We need to store the original session/process IDs for reconnection
+            // For now, we'll emit an error and let the parent component handle reconnection
+            this.emit('error', { error: 'Connection lost - manual reconnection required' });
         }, delay);
     }
 
@@ -316,9 +434,16 @@ class WebSocketService {
     }
 
     /**
-     * Send plan approval response
+     * Send plan approval response for v3 backend
      */
-    sendPlanApprovalResponse(response: PlanApprovalResponseData): void {
+    sendPlanApprovalResponse(response: {
+        plan_id: string;
+        session_id: string;
+        approved: boolean;
+        feedback?: string;
+        user_response?: string;
+        human_clarification?: string;
+    }): void {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             console.error('WebSocket not connected - cannot send plan approval response');
             this.emit('error', { error: 'Cannot send plan approval response - WebSocket not connected' });
@@ -326,12 +451,22 @@ class WebSocketService {
         }
 
         try {
+            // Send in v3 expected format
+            const v3Response = {
+                m_plan_id: response.plan_id, // v3 backend expects 'm_plan_id'
+                approved: response.approved,
+                feedback: response.feedback || response.user_response || response.human_clarification || '',
+            };
+
+            console.log('📤 Sending v3 plan approval response:', v3Response);
+
             const message = {
                 type: 'plan_approval_response',
-                data: response
+                data: v3Response
             };
+
             this.ws.send(JSON.stringify(message));
-            console.log('Plan approval response sent:', response);
+            console.log('Plan approval response sent successfully');
         } catch (error) {
             console.error('Failed to send plan approval response:', error);
             this.emit('error', { error: 'Failed to send plan approval response' });

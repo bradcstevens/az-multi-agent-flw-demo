@@ -77,9 +77,9 @@ class OrchestrationConfig:
     def __init__(self):
         self.orchestrations: Dict[str, MagenticOrchestration] = {} # user_id -> orchestration instance
         self.plans: Dict[str, any] = {} # plan_id -> plan details
-        self.approvals: Dict[str, bool] = {} # plan_dot_id -> approval status
+        self.approvals: Dict[str, bool] = {} # m_plan_id -> approval status
         self.sockets: Dict[str, WebSocket] = {} # user_id -> WebSocket
-        self.clarifications: Dict[str, str] = {} # plan_dot_id -> clarification response
+        self.clarifications: Dict[str, str] = {} # m_plan_id -> clarification response
 
     def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
         """get existing orchestration instance."""
