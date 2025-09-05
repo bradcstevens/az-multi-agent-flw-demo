@@ -42,7 +42,7 @@ var deployingUserPrincipalId = deployerInfo.objectId
   azd: {
     type: 'location'
     usageName: [
-      'OpenAI.GlobalStandard.4.1-mini, 50'
+      'OpenAI.GlobalStandard.o4-mini, 50'
     ]
   }
 })
@@ -1517,11 +1517,11 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_BING_CONNECTION_NAME'
-            value: '' 
+            value: 'binggrnd' 
           }
-           {
+          {
             name: 'BING_CONNECTION_NAME'
-            value: '' 
+            value: 'binggrnd' 
           } 
           {
             name: 'REASONING_MODEL_NAME'
@@ -1554,10 +1554,6 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           {
             name: 'AZURE_AI_SEARCH_API_KEY'
             secretRef: 'azure-ai-search-api-key'
-          } 
-          {
-            name: 'BING_CONNECTION_NAME'
-            value: '' 
           } 
           {
             name: 'AZURE_STORAGE_BLOB_URL'
