@@ -17,10 +17,9 @@ from common.models.messages_kernel import (AgentMessage, AgentType,
                                            InputTask, Plan, PlanStatus,
                                            PlanWithSteps, Step, UserLanguage)
 from common.utils.event_utils import track_event_if_configured
-
+from common.utils.utils_date import format_dates_in_messages
 # Updated import for KernelArguments
 from common.utils.utils_kernel import rai_success
-
 # FastAPI imports
 from fastapi import (FastAPI, HTTPException, Query, Request, WebSocket,
                      WebSocketDisconnect)
@@ -28,9 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from kernel_agents.agent_factory import AgentFactory
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
-from common.utils.utils_date import format_dates_in_messages
 from v3.api.router import app_v3
-
 # Semantic Kernel imports
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
@@ -74,7 +71,7 @@ app.add_middleware(
         "http://localhost:3000",    # Add this for local development
         "https://localhost:3000",   # Add this if using HTTPS locally
         "https://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3000",
     ],  # Allow all origins for development; restrict in production
     allow_credentials=True,
     allow_methods=["*"],
