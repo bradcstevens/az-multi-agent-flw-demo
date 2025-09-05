@@ -73,7 +73,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",    # Add this for local development
         "https://localhost:3000",   # Add this if using HTTPS locally
-        "http://127.0.0.1:3000",
+        "https://127.0.0.1:3000",
         "http://127.0.0.1:3001",
     ],  # Allow all origins for development; restrict in production
     allow_credentials=True,
@@ -598,9 +598,7 @@ async def approve_step_endpoint(
 @app.get("/api/plans")
 async def get_plans(
     request: Request,
-    session_id: Optional[str] = Query(None),
     plan_id: Optional[str] = Query(None),
-    team_id: Optional[str] = Query(None),
 ):
     """
     Retrieve plans for the current user.
@@ -673,20 +671,7 @@ async def get_plans(
 
     # # Initialize memory context
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
-    if session_id:
-        plan = await memory_store.get_plan_by_session(session_id=session_id)
-        if not plan:
-            track_event_if_configured(
-                "GetPlanBySessionNotFound",
-                {"status_code": 400, "detail": "Plan not found"},
-            )
-            raise HTTPException(status_code=404, detail="Plan not found")
 
-        # Use get_steps_by_plan to match the original implementation
-        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
-        return [plan_with_steps]
     if plan_id:
         plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
         if not plan:
@@ -712,7 +697,11 @@ async def get_plans(
 
         return [plan_with_steps, formatted_messages]
 
-    all_plans = await memory_store.get_all_plans()
+    current_team = await memory_store.get_current_team(user_id=user_id)
+    if not current_team:
+      return []
+    
+    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
     # Fetch steps for all plans concurrently
     steps_for_all_plans = await asyncio.gather(
         *[memory_store.get_steps_by_plan(plan_id=plan.id) for plan in all_plans]

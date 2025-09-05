@@ -37,35 +37,35 @@ export const useTeamSelection = ({
 
     try {
       console.log('Selecting team:', team.name, 'with session ID:', sessionId);
-      
+
       const result = await TeamService.selectTeam(team.team_id);
-      
+
       if (result.success) {
         setSelectedTeam(team);
         console.log('Team selection successful:', result.data);
-        
+
         // Call success callback
         onTeamSelected?.(team, result.data);
-        
+
         return true;
       } else {
         const errorMessage = result.error || 'Failed to select team';
         setError(errorMessage);
-        
+
         // Call error callback
         onError?.(errorMessage);
-        
+
         return false;
       }
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to select team';
       setError(errorMessage);
-      
+
       console.error('Team selection error:', err);
-      
+
       // Call error callback
       onError?.(errorMessage);
-      
+
       return false;
     } finally {
       setIsLoading(false);

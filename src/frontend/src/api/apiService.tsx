@@ -9,7 +9,9 @@ import {
     Step,
     StepStatus,
     AgentType,
-    PlanMessage
+    PlanMessage,
+    PlanApprovalRequest,
+    PlanApprovalResponse
 } from '../models';
 
 // Constants for endpoints
@@ -23,7 +25,8 @@ const API_ENDPOINTS = {
     HUMAN_CLARIFICATION: '/human_clarification_on_plan',
     AGENT_MESSAGES: '/agent_messages',
     MESSAGES: '/messages',
-    USER_BROWSER_LANGUAGE: '/user_browser_language'
+    USER_BROWSER_LANGUAGE: '/user_browser_language',
+    PLAN_APPROVAL: '/v3/plan_approval'
 };
 
 // Simple cache implementation
@@ -95,6 +98,8 @@ class RequestTracker {
         }
     }
 }
+
+
 
 export class APIService {
     private _cache = new APICache();
@@ -245,116 +250,72 @@ export class APIService {
     }
 
     /**
-     * Update a step with new status and optional feedback
-     * @param sessionId Session ID
-     * @param planId Plan ID
-     * @param stepId Step ID
-     * @param update Update object with status and optional feedback
-     * @returns Promise with the updated step
-     */
-    async updateStep(
-        sessionId: string,
-        planId: string,
-        stepId: string,
-        update: {
-            status: StepStatus;
-            human_feedback?: string;
-            updated_action?: string;
-        }
-    ): Promise<Step> {
-        const response = await this.provideStepFeedback(
-            stepId,
-            planId,
-            sessionId,
-            update.status === StepStatus.APPROVED,
-            update.human_feedback,
-            update.updated_action
-        );
+   * Approve a plan for execution 
+   * @param planApprovalData Plan approval data
+   * @returns Promise with approval response
+   */
+    async approvePlan(planApprovalData: PlanApprovalRequest): Promise<PlanApprovalResponse> {
+        const requestKey = `approve-plan-${planApprovalData.m_plan_id}`;
 
-        // Invalidate cached data
-        this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
-        this._cache.invalidate(new RegExp(`^plans_`));
+        return this._requestTracker.trackRequest(requestKey, async () => {
+            console.log('📤 Approving plan via v3 API:', planApprovalData);
 
-        // Get fresh step data
-        const steps = await this.getSteps(planId, false); // Force fresh data
-        const updatedStep = steps.find(step => step.id === stepId);
+            const response = await apiClient.post(API_ENDPOINTS.PLAN_APPROVAL, planApprovalData);
 
-        if (!updatedStep) {
-            throw new Error(`Step with ID ${stepId} not found after update`);
-        }
+            // Invalidate cache since plan execution will start
+            this._cache.invalidate(new RegExp(`^plans_`));
+            if (planApprovalData.plan_id) {
+                this._cache.invalidate(new RegExp(`^plan.*_${planApprovalData.plan_id}`));
+            }
 
-        return updatedStep;
+            console.log('✅ Plan approval successful:', response);
+            return response;
+        });
     }
 
     /**
-     * Provide feedback for a specific step
-     * @param stepId Step ID
-     * @param planId Plan ID
-     * @param sessionId Session ID
-     * @param approved Whether the step is approved
-     * @param humanFeedback Optional human feedback
-     * @param updatedAction Optional updated action
-     * @returns Promise with response object
+     * Get final plan execution results after approval
+     * @param planId 
+     * @param useCache 
+     * @returns Promise with final plan execution data
      */
-    async provideStepFeedback(
-        stepId: string,
-        planId: string,
-        sessionId: string,
-        approved: boolean,
-        humanFeedback?: string,
-        updatedAction?: string
-    ): Promise<{ status: string; session_id: string; step_id: string }> {
-        const response = await apiClient.post(
-            API_ENDPOINTS.HUMAN_FEEDBACK,
-            {
-                step_id: stepId,
-                plan_id: planId,
-                session_id: sessionId,
-                approved,
-                human_feedback: humanFeedback,
-                updated_action: updatedAction
+    async getFinalPlanResults(planId: string, useCache = true): Promise<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }> {
+        const cacheKey = `final_plan_results_${planId}`;
+
+        const fetcher = async () => {
+            console.log('📤 Fetching final plan results for plan_id:', planId);
+
+            // ✅ Call /api/plans?plan_id={plan_id} to get executed plan
+            const data = await apiClient.get(API_ENDPOINTS.PLANS, {
+                params: { plan_id: planId }
+            });
+
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                throw new Error(`No plan results found for plan_id: ${planId}`);
             }
-        );
 
-        // Invalidate cached data
-        this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
-        this._cache.invalidate(new RegExp(`^plans_`));
+            const plan = data[0] as PlanWithSteps;
+            const messages = data[1] || [];
 
-        return response;
+            if (useCache) {
+                this._cache.set(cacheKey, { plan_with_steps: plan, messages }, 30000);
+            }
+
+            console.log('✅ Final plan results received:', { plan, messages });
+            return { plan_with_steps: plan, messages };
+        };
+
+        if (useCache) {
+            const cachedData = this._cache.get<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }>(cacheKey);
+            if (cachedData) return cachedData;
+
+            return this._requestTracker.trackRequest(cacheKey, fetcher);
+        }
+
+        return fetcher();
     }
 
-    /**
-     * Approve one or more steps
-     * @param planId Plan ID
-     * @param sessionId Session ID
-     * @param approved Whether the step(s) are approved
-     * @param stepId Optional specific step ID
-     * @param humanFeedback Optional human feedback
-     * @param updatedAction Optional updated action
-     * @returns Promise with response object
-     */
-    async stepStatus(
-        planId: string,
-        sessionId: string,
-        approved: boolean,
-        stepId?: string,
-    ): Promise<{ status: string }> {
-        const response = await apiClient.post(
-            API_ENDPOINTS.APPROVE_STEPS,
-            {
-                step_id: stepId,
-                plan_id: planId,
-                session_id: sessionId,
-                approved
-            }
-        );
 
-        // Invalidate cached data
-        this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
-        this._cache.invalidate(new RegExp(`^plans_`));
-
-        return response;
-    }
 
     /**
      * Submit clarification for a plan
@@ -410,6 +371,9 @@ export class APIService {
         return fetcher();
     }
 
+
+
+
     /**
      * Delete all messages
      * @returns Promise with response object
@@ -446,36 +410,6 @@ export class APIService {
         return fetcher();
     }
 
-    // Utility methods
-
-    /**
-     * Check if a plan is complete (all steps are completed or failed)
-     * @param plan Plan with steps
-     * @returns Boolean indicating if plan is complete
-     */
-    isPlanComplete(plan: PlanWithSteps): boolean {
-        return plan.steps.every(step =>
-            [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
-        );
-    }
-
-    /**
-     * Get steps that are awaiting human feedback
-     * @param plan Plan with steps
-     * @returns Array of steps awaiting feedback
-     */
-    getStepsAwaitingFeedback(plan: PlanWithSteps): Step[] {
-        return plan.steps.filter(step => step.status === StepStatus.AWAITING_FEEDBACK);
-    }    /**
-     * Get steps assigned to a specific agent type
-     * @param plan Plan with steps
-     * @param agentType Agent type to filter by
-     * @returns Array of steps for the specified agent
-     */
-    getStepsForAgent(plan: PlanWithSteps, agentType: AgentType): Step[] {
-        return plan.steps.filter(step => step.agent === agentType);
-    }
-
     /**
      * Clear all cached data
      */
@@ -483,38 +417,7 @@ export class APIService {
         this._cache.clear();
     }
 
-    /**
-     * Get progress status counts for a plan
-     * @param plan Plan with steps
-     * @returns Object with counts for each step status
-     */
-    getPlanProgressStatus(plan: PlanWithSteps): Record<StepStatus, number> {
-        const result = Object.values(StepStatus).reduce((acc, status) => {
-            acc[status] = 0;
-            return acc;
-        }, {} as Record<StepStatus, number>);
 
-        plan.steps.forEach(step => {
-            result[step.status]++;
-        });
-
-        return result;
-    }
-
-    /**
-     * Get completion percentage for a plan
-     * @param plan Plan with steps
-     * @returns Completion percentage (0-100)
-     */
-    getPlanCompletionPercentage(plan: PlanWithSteps): number {
-        if (!plan.steps.length) return 0;
-
-        const completedSteps = plan.steps.filter(
-            step => [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
-        ).length;
-
-        return Math.round((completedSteps / plan.steps.length) * 100);
-    }
 
     /**
      * Send the user's browser language to the backend

@@ -20,6 +20,7 @@ interface ChatInputProps {
   placeholder?: string;
   children?: React.ReactNode;
   disabledChat?: boolean;
+  style?: React.CSSProperties;
 }
 
 // ✅ ForwardRef component
@@ -32,6 +33,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       placeholder = "Type a message...",
       children,
       disabledChat,
+      style,
     },
     ref
   ) => {
@@ -50,7 +52,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     }, [value]);
 
     return (
-      <div style={{ width: "100%", margin: "0 auto" }}>
+      <div style={{ width: "100%", margin: "0 auto", ...style }}>
         <div
           ref={inputContainerRef}
           style={{
