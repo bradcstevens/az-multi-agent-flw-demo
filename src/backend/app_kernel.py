@@ -6,42 +6,25 @@ import os
 # Azure monitoring
 import re
 import uuid
-from contextlib import asynccontextmanager
+
 from typing import Dict, List, Optional
 
-from auth.auth_utils import get_authenticated_user_details
+
 from azure.monitor.opentelemetry import configure_azure_monitor
 from common.config.app_config import config
-from common.database.database_factory import DatabaseFactory
 from common.models.messages_kernel import (
-    AgentMessage,
-    AgentType,
-    HumanClarification,
-    HumanFeedback,
-    InputTask,
-    Plan,
-    PlanStatus,
-    PlanWithSteps,
-    Step,
     UserLanguage,
 )
-from common.utils.event_utils import track_event_if_configured
-from common.utils.utils_date import format_dates_in_messages
 
-# Updated import for KernelArguments
-from common.utils.utils_kernel import rai_success
 
 # FastAPI imports
 from fastapi import (
     FastAPI,
-    HTTPException,
     Query,
     Request,
-    WebSocket,
-    WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from kernel_agents.agent_factory import AgentFactory
+
 
 # Local imports
 from middleware.health_check import HealthCheckMiddleware

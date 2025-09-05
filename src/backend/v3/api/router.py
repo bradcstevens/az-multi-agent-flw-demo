@@ -19,8 +19,6 @@ from common.utils.utils_kernel import rai_success, rai_validate_team_config
 from fastapi import (
     APIRouter,
     BackgroundTasks,
-    Depends,
-    FastAPI,
     File,
     HTTPException,
     Query,
@@ -29,7 +27,6 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from kernel_agents.agent_factory import AgentFactory
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
 from v3.config.settings import (
@@ -1013,9 +1010,7 @@ async def get_search_indexes(request: Request):
 
 # Get plans is called in the initial side rendering of the frontend
 @app_v3.get("/plans")
-async def get_plans(
-    request: Request
-):
+async def get_plans(request: Request):
     """
     Retrieve plans for the current user.
 
@@ -1093,8 +1088,7 @@ async def get_plans(
 
     all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
 
-
-    return all_plans 
+    return all_plans
 
 
 # Get plans is called in the initial side rendering of the frontend
