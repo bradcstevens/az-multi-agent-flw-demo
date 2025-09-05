@@ -374,7 +374,6 @@ The files for the dev container are located in `/.devcontainer/` folder.
 
    - To install the requirement for backend -
      Open a terminal in the `src/backend` folder and run:
-
      ```bash
      pip install uv
      uv sync
@@ -399,7 +398,7 @@ The files for the dev container are located in `/.devcontainer/` folder.
 
 10. **Run the application:**
 
-- From the src/backend directory activate the virtual environment created through step 8:
+- From the `src/backend` directory activate the virtual environment created through step 8 and Run:
 
 ```bash
 python app_kernel.py
@@ -411,9 +410,14 @@ python app_kernel.py
  python frontend_server.py
 ```
 
+or Run 
+
+  ```bash
+  npm run dev
+  ```
+
 11. Open a browser and navigate to `http://localhost:3000`
 12. To see swagger API documentation, you can navigate to `http://localhost:8000/docs`
-
 
 ## Deploy Your local changes
 To Deploy your local changes rename the below files.

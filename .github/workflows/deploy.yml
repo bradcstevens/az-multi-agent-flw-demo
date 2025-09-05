@@ -134,9 +134,11 @@ jobs:
               gptModelDeploymentType="GlobalStandard" \
               gptModelName="gpt-4o" \
               gptModelVersion="2024-08-06" \
-              imageTag="${IMAGE_TAG}" \
+              backendContainerImageTag="${IMAGE_TAG}" \
+              frontendContainerImageTag="${IMAGE_TAG}" \
               azureAiServiceLocation='${{ env.AZURE_LOCATION }}' \
               gptModelCapacity=150 \
+              createdBy="Pipeline" \
             --output json
 
       - name: Extract Web App and API App URLs
