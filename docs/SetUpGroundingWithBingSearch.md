@@ -1,42 +1,47 @@
-# Grounding with Bing Search — Quick Setup
 
-This guide shows how to **create a Grounding with Bing Search resource** and **connect it to your Azure AI Foundry project through the portal**.
+````markdown
+# 🌐 Grounding with Bing Search — Quick Setup
+
+This guide explains how to **create a Bing Search Grounding resource** and **connect it to your Azure AI Foundry project**.
 
 ---
 
-## Prerequisites
+## ✅ Prerequisites
 
-* An **Azure subscription**
-* **Azure CLI** installed and logged in (`az login`)
-* A **resource group** already created
-* Register the Bing provider:
+- An active **Azure subscription**  
+- **Azure CLI** installed and logged in (`az login`)  
+- A **resource group** created  
+- Register the Bing provider (one-time setup):  
 
   ```bash
   az provider register --namespace Microsoft.Bing
-  ```
+````
 
-⚠️ **Important:**  
-Bing Search grounding only works with **API key authentication**.  
-Make sure your **Azure AI Foundry account has Local Authentication enabled**.  
-If local auth is disabled, you will not be able to create a Bing Search connection.
+⚠️ **Important:**
+Bing Search Grounding only supports **API key authentication**.
+Ensure your **Azure AI Foundry account has Local Authentication enabled**.
+If local auth is disabled, you will not be able to connect Bing Search.
 
+---
 
-## 1) Create the Bing Search Grounding resource
+## 🚀 Step 1: Create a Bing Search Grounding Resource
 
-### Option A — Using Azure Portal
+### Option A — Azure Portal
 
-1. In the [Azure Portal](https://portal.azure.com), search for **Bing Search (Grounding)**.  
-2. Click **Create**.  
-3. Select the **Subscription** and **Resource Group**.  
-4. Enter the **Resource Name** and select a **Pricing Tier (SKU)**.  
-5. ⚠️ At the bottom of the creation form, you will see a required checkbox:  
-   - You must enable: ✅ *“I confirm I have read and understood the notice above.”*  
-   - Without checking this, you cannot proceed.  
-6. Click **Review + Create** → **Create**. 
+1. In the [Azure Portal](https://portal.azure.com), search for **Bing Search (Grounding)**.
+2. Click **Create**.
+3. Select your **Subscription** and **Resource Group**.
+4. Enter a **Resource Name** and choose a **Pricing Tier (SKU)**.
+5. At the bottom of the form, tick the required checkbox:
+   ✅ *“I confirm I have read and understood the notice above.”*
+   (You cannot proceed without this.)
+6. Click **Review + Create** → **Create**.
 
-### Option B — Using Azure CLI
+---
 
-Set the variables (replace values with your own):
+### Option B — Azure CLI
+
+Set your variables (replace with your own values):
 
 ```bash
 RESOURCE_GROUP="<your-resource-group>"
@@ -62,7 +67,7 @@ az rest --method put \
   }'
 ```
 
-Verify:
+Verify creation:
 
 ```bash
 az resource show --ids "$RESOURCE_ID" --api-version 2020-06-10 -o table
@@ -70,10 +75,10 @@ az resource show --ids "$RESOURCE_ID" --api-version 2020-06-10 -o table
 
 ---
 
-## 2) Connect the Bing resource to your Azure AI Foundry project (Portal)
+## 🔗 Step 2: Connect Bing Search to Azure AI Foundry
 
-1. Go to your **Azure AI Foundry project** in the portal.
-2. Open **Management center** → **Connected resources**.
+1. Open your **Azure AI Foundry project** in the [AI Studio portal](https://ai.azure.com).
+2. Go to **Management center** → **Connected resources**.
 3. Click **+ Add connection**.
 4. Select **Grounding with Bing Search**.
 5. Choose the Bing resource you created and click **Create**.
@@ -83,15 +88,14 @@ az resource show --ids "$RESOURCE_ID" --api-version 2020-06-10 -o table
 ## 💡 Why Use Bing Search Grounding?
 
 * Provides **real-time information** to enrich AI responses.
-* Helps LLMs answer with **up-to-date knowledge** beyond training data.
-* Useful for scenarios like **news, research, or dynamic data queries**.
+* Helps LLMs give answers with **up-to-date knowledge** beyond training data.
+* Useful for scenarios like **news, research, or dynamic queries**.
 
 ---
 
 ## 📚 Additional Resources
 
-* [Use Bing Search grounding with Azure AI Foundry (official docs)](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/bing-code-samples?source=recommendations&pivots=portal)
-
-```
+* [Grounding with Bing Search (overview)](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/bing-grounding) — Learn how the tool works, pricing, privacy notes, and how real-time search is integrated. ([Microsoft Learn][1])
+* [Grounding with Bing Search code samples](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/bing-code-samples?source=recommendations&pivots=portal) — SDK and REST examples for using Bing grounding. ([Microsoft Learn][2])
 
 ---
