@@ -12,7 +12,7 @@ from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
     MagenticContext, StandardMagenticManager)
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import \
-    ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT
+    ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT
 from semantic_kernel.contents import ChatMessageContent
 from v3.config.settings import (connection_config, current_user_id,
                                 orchestration_config)
@@ -37,14 +37,12 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         # object.__setattr__(self, 'current_user_id', None)
 
         custom_addition = """
-Before creating the final plan, please ask each agent - team member to list all relevant tools (including MCP tools, plug-ins, etc.) they have access to.  For each tool, list its required parameters.
-Obtain every required parameter that is not specified in the users request. These questions should be sent to the proxy agent.  Do not ask for information that is outside of this list of required parameters.
-
-Once this information is obtained, replan to create a final bullet-point plan to address the original request using the data and clarifications obtained.
-Each step in the plan should start with a specific agent which is responsible for executing it.
+As part of the plan, ask the team members regarding what relevant tools they have access to, and what information those tools require.  Please query the user through 
+the ProxyAgent if you need any additional information to supply required data to use these tools. Always clarify with the user if you are unsure about any aspect of 
+the request or the information you need to complete it.
 """
 
-        kwargs['task_ledger_plan_prompt'] = ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT + custom_addition
+        kwargs['task_ledger_facts_prompt'] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + custom_addition
         
         super().__init__(*args, **kwargs)
 
@@ -66,6 +64,7 @@ Each step in the plan should start with a specific agent which is responsible fo
         # First, let the parent create the actual plan
         print(" Creating execution plan...")
         plan = await super().plan(magentic_context)
+        print(f" Plan created: {plan}")
         self.magentic_plan = self.plan_to_obj( magentic_context, self.task_ledger)
 
         self.magentic_plan.user_id = current_user_id.get()
@@ -110,6 +109,11 @@ Each step in the plan should start with a specific agent which is responsible fo
             #     content="Plan execution was cancelled by the user."
             # )
             
+    async def replan(self,magentic_context: MagenticContext) -> Any:
+        print(f"\nHuman-in-the-Loop Magentic Manager replanned:")
+        replan = await super().replan(magentic_context=magentic_context)
+        print(replan)
+        return replan
     
     async def _wait_for_user_approval(self, m_plan_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
         """Wait for user approval response."""

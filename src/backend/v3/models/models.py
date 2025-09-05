@@ -16,17 +16,8 @@ class PlanStatus(str, Enum):
 
 class MStep(BaseModel):
     """model of a step in a plan"""
-    _agent: str = ""
+    agent: str = ""
     action: str = ""
-
-    @property
-    def agent(self):
-        return self._agent
-
-    @agent.setter
-    def agent(self, value):
-        self._agent = value if value is not None else ""
-
 
 class MPlan(BaseModel):
     """model of a plan"""
