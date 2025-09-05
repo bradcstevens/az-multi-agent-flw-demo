@@ -16,17 +16,13 @@ import {
 
 // Constants for endpoints
 const API_ENDPOINTS = {
-    INPUT_TASK: '/input_task',
     PROCESS_REQUEST: '/v3/process_request',
-    PLANS: '/plans',
-    STEPS: '/steps',
-    HUMAN_FEEDBACK: '/human_feedback',
-    APPROVE_STEPS: '/approve_step_or_steps',
-    HUMAN_CLARIFICATION: '/human_clarification_on_plan',
-    AGENT_MESSAGES: '/agent_messages',
-    MESSAGES: '/messages',
-    USER_BROWSER_LANGUAGE: '/user_browser_language',
-    PLAN_APPROVAL: '/v3/plan_approval'
+    PLANS: '/v3/plans',
+    PLAN: '/v3/plan',
+    PLAN_APPROVAL: '/v3/plan_approval',
+    HUMAN_CLARIFICATION: '/v3/user_clarification',
+    USER_BROWSER_LANGUAGE: '/user_browser_language'
+
 };
 
 // Simple cache implementation
@@ -163,7 +159,7 @@ export class APIService {
         const params = { plan_id: planId };
 
         const fetcher = async () => {
-            const data = await apiClient.get(API_ENDPOINTS.PLANS, { params });
+            const data = await apiClient.get(API_ENDPOINTS.PLAN, { params });
 
             // The API returns an array, but with plan_id filter it should have only one item
             if (!data) {
@@ -347,68 +343,6 @@ export class APIService {
         return response;
     }
 
-    /**
-     * Get agent messages for a session
-     * @param sessionId Session ID
-     * @param useCache Whether to use cached data or force fresh fetch
-     * @returns Promise with array of agent messages
-     */
-    async getAgentMessages(sessionId: string, useCache = true): Promise<AgentMessage[]> {
-        const cacheKey = `agent_messages_${sessionId}`;
-
-        const fetcher = async () => {
-            const data = await apiClient.get(`${API_ENDPOINTS.AGENT_MESSAGES}/${sessionId}`);
-            if (useCache) {
-                this._cache.set(cacheKey, data, 30000); // Cache for 30 seconds
-            }
-            return data;
-        };
-
-        if (useCache) {
-            return this._requestTracker.trackRequest(cacheKey, fetcher);
-        }
-
-        return fetcher();
-    }
-
-
-
-
-    /**
-     * Delete all messages
-     * @returns Promise with response object
-     */
-    async deleteAllMessages(): Promise<{ status: string }> {
-        const response = await apiClient.delete(API_ENDPOINTS.MESSAGES);
-
-        // Clear all cached data
-        this._cache.clear();
-
-        return response;
-    }
-
-    /**
-     * Get all messages
-     * @param useCache Whether to use cached data or force fresh fetch
-     * @returns Promise with array of messages
-     */
-    async getAllMessages(useCache = true): Promise<any[]> {
-        const cacheKey = 'all_messages';
-
-        const fetcher = async () => {
-            const data = await apiClient.get(API_ENDPOINTS.MESSAGES);
-            if (useCache) {
-                this._cache.set(cacheKey, data, 30000); // Cache for 30 seconds
-            }
-            return data;
-        };
-
-        if (useCache) {
-            return this._requestTracker.trackRequest(cacheKey, fetcher);
-        }
-
-        return fetcher();
-    }
 
     /**
      * Clear all cached data

@@ -12,8 +12,11 @@ class DataType(str, Enum):
     session = "session"
     plan = "plan"
     step = "step"
-    message = "message"
-    team = "team"
+    message = "agent_message"
+    team = "team_config"
+    user_current_team = "user_current_team"
+    m_plan = "m_plan"
+    m_plan_step = "m_plan_step"
 
 
 class AgentType(str, Enum):

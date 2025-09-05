@@ -377,7 +377,7 @@ async def plan_approval(
                 # )
                 try:
                     plan = orchestration_config.plans[human_feedback.m_plan_id]
-                    if hasattr(plan, 'plan_id'):
+                    if hasattr(plan, "plan_id"):
                         print(
                             "Updated orchestration config:",
                             orchestration_config.plans[human_feedback.m_plan_id],
@@ -406,9 +406,8 @@ async def plan_approval(
                 )
     except Exception as e:
         logging.error(f"Error processing plan approval: {e}")
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @app_v3.post("/user_clarification")
 async def user_clarification(
@@ -1010,3 +1009,207 @@ async def get_search_indexes(request: Request):
     except Exception as e:
         logging.error(f"Error retrieving search indexes: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+# Get plans is called in the initial side rendering of the frontend
+@app_v3.get("/plans")
+async def get_plans(
+    request: Request
+):
+    """
+    Retrieve plans for the current user.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: session_id
+        in: query
+        type: string
+        required: false
+        description: Optional session ID to retrieve plans for a specific session
+    responses:
+      200:
+        description: List of plans with steps for the user
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Unique ID of the plan
+              session_id:
+                type: string
+                description: Session ID associated with the plan
+              initial_goal:
+                type: string
+                description: The initial goal derived from the user's input
+              overall_status:
+                type: string
+                description: Status of the plan (e.g., in_progress, completed)
+              steps:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Unique ID of the step
+                    plan_id:
+                      type: string
+                      description: ID of the plan the step belongs to
+                    action:
+                      type: string
+                      description: The action to be performed
+                    agent:
+                      type: string
+                      description: The agent responsible for the step
+                    status:
+                      type: string
+                      description: Status of the step (e.g., planned, approved, completed)
+      400:
+        description: Missing or invalid user information
+      404:
+        description: Plan not found
+    """
+
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    #### <To do: Francia> Replace the following with code to get plan run history from the database
+
+    # # Initialize memory context
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+
+    current_team = await memory_store.get_current_team(user_id=user_id)
+    if not current_team:
+        return []
+
+    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
+
+
+    return all_plans 
+
+
+# Get plans is called in the initial side rendering of the frontend
+@app_v3.get("/plan/{plan_id}")
+async def get_plan_by_id(request: Request, plan_id: str):
+    """
+    Retrieve plans for the current user.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: session_id
+        in: query
+        type: string
+        required: false
+        description: Optional session ID to retrieve plans for a specific session
+    responses:
+      200:
+        description: List of plans with steps for the user
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Unique ID of the plan
+              session_id:
+                type: string
+                description: Session ID associated with the plan
+              initial_goal:
+                type: string
+                description: The initial goal derived from the user's input
+              overall_status:
+                type: string
+                description: Status of the plan (e.g., in_progress, completed)
+              steps:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Unique ID of the step
+                    plan_id:
+                      type: string
+                      description: ID of the plan the step belongs to
+                    action:
+                      type: string
+                      description: The action to be performed
+                    agent:
+                      type: string
+                      description: The agent responsible for the step
+                    status:
+                      type: string
+                      description: Status of the step (e.g., planned, approved, completed)
+      400:
+        description: Missing or invalid user information
+      404:
+        description: Plan not found
+    """
+
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    #### <To do: Francia> Replace the following with code to get plan run history from the database
+
+    # # Initialize memory context
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+
+    if plan_id:
+        plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
+        if not plan:
+            track_event_if_configured(
+                "GetPlanBySessionNotFound",
+                {"status_code": 400, "detail": "Plan not found"},
+            )
+            raise HTTPException(status_code=404, detail="Plan not found")
+
+        # Use get_steps_by_plan to match the original implementation
+        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
+        messages = await memory_store.get_data_by_type_and_session_id(
+            "agent_message", session_id=plan.session_id
+        )
+
+        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+        plan_with_steps.update_step_counts()
+
+        # Format dates in messages according to locale
+        formatted_messages = format_dates_in_messages(
+            messages, config.get_user_local_browser_language()
+        )
+
+        return [plan_with_steps, formatted_messages]
+
+    current_team = await memory_store.get_current_team(user_id=user_id)
+    if not current_team:
+        return []
+
+    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
+    # Fetch steps for all plans concurrently
+    steps_for_all_plans = await asyncio.gather(
+        *[memory_store.get_steps_by_plan(plan_id=plan.id) for plan in all_plans]
+    )
+    # Create list of PlanWithSteps and update step counts
+    list_of_plans_with_steps = []
+    for plan, steps in zip(all_plans, steps_for_all_plans):
+        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+        plan_with_steps.update_step_counts()
+        list_of_plans_with_steps.append(plan_with_steps)
+
+    return []
