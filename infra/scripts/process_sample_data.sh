@@ -4,7 +4,8 @@
 storageAccount="$1"
 blobContainer="$2"
 aiSearch="$3"
-resourceGroup="$4"
+aiSearchIndex="$4"
+resourceGroup="$5"
 
 # get parameters from azd env, if not provided
 if [ -z "$storageAccount" ]; then
@@ -16,7 +17,11 @@ if [ -z "$blobContainer" ]; then
 fi
 
 if [ -z "$aiSearch" ]; then
-    aiSearch=$(azd env get-value AZURE_SEARCH_NAME)
+    aiSearch=$(azd env get-value AZURE_AI_SEARCH_NAME)
+fi
+
+if [ -z "$aiSearchIndex" ]; then
+    aiSearchIndex=$(azd env get-value AZURE_AI_SEARCH_INDEX_NAME)
 fi
 
 if [ -z "$resourceGroup" ]; then
@@ -27,7 +32,7 @@ azSubscriptionId=$(azd env get-value AZURE_SUBSCRIPTION_ID)
 
 # Check if all required arguments are provided
 if [ -z "$storageAccount" ] || [ -z "$blobContainer" ] || [ -z "$aiSearch" ]; then
-    echo "Usage: $0 <StorageAccount> <StorageContainerName> <AISearchName> [ResourceGroup]"
+    echo "Usage: $0 <StorageAccountName> <StorageContainerName> <AISearchName> [AISearchIndexName] [ResourceGroupName]"
     exit 1
 fi
 
@@ -127,10 +132,10 @@ fi
 echo "Files uploaded successfully to blob storage."
 
 # Determine the correct Python command
-if command -v python3 && python3 --version &> /dev/null; then
-    PYTHON_CMD="python3"
-elif command -v python && python --version &> /dev/null; then
+if command -v python && python --version &> /dev/null; then
     PYTHON_CMD="python"
+elif command -v python3 && python3 --version &> /dev/null; then
+    PYTHON_CMD="python3"
 else
     echo "Python is not installed on this system. Or it is not added in the PATH."
     exit 1
@@ -161,7 +166,7 @@ pip install --quiet -r infra/scripts/requirements.txt
 echo "Requirements installed"
 
 echo "Running the python script to index data"
-python infra/scripts/index_datasets.py "$storageAccount" "$blobContainer" "$aiSearch"
+$PYTHON_CMD infra/scripts/index_datasets.py "$storageAccount" "$blobContainer" "$aiSearch" "$aiSearchIndex"
 if [ $? -ne 0 ]; then
     echo "Error: Indexing python script execution failed."
     exit 1

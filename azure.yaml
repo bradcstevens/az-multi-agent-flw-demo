@@ -4,3 +4,37 @@ metadata:
   template: multi-agent-custom-automation-engine-solution-accelerator@1.0
 requiredVersions:
   azd: ">=1.15.0 !=1.17.1"
+hooks:
+  postdeploy:
+    windows:
+      run: |
+        Write-Host "To upload Team Configurations to Cosmos. Run the following command in PowerShell:"
+        Write-Host "infra\scripts\Upload-Team-Config.ps1" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "To index Sample Data into Azure Search. Run the following command in PowerShell:"
+        Write-Host "infra\scripts\Process-Sample-Data.ps1" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "To upload team configurations and index sample data both in one command, you can use the following command in PowerShell:"
+        Write-Host "infra\scripts\Team-Config-And-Data.ps1" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "You can access the deployed Frontend application at the following URL:"
+        Write-Host "https://$env:webSiteDefaultHostname" -ForegroundColor Cyan
+      shell: pwsh
+      interactive: true
+    posix:
+      run: |
+        Blue='\033[0;34m'
+        NC='\033[0m'
+        echo "To upload Team Configurations to Cosmos. Run the following command in Bash:"
+        echo "${Blue}bash infra/scripts/upload_team_config.sh"
+        echo ""
+        echo "${NC}To index Sample Data into Azure Search. Run the following command in Bash:"
+        echo "${Blue}bash infra/scripts/process_sample_data.sh"
+        echo ""
+        echo "${NC}To upload team configurations and index sample data both in one command, you can use the following command in Bash:"
+        echo "${Blue}bash infra/scripts/team_config_and_data.sh"
+        echo ""
+        echo "${NC}You can access the deployed Frontend application at the following URL:"
+        echo "${Blue}https://$webSiteDefaultHostname"
+      shell: sh
+      interactive: true
