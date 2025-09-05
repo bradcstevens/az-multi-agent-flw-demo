@@ -101,14 +101,6 @@ export class APIService {
     private _cache = new APICache();
     private _requestTracker = new RequestTracker();
 
-    /**
-     * Submit a new input task to generate a plan
-     * @param inputTask The task description and optional session ID
-     * @returns Promise with the response containing session and plan IDs
-     */
-    async submitInputTask(inputTask: InputTask): Promise<InputTaskResponse> {
-        return apiClient.post(API_ENDPOINTS.INPUT_TASK, inputTask);
-    }
 
     /**
      * Create a new plan with RAI validation
@@ -221,29 +213,6 @@ export class APIService {
         return fetcher();
     }
 
-    /**
-     * Get steps for a specific plan
-     * @param planId Plan ID
-     * @param useCache Whether to use cached data or force fresh fetch
-     * @returns Promise with array of steps
-     */
-    async getSteps(planId: string, useCache = true): Promise<Step[]> {
-        const cacheKey = `steps_${planId}`;
-
-        const fetcher = async () => {
-            const data = await apiClient.get(`${API_ENDPOINTS.STEPS}/${planId}`);
-            if (useCache) {
-                this._cache.set(cacheKey, data, 30000); // Cache for 30 seconds
-            }
-            return data;
-        };
-
-        if (useCache) {
-            return this._requestTracker.trackRequest(cacheKey, fetcher);
-        }
-
-        return fetcher();
-    }
 
     /**
    * Approve a plan for execution 
