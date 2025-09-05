@@ -298,7 +298,7 @@ async def process_request(
                 "plan_id": plan.plan_id,
                 "session_id": input_task.session_id,
                 "user_id": user_id,
-                "team_id": "",  # TODO add current_team_id
+                "team_id": team_id,  # TODO add current_team_id
                 "description": input_task.description,
             },
         )
