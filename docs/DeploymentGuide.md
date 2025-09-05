@@ -239,11 +239,47 @@ Once you've opened the project in [Codespaces](#github-codespaces), [Dev Contain
    - This deployment will take _4-6 minutes_ to provision the resources in your account and set up the solution with sample data.
    - If you encounter an error or timeout during deployment, changing the location may help, as there could be availability constraints for the resources.
 
-5. Once the deployment has completed successfully, open the [Azure Portal](https://portal.azure.com/), go to the deployed resource group, find the App Service, and get the app URL from `Default domain`.
+5. After deployment completes, you can upload Team Configurations using command printed in the terminal. The command will look like one of the following. Run the appropriate command for your shell from the project root:
 
-6. When Deployment is complete, follow steps in [Set Up Authentication in Azure App Service](../docs/azure_app_service_auth_setup.md) to add app authentication to your web app running on Azure App Service
+  - **For Bash (Linux/macOS/WSL):**
+    ```bash
+    bash infra/scripts/upload_team_config.sh
+    ```
 
-7. If you are done trying out the application, you can delete the resources by running `azd down`.
+  - **For PowerShell (Windows):**
+    ```powershell
+    infra\scripts\Upload-Team-Config.ps1
+    ```
+
+6. After deployment completes, you can index Sample Data into Search Service using command printed in the terminal. The command will look like one of the following. Run the appropriate command for your shell from the project root:
+
+  - **For Bash (Linux/macOS/WSL):**
+    ```bash
+    bash infra/scripts/process_sample_data.sh
+    ```
+
+  - **For PowerShell (Windows):**
+    ```powershell
+    infra\scripts\Process-Sample-Data.ps1
+    ```
+
+7. To upload team configurations and index sample data in one step. Run the appropriate command for your shell from the project root:
+
+  - **For Bash (Linux/macOS/WSL):**
+    ```bash
+    bash infra/scripts/team_config_and_data.sh
+    ```
+
+  - **For PowerShell (Windows):**
+    ```powershell
+    infra\scripts\Team-Config-And-Data.ps1
+    ```
+
+8. Once the deployment has completed successfully, open the [Azure Portal](https://portal.azure.com/), go to the deployed resource group, find the App Service, and get the app URL from `Default domain`.
+
+9. When Deployment is complete, follow steps in [Set Up Authentication in Azure App Service](../docs/azure_app_service_auth_setup.md) to add app authentication to your web app running on Azure App Service
+
+10. If you are done trying out the application, you can delete the resources by running `azd down`.
 
 
 ### 🛠️ Troubleshooting

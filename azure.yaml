@@ -13,6 +13,12 @@ hooks:
         Write-Host ""
         Write-Host "To index Sample Data into Azure Search. Run the following command in PowerShell:"
         Write-Host "infra\scripts\Process-Sample-Data.ps1" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "To upload team configurations and index sample data both in one command, you can use the following command in PowerShell:"
+        Write-Host "infra\scripts\Team-Config-And-Data.ps1" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "You can access the deployed Frontend application at the following URL:"
+        Write-Host "https://$env:webSiteDefaultHostname" -ForegroundColor Cyan
       shell: pwsh
       interactive: true
     posix:
@@ -22,5 +28,11 @@ hooks:
         echo ""
         echo "To index Sample Data into Azure Search. Run the following command in Bash:"
         echo "bash infra/scripts/process_sample_data.sh"
+        echo ""
+        echo "To upload team configurations and index sample data both in one command, you can use the following command in Bash:"
+        echo "bash infra/scripts/team_config_and_data.sh"
+        echo ""
+        echo "You can access the deployed Frontend application at the following URL:"
+        echo "https://$webSiteDefaultHostname"
       shell: sh
       interactive: true

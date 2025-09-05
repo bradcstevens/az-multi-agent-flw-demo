@@ -1,34 +1,23 @@
 #Requires -Version 7.0
 
 param(
-    [string]$CosmosDbName,
-    [string]$DatabaseName,
-    [string]$ContainerName,
-    [string]$DirectoryPath,
-    [string]$ResourceGroup
+    [string]$backendUrl,
+    [string]$DirectoryPath
 )
 
 # Get parameters from azd env, if not provided
-if (-not $CosmosDbName) {
-    $CosmosDbName = $(azd env get-value COSMOSDB_ACCOUNT_NAME)
-}
-if (-not $DatabaseName) {
-    $DatabaseName = $(azd env get-value COSMOSDB_DATABASE)
-}
-if (-not $ContainerName) {
-    $ContainerName = $(azd env get-value COSMOSDB_CONTAINER)
+if (-not $backendUrl) {
+    $backendUrl = $(azd env get-value BACKEND_URL)
 }
 if (-not $DirectoryPath) {
     $DirectoryPath = "data/agent_teams"
 }
-if (-not $ResourceGroup) {
-    $ResourceGroup = $(azd env get-value AZURE_RESOURCE_GROUP)
-}
+
 $AzSubscriptionId = $(azd env get-value AZURE_SUBSCRIPTION_ID)
 
 # Check if all required arguments are provided
-if (-not $CosmosDbName -or -not $DatabaseName -or -not $ContainerName -or -not $DirectoryPath) {
-    Write-Host "Usage: .\infra\scripts\Upload-Team-Config.ps1 -CosmosDbName <CosmosDbName> -DatabaseName <DatabaseName> -ContainerName <ContainerName> -DirectoryPath <DirectoryPath> [-ResourceGroup <ResourceGroupName>]"
+if (-not $backendUrl -or -not $DirectoryPath) {
+    Write-Host "Usage: .\infra\scripts\Upload-Team-Config.ps1 -backendUrl <backendUrl> -DirectoryPath <DirectoryPath>"
     exit 1
 }
 
@@ -95,23 +84,6 @@ if ($currentSubscriptionId -ne $AzSubscriptionId) {
 
 $userPrincipalId = $(az ad signed-in-user show --query id -o tsv)
 
-$cosmosIsPublicAccessDisabled = $false
-if ($ResourceGroup) {
-    $cosmosPublicAccess = $(az cosmosdb show --name $CosmosDbName --resource-group $ResourceGroup --query "publicNetworkAccess" -o tsv)
-    if ($cosmosPublicAccess -eq "Disabled") {
-        $cosmosIsPublicAccessDisabled = $true
-        Write-Host "Enabling public access for CosmosDB: $CosmosDbName"
-        az cosmosdb update --name $CosmosDbName --resource-group $ResourceGroup --public-network-access enabled --output none
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "Error: Failed to enable public access for CosmosDB."
-            exit 1
-        }
-        Write-Host "Public access enabled for CosmosDB: $CosmosDbName"
-    } else {
-        Write-Host "Public access is already enabled for CosmosDB: $CosmosDbName"
-    }
-}
-
 # Determine the correct Python command
 $pythonCmd = $null
 
@@ -173,21 +145,10 @@ Write-Host "Requirements installed"
 
 # Run the Python script to upload team configuration
 Write-Host "Running the python script to upload team configuration"
-$process = Start-Process -FilePath $pythonCmd -ArgumentList "infra/scripts/team-config-scripts/upload_team_config.py", $CosmosDbName, $DatabaseName, $ContainerName, $DirectoryPath, $userPrincipalId -Wait -NoNewWindow -PassThru
+$process = Start-Process -FilePath $pythonCmd -ArgumentList "infra/scripts/upload_team_config.py", $backendUrl, $DirectoryPath, $userPrincipalId -Wait -NoNewWindow -PassThru
 if ($process.ExitCode -ne 0) {
     Write-Host "Error: Team configuration upload failed."
     exit 1
-}
-
-#disable public access for cosmos
-if ($cosmosIsPublicAccessDisabled) {
-    Write-Host "Disabling public access for CosmosDB: $CosmosDbName"
-    az cosmosdb update --name $CosmosDbName --resource-group $ResourceGroup --public-network-access disabled --output none
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: Failed to disable public access for CosmosDB."
-        exit 1
-    }
-    Write-Host "Public access disabled for CosmosDB: $CosmosDbName"
 }
 
 Write-Host "Script executed successfully. Team configuration uploaded."
