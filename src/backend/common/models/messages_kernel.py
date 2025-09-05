@@ -101,6 +101,7 @@ class Session(BaseDataModel):
     current_status: str
     message_to_user: Optional[str] = None
 
+
 class UserCurrentTeam(BaseDataModel):
     """Represents the current team of a user."""
 
@@ -108,11 +109,12 @@ class UserCurrentTeam(BaseDataModel):
     user_id: str
     team_id: str
 
+
 class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
     data_type: Literal["plan"] = Field("plan", Literal=True)
-    plan_id: str 
+    plan_id: str
     session_id: str
     user_id: str
     initial_goal: str
@@ -122,7 +124,7 @@ class Plan(BaseDataModel):
     team_id: Optional[str] = None
     human_clarification_request: Optional[str] = None
     human_clarification_response: Optional[str] = None
-    
+
 
 class Step(BaseDataModel):
     """Represents an individual step (task) within a plan."""
@@ -140,24 +142,10 @@ class Step(BaseDataModel):
     updated_action: Optional[str] = None
 
 
-class ThreadIdAgent(BaseDataModel):
-    """Represents an individual thread_id."""
+class TeamSelectionRequest(KernelBaseModel):
+    """Request model for team selection."""
 
-    data_type: Literal["thread"] = Field("thread", Literal=True)
-    session_id: str  # Partition key
-    user_id: str
-    thread_id: str
-
-
-class AzureIdAgent(BaseDataModel):
-    """Represents an individual thread_id."""
-
-    data_type: Literal["agent"] = Field("agent", Literal=True)
-    session_id: str  # Partition key
-    user_id: str
-    action: str
-    agent: AgentType
-    agent_id: str
+    team_id: str
 
 
 class TeamAgent(KernelBaseModel):
@@ -188,9 +176,6 @@ class StartingTask(KernelBaseModel):
     creator: str
     logo: str
 
-class TeamSelectionRequest(KernelBaseModel):
-    """Request model for team selection."""
-    team_id: str
 
 class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""
@@ -263,80 +248,3 @@ class InputTask(KernelBaseModel):
 
 class UserLanguage(KernelBaseModel):
     language: str
-
-
-class GeneratePlanRequest(KernelBaseModel):
-    """Message representing a request to generate a plan from an existing plan ID."""
-
-    plan_id: str
-
-
-class ApprovalRequest(KernelBaseModel):
-    """Message sent to HumanAgent to request approval for a step."""
-
-    step_id: str
-    plan_id: str
-    session_id: str
-    user_id: str
-    action: str
-    agent: AgentType
-
-
-class HumanFeedback(KernelBaseModel):
-    """Message containing human feedback on a step."""
-
-    step_id: Optional[str] = None
-    plan_id: str
-    session_id: str
-    approved: bool
-    human_feedback: Optional[str] = None
-    updated_action: Optional[str] = None
-
-
-class HumanClarification(KernelBaseModel):
-    """Message containing human clarification on a plan."""
-
-    plan_id: str
-    session_id: str
-    human_clarification: str
-
-
-class ActionRequest(KernelBaseModel):
-    """Message sent to an agent to perform an action."""
-
-    step_id: str
-    plan_id: str
-    session_id: str
-    action: str
-    agent: AgentType
-
-
-class ActionResponse(KernelBaseModel):
-    """Message containing the response from an agent after performing an action."""
-
-    step_id: str
-    plan_id: str
-    session_id: str
-    result: str
-    status: StepStatus  # Should be 'completed' or 'failed'
-
-
-class PlanStateUpdate(KernelBaseModel):
-    """Optional message for updating the plan state."""
-
-    plan_id: str
-    session_id: str
-    overall_status: PlanStatus
-
-
-# Define the expected structure of the LLM response
-class PlannerResponseStep(KernelBaseModel):
-    action: str
-    agent: AgentType
-
-
-class PlannerResponsePlan(KernelBaseModel):
-    initial_goal: str
-    steps: List[PlannerResponseStep]
-    summary_plan_and_steps: str
-    human_clarification_request: Optional[str] = None
