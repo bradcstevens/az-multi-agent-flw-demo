@@ -165,6 +165,28 @@ var replicaLocation = replicaRegionPairs[location]
 // Resources      //
 // ============== //
 
+
+var allTags = union(
+  {
+    'azd-env-name': solutionName
+  },
+  tags
+)
+@description('Optional created by user name')
+param createdBy string = empty(deployer().userPrincipalName) ? '' : split(deployer().userPrincipalName, '@')[0] 
+
+resource resourceGroupTags 'Microsoft.Resources/tags@2021-04-01' = {
+  name: 'default'
+  properties: {
+    tags: {
+      ...allTags
+      TemplateName: 'MACAE'
+      CreatedBy: createdBy
+    }
+  }
+}
+
+
 #disable-next-line no-deployments-resources
 resource avmTelemetry 'Microsoft.Resources/deployments@2024-03-01' = if (enableTelemetry) {
   name: '46d3xbcp.ptn.sa-multiagentcustauteng.${replace('-..--..-', '.', '-')}.${substring(uniqueString(deployment().name, location), 0, 4)}'
