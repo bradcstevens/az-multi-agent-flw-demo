@@ -42,7 +42,7 @@ var deployingUserPrincipalId = deployerInfo.objectId
   azd: {
     type: 'location'
     usageName: [
-      'OpenAI.GlobalStandard.gpt-4o, 150'
+      'OpenAI.GlobalStandard.4.1-mini, 50'
     ]
   }
 })
@@ -51,13 +51,20 @@ param azureAiServiceLocation string
 
 @minLength(1)
 @description('Optional. Name of the GPT model to deploy:')
-param gptModelName string = 'gpt-4o'
+param gptModelName string = 'gpt-4.1-mini'
 
-@description('Optional. Version of the GPT model to deploy. Defaults to 2024-08-06.')
-param gptModelVersion string = '2024-08-06'
+@description('Optional. Version of the GPT model to deploy. Defaults to 2025-04-14.')
+param gptModelVersion string = '2025-04-14'
+
+@minLength(1)
+@description('Optional. Name of the GPT Reasoning model to deploy:')
+param gptReasoningModelName string = 'o4-mini'
+
+@description('Optional. Version of the GPT Reasoning model to deploy. Defaults to 2025-04-14.')
+param gptReasoningModelVersion string = '2025-04-16'
 
 @description('Optional. Version of the Azure OpenAI service to deploy. Defaults to 2025-01-01-preview.')
-param azureopenaiVersion string = '2025-01-01-preview'
+param azureopenaiVersion string = '2024-12-01-preview'
 
 @minLength(1)
 @allowed([
@@ -67,8 +74,19 @@ param azureopenaiVersion string = '2025-01-01-preview'
 @description('Optional. GPT model deployment type. Defaults to GlobalStandard.')
 param gptModelDeploymentType string = 'GlobalStandard'
 
+@minLength(1)
+@allowed([
+  'Standard'
+  'GlobalStandard'
+])
+@description('Optional. GPT model deployment type. Defaults to GlobalStandard.')
+param gptReasoningModelDeploymentType string = 'GlobalStandard'
+
+@description('Optional. AI model deployment token capacity. Defaults to 250 for optimal performance.')
+param gptModelCapacity int = 50
+
 @description('Optional. AI model deployment token capacity. Defaults to 150 for optimal performance.')
-param gptModelCapacity int = 150
+param gptReasoningModelCapacity int = 50
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags resourceInput<'Microsoft.Resources/resourceGroups@2025-04-01'>.tags = {}
@@ -110,6 +128,15 @@ param frontendContainerImageName string = 'macaefrontend'
 
 @description('Optional. The Container Image Tag to deploy on the frontend.')
 param frontendContainerImageTag string = 'latest_2025-07-22_895'
+
+@description('Optional. The Container Registry hostname where the docker images for the MCP are located.')
+param MCPContainerRegistryHostname string = 'macaemcpacrdk.azurecr.io'
+
+@description('Optional. The Container Image Name to deploy on the MCP.')
+param MCPContainerImageName string = 'macae-mac-app'
+
+@description('Optional. The Container Image Tag to deploy on the MCP.')
+param MCPContainerImageTag string = 't9'
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
@@ -997,6 +1024,16 @@ var aiFoundryAiServicesModelDeployment = {
   }
   raiPolicyName: 'Microsoft.Default'
 }
+var aiFoundryAiServicesReasoningModelDeployment = {
+  format: 'OpenAI'
+  name: gptReasoningModelName
+  version: gptReasoningModelVersion
+  sku: {
+    name: gptReasoningModelDeploymentType
+    capacity: gptReasoningModelCapacity
+  }
+  raiPolicyName: 'Microsoft.Default'
+}
 var aiFoundryAiProjectDescription = 'AI Foundry Project'
 
 resource existingAiFoundryAiServices 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (useExistingAiFoundryAiProject) {
@@ -1021,6 +1058,19 @@ module existingAiFoundryAiServicesDeployments 'modules/ai-services-deployments.b
         sku: {
           name: aiFoundryAiServicesModelDeployment.sku.name
           capacity: aiFoundryAiServicesModelDeployment.sku.capacity
+        }
+      }
+      {
+        name: aiFoundryAiServicesReasoningModelDeployment.name
+        model: {
+          format: aiFoundryAiServicesReasoningModelDeployment.format
+          name: aiFoundryAiServicesReasoningModelDeployment.name
+          version: aiFoundryAiServicesReasoningModelDeployment.version
+        }
+        raiPolicyName: aiFoundryAiServicesReasoningModelDeployment.raiPolicyName
+        sku: {
+          name: aiFoundryAiServicesReasoningModelDeployment.sku.name
+          capacity: aiFoundryAiServicesReasoningModelDeployment.sku.capacity
         }
       }
     ]
@@ -1070,6 +1120,19 @@ module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-service
         sku: {
           name: aiFoundryAiServicesModelDeployment.sku.name
           capacity: aiFoundryAiServicesModelDeployment.sku.capacity
+        }
+      }
+      {
+        name: aiFoundryAiServicesReasoningModelDeployment.name
+        model: {
+          format: aiFoundryAiServicesReasoningModelDeployment.format
+          name: aiFoundryAiServicesReasoningModelDeployment.name
+          version: aiFoundryAiServicesReasoningModelDeployment.version
+        }
+        raiPolicyName: aiFoundryAiServicesReasoningModelDeployment.raiPolicyName
+        sku: {
+          name: aiFoundryAiServicesReasoningModelDeployment.sku.name
+          capacity: aiFoundryAiServicesReasoningModelDeployment.sku.capacity
         }
       }
     ]
@@ -1453,9 +1516,13 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
             name: 'AZURE_BING_CONNECTION_NAME'
             value: '' 
           }
+           {
+            name: 'BING_CONNECTION_NAME'
+            value: '' 
+          } 
           {
             name: 'REASONING_MODEL_NAME'
-            value: 'o3' 
+            value: aiFoundryAiServicesReasoningModelDeployment.name
           }
           {
             name: 'MCP_SERVER_ENDPOINT'
@@ -1496,6 +1563,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           {
             name: 'AZURE_STORAGE_CONTAINER_NAME'
             value: storageContainerName
+          }
+          {
+            name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME'
+            value: aiFoundryAiServicesModelDeployment.name
           }
         ]
       }
@@ -1543,8 +1614,8 @@ module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = {
     containers: [
       {
         name: 'mcp'
-        //image: '${backendContainerRegistryHostname}/${backendContainerImageName}:${backendContainerImageTag}'
-        image: 'macaemcpacrdk.azurecr.io/macae-mac-app:t9'
+        image: '${MCPContainerRegistryHostname}/${MCPContainerImageName}:${MCPContainerImageTag}'
+        //image: 'macaemcpacrdk.azurecr.io/macae-mac-app:t9'
         //TODO: configure probes for container app
         // probes: [
         //   {
@@ -1886,7 +1957,7 @@ output AZURE_CLIENT_ID string  = userAssignedIdentity!.outputs.clientId
 output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_AI_SEARCH_CONNECTION_NAME string  = searchService.outputs.name
 output AZURE_COGNITIVE_SERVICES string = 'https://cognitiveservices.azure.com/.default'
-output REASONING_MODEL_NAME string = 'o3'
+output REASONING_MODEL_NAME string = aiFoundryAiServicesReasoningModelDeployment.name
 output MCP_SERVER_NAME string = 'MACAE MCP Server'
 output MCP_SERVER_DESCRIPTION string = 'MACAE MCP Server Description'
 output SUPPORTED_MODELS string = '["o3","o4-mini","gpt-4.1","gpt-4.1-mini"]'
