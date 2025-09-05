@@ -41,7 +41,7 @@ services:
           continueOnError: false
 
 hooks:
-  postprovision:
+  postdeploy:
     windows:
       run: |
         Write-Host "To upload Team Configurations to Cosmos. Run the following command in PowerShell:"

@@ -5,7 +5,7 @@ metadata:
 requiredVersions:
   azd: ">=1.15.0 !=1.17.1"
 hooks:
-  postprovision:
+  postdeploy:
     windows:
       run: |
         Write-Host "To upload Team Configurations to Cosmos. Run the following command in PowerShell:"

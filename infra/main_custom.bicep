@@ -919,6 +919,7 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.17.0' = if (e
 }
 
 // ========== Private DNS Zones ========== //
+var keyVaultPrivateDNSZone = 'privatelink.${toLower(environment().name) == 'azureusgovernment' ? 'vaultcore.usgovcloudapi.net' : 'vaultcore.azure.net'}'
 var privateDnsZones = [
   'privatelink.cognitiveservices.azure.com'
   'privatelink.openai.azure.com'
@@ -926,6 +927,7 @@ var privateDnsZones = [
   'privatelink.documents.azure.com'
   'privatelink.blob.core.windows.net'
   'privatelink.search.windows.net'
+  keyVaultPrivateDNSZone
 ]
 
 // DNS Zone Index Constants
@@ -936,6 +938,7 @@ var dnsZoneIndex = {
   cosmosDb: 3
   blob: 4
   search: 5
+  keyVault: 6
 }
 
 // List of DNS zone indices that correspond to AI-related services.
@@ -1516,7 +1519,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           } 
           {
             name: 'AZURE_AI_SEARCH_API_KEY'
-            value: ''
+            value: 'azure-ai-search-api-key'
           } 
           {
             name: 'BING_CONNECTION_NAME'
@@ -1531,6 +1534,13 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
             value: storageContainerName
           }
         ]
+      }
+    ]
+    secrets: [
+      {
+        name: 'azure-ai-search-api-key'
+        keyVaultUrl: keyvault.outputs.secrets[0].uriWithVersion
+        identity: userAssignedIdentity.outputs.resourceId
       }
     ]
   }
@@ -1880,12 +1890,67 @@ module aiSearchFoundryConnection 'modules/aifp-connections.bicep' = {
     searchServiceResourceId: searchService.outputs.resourceId
     searchServiceLocation: searchService.outputs.location
     searchServiceName: searchService.outputs.name
+    searchApiKey: searchService.outputs.primaryKey
   }
   dependsOn: [
     aiFoundryAiServices
   ]
 }
 
+
+// ========== KeyVault ========== //
+var keyVaultName = 'kv-${solutionSuffix}'
+module keyvault 'br/public:avm/res/key-vault/vault:0.12.1' = {
+  name: take('avm.res.key-vault.vault.${keyVaultName}', 64)
+  params: {
+    name: keyVaultName
+    location: location
+    tags: tags
+    sku: enableScalability ? 'premium' : 'standard'
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+    networkAcls: {
+      defaultAction: 'Allow'
+    }
+    enableVaultForDeployment: true
+    enableVaultForDiskEncryption: true
+    enableVaultForTemplateDeployment: true
+    enableRbacAuthorization: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 7
+    diagnosticSettings: enableMonitoring 
+      ? [{ workspaceResourceId: logAnalyticsWorkspace!.outputs.resourceId }] 
+      : []
+    // WAF aligned configuration for Private Networking
+    privateEndpoints: enablePrivateNetworking
+      ? [
+          {
+            name: 'pep-${keyVaultName}'
+            customNetworkInterfaceName: 'nic-${keyVaultName}'
+            privateDnsZoneGroup: {
+              privateDnsZoneGroupConfigs: [{ privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.keyVault]!.outputs.resourceId }]
+            }
+            service: 'vault'
+            subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
+          }
+        ]
+      : []
+    // WAF aligned configuration for Role-based Access Control
+    roleAssignments: [
+      {
+         principalId: userAssignedIdentity.outputs.principalId
+         principalType: 'ServicePrincipal'
+         roleDefinitionIdOrName: 'Key Vault Administrator'
+      }
+    ]
+    secrets: [
+      {
+        name: 'AzureAISearchAPIKey'
+        value: searchService.outputs.primaryKey
+      }
+    ]
+    enableTelemetry: enableTelemetry
+  }
+}
 
 // ============ //
 // Outputs      //
@@ -1948,3 +2013,4 @@ output REASONING_MODEL_NAME string = 'o3'
 output MCP_SERVER_NAME string = 'MACAE MCP Server'
 output MCP_SERVER_DESCRIPTION string = 'MACAE MCP Server Description'
 output SUPPORTED_MODELS string = '["o3","o4-mini","gpt-4.1","gpt-4.1-mini"]'
+output AZURE_AI_SEARCH_API_KEY string = '<Deployed-Search-ApiKey>'
