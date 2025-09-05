@@ -26,11 +26,30 @@
   margin: 0 !important;
   width: 100% !important;
   box-sizing: border-box !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  border-bottom: none !important;
+}
+
+.closeButton {
+  color: var(--colorNeutralForeground2) !important;
+  background-color: transparent !important;
+  border: none !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  border-radius: 4px !important;
+  flex-shrink: 0;
+}
+
+.closeButton:hover {
+  background-color: var(--colorNeutralBackground3) !important;
+  color: var(--colorNeutralForeground1) !important;
 }
 
 .dialogBody {
   color: var(--colorNeutralForeground1) !important;
-  padding: 24px !important;
+  padding: 0 24px 24px 24px !important;
   background-color: var(--colorNeutralBackground1) !important;
   width: 100% !important;
   margin: 0 !important;
@@ -45,18 +64,21 @@
 .dialogActions {
   padding: 16px 24px;
   background-color: var(--colorNeutralBackground1);
-  border-top: 1px solid var(--colorNeutralStroke2);
+  border-top: none !important;
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* Tab Container */
 .tabContainer {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   width: 100%;
 }
 
 .tabContentContainer {
   overflow: hidden;
   width: 100%;
+  margin-top: 0 !important;
 }
 
 .teamsTabContent {
@@ -67,34 +89,115 @@
   width: 100%;
 }
 
-/* Tab Styles */
+.uploadSuccessMessage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  text-align: center;
+  gap: 24px;
+  min-height: 350px;
+  background-color: var(--colorNeutralBackground1);
+  border-radius: 12px;
+  margin: 20px 0;
+  border: 1px solid var(--colorNeutralStroke2);
+  position: relative;
+  animation: successFadeIn 0.6s ease-out;
+  box-shadow: var(--shadow16);
+}
+
+.successIcon {
+  color: #10b981 !important;
+  font-size: 72px !important;
+  width: 72px !important;
+  height: 72px !important;
+  margin-bottom: 8px;
+  animation: successIconBounce 0.8s ease-out;
+  filter: drop-shadow(0 6px 12px rgba(16, 185, 129, 0.25));
+}
+
+.successText {
+  color: var(--colorNeutralForeground1) !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 1.4;
+  margin: 0;
+  max-width: 450px;
+  word-wrap: break-word;
+  animation: textSlideUp 0.8s ease-out 0.3s both;
+}
+
+/* Add this to your existing CSS file */
+
+.successActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+  justify-content: center;
+}
+
+.successActions .continueButton {
+  padding: 12px 32px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 120, 212, 0.25) !important;
+}
+
+.successActions .continueButton:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(0, 120, 212, 0.35) !important;
+}
+
 .tabList {
-  margin-bottom: 20px !important;
-  width: 100% !important;
+  gap: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  margin-bottom: 0 !important;
   background-color: var(--colorNeutralBackground1) !important;
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+  box-shadow: none !important;
 }
 
 .tab {
   color: var(--colorNeutralForeground2) !important;
   font-weight: 400 !important;
-  padding: 12px 16px !important;
-  margin-right: 24px !important;
+  padding: 8px 0 !important;
+  margin: 0 !important;
+  /* border: none !important; */
+  /* border-bottom: 2px solid transparent !important; */
+  background: transparent !important;
+}
+
+.tab:hover {
+  background: transparent !important;
+  color: var(--colorNeutralForeground1) !important;
 }
 
 .tabSelected {
-  color: var(--colorBrandForeground1) !important;
+ color: var(--colorBrandForeground1) !important;
   font-weight: 600 !important;
+  border-bottom: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.tabSelected:hover {
+  background: transparent !important;
 }
 
 /* Search Input */
 .searchContainer {
-  margin-bottom: 16px;
+  margin: 16px 0;
   width: 100%;
 }
 
 .searchInput {
   width: 100%;
-  margin-bottom: 16px;
   background-color: var(--colorNeutralBackground1) !important;
   border: 1px solid var(--colorNeutralStroke1) !important;
   color: var(--colorNeutralForeground1) !important;
@@ -142,12 +245,6 @@
   white-space: pre-line;
 }
 
-/* Team List */
-.teamList {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
 /* No Teams Container */
 .noTeamsContainer {
   display: flex;
@@ -166,83 +263,106 @@
   color: var(--colorNeutralForeground3);
 }
 
-/* Team Item */
-.teamItem {
+/* Team Card - 4 Column Layout: Radio | Team Info | Agent Tags | Three-dots */
+.teamCard {
   display: flex;
-  align-items: center;
-  padding: 16px;
-  border: 1px solid var(--colorNeutralStroke1);
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 16px;
+  border: 1px solid var(--colorNeutralStroke2);
   border-radius: 8px;
   margin-bottom: 12px;
-  justify-content: space-between;
-  background-color: var(--colorNeutralBackground1);
   cursor: pointer;
+  background-color: var(--colorNeutralBackground1);
   transition: all 0.2s ease;
-  box-sizing: border-box;
-  width: 100%;
-  overflow: hidden;
 }
 
-.teamItem:hover {
-  border-color: var(--colorBrandStroke1);
-  background-color: var(--colorBrandBackground2);
+.teamCard:hover {
+  background-color: var(--colorNeutralBackground2);
+  border-color: var(--colorNeutralStroke1);
 }
 
-.teamItemSelected {
+.teamCardSelected {
   background-color: var(--colorBrandBackground2);
   border-color: var(--colorBrandStroke1);
 }
 
-.teamInfo {
-  flex: 2;
-  margin-left: 16px;
+/* Radio Button Column */
+.teamRadio {
+  margin: 0 !important;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* Team Content Column - Name and Description only */
+.teamContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .teamName {
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
+  font-weight: 600 !important;
+  color: var(--colorNeutralForeground1) !important;
+  margin: 0 !important;
+  font-size: 16px !important;
+  line-height: 1.3;
 }
 
 .teamDescription {
-  font-size: 13px;
-  color: var(--colorNeutralForeground2);
-  margin-top: 4px;
+  color: var(--colorNeutralForeground2) !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+  line-height: 1.4;
 }
 
-.teamBadges {
-  flex: 1;
+/* Agent Tags Column - On the RIGHT of team info */
+.agentTags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: flex-end;
-  align-items: center;
-  margin-left: 16px;
-  margin-right: 12px;
+  /* align-items: flex-start; */
+  flex-shrink: 0;
+  max-width: 200px;
+  padding: 4px 8px;
+  /* justify-content: flex-end; */
 }
 
 .agentBadge {
-  background-color: var(--colorBrandBackground2);
-  color: var(--colorBrandForeground2);
-  border: 1px solid var(--colorBrandStroke2);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  min-height: 24px;
+  background-color: var(--colorNeutralBackground3) !important;
+  color: var(--colorNeutralForeground2) !important;
+  border: 1px solid var(--colorNeutralStroke2) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
 }
 
-/* Agent Badge Icon */
-.badgeIcon {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
+/* Override FluentUI Badge padding specifically */
+.agentTags .agentBadge,
+.agentTags .agentBadge[class*="r1iycov"] {
+  padding: 6px 12px !important;
+  height: auto !important;
+  min-height: auto !important;
 }
 
-/* Delete Button */
-.deleteButton {
-  color: var(--colorPaletteRedForeground1);
-  margin-left: 12px;
-  min-width: 32px;
+/* More Button Column */
+.moreButton {
+  color: var(--colorNeutralForeground2) !important;
+  background-color: transparent !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  border: none !important;
+  border-radius: 4px !important;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.moreButton:hover {
+  background-color: var(--colorNeutralBackground3) !important;
+  color: var(--colorNeutralForeground1) !important;
 }
 
 /* Team Selector Button */
@@ -459,4 +579,53 @@
   color: var(--colorNeutralForegroundOnBrand);
   padding: 8px 16px;
   min-width: 100px;
+}
+
+/* Legacy styles - can be removed */
+.teamItem {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  justify-content: space-between;
+  background-color: var(--colorNeutralBackground1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
+}
+
+.teamItem:hover {
+  border-color: var(--colorBrandStroke1);
+  background-color: var(--colorBrandBackground2);
+}
+
+.teamItemSelected {
+  background-color: var(--colorBrandBackground2);
+  border-color: var(--colorBrandStroke1);
+}
+
+.teamInfo {
+  flex: 2;
+  margin-left: 16px;
+}
+
+.teamBadges {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+  margin-left: 16px;
+  margin-right: 12px;
+}
+
+.deleteButton {
+  color: var(--colorPaletteRedForeground1);
+  margin-left: 12px;
+  min-width: 32px;
 }
