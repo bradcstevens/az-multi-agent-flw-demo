@@ -855,37 +855,6 @@ async def delete_team_config(team_id: str, request: Request):
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 
-@app_v3.get("/model_deployments")
-async def get_model_deployments(request: Request):
-    """
-    Get information about available model deployments for debugging/validation.
-
-    ---
-    tags:
-      - Model Validation
-    responses:
-      200:
-        description: List of available model deployments
-      401:
-        description: Missing or invalid user information
-    """
-    # Validate user authentication
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
-    if not user_id:
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid user information"
-        )
-
-    try:
-        team_service = TeamService()
-        deployments = []  # await team_service.extract_models_from_agent()
-        summary = await team_service.get_deployment_status_summary()
-        return {"deployments": deployments, "summary": summary}
-    except Exception as e:
-        logging.error(f"Error retrieving model deployments: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error occurred")
-
 
 @app_v3.post("/select_team")
 async def select_team(selection: TeamSelectionRequest, request: Request):
@@ -975,38 +944,6 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
             },
         )
         raise HTTPException(status_code=500, detail="Internal server error occurred")
-
-
-@app_v3.get("/search_indexes")
-async def get_search_indexes(request: Request):
-    """
-    Get information about available search indexes for debugging/validation.
-
-    ---
-    tags:
-      - Search Validation
-    responses:
-      200:
-        description: List of available search indexes
-      401:
-        description: Missing or invalid user information
-    """
-    # Validate user authentication
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
-    if not user_id:
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid user information"
-        )
-
-    try:
-        team_service = TeamService()
-        summary = await team_service.get_search_index_summary()
-        return {"search_summary": summary}
-    except Exception as e:
-        logging.error(f"Error retrieving search indexes: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error occurred")
-
 
 # Get plans is called in the initial side rendering of the frontend
 @app_v3.get("/plans")
