@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from azure.ai.projects.aio import AIProjectClient
-from azure.identity import InteractiveBrowserCredential
 from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 from semantic_kernel.connectors.mcp import MCPStreamableHttpPlugin
@@ -35,7 +34,7 @@ class MCPEnabledBase:
         if self._stack is None:
             return
         try:
-            self.cred.close()
+            #self.cred.close()
             await self._stack.aclose()
         finally:
             self._stack = None
