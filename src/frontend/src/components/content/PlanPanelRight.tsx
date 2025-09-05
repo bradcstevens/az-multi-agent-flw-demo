@@ -22,7 +22,6 @@ import ContentNotFound from "../NotFound/ContentNotFound";
 // Clean interface - only display-related props
 interface PlanPanelRightProps {
   planData: any;
-  OnApproveStep: (step: Step, total: number, completed: number, approve: boolean) => Promise<void>;
   submittingChatDisableInput: boolean;
   processingSubtaskId: string | null;
   loading: boolean;
@@ -66,14 +65,14 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   // Helper function to get clean agent display name
   const getAgentDisplayName = (agentName: string): string => {
     if (!agentName) return 'Assistant';
-    
+
     // Special handling for orchestrator/system agents
-    if (agentName.toLowerCase().includes('orchestrator') || 
-        agentName.toLowerCase() === 'system' ||
-        agentName.toLowerCase().includes('planner')) {
+    if (agentName.toLowerCase().includes('orchestrator') ||
+      agentName.toLowerCase() === 'system' ||
+      agentName.toLowerCase().includes('planner')) {
       return 'BOT';
     }
-    
+
     let cleanName = TaskService.cleanTextToSpaces(agentName);
     if (cleanName.toLowerCase().includes('agent')) {
       cleanName = cleanName.replace(/agent/gi, '').trim();
@@ -93,15 +92,15 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   // Track when streaming starts
   useEffect(() => {
     console.log('🔍 Right panel - streaming messages changed:', streamingMessages.length, 'hasStreamingStarted:', hasStreamingStarted);
-    
+
     if (streamingMessages.length > 0 && !hasStreamingStarted) {
-      const hasRealAgentContent = streamingMessages.some(msg => 
-        msg.agent_name && 
-        msg.content && 
+      const hasRealAgentContent = streamingMessages.some(msg =>
+        msg.agent_name &&
+        msg.content &&
         msg.content.trim().length > 0 &&
         msg.agent_name !== 'system'
       );
-      
+
       if (hasRealAgentContent) {
         console.log('🚀 Real streaming content started in right panel');
         setHasStreamingStarted(true);
@@ -134,7 +133,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
 
     messages.forEach((msg) => {
       const groupKey = `${msg.agent_name || 'system'}_${msg.step_id || 'general'}`;
-      
+
       if (!groups[groupKey]) {
         groups[groupKey] = {
           id: groupKey,
@@ -147,7 +146,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
       }
 
       groups[groupKey].messages.push(msg);
-      
+
       const msgTimestamp = normalizeTimestamp(msg.timestamp);
       const groupTimestamp = groups[groupKey].latest_timestamp;
       if (msgTimestamp > groupTimestamp) {
@@ -156,7 +155,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
       }
     });
 
-    return Object.values(groups).sort((a, b) => 
+    return Object.values(groups).sort((a, b) =>
       new Date(a.latest_timestamp).getTime() - new Date(b.latest_timestamp).getTime()
     );
   }, []);
@@ -174,7 +173,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   // ✅ NEW: Get comprehensive agent status combining planned and streaming agents
   const getAgentStatus = useCallback((): AgentStatus[] => {
     const agentStatusMap = new Map<string, AgentStatus>();
-    
+
     // Add planned agents from the plan approval request
     if (planApprovalRequest?.team && planApprovalRequest.team.length > 0) {
       planApprovalRequest.team.forEach(agentName => {
@@ -194,11 +193,11 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
     groupedStreamingMessages.forEach(group => {
       const agentName = group.agent_name;
       const displayName = getAgentDisplayName(agentName);
-      
+
       const existing = agentStatusMap.get(agentName);
-      const status = group.status === 'completed' ? 'completed' : 
-                   group.status === 'error' ? 'error' : 'active';
-      
+      const status = group.status === 'completed' ? 'completed' :
+        group.status === 'error' ? 'error' : 'active';
+
       agentStatusMap.set(agentName, {
         name: agentName,
         displayName,
@@ -252,7 +251,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   // ✅ ENHANCED: Show waiting message only when we don't have plan approval request
   if (!planApprovalRequest) {
     return (
-      <div style={{ 
+      <div style={{
         width: '280px',
         height: '100vh',
         display: 'flex',
@@ -271,7 +270,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   // Render Plan Section - show once we have plan approval request
   const renderPlanSection = () => {
     return (
-      <div style={{ 
+      <div style={{
         height: '45%',
         overflow: 'auto',
         marginBottom: '16px',
@@ -280,7 +279,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
         borderRadius: '8px',
         border: '1px solid var(--colorNeutralStroke2)'
       }}>
-        <div style={{ 
+        <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -300,8 +299,8 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
         </div>
 
         <div>
-          <Body1 style={{ 
-            marginBottom: '16px', 
+          <Body1 style={{
+            marginBottom: '16px',
             fontStyle: 'italic',
             color: 'var(--colorNeutralForeground2)'
           }}>
@@ -318,15 +317,15 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
                   borderRadius: '6px',
                   border: '1px solid var(--colorNeutralStroke2)'
                 }}>
-                  <Body1 style={{ 
-                    fontSize: '12px', 
+                  <Body1 style={{
+                    fontSize: '12px',
                     color: 'var(--colorNeutralForeground1)',
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '8px'
                   }}>
-                    <span style={{ 
-                      backgroundColor: 'var(--colorBrandBackground)', 
+                    <span style={{
+                      backgroundColor: 'var(--colorBrandBackground)',
                       color: 'var(--colorNeutralForegroundOnBrand)',
                       borderRadius: '50%',
                       width: '20px',
@@ -363,7 +362,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
         height: '55%',
         overflow: 'auto'
       }}>
-        <div style={{ 
+        <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -393,7 +392,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
         </div>
 
         {agents.length === 0 ? (
-          <div style={{ 
+          <div style={{
             textAlign: 'center',
             color: 'var(--colorNeutralForeground3)',
             fontSize: '12px',
@@ -413,9 +412,9 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
               position: 'relative'
             }}>
               {/* Agent Header */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 marginBottom: '8px'
               }}>
@@ -427,22 +426,22 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
                   appearance="outline"
                   icon={getStatusIcon(agent.status)}
                   color={
-                    agent.status === 'completed' ? 'success' : 
-                    agent.status === 'active' ? 'brand' : 
-                    agent.status === 'error' ? 'danger' :
-                    'neutral'
+                    agent.status === 'completed' ? 'success' :
+                      agent.status === 'active' ? 'brand' :
+                        agent.status === 'error' ? 'danger' :
+                          'neutral'
                   }
                 >
-                  {agent.status === 'completed' ? 'Completed' : 
-                   agent.status === 'active' ? 'Working' : 
-                   agent.status === 'error' ? 'Error' : 
-                   'Planned'}
+                  {agent.status === 'completed' ? 'Completed' :
+                    agent.status === 'active' ? 'Working' :
+                      agent.status === 'error' ? 'Error' :
+                        'Planned'}
                 </Tag>
               </div>
 
               {/* Agent Role */}
-              <Body1 style={{ 
-                fontSize: '11px', 
+              <Body1 style={{
+                fontSize: '11px',
                 color: 'var(--colorNeutralForeground3)',
                 fontStyle: 'italic',
                 marginBottom: '4px'
@@ -462,8 +461,8 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
 
               {/* Latest Message */}
               {agent.latest_message && (
-                <Body1 style={{ 
-                  fontSize: '10px', 
+                <Body1 style={{
+                  fontSize: '10px',
                   color: 'var(--colorNeutralForeground2)',
                   lineHeight: 1.3,
                   marginTop: '4px'
@@ -491,12 +490,12 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
 
         {/* Recent Activity - only show if we have streaming messages */}
         {groupedStreamingMessages.length > 0 && (
-          <div style={{ 
+          <div style={{
             marginTop: '20px',
             paddingTop: '16px',
             borderTop: '1px solid var(--colorNeutralStroke2)'
           }}>
-            <Body1 style={{ 
+            <Body1 style={{
               fontSize: '12px',
               color: 'var(--colorNeutralForeground2)',
               marginBottom: '8px',
@@ -524,7 +523,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
 
   // Main render - show content in proportional layout (280px width to match left panel)
   return (
-    <div style={{ 
+    <div style={{
       width: '280px',
       height: '100vh',
       padding: '20px',
@@ -534,7 +533,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
     }}>
       {/* Plan section - 45% height, scrollable */}
       {renderPlanSection()}
-      
+
       {/* Agents section - 55% height, scrollable */}
       {renderAgentsSection()}
 

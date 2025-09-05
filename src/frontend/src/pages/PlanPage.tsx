@@ -442,7 +442,6 @@ const PlanPage: React.FC = () => {
 
                 <PlanPanelRight
                     planData={planData}
-                    OnApproveStep={handleApproveStep}
                     submittingChatDisableInput={submittingChatDisableInput}
                     processingSubtaskId={processingSubtaskId}
                     loading={loading}
