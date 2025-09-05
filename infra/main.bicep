@@ -165,20 +165,23 @@ var replicaLocation = replicaRegionPairs[location]
 // Resources      //
 // ============== //
 
-var deployerInfo = deployer()
+
 var allTags = union(
   {
     'azd-env-name': solutionName
   },
   tags
 )
+@description('Optional created by user name')
+param createdBy string = empty(deployer().userPrincipalName) ? '' : split(deployer().userPrincipalName, '@')[0] 
+
 resource resourceGroupTags 'Microsoft.Resources/tags@2021-04-01' = {
   name: 'default'
   properties: {
     tags: {
       ...allTags
       TemplateName: 'MACAE'
-      CreatedBy: split(deployerInfo.userPrincipalName, '@')[0] 
+      CreatedBy: createdBy
     }
   }
 }
