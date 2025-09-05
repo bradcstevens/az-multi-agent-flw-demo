@@ -194,8 +194,6 @@ class ProxyAgent(Agent):
 
         # Send clarification request via streaming callbacks
         clarification_request = f"I need clarification about: {message}"
-        #self._create_message_content(clarification_request, thread.id)
-        # await self._trigger_streaming_callbacks(clarification_request)
 
         clarification_message = UserClarificationRequest(
             question=clarification_request,
