@@ -14,12 +14,19 @@ from common.models.messages_kernel import TeamConfiguration
 from fastapi import WebSocket
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.connectors.ai.open_ai import (
-    AzureChatCompletion, OpenAIChatPromptExecutionSettings)
+    AzureChatCompletion,
+    OpenAIChatPromptExecutionSettings,
+)
+
+from v3.models.messages import WebsocketMessageType
 
 logger = logging.getLogger(__name__)
 
 # Create a context variable to track current user
-current_user_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar('current_user_id', default=None)
+current_user_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "current_user_id", default=None
+)
+
 
 class AzureConfig:
     """Azure OpenAI and authentication configuration."""
@@ -37,7 +44,7 @@ class AzureConfig:
         token = self.credential.get_token(config.AZURE_COGNITIVE_SERVICES)
         return token.token
 
-    async def create_chat_completion_service(self, use_reasoning_model: bool=False):
+    async def create_chat_completion_service(self, use_reasoning_model: bool = False):
         """Create Azure Chat Completion service."""
         model_name = (
             self.reasoning_model if use_reasoning_model else self.standard_model
@@ -75,16 +82,19 @@ class OrchestrationConfig:
     """Configuration for orchestration settings."""
 
     def __init__(self):
-        self.orchestrations: Dict[str, MagenticOrchestration] = {} # user_id -> orchestration instance
-        self.plans: Dict[str, any] = {} # plan_id -> plan details
-        self.approvals: Dict[str, bool] = {} # m_plan_id -> approval status
-        self.sockets: Dict[str, WebSocket] = {} # user_id -> WebSocket
-        self.clarifications: Dict[str, str] = {} # m_plan_id -> clarification response
+        self.orchestrations: Dict[str, MagenticOrchestration] = (
+            {}
+        )  # user_id -> orchestration instance
+        self.plans: Dict[str, any] = {}  # plan_id -> plan details
+        self.approvals: Dict[str, bool] = {}  # m_plan_id -> approval status
+        self.sockets: Dict[str, WebSocket] = {}  # user_id -> WebSocket
+        self.clarifications: Dict[str, str] = {}  # m_plan_id -> clarification response
 
     def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
         """get existing orchestration instance."""
         return self.orchestrations.get(user_id, None)
-    
+
+
 class ConnectionConfig:
     """Connection manager for WebSocket connections."""
 
@@ -93,15 +103,19 @@ class ConnectionConfig:
         # Map user_id to process_id for context-based messaging
         self.user_to_process: Dict[str, str] = {}
 
-    def add_connection(self, process_id: str, connection: WebSocket, user_id: str = None):
+    def add_connection(
+        self, process_id: str, connection: WebSocket, user_id: str = None
+    ):
         """Add a new connection."""
         # Close existing connection if it exists
         if process_id in self.connections:
             try:
                 asyncio.create_task(self.connections[process_id].close())
             except Exception as e:
-                logger.error(f"Error closing existing connection for user {process_id}: {e}")
-        
+                logger.error(
+                    f"Error closing existing connection for user {process_id}: {e}"
+                )
+
         self.connections[process_id] = connection
         # Map user to process for context-based messaging
         if user_id:
@@ -114,12 +128,18 @@ class ConnectionConfig:
                     try:
                         asyncio.create_task(old_connection.close())
                         del self.connections[old_process_id]
-                        logger.info(f"Closed old connection {old_process_id} for user {user_id}")
+                        logger.info(
+                            f"Closed old connection {old_process_id} for user {user_id}"
+                        )
                     except Exception as e:
-                        logger.error(f"Error closing old connection for user {user_id}: {e}")
-            
+                        logger.error(
+                            f"Error closing old connection for user {user_id}: {e}"
+                        )
+
             self.user_to_process[user_id] = process_id
-            logger.info(f"WebSocket connection added for process: {process_id} (user: {user_id})")
+            logger.info(
+                f"WebSocket connection added for process: {process_id} (user: {user_id})"
+            )
         else:
             logger.info(f"WebSocket connection added for process: {process_id}")
 
@@ -128,7 +148,7 @@ class ConnectionConfig:
         process_id = str(process_id)
         if process_id in self.connections:
             del self.connections[process_id]
-            
+
         # Remove from user mapping if exists
         for user_id, mapped_process_id in list(self.user_to_process.items()):
             if mapped_process_id == process_id:
@@ -139,7 +159,7 @@ class ConnectionConfig:
     def get_connection(self, process_id):
         """Get a connection."""
         return self.connections.get(process_id)
-    
+
     async def close_connection(self, process_id):
         """Remove a connection."""
         connection = self.get_connection(process_id)
@@ -156,22 +176,29 @@ class ConnectionConfig:
         self.remove_connection(process_id)
         logger.info("Connection removed for batch ID: %s", process_id)
 
-    async def send_status_update_async(self, message: any, user_id: Optional[str] = None):
+    async def send_status_update_async(
+        self,
+        message: any,
+        user_id: Optional[str] = None,
+        message_type: WebsocketMessageType = WebsocketMessageType.SYSTEM_MESSAGE,
+    ):
         """Send a status update to a specific client."""
         # If no process_id provided, get from context
         if user_id is None:
             user_id = current_user_id.get()
-            
+
         if not user_id:
             logger.warning("No user_id available for WebSocket message")
             return
-        
+
         process_id = self.user_to_process.get(user_id)
         if not process_id:
             logger.warning("No active WebSocket process found for user ID: %s", user_id)
-            logger.debug(f"Available user mappings: {list(self.user_to_process.keys())}")
+            logger.debug(
+                f"Available user mappings: {list(self.user_to_process.keys())}"
+            )
             return
-            
+
         connection = self.get_connection(process_id)
         if connection:
             try:
@@ -183,7 +210,9 @@ class ConnectionConfig:
                 # Clean up stale connection
                 self.remove_connection(process_id)
         else:
-            logger.warning("No connection found for process ID: %s (user: %s)", process_id, user_id)
+            logger.warning(
+                "No connection found for process ID: %s (user: %s)", process_id, user_id
+            )
             # Clean up stale mapping
             if user_id in self.user_to_process:
                 del self.user_to_process[user_id]
@@ -201,6 +230,7 @@ class ConnectionConfig:
         else:
             logger.warning("No connection found for process ID: %s", process_id)
 
+
 class TeamConfig:
     """Team configuration for agents."""
 
@@ -217,6 +247,7 @@ class TeamConfig:
     def get_current_team(self, user_id: str) -> TeamConfiguration:
         """Get the current team configuration."""
         return self.teams.get(user_id, None)
+
 
 # Global config instances
 azure_config = AzureConfig()

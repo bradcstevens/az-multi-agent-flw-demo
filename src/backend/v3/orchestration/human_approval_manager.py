@@ -87,9 +87,9 @@ the request or the information you need to complete it.
         # Send the approval request to the user's WebSocket
         # The user_id will be automatically retrieved from context
         await connection_config.send_status_update_async({
-            "type": "plan_approval_request", 
+            "type": messages.WebsocketMessageType.PLAN_APPROVAL_REQUEST, 
             "data": approval_message
-        })
+        }, user_id=current_user_id.get(), message_type=messages.WebsocketMessageType.PLAN_APPROVAL_REQUEST)
         
         # Wait for user approval
         approval_response = await self._wait_for_user_approval(approval_message.plan.id)
@@ -100,9 +100,9 @@ the request or the information you need to complete it.
         else:
             print("Plan execution cancelled by user")
             await connection_config.send_status_update_async({
-                "type": "plan_approval_response", 
+                "type": messages.WebsocketMessageType.PLAN_APPROVAL_RESPONSE, 
                 "data": approval_response
-            })
+            }, user_id=current_user_id.get(), message_type=messages.WebsocketMessageType.PLAN_APPROVAL_RESPONSE)
             raise Exception("Plan execution cancelled by user") 
             # return ChatMessageContent(
             #     role="assistant",

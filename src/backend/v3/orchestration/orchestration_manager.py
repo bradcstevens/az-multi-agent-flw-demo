@@ -17,6 +17,7 @@ from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion, OpenAIChatPromptExecutionSettings)
 from semantic_kernel.contents import (ChatMessageContent,
                                       StreamingChatMessageContent)
+from v3.models.messages import WebsocketMessageType
 from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
 from v3.config.settings import (config, connection_config, current_user_id,
@@ -140,7 +141,7 @@ class OrchestrationManager:
                         "status": "completed",
                         "timestamp": str(uuid.uuid4())  # or use actual timestamp
                     }
-                }, user_id)
+                }, user_id, message_type=WebsocketMessageType.FINAL_RESULT_MESSAGE)
                 print(f"Final result sent via WebSocket to user {user_id}")
             except Exception as e:
                 print(f"Error: {e}")

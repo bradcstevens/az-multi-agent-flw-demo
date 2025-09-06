@@ -141,6 +141,8 @@ class ApprovalRequest(KernelBaseModel):
 
 
 class WebsocketMessageType(str, Enum):
+    """Types of WebSocket messages."""
+    SYSTEM_MESSAGE = "system_message" 
     AGENT_MESSAGE = "agent_message"
     AGENT_STREAM_START = "agent_stream_start"
     AGENT_STREAM_END = "agent_stream_end"
