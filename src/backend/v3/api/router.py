@@ -5,6 +5,8 @@ import logging
 import uuid
 from typing import Optional
 
+from common.utils.utils_date import format_dates_in_messages
+from common.config.app_config import config
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.database.database_factory import DatabaseFactory
@@ -12,6 +14,7 @@ from common.models.messages_kernel import (
     InputTask,
     Plan,
     PlanStatus,
+    PlanWithSteps,
     TeamSelectionRequest,
 )
 from common.utils.event_utils import track_event_if_configured
@@ -19,8 +22,6 @@ from common.utils.utils_kernel import rai_success, rai_validate_team_config
 from fastapi import (
     APIRouter,
     BackgroundTasks,
-    Depends,
-    FastAPI,
     File,
     HTTPException,
     Query,
@@ -29,7 +30,6 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from kernel_agents.agent_factory import AgentFactory
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.team_service import TeamService
 from v3.config.settings import (
@@ -276,12 +276,16 @@ async def process_request(
         plan_id = str(uuid.uuid4())
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        user_current_team = await memory_store.get_current_team(user_id=user_id)
+        team_id = None
+        if user_current_team:
+            team_id = user_current_team.team_id
         plan = Plan(
             id=plan_id,
             plan_id=plan_id,
             user_id=user_id,
             session_id=input_task.session_id,
-            team_id=None,  # TODO add current_team_id
+            team_id=team_id,
             initial_goal=input_task.description,
             overall_status=PlanStatus.in_progress,
         )
@@ -294,7 +298,7 @@ async def process_request(
                 "plan_id": plan.plan_id,
                 "session_id": input_task.session_id,
                 "user_id": user_id,
-                "team_id": "",  # TODO add current_team_id
+                "team_id": team_id,  # TODO add current_team_id
                 "description": input_task.description,
             },
         )
@@ -377,7 +381,7 @@ async def plan_approval(
                 # )
                 try:
                     plan = orchestration_config.plans[human_feedback.m_plan_id]
-                    if hasattr(plan, 'plan_id'):
+                    if hasattr(plan, "plan_id"):
                         print(
                             "Updated orchestration config:",
                             orchestration_config.plans[human_feedback.m_plan_id],
@@ -406,9 +410,8 @@ async def plan_approval(
                 )
     except Exception as e:
         logging.error(f"Error processing plan approval: {e}")
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @app_v3.post("/user_clarification")
 async def user_clarification(
@@ -859,37 +862,6 @@ async def delete_team_config(team_id: str, request: Request):
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 
-@app_v3.get("/model_deployments")
-async def get_model_deployments(request: Request):
-    """
-    Get information about available model deployments for debugging/validation.
-
-    ---
-    tags:
-      - Model Validation
-    responses:
-      200:
-        description: List of available model deployments
-      401:
-        description: Missing or invalid user information
-    """
-    # Validate user authentication
-    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
-    user_id = authenticated_user["user_principal_id"]
-    if not user_id:
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid user information"
-        )
-
-    try:
-        team_service = TeamService()
-        deployments = []  # await team_service.extract_models_from_agent()
-        summary = await team_service.get_deployment_status_summary()
-        return {"deployments": deployments, "summary": summary}
-    except Exception as e:
-        logging.error(f"Error retrieving model deployments: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error occurred")
-
 
 @app_v3.post("/select_team")
 async def select_team(selection: TeamSelectionRequest, request: Request):
@@ -980,33 +952,189 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
         )
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
-
-@app_v3.get("/search_indexes")
-async def get_search_indexes(request: Request):
+# Get plans is called in the initial side rendering of the frontend
+@app_v3.get("/plans")
+async def get_plans(request: Request):
     """
-    Get information about available search indexes for debugging/validation.
+    Retrieve plans for the current user.
 
     ---
     tags:
-      - Search Validation
+      - Plans
+    parameters:
+      - name: session_id
+        in: query
+        type: string
+        required: false
+        description: Optional session ID to retrieve plans for a specific session
     responses:
       200:
-        description: List of available search indexes
-      401:
+        description: List of plans with steps for the user
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Unique ID of the plan
+              session_id:
+                type: string
+                description: Session ID associated with the plan
+              initial_goal:
+                type: string
+                description: The initial goal derived from the user's input
+              overall_status:
+                type: string
+                description: Status of the plan (e.g., in_progress, completed)
+              steps:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Unique ID of the step
+                    plan_id:
+                      type: string
+                      description: ID of the plan the step belongs to
+                    action:
+                      type: string
+                      description: The action to be performed
+                    agent:
+                      type: string
+                      description: The agent responsible for the step
+                    status:
+                      type: string
+                      description: Status of the step (e.g., planned, approved, completed)
+      400:
         description: Missing or invalid user information
+      404:
+        description: Plan not found
     """
-    # Validate user authentication
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid user information"
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    #### <To do: Francia> Replace the following with code to get plan run history from the database
+
+    # # Initialize memory context
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+
+    current_team = await memory_store.get_current_team(user_id=user_id)
+    if not current_team:
+        return []
+
+    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
+
+    return all_plans
+
+
+# Get plans is called in the initial side rendering of the frontend
+@app_v3.get("/plan")
+async def get_plan_by_id(request: Request,   plan_id: str):
+    """
+    Retrieve plans for the current user.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: session_id
+        in: query
+        type: string
+        required: false
+        description: Optional session ID to retrieve plans for a specific session
+    responses:
+      200:
+        description: List of plans with steps for the user
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Unique ID of the plan
+              session_id:
+                type: string
+                description: Session ID associated with the plan
+              initial_goal:
+                type: string
+                description: The initial goal derived from the user's input
+              overall_status:
+                type: string
+                description: Status of the plan (e.g., in_progress, completed)
+              steps:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Unique ID of the step
+                    plan_id:
+                      type: string
+                      description: ID of the plan the step belongs to
+                    action:
+                      type: string
+                      description: The action to be performed
+                    agent:
+                      type: string
+                      description: The agent responsible for the step
+                    status:
+                      type: string
+                      description: Status of the step (e.g., planned, approved, completed)
+      400:
+        description: Missing or invalid user information
+      404:
+        description: Plan not found
+    """
+
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        track_event_if_configured(
+            "UserIdNotFound", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    #### <To do: Francia> Replace the following with code to get plan run history from the database
+
+    # # Initialize memory context
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+
+    if plan_id:
+        plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
+        if not plan:
+            track_event_if_configured(
+                "GetPlanBySessionNotFound",
+                {"status_code": 400, "detail": "Plan not found"},
+            )
+            raise HTTPException(status_code=404, detail="Plan not found")
+
+        # Use get_steps_by_plan to match the original implementation
+        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
+        messages = await memory_store.get_data_by_type_and_session_id(
+            "agent_message", session_id=plan.session_id
         )
 
-    try:
-        team_service = TeamService()
-        summary = await team_service.get_search_index_summary()
-        return {"search_summary": summary}
-    except Exception as e:
-        logging.error(f"Error retrieving search indexes: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error occurred")
+        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
+        plan_with_steps.update_step_counts()
+
+        # Format dates in messages according to locale
+        formatted_messages = format_dates_in_messages(
+            messages, config.get_user_local_browser_language()
+        )
+
+        return [plan_with_steps, formatted_messages]
+    else:
+        track_event_if_configured(
+            "GetPlanId", {"status_code": 400, "detail": "no plan id"}
+        )
+        raise HTTPException(status_code=400, detail="no plan id")

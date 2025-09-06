@@ -167,35 +167,6 @@ export class TaskService {
 
     return cleanedText;
   }
-  /**
-   * Submit an input task to create a new plan
-   * @param description Task description
-   * @returns Promise with the response containing session and plan IDs
-   */
-  static async submitInputTask(
-    description: string
-  ): Promise<InputTaskResponse> {
-    const sessionId = this.generateSessionId();
-
-    const inputTask: InputTask = {
-      session_id: sessionId,
-      description: description,
-    };
-
-    try {
-      return await apiService.submitInputTask(inputTask);
-    } catch (error: any) {
-      // You can customize this logic as needed
-      let message = "Failed to create task.";
-      if (error?.response?.data?.message) {
-        message = error.response.data.message;
-      } else if (error?.message) {
-        message = error.message?.detail ? error.message.detail : error.message;
-      }
-      // Throw a new error with a user-friendly message
-      throw new Error(message);
-    }
-  }
 
   /**
    * Create a new plan with RAI validation
