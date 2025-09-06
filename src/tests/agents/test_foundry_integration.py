@@ -157,13 +157,13 @@ class TestFoundryAgentIntegration:
             if not agent.mcp or not agent.mcp.url:
                 pytest.skip("MCP configuration not available - skipping MCP test")
 
-            query = "Please greet Tom using an MCP tool"
+            query = "Please greet Tom"
             
             response = await self._get_agent_response(agent, query)
             
             # Check for the expected MCP response indicator
-            assert "Hello from MCP, Tom" in response, \
-                f"Expected 'Hello from MCP, Tom' in MCP response, got: {response}"
+            assert "Hello from MACAE MCP Server, Tom" in response, \
+                f"Expected 'Hello from MACAE MCP Server, Tom' in MCP response, got: {response}"
             
         except Exception as e:
             pytest.fail(f"MCP test failed with error: {e}")

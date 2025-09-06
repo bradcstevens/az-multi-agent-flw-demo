@@ -86,7 +86,7 @@ export class TeamService {
 
             return {
                 success: true,
-                team: response.data
+                team: response.team
             };
         } catch (error: any) {
 
