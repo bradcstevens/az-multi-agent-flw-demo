@@ -151,18 +151,28 @@ export class PlanDataService {
     }
   }
 
-
   static parsePlanApprovalRequest(rawData: any): MPlanData | null {
     try {
       console.log('🔍 Parsing plan approval request:', rawData, 'Type:', typeof rawData);
 
-      // Already parsed object
+      // Already parsed object passthrough
       if (rawData && typeof rawData === 'object' && rawData.type === 'parsed_plan_approval_request') {
         return rawData.parsedData || null;
       }
 
-      // v3 backend format with plan property
-      if (rawData && typeof rawData === 'object' && rawData.plan) {
+      // Wrapper form: { type: 'plan_approval_request', data: 'PlanApprovalRequest(plan=MPlan(...), ...)' }
+      if (
+        rawData &&
+        typeof rawData === 'object' &&
+        rawData.type === 'plan_approval_request' &&
+        typeof rawData.data === 'string'
+      ) {
+        // Recurse using the contained string
+        return this.parsePlanApprovalRequest(rawData.data);
+      }
+
+      // Structured v3 style: { plan: { id, steps, user_request, ... }, context?: {...} }
+      if (rawData && typeof rawData === 'object' && rawData.plan && typeof rawData.plan === 'object') {
         const mplan = rawData.plan;
 
         // Extract user_request text
@@ -180,36 +190,35 @@ export class PlanDataService {
           }
         }
 
-        // Parse steps with generic cleaning (remove task-specific prefixes)
-        const steps = (mplan.steps || []).map((step: any, index: number) => {
-          let action = step.action || '';
+        const steps = (mplan.steps || [])
+          .map((step: any, index: number) => {
+            const action = step.action || '';
+            const cleanAction = action
+              .replace(/\*\*/g, '')
+              .replace(/^Certainly!\s*/i, '')
+              .replace(/^Given the team composition and the available facts,?\s*/i, '')
+              .replace(/^here is a (?:concise )?plan to address the original request[^.]*\.\s*/i, '')
+              .replace(/^(?:here is|this is) a (?:concise )?(?:plan|approach|strategy)[^.]*[.:]\s*/i, '')
+              .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ')
+              .replace(/^[-•]\s*/, '')
+              .replace(/\s+/g, ' ')
+              .trim();
 
-          // Generic cleanup - remove common prefixes and formatting
-          let cleanAction = action
-            .replace(/\*\*/g, '') // Remove markdown bold
-            .replace(/^Certainly!\s*/i, '') // Remove "Certainly!"
-            .replace(/^Given the team composition and the available facts,?\s*/i, '') // Remove team composition prefix
-            .replace(/^here is a (?:concise )?plan to address the original request[^.]*\.\s*/i, '') // Remove plan introduction
-            .replace(/^(?:here is|this is) a (?:concise )?(?:plan|approach|strategy)[^.]*[.:]\s*/i, '') // Remove other plan intros
-            .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ') // Convert **text**: to text:
-            .replace(/^[-•]\s*/, '') // Remove bullet points
-            .replace(/\s+/g, ' ') // Normalize whitespace
-            .trim();
-
-          return {
-            id: index + 1,
-            action,
-            cleanAction,
-            agent: step.agent || step._agent || 'System'
-          };
-        }).filter((step: any) =>
-          step.cleanAction.length > 3 && // Filter out very short actions
-          !step.cleanAction.match(/^(?:involvement|certainly|given|here is)/i) // Filter out meaningless steps
-        );
+            return {
+              id: index + 1,
+              action,
+              cleanAction,
+              agent: step.agent || step._agent || 'System'
+            };
+          })
+          .filter((s: any) =>
+            s.cleanAction.length > 3 &&
+            !/^(?:involvement|certainly|given|here is)/i.test(s.cleanAction)
+          );
 
         return {
           id: mplan.id || mplan.plan_id || 'unknown',
-          status: mplan.overall_status || rawData.status || 'PENDING_APPROVAL',
+          status: (mplan.overall_status || rawData.status || 'PENDING_APPROVAL'),
           user_request: userRequestText,
           team: Array.isArray(mplan.team) ? mplan.team : [],
           facts: mplan.facts || '',
@@ -218,73 +227,109 @@ export class PlanDataService {
             task: userRequestText,
             participant_descriptions: rawData.context?.participant_descriptions || {}
           },
-          // Additional m_plan fields
           user_id: mplan.user_id,
           team_id: mplan.team_id,
           plan_id: mplan.plan_id,
           overall_status: mplan.overall_status,
-          raw_data: rawData // Store for debugging
+          raw_data: rawData
         };
       }
 
-      // Handle string format (generic parsing)
+      // String representation parsing (PlanApprovalRequest(...MPlan(...)) or raw repr)
       if (typeof rawData === 'string') {
-        // Extract user request from text field
-        let user_request = 'Plan approval required';
-        const textMatch = rawData.match(/text="([^"]+)"/);
-        if (textMatch?.[1]) {
-          user_request = textMatch[1].replace(/\\u200b/g, '').trim();
+        const source = rawData;
+
+        // Extract MPlan(...) block (optional)
+        // Not strictly needed but could be used for scoping later.
+        // const mplanBlock = source.match(/MPlan\(([\s\S]*?)\)\)/);
+
+        // User request (first text='...')
+        let user_request =
+          source.match(/text=['"]([^'"]+?)['"]/)
+            ?.[1]
+            ?.replace(/\\u200b/g, '')
+            .trim() || 'Plan approval required';
+
+        const id = source.match(/MPlan\(id=['"]([^'"]+)['"]/)?.[1] ||
+          source.match(/id=['"]([^'"]+)['"]/)?.[1] ||
+          'unknown';
+
+        let status =
+          source.match(/overall_status=<PlanStatus\.([a-zA-Z_]+):/)?.[1] ||
+          source.match(/overall_status=['"]([^'"]+)['"]/)?.[1] ||
+          'PENDING_APPROVAL';
+        if (status) {
+          status = status.toUpperCase();
         }
 
-        // Extract basic information
-        const id = rawData.match(/id='([^']+)'/)?.[1] || 'unknown';
-        const status = rawData.match(/overall_status=<PlanStatus\.([^>]+)>/)?.[1] || 'PENDING_APPROVAL';
-        const team = rawData.match(/team=\[([^\]]*)\]/)?.[1]
-          ?.split(',')
-          .map(member => member.trim().replace(/['"]/g, ''))
-          .filter(member => member.length > 0) || [];
+        const teamRaw =
+          source.match(/team=\[([^\]]*)\]/)?.[1] || '';
+        const team = teamRaw
+          .split(',')
+          .map(s => s.trim().replace(/['"]/g, ''))
+          .filter(Boolean);
 
-        // Extract facts
-        const factsMatch = rawData.match(/facts="([^"]*(?:\\.[^"]*)*)"/);
-        const facts = factsMatch?.[1]?.replace(/\\n/g, '\n').replace(/\\"/g, '"') || '';
+        const facts =
+          source
+            .match(/facts="([^"]*(?:\\.[^"]*)*)"/)?.[1]
+            ?.replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"') || '';
 
-        // Extract steps with generic parsing
-        const stepMatches = rawData.match(/MStep\([^)]*action="([^"]+)"/g);
-        const steps = [];
+        // Steps: accept single or double quotes: action='...' or action="..."
+        const stepRegex = /MStep\(([^)]*?)\)/g;
+        const steps: any[] = [];
+        const uniqueActions = new Set<string>();
+        let match: RegExpExecArray | null;
+        let stepIndex = 1;
 
-        if (stepMatches) {
-          const uniqueActions = new Set();
-          let stepIndex = 1;
+        while ((match = stepRegex.exec(source)) !== null) {
+          const chunk = match[1];
+          const agent =
+            chunk.match(/agent=['"]([^'"]+)['"]/)?.[1] || 'System';
+          const actionRaw =
+            chunk.match(/action=['"]([^'"]+)['"]/)?.[1] || '';
 
-          for (const stepStr of stepMatches) {
-            const actionMatch = stepStr.match(/action="([^"]+)"/);
-            if (actionMatch?.[1]) {
-              let action = actionMatch[1];
+          if (!actionRaw) continue;
 
-              // Generic action cleaning
-              let cleanAction = action
-                .replace(/^Certainly!\s*/i, '') // Remove "Certainly!"
-                .replace(/^Given the team composition and the available facts,?\s*/i, '') // Remove team prefix
-                .replace(/^here is a (?:concise )?plan to[^.]*\.\s*/i, '') // Remove plan introduction
-                .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ') // Convert **text**: to text:
-                .replace(/^[-•]\s*/, '') // Remove bullet points
-                .replace(/\s+/g, ' ') // Normalize whitespace
-                .trim();
+          let cleanAction = actionRaw
+            .replace(/\*\*/g, '')
+            .replace(/^Certainly!\s*/i, '')
+            .replace(/^Given the team composition and the available facts,?\s*/i, '')
+            .replace(/^here is a (?:concise )?plan to[^.]*\.\s*/i, '')
+            .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ')
+            .replace(/^[-•]\s*/, '')
+            .replace(/\s+/g, ' ')
+            .trim();
 
-              // Generic filtering - avoid very short, duplicate, or meaningless steps
-              if (cleanAction.length > 5 &&
-                !uniqueActions.has(cleanAction.toLowerCase()) &&
-                !cleanAction.match(/^(?:here is|this is a|given|certainly|involvement)/i)) {
+          if (
+            cleanAction.length > 3 &&
+            !uniqueActions.has(cleanAction.toLowerCase()) &&
+            !/^(?:here is|this is|given|certainly|involvement)$/i.test(cleanAction)
+          ) {
+            uniqueActions.add(cleanAction.toLowerCase());
+            steps.push({
+              id: stepIndex++,
+              action: actionRaw,
+              cleanAction,
+              agent
+            });
+          }
+        }
 
-                uniqueActions.add(cleanAction.toLowerCase());
-                steps.push({
-                  id: stepIndex++,
-                  action,
-                  cleanAction,
-                  agent: 'System'
-                });
-              }
-            }
+        // participant_descriptions (best-effort)
+        let participant_descriptions: Record<string, string> = {};
+        const pdMatch =
+          source.match(/participant_descriptions['"]?\s*:\s*({[^}]*})/) ||
+          source.match(/'participant_descriptions':\s*({[^}]*})/);
+
+        if (pdMatch?.[1]) {
+          const transformed = pdMatch[1]
+            .replace(/'/g, '"')
+            .replace(/([a-zA-Z0-9_]+)\s*:/g, '"$1":');
+          try {
+            participant_descriptions = JSON.parse(transformed);
+          } catch {
+            participant_descriptions = {};
           }
         }
 
@@ -297,7 +342,7 @@ export class PlanDataService {
           steps,
           context: {
             task: user_request,
-            participant_descriptions: {}
+            participant_descriptions
           },
           raw_data: rawData
         };
@@ -309,4 +354,178 @@ export class PlanDataService {
       return null;
     }
   }
+  // ...existing code...
+
+  /**
+   * Parse an agent message object or repr string:
+   * Input forms supported:
+   *  - { type: 'agent_message', data: "AgentMessage(agent_name='X', timestamp=..., content='...')"}
+   *  - "AgentMessage(agent_name='X', timestamp=..., content='...')"
+   * Returns a structured object with steps parsed from markdown-ish content.
+   */
+  static parseAgentMessage(rawData: any): {
+    agent: string;
+    timestamp: number | null;
+    steps: Array<{
+      title: string;
+      fields: Record<string, string>;
+      summary?: string;
+      raw_block: string;
+    }>;
+    next_steps: string[];
+    raw_content: string;
+    raw_data: any;
+  } | null {
+    try {
+      // Unwrap wrapper
+      if (rawData && typeof rawData === 'object' && rawData.type === 'agent_message' && typeof rawData.data === 'string') {
+        return this.parseAgentMessage(rawData.data);
+      }
+
+      if (typeof rawData !== 'string') return null;
+      if (!rawData.startsWith('AgentMessage(')) return null;
+
+      const source = rawData;
+
+      const agent =
+        source.match(/agent_name='([^']+)'/)?.[1] ||
+        source.match(/agent_name="([^"]+)"/)?.[1] ||
+        'UnknownAgent';
+
+      const timestampStr =
+        source.match(/timestamp=([\d.]+)/)?.[1];
+      const timestamp = timestampStr ? Number(timestampStr) : null;
+
+      // Extract content='...'
+      const contentMatch = source.match(/content='((?:\\'|[^'])*)'/);
+      let raw_content = contentMatch ? contentMatch[1] : '';
+      // Unescape
+      raw_content = raw_content
+        .replace(/\\n/g, '\n')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+
+      // Parse sections of the form "##### Title Completed"
+      // Each block ends at --- line or next "##### " or end.
+      const lines = raw_content.split('\n');
+      const steps: Array<{ title: string; fields: Record<string, string>; summary?: string; raw_block: string; }> = [];
+      let i = 0;
+      while (i < lines.length) {
+        const headingMatch = lines[i].match(/^#####\s+(.+?)\s+Completed\s*$/i);
+        if (headingMatch) {
+          const title = headingMatch[1].trim();
+          const blockLines: string[] = [];
+          i++;
+          while (i < lines.length && !/^---\s*$/.test(lines[i]) && !/^#####\s+/.test(lines[i])) {
+            blockLines.push(lines[i]);
+            i++;
+          }
+          // Skip separator line if present
+          if (i < lines.length && /^---\s*$/.test(lines[i])) i++;
+
+          const fields: Record<string, string> = {};
+          let summary: string | undefined;
+          for (const bl of blockLines) {
+            const fieldMatch = bl.match(/^\*\*(.+?)\*\*:\s*(.*)$/);
+            if (fieldMatch) {
+              const fieldName = fieldMatch[1].trim().replace(/:$/, '');
+              const value = fieldMatch[2].trim().replace(/\\s+$/, '');
+              if (fieldName) fields[fieldName] = value;
+            } else {
+              const summaryMatch = bl.match(/^AGENT SUMMARY:\s*(.+)$/i);
+              if (summaryMatch) {
+                summary = summaryMatch[1].trim();
+              }
+            }
+          }
+
+          steps.push({
+            title,
+            fields,
+            summary,
+            raw_block: blockLines.join('\n').trim()
+          });
+        } else {
+          i++;
+        }
+      }
+
+      // Next Steps section
+      const nextSteps: string[] = [];
+      const nextIdx = lines.findIndex(l => /^Next Steps:/.test(l.trim()));
+      if (nextIdx !== -1) {
+        for (let j = nextIdx + 1; j < lines.length; j++) {
+          const l = lines[j].trim();
+          if (!l) continue;
+          if (/^[-*]\s+/.test(l)) {
+            nextSteps.push(l.replace(/^[-*]\s+/, '').trim());
+          }
+        }
+      }
+
+      return {
+        agent,
+        timestamp,
+        steps,
+        next_steps: nextSteps,
+        raw_content,
+        raw_data: rawData
+      };
+    } catch (e) {
+      console.error('Failed to parse agent message:', e);
+      return null;
+    }
+  }
+  // ...inside export class PlanDataService { (place near other parsers)
+
+  /**
+   * Parse streaming agent message fragments.
+   * Supports:
+   *  - { type: 'agent_message_streaming', data: "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)" }
+   *  - "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)"
+   */
+  static parseAgentMessageStreaming(rawData: any): {
+    agent: string;
+    content: string;
+    is_final: boolean;
+    raw_data: any;
+  } | null {
+    try {
+      // Unwrap wrapper
+      if (rawData && typeof rawData === 'object' && rawData.type === 'agent_message_streaming' && typeof rawData.data === 'string') {
+        return this.parseAgentMessageStreaming(rawData.data);
+      }
+
+      if (typeof rawData !== 'string') return null;
+      if (!rawData.startsWith('AgentMessageStreaming(')) return null;
+
+      const source = rawData;
+
+      const agent =
+        source.match(/agent_name='([^']+)'/)?.[1] ||
+        source.match(/agent_name="([^"]+)"/)?.[1] ||
+        'UnknownAgent';
+
+      const contentMatch = source.match(/content='((?:\\'|[^'])*)'/);
+      let content = contentMatch ? contentMatch[1] : '';
+      content = content
+        .replace(/\\n/g, '\n')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+
+      let is_final = false;
+      const finalMatch = source.match(/is_final=(True|False)/i);
+      if (finalMatch) {
+        is_final = /True/i.test(finalMatch[1]);
+      }
+
+      return { agent, content, is_final, raw_data: rawData };
+    } catch (e) {
+      console.error('Failed to parse streaming agent message:', e);
+      return null;
+    }
+  }
+
 }
