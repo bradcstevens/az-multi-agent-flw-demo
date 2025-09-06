@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 """ Orchestration manager to handle the orchestration logic. """
 
+import asyncio
 import contextvars
 import os
 import uuid
@@ -139,7 +140,7 @@ class OrchestrationManager:
                     "data": {
                         "content": str(value),
                         "status": "completed",
-                        "timestamp": str(uuid.uuid4())  # or use actual timestamp
+                        "timestamp": asyncio.get_event_loop().time()
                     }
                 }, user_id, message_type=WebsocketMessageType.FINAL_RESULT_MESSAGE)
                 print(f"Final result sent via WebSocket to user {user_id}")
