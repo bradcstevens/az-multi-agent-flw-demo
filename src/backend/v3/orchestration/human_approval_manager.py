@@ -190,6 +190,9 @@ the request or the information you need to complete it.
                     line = line.replace('*', '').strip()
                     break
             
+            if not found_agent:
+                # If no agent found, assign to ProxyAgent if available
+                found_agent = "MagenticAgent"
             # If line indicates a following list of actions (e.g. "Assign **EnhancedResearchAgent** 
             # to gather authoritative data on:") save and prefix to the steps
             if line.endswith(':'):

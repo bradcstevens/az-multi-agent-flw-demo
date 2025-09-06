@@ -2,21 +2,23 @@
 MACAE MCP Server - FastMCP server with organized tools and services.
 """
 
+import argparse
+import logging
 ###
 import sys
-import argparse
 from pathlib import Path
-from fastmcp import FastMCP
-from fastmcp.server.auth.providers.jwt import JWTVerifier
-import logging
 from typing import Optional
 
-from core.factory import MCPToolFactory
-from services.hr_service import HRService
-from services.tech_support_service import TechSupportService
-from services.general_service import GeneralService
-from services.data_tool_service import DataToolService
 from config.settings import config
+from core.factory import MCPToolFactory
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+from services.data_tool_service import DataToolService
+from services.general_service import GeneralService
+from services.hr_service import HRService
+from services.marketing_service import MarketingService
+from services.product_service import ProductService
+from services.tech_support_service import TechSupportService
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +30,8 @@ factory = MCPToolFactory()
 # Initialize services
 factory.register_service(HRService())
 factory.register_service(TechSupportService())
+factory.register_service(MarketingService())
+factory.register_service(ProductService())
 factory.register_service(GeneralService())
 
 # Register DataToolService with the dataset path
