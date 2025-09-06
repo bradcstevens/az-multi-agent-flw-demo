@@ -1036,8 +1036,8 @@ async def get_plans(request: Request):
 
 
 # Get plans is called in the initial side rendering of the frontend
-@app_v3.get("/plan/{plan_id}")
-async def get_plan_by_id(request: Request, plan_id: str):
+@app_v3.get("/plan")
+async def get_plan_by_id(request: Request,   plan_id: str):
     """
     Retrieve plans for the current user.
 
@@ -1133,21 +1133,8 @@ async def get_plan_by_id(request: Request, plan_id: str):
         )
 
         return [plan_with_steps, formatted_messages]
-
-    current_team = await memory_store.get_current_team(user_id=user_id)
-    if not current_team:
-        return []
-
-    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
-    # Fetch steps for all plans concurrently
-    steps_for_all_plans = await asyncio.gather(
-        *[memory_store.get_steps_by_plan(plan_id=plan.id) for plan in all_plans]
-    )
-    # Create list of PlanWithSteps and update step counts
-    list_of_plans_with_steps = []
-    for plan, steps in zip(all_plans, steps_for_all_plans):
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
-        list_of_plans_with_steps.append(plan_with_steps)
-
-    return []
+    else:
+        track_event_if_configured(
+            "GetPlanId", {"status_code": 400, "detail": "no plan id"}
+        )
+        raise HTTPException(status_code=400, detail="no plan id")

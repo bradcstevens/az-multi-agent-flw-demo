@@ -24,7 +24,7 @@ from v3.callbacks.response_handlers import (agent_response_callback,
 from v3.config.settings import (connection_config, current_user_id,
                                 orchestration_config)
 from v3.models.messages import (UserClarificationRequest,
-                                UserClarificationResponse)
+                                UserClarificationResponse, WebsocketMessageType)
 
 
 class DummyAgentThread(AgentThread):
@@ -155,10 +155,10 @@ class ProxyAgent(Agent):
 
         # Send the approval request to the user's WebSocket
         await connection_config.send_status_update_async({
-            "type": "user_clarification_request", 
+            "type": WebsocketMessageType.USER_CLARIFICATION_REQUEST,
             "data": clarification_message
-        })
-        
+        }, user_id=current_user_id.get(), message_type=WebsocketMessageType.USER_CLARIFICATION_REQUEST)
+
         # Get human input
         human_response = await self._wait_for_user_clarification(clarification_message.request_id)
         
@@ -203,10 +203,10 @@ class ProxyAgent(Agent):
         # Send the approval request to the user's WebSocket
         # The user_id will be automatically retrieved from context
         await connection_config.send_status_update_async({
-            "type": "user_clarification_request", 
+            "type": WebsocketMessageType.USER_CLARIFICATION_REQUEST, 
             "data": clarification_message
-        })
-        
+        }, user_id=current_user_id.get(), message_type=WebsocketMessageType.USER_CLARIFICATION_REQUEST)
+
         # Get human input - replace with websocket call when available
         human_response = await self._wait_for_user_clarification(clarification_message.request_id)
         

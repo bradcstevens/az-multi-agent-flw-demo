@@ -199,10 +199,20 @@ class ConnectionConfig:
             )
             return
 
+        try:
+            if hasattr(message, "data") and hasattr(message, "type"):
+                message = message.data
+        except Exception as e:
+                print(f"Error loading message data: {e}")
+
+        standard_message = {
+            "type": message_type,
+            "data": message
+        }
         connection = self.get_connection(process_id)
         if connection:
             try:
-                str_message = json.dumps(message, default=str)
+                str_message = json.dumps(standard_message, default=str)
                 await connection.send_text(str_message)
                 logger.debug(f"Message sent to user {user_id} via process {process_id}")
             except Exception as e:

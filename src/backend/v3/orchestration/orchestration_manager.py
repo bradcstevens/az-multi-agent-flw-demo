@@ -136,7 +136,7 @@ class OrchestrationManager:
 
                 # Send final result via WebSocket
                 await connection_config.send_status_update_async({
-                    "type": "final_result",
+                    "type": WebsocketMessageType.FINAL_RESULT_MESSAGE,
                     "data": {
                         "content": str(value),
                         "status": "completed",

@@ -56,6 +56,6 @@ async def streaming_agent_response_callback(streaming_message: StreamingChatMess
         if user_id:
             try:
                 message = AgentMessageStreaming(agent_name=streaming_message.name or "Unknown Agent", content=streaming_message.content, is_final=is_final)
-                await connection_config.send_status_update_async(message, user_id)
+                await connection_config.send_status_update_async(message, user_id, message_type=WebsocketMessageType.AGENT_MESSAGE_STREAMING)
             except Exception as e:
                 logging.error(f"Response_callback: Error sending streaming WebSocket message: {e}")
