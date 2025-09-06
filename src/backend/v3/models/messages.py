@@ -108,24 +108,6 @@ class FinalResultMessage:
     result: str
     summary: str | None = None
 
-@dataclass(slots=True)
-class HumanFeedback(KernelBaseModel):
-    """Message containing human feedback on a step."""
-
-    step_id: Optional[str] = None
-    plan_id: str
-    session_id: str
-    approved: bool
-    human_feedback: Optional[str] = None
-    updated_action: Optional[str] = None
-
-@dataclass(slots=True)
-class HumanClarification(KernelBaseModel):
-    """Message containing human clarification on a plan."""
-
-    plan_id: str
-    session_id: str
-    human_clarification: str
 
 @dataclass(slots=True)
 class ApprovalRequest(KernelBaseModel):
@@ -155,19 +137,3 @@ class WebsocketMessageType(str, Enum):
     USER_CLARIFICATION_REQUEST = "user_clarification_request"
     USER_CLARIFICATION_RESPONSE = "user_clarification_response"
     FINAL_RESULT_MESSAGE = "final_result_message"
-
-
-@dataclass(slots=True)
-class WebsocketMessage:
-    """Generic WebSocket message wrapper."""
-    type: WebsocketMessageType
-    message: Any
-    data: Any
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert the WebsocketMessage to a dictionary for JSON serialization."""
-        return {
-            "type": self.type,
-            "data": self.data.to_dict() if hasattr(self.data, 'to_dict') else self.data,
-            "message": self.message.to_dict() if hasattr(self.message, 'to_dict') else self.message
-        }
