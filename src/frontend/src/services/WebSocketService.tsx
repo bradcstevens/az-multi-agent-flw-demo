@@ -171,6 +171,7 @@ class WebSocketService {
 
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
+                console.log("enter plan approval request");
                 const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
                 if (parsedData) {
                     const structuredMessage: ParsedPlanApprovalRequest = {
@@ -187,7 +188,7 @@ class WebSocketService {
             }
 
             case WebsocketMessageType.AGENT_MESSAGE: {
-                if (message.data && !message.data.plan_id && firstPlanId) {
+                if (message.data) {
                     const transformed: StreamMessage = {
                         ...message,
                         data: {

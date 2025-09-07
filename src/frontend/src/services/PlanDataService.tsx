@@ -154,208 +154,201 @@ export class PlanDataService {
 
   static parsePlanApprovalRequest(rawData: any): MPlanData | null {
     try {
-      console.log('🔍 Parsing plan approval request:', rawData, 'Type:', typeof rawData);
+      if (!rawData) return null;
 
-      // Already parsed object passthrough
-      if (rawData && typeof rawData === 'object' && rawData.type === WebsocketMessageType.PLAN_APPROVAL_REQUEST) {
-        return rawData.parsedData || null;
-      }
+      // Normalize to the PlanApprovalRequest(...) string that contains MPlan(...)
+      let source: string | null = null;
 
-      // Wrapper form: { type: 'plan_approval_request', data: 'PlanApprovalRequest(plan=MPlan(...), ...)' }
-      if (
-        rawData &&
-        typeof rawData === 'object' &&
-        rawData.type === 'plan_approval_request' &&
-        typeof rawData.data === 'string'
-      ) {
-        // Recurse using the contained string
-        return this.parsePlanApprovalRequest(rawData.data);
-      }
+      if (typeof rawData === 'object') {
+        if (typeof rawData.data === 'string' && /PlanApprovalRequest\(plan=MPlan\(/.test(rawData.data)) {
+          source = rawData.data;
+        } else if (rawData.plan && typeof rawData.plan === 'object') {
+          // Already structured style
+          const mplan = rawData.plan;
+          const userRequestText =
+            typeof mplan.user_request === 'string'
+              ? mplan.user_request
+              : (Array.isArray(mplan.user_request?.items)
+                ? (mplan.user_request.items.find((i: any) => i.text)?.text || '')
+                : (mplan.user_request?.content || '')
+              ).replace?.(/\u200b/g, '').trim() || 'Plan approval required';
 
-      // Structured v3 style: { plan: { id, steps, user_request, ... }, context?: {...} }
-      if (rawData && typeof rawData === 'object' && rawData.plan && typeof rawData.plan === 'object') {
-        const mplan = rawData.plan;
-
-        // Extract user_request text
-        let userRequestText = 'Plan approval required';
-        if (mplan.user_request) {
-          if (typeof mplan.user_request === 'string') {
-            userRequestText = mplan.user_request;
-          } else if (Array.isArray(mplan.user_request.items)) {
-            const textContent = mplan.user_request.items.find((item: any) => item.text);
-            if (textContent?.text) {
-              userRequestText = textContent.text.replace(/\u200b/g, '').trim();
-            }
-          } else if (mplan.user_request.content) {
-            userRequestText = mplan.user_request.content;
-          }
-        }
-
-        const steps = (mplan.steps || [])
-          .map((step: any, index: number) => {
+          const steps = (mplan.steps || []).map((step: any, i: number) => {
             const action = step.action || '';
             const cleanAction = action
               .replace(/\*\*/g, '')
               .replace(/^Certainly!\s*/i, '')
               .replace(/^Given the team composition and the available facts,?\s*/i, '')
-              .replace(/^here is a (?:concise )?plan to address the original request[^.]*\.\s*/i, '')
+              .replace(/^here is a (?:concise )?plan[^.]*\.\s*/i, '')
               .replace(/^(?:here is|this is) a (?:concise )?(?:plan|approach|strategy)[^.]*[.:]\s*/i, '')
               .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ')
               .replace(/^[-•]\s*/, '')
               .replace(/\s+/g, ' ')
               .trim();
-
             return {
-              id: index + 1,
+              id: i + 1,
               action,
               cleanAction,
               agent: step.agent || step._agent || 'System'
             };
-          })
-          .filter((s: any) =>
-            s.cleanAction.length > 3 &&
-            !/^(?:involvement|certainly|given|here is)/i.test(s.cleanAction)
-          );
+          }).filter((s: any) => s.cleanAction.length > 3 && !/^(?:involvement|certainly|given|here is)/i.test(s.cleanAction));
 
-        return {
-          id: mplan.id || mplan.plan_id || 'unknown',
-          status: (mplan.overall_status || rawData.status || 'PENDING_APPROVAL'),
-          user_request: userRequestText,
-          team: Array.isArray(mplan.team) ? mplan.team : [],
-          facts: mplan.facts || '',
-          steps,
-          context: {
-            task: userRequestText,
-            participant_descriptions: rawData.context?.participant_descriptions || {}
-          },
-          user_id: mplan.user_id,
-          team_id: mplan.team_id,
-          plan_id: mplan.plan_id,
-          overall_status: mplan.overall_status,
-          raw_data: rawData
-        };
+
+          const result: MPlanData = {
+            id: mplan.id || mplan.plan_id || 'unknown',
+            status: (mplan.overall_status || rawData.status || 'PENDING_APPROVAL').toString().toUpperCase(),
+            user_request: userRequestText,
+            team: Array.isArray(mplan.team) ? mplan.team : [],
+            facts: mplan.facts || '',
+            steps,
+            context: {
+              task: userRequestText,
+              participant_descriptions: rawData.context?.participant_descriptions || {}
+            },
+            user_id: mplan.user_id,
+            team_id: mplan.team_id,
+            plan_id: mplan.plan_id,
+            overall_status: mplan.overall_status,
+            raw_data: rawData
+          };
+          return result;
+        }
+      } else if (typeof rawData === 'string') {
+        if (/PlanApprovalRequest\(plan=MPlan\(/.test(rawData)) {
+          source = rawData;
+        } else if (/^MPlan\(/.test(rawData)) {
+          source = `PlanApprovalRequest(plan=${rawData})`;
+        }
       }
 
-      // String representation parsing (PlanApprovalRequest(...MPlan(...)) or raw repr)
-      if (typeof rawData === 'string') {
-        const source = rawData;
+      if (!source) return null;
 
-        // Extract MPlan(...) block (optional)
-        // Not strictly needed but could be used for scoping later.
-        // const mplanBlock = source.match(/MPlan\(([\s\S]*?)\)\)/);
+      // Extract inner MPlan body
+      const mplanMatch =
+        source.match(/plan=MPlan\(([\s\S]*?)\),\s*status=/) ||
+        source.match(/plan=MPlan\(([\s\S]*?)\)\s*\)/);
+      const body = mplanMatch ? mplanMatch[1] : null;
+      if (!body) return null;
 
-        // User request (first text='...')
-        let user_request =
-          source.match(/text=['"]([^'"]+?)['"]/)
-            ?.[1]
-            ?.replace(/\\u200b/g, '')
-            .trim() || 'Plan approval required';
+      const pick = (re: RegExp, upper = false): string | undefined => {
+        const m = body.match(re);
+        return m ? (upper ? m[1].toUpperCase() : m[1]) : undefined;
+      };
 
-        const id = source.match(/MPlan\(id=['"]([^'"]+)['"]/)?.[1] ||
-          source.match(/id=['"]([^'"]+)['"]/)?.[1] ||
-          'unknown';
+      const id = pick(/id='([^']+)'/) || pick(/id="([^"]+)"/) || 'unknown';
+      const user_id = pick(/user_id='([^']*)'/) || '';
+      const team_id = pick(/team_id='([^']*)'/) || '';
+      const plan_id = pick(/plan_id='([^']*)'/) || '';
+      let overall_status =
+        pick(/overall_status=<PlanStatus\.([a-zA-Z_]+):/, true) ||
+        pick(/overall_status='([^']+)'/, true) ||
+        'PENDING_APPROVAL';
 
-        let status =
-          source.match(/overall_status=<PlanStatus\.([a-zA-Z_]+):/)?.[1] ||
-          source.match(/overall_status=['"]([^'"]+)['"]/)?.[1] ||
-          'PENDING_APPROVAL';
-        if (status) {
-          status = status.toUpperCase();
+      const outerStatus =
+        source.match(/status='([^']+)'/)?.[1] ||
+        source.match(/status="([^"]+)"/)?.[1];
+      const status = (outerStatus || overall_status || 'PENDING_APPROVAL').toUpperCase();
+
+      let user_request =
+        source.match(/text='([^']+)'/)?.[1] ||
+        source.match(/text="([^"]+)"/)?.[1] ||
+        'Plan approval required';
+      user_request = user_request.replace(/\\u200b/g, '').trim();
+
+      const teamRaw = body.match(/team=\[([^\]]*)\]/)?.[1] || '';
+      const team = teamRaw
+        .split(',')
+        .map(s => s.trim().replace(/['"]/g, ''))
+        .filter(Boolean);
+
+      const facts =
+        body
+          .match(/facts="([^"]*(?:\\.[^"]*)*)"/)?.[1]
+          ?.replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"') || '';
+
+      const steps: MPlanData['steps'] = [];
+      const stepRegex = /MStep\(([^)]*?)\)/g;
+      let stepMatch: RegExpExecArray | null;
+      let idx = 1;
+      const seen = new Set<string>();
+      while ((stepMatch = stepRegex.exec(body)) !== null) {
+        const chunk = stepMatch[1];
+        const agent =
+          chunk.match(/agent='([^']+)'/)?.[1] ||
+          chunk.match(/agent="([^"]+)"/)?.[1] ||
+          'System';
+        const actionRaw =
+          chunk.match(/action='([^']+)'/)?.[1] ||
+          chunk.match(/action="([^"]+)"/)?.[1] ||
+          '';
+        if (!actionRaw) continue;
+
+        const cleanAction = actionRaw
+          .replace(/\*\*/g, '')
+          .replace(/^Certainly!\s*/i, '')
+          .replace(/^Given the team composition and the available facts,?\s*/i, '')
+          .replace(/^here is a (?:concise )?plan to[^.]*\.\s*/i, '')
+          .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ')
+          .replace(/^[-•]\s*/, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        const key = cleanAction.toLowerCase();
+        if (
+          cleanAction.length > 3 &&
+          !seen.has(key) &&
+          !/^(?:here is|this is|given|certainly|involvement)$/i.test(cleanAction)
+        ) {
+          seen.add(key);
+          steps.push({
+            id: idx++,
+            action: actionRaw,
+            cleanAction,
+            agent
+          });
         }
-
-        const teamRaw =
-          source.match(/team=\[([^\]]*)\]/)?.[1] || '';
-        const team = teamRaw
-          .split(',')
-          .map(s => s.trim().replace(/['"]/g, ''))
-          .filter(Boolean);
-
-        const facts =
-          source
-            .match(/facts="([^"]*(?:\\.[^"]*)*)"/)?.[1]
-            ?.replace(/\\n/g, '\n')
-            .replace(/\\"/g, '"') || '';
-
-        // Steps: accept single or double quotes: action='...' or action="..."
-        const stepRegex = /MStep\(([^)]*?)\)/g;
-        const steps: any[] = [];
-        const uniqueActions = new Set<string>();
-        let match: RegExpExecArray | null;
-        let stepIndex = 1;
-
-        while ((match = stepRegex.exec(source)) !== null) {
-          const chunk = match[1];
-          const agent =
-            chunk.match(/agent=['"]([^'"]+)['"]/)?.[1] || 'System';
-          const actionRaw =
-            chunk.match(/action=['"]([^'"]+)['"]/)?.[1] || '';
-
-          if (!actionRaw) continue;
-
-          let cleanAction = actionRaw
-            .replace(/\*\*/g, '')
-            .replace(/^Certainly!\s*/i, '')
-            .replace(/^Given the team composition and the available facts,?\s*/i, '')
-            .replace(/^here is a (?:concise )?plan to[^.]*\.\s*/i, '')
-            .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ')
-            .replace(/^[-•]\s*/, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (
-            cleanAction.length > 3 &&
-            !uniqueActions.has(cleanAction.toLowerCase()) &&
-            !/^(?:here is|this is|given|certainly|involvement)$/i.test(cleanAction)
-          ) {
-            uniqueActions.add(cleanAction.toLowerCase());
-            steps.push({
-              id: stepIndex++,
-              action: actionRaw,
-              cleanAction,
-              agent
-            });
-          }
-        }
-
-        // participant_descriptions (best-effort)
-        let participant_descriptions: Record<string, string> = {};
-        const pdMatch =
-          source.match(/participant_descriptions['"]?\s*:\s*({[^}]*})/) ||
-          source.match(/'participant_descriptions':\s*({[^}]*})/);
-
-        if (pdMatch?.[1]) {
-          const transformed = pdMatch[1]
-            .replace(/'/g, '"')
-            .replace(/([a-zA-Z0-9_]+)\s*:/g, '"$1":');
-          try {
-            participant_descriptions = JSON.parse(transformed);
-          } catch {
-            participant_descriptions = {};
-          }
-        }
-
-        return {
-          id,
-          status,
-          user_request,
-          team,
-          facts,
-          steps,
-          context: {
-            task: user_request,
-            participant_descriptions
-          },
-          raw_data: rawData
-        };
       }
 
-      return null;
-    } catch (error) {
-      console.error('Error parsing plan approval request:', error);
+      let participant_descriptions: Record<string, string> = {};
+      const pdMatch =
+        source.match(/participant_descriptions['"]?\s*:\s*({[^}]*})/) ||
+        source.match(/'participant_descriptions':\s*({[^}]*})/);
+      if (pdMatch?.[1]) {
+        const jsonish = pdMatch[1]
+          .replace(/'/g, '"')
+          .replace(/([a-zA-Z0-9_]+)\s*:/g, '"$1":');
+        try {
+          participant_descriptions = JSON.parse(jsonish);
+        } catch {
+          participant_descriptions = {};
+        }
+      }
+
+      const result: MPlanData = {
+        id,
+        status,
+        user_request,
+        team,
+        facts,
+        steps,
+        context: {
+          task: user_request,
+          participant_descriptions
+        },
+        user_id,
+        team_id,
+        plan_id,
+        overall_status,
+        raw_data: rawData
+      };
+
+      return result;
+    } catch (e) {
+      console.error('parsePlanApprovalRequest failed:', e);
       return null;
     }
   }
-  // ...existing code...
 
   /**
    * Parse an agent message object or repr string:
