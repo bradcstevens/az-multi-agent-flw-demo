@@ -232,9 +232,11 @@ class PlanWithSteps(Plan):
         self.completed = status_counts[StepStatus.completed]
         self.failed = status_counts[StepStatus.failed]
 
-        # Mark the plan as complete if the sum of completed and failed steps equals the total number of steps
-        if self.completed + self.failed == self.total_steps:
+
+        if self.total_steps > 0 and (self.completed + self.failed) == self.total_steps:
             self.overall_status = PlanStatus.completed
+        # Mark the plan as complete if the sum of completed and failed steps equals the total number of steps
+
 
 
 # Message classes for communication between agents

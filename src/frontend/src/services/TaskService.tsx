@@ -27,14 +27,14 @@ export class TaskService {
     plansData.forEach((plan) => {
       const task: Task = {
         id: plan.session_id,
-        name: plan.title,
+        name: plan.initial_goal,
         completed_steps: plan.completed,
         total_steps: plan.total_steps,
-        status: PlanDataService.isPlanComplete(plan) ? "completed" : "inprogress",
+        status: plan.overall_status === PlanStatus.COMPLETED ? "completed" : "inprogress",
         date: new Intl.DateTimeFormat(undefined, {
           dateStyle: "long",
           // timeStyle: "short",
-        }).format(new Date(plan.updated_at)),
+        }).format(new Date(plan.timestamp)),
       };
 
       // Categorize based on plan status and completion

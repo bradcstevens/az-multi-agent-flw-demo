@@ -1030,7 +1030,16 @@ async def get_plans(request: Request):
 
     all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.team_id)
 
-    return all_plans
+    steps_for_all_plans = []
+    # Create list of PlanWithSteps and update step counts
+    list_of_plans_with_steps = []
+    for plan in all_plans:
+        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=[])
+        plan_with_steps.overall_status
+        plan_with_steps.update_step_counts()
+        list_of_plans_with_steps.append(plan_with_steps)
+
+    return list_of_plans_with_steps
 
 
 # Get plans is called in the initial side rendering of the frontend
