@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType } from "../models";
+import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -37,7 +37,7 @@ const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
     const { showToast, dismissToast } = useInlineToaster();
-
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [input, setInput] = useState("");
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
     const [allPlans, setAllPlans] = useState<ProcessedPlanData[]>([]);
@@ -47,8 +47,9 @@ const PlanPage: React.FC = () => {
     const [processingSubtaskId, setProcessingSubtaskId] = useState<string | null>(
         null
     );
+    const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
     const [reloadLeftList, setReloadLeftList] = useState(true);
-
+    const [waitingForPlan, setWaitingForPlan] = useState(true);
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
@@ -67,8 +68,54 @@ const PlanPage: React.FC = () => {
 
     // Use ref to store the function to avoid stale closure issues
     const loadPlanDataRef = useRef<() => Promise<ProcessedPlanData[]>>();
+    // Auto-scroll helper
+    const scrollToBottom = useCallback(() => {
+        setTimeout(() => {
+            if (messagesContainerRef.current) {
+                messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            }
+        }, 100);
+    }, []);
 
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, (approvalRequest: any) => {
+            console.log('📋 Plan received:', approvalRequest);
 
+            let mPlanData: MPlanData | null = null;
+
+            // Handle the different message structures
+            if (approvalRequest.parsedData) {
+                // Direct parsedData property
+                mPlanData = approvalRequest.parsedData;
+            } else if (approvalRequest.data && typeof approvalRequest.data === 'object') {
+                // Data property with nested object
+                if (approvalRequest.data.parsedData) {
+                    mPlanData = approvalRequest.data.parsedData;
+                } else {
+                    // Try to parse the data object directly
+                    mPlanData = approvalRequest.data;
+                }
+            } else if (approvalRequest.rawData) {
+                // Parse the raw data string
+                mPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest.rawData);
+            } else {
+                // Try to parse the entire object
+                mPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest);
+            }
+
+            if (mPlanData) {
+                console.log('✅ Parsed plan data:', mPlanData);
+                setPlanApprovalRequest(mPlanData);
+                setWaitingForPlan(false);
+                // onPlanReceived?.(mPlanData);
+                // scrollToBottom();
+            } else {
+                console.error('❌ Failed to parse plan data', approvalRequest);
+            }
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
     // Loading message rotation effect
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -405,6 +452,9 @@ const PlanPage: React.FC = () => {
                                 streamingMessages={streamingMessages}
                                 wsConnected={wsConnected}
                                 onPlanApproval={(approved) => setPlanApproved(approved)}
+                                planApprovalRequest={planApprovalRequest}
+                                waitingForPlan={waitingForPlan}
+                                messagesContainerRef={messagesContainerRef}
                             />
                         </>
                     )}
@@ -417,6 +467,7 @@ const PlanPage: React.FC = () => {
                     loading={loading}
                     streamingMessages={streamingMessages}
                     planApproved={planApproved}
+                    planApprovalRequest={planApprovalRequest}
                 />
             </CoralShellRow>
         </CoralShellColumn>

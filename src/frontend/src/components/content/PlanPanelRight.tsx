@@ -28,6 +28,8 @@ interface PlanPanelRightProps {
   planApproved: boolean;
   onPlanApproval?: (approved: boolean) => void;
   wsConnected?: boolean;
+  planApprovalRequest: MPlanData | null;
+
 }
 
 interface GroupedMessage {
@@ -56,9 +58,9 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   streamingMessages = [],
   planApproved,
   wsConnected = false,
+  planApprovalRequest
 }) => {
   const [groupedStreamingMessages, setGroupedStreamingMessages] = useState<GroupedMessage[]>([]);
-  const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
   const [hasStreamingStarted, setHasStreamingStarted] = useState(false);
 
   // Helper function to get clean agent display name
@@ -107,24 +109,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
     }
   }, [streamingMessages, hasStreamingStarted]);
 
-  // Add WebSocket listener for plan approval requests - but only store, don't display until streaming starts
-  useEffect(() => {
-    const unsubscribePlanApproval = webSocketService.onPlanApprovalRequest((approvalRequest) => {
-      if (approvalRequest.parsedData) {
-        const parsedData = PlanDataService.parsePlanApprovalRequest(approvalRequest);
-        if (parsedData) {
-          console.log('📥 Right panel received plan approval request:', parsedData);
-          setPlanApprovalRequest(parsedData);
-          // Reset states when new plan comes in
-          setHasStreamingStarted(false);
-        }
-      }
-    });
 
-    return () => {
-      unsubscribePlanApproval();
-    };
-  }, []);
 
   // Group streaming messages by agent 
   const groupStreamingMessages = useCallback((messages: StreamingPlanUpdate[]): GroupedMessage[] => {
@@ -170,7 +155,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   }, [streamingMessages, groupStreamingMessages]);
 
   // ✅ NEW: Get comprehensive agent status combining planned and streaming agents
-  const getAgentStatus = useCallback((): AgentStatus[] => {
+  const getAgentStatus = useCallback((planApprovalRequest: MPlanData | null): AgentStatus[] => {
     const agentStatusMap = new Map<string, AgentStatus>();
 
     // Add planned agents from the plan approval request
@@ -249,21 +234,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
 
   // ✅ ENHANCED: Show waiting message only when we don't have plan approval request
   if (!planApprovalRequest) {
-    return (
-      <div style={{
-        width: '280px',
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--colorNeutralForeground3)',
-        fontSize: '14px',
-        padding: '20px',
-        textAlign: 'center'
-      }}>
-        Waiting for plan creation...
-      </div>
-    );
+    return null;
   }
 
   // Render Plan Section - show once we have plan approval request
@@ -354,7 +325,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
 
   // ✅ ENHANCED: Render Agents Section - show planned agents immediately, update with streaming status
   const renderAgentsSection = () => {
-    const agents = getAgentStatus();
+    const agents = getAgentStatus(planApprovalRequest);
 
     return (
       <div style={{

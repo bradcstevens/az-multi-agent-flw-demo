@@ -34,6 +34,9 @@ import PlanChatBody from "./PlanChatBody";
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
+  planApprovalRequest: MPlanData | null;
+  waitingForPlan: boolean;
+  messagesContainerRef: React.RefObject<HTMLDivElement>;
 }
 
 const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
@@ -45,67 +48,25 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   onPlanApproval,
   onPlanReceived,
   initialTask,
+  planApprovalRequest,
+  waitingForPlan,
+  messagesContainerRef
+
 }) => {
   const navigate = useNavigate();
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
   const { showToast, dismissToast } = useInlineToaster();
   // States
-  const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
+
   const [processingApproval, setProcessingApproval] = useState(false);
-  const [waitingForPlan, setWaitingForPlan] = useState(true);
-  const [userFeedback, setUserFeedback] = useState('');
-  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+
+  const [showApprovalButtons, setShowApprovalButtons] = useState(true);
 
 
-  // Auto-scroll helper
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      if (messagesContainerRef.current) {
-        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-      }
-    }, 100);
-  }, []);
+
 
   // Listen for m_plan streaming
-  useEffect(() => {
-    const unsubscribe = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, (approvalRequest: any) => {
-      console.log('📋 Plan received:', approvalRequest);
 
-      let mPlanData: MPlanData | null = null;
-
-      // Handle the different message structures
-      if (approvalRequest.parsedData) {
-        // Direct parsedData property
-        mPlanData = approvalRequest.parsedData;
-      } else if (approvalRequest.data && typeof approvalRequest.data === 'object') {
-        // Data property with nested object
-        if (approvalRequest.data.parsedData) {
-          mPlanData = approvalRequest.data.parsedData;
-        } else {
-          // Try to parse the data object directly
-          mPlanData = approvalRequest.data;
-        }
-      } else if (approvalRequest.rawData) {
-        // Parse the raw data string
-        mPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest.rawData);
-      } else {
-        // Try to parse the entire object
-        mPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest);
-      }
-
-      if (mPlanData) {
-        console.log('✅ Parsed plan data:', mPlanData);
-        setPlanApprovalRequest(mPlanData);
-        setWaitingForPlan(false);
-        onPlanReceived?.(mPlanData);
-        scrollToBottom();
-      } else {
-        console.error('❌ Failed to parse plan data', approvalRequest);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [onPlanReceived, scrollToBottom]);
 
   // Handle plan approval
   const handleApprovePlan = useCallback(async () => {
@@ -118,12 +79,12 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         m_plan_id: planApprovalRequest.id,
         plan_id: planData?.plan?.id,
         approved: true,
-        feedback: userFeedback || 'Plan approved by user'
+        feedback: 'Plan approved by user'
       });
 
       dismissToast(id);
-      setShowFeedbackInput(false);
       onPlanApproval?.(true);
+      setShowApprovalButtons(false);
 
     } catch (error) {
       dismissToast(id);
@@ -132,7 +93,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     } finally {
       setProcessingApproval(false);
     }
-  }, [planApprovalRequest, planData, userFeedback, onPlanApproval]);
+  }, [planApprovalRequest, planData, onPlanApproval]);
 
   // Handle plan rejection  
   const handleRejectPlan = useCallback(async () => {
@@ -145,7 +106,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         m_plan_id: planApprovalRequest.id,
         plan_id: planData?.plan?.id,
         approved: false,
-        feedback: userFeedback || 'Plan rejected by user'
+        feedback: 'Plan rejected by user'
       });
 
       dismissToast(id);
@@ -192,7 +153,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         {renderThinkingState(waitingForPlan)}
 
         {/* Plan response with all information */}
-        {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval)}
+        {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
       </div>
 
       {/* Chat Input - only show if no plan is waiting for approval */}

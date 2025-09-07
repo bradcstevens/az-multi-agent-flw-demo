@@ -4,7 +4,7 @@ import { BotRegular, CheckmarkRegular, DismissRegular } from "@fluentui/react-ic
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 // Render the complete plan with all information
-const renderPlanResponse = (planApprovalRequest: MPlanData | null, handleApprovePlan: () => void, handleRejectPlan: () => void, processingApproval: boolean,) => {
+const renderPlanResponse = (planApprovalRequest: MPlanData | null, handleApprovePlan: () => void, handleRejectPlan: () => void, processingApproval: boolean, showApprovalButtons: boolean) => {
     if (!planApprovalRequest) return null;
 
     return (
@@ -55,7 +55,7 @@ const renderPlanResponse = (planApprovalRequest: MPlanData | null, handleApprove
                     }}>
                         <span>Plan ID: {planApprovalRequest.id}</span>
                         <Tag size="extra-small" appearance="outline">
-                            {planApprovalRequest.status?.replace(/^.*'([^']*)'.*$/, '$1') || planApprovalRequest.status || 'PENDING_APPROVAL'}
+                            {planApprovalRequest.status?.replace(/^.*'([^']*)'.*$/, '$1') || planApprovalRequest.status || 'Pending'}
                         </Tag>
                     </div>
                 </div>
@@ -203,46 +203,49 @@ const renderPlanResponse = (planApprovalRequest: MPlanData | null, handleApprove
 
 
                 {/* Action Buttons - Separate section */}
-                <div style={{
-                    display: 'flex',
-                    gap: '12px',
-                    alignItems: 'center',
-                    padding: '20px',
-                    backgroundColor: 'var(--colorNeutralBackground2)',
-                    borderRadius: '12px',
-                    border: '1px solid var(--colorNeutralStroke2)',
-                    marginTop: '20px'
-                }}>
+                {showApprovalButtons && <>
                     <div style={{
-                        flex: 1,
-                        fontSize: '14px',
-                        color: 'var(--colorNeutralForeground2)'
+                        display: 'flex',
+                        gap: '12px',
+                        alignItems: 'center',
+                        padding: '20px',
+                        backgroundColor: 'var(--colorNeutralBackground2)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--colorNeutralStroke2)',
+                        marginTop: '20px'
                     }}>
-                        <span>Ready for approval</span>
+                        <div style={{
+                            flex: 1,
+                            fontSize: '14px',
+                            color: 'var(--colorNeutralForeground2)'
+                        }}>
+                            <span>Ready for approval</span>
+
+                        </div>
+
+                        <Button
+                            appearance="primary"
+                            icon={processingApproval ? <Spinner size="extra-tiny" /> : <CheckmarkRegular />}
+                            onClick={handleApprovePlan}
+                            disabled={processingApproval}
+                            size="medium"
+                            style={{ minWidth: '140px' }}
+                        >
+                            {processingApproval ? 'Processing...' : 'Approve'}
+                        </Button>
+                        <Button
+                            appearance="outline"
+                            icon={<DismissRegular />}
+                            onClick={handleRejectPlan}
+                            disabled={processingApproval}
+                            size="medium"
+                            style={{ minWidth: '100px' }}
+                        >
+                            Cancel
+                        </Button>
 
                     </div>
-
-                    <Button
-                        appearance="primary"
-                        icon={processingApproval ? <Spinner size="extra-tiny" /> : <CheckmarkRegular />}
-                        onClick={handleApprovePlan}
-                        disabled={processingApproval}
-                        size="medium"
-                        style={{ minWidth: '140px' }}
-                    >
-                        {processingApproval ? 'Processing...' : 'Approve'}
-                    </Button>
-                    <Button
-                        appearance="outline"
-                        icon={<DismissRegular />}
-                        onClick={handleRejectPlan}
-                        disabled={processingApproval}
-                        size="medium"
-                        style={{ minWidth: '100px' }}
-                    >
-                        Cancel
-                    </Button>
-                </div>
+                </>}
             </div>
         </div>
     );
