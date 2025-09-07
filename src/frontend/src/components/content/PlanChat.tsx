@@ -25,6 +25,11 @@ import InlineToaster, {
   useInlineToaster,
 } from "../toast/InlineToaster";
 import { WebsocketMessageType } from "@/models";
+import getUserPlan from "./streaming/StreamingUserPlan";
+import renderUserPlanMessage from "./streaming/StreamingUserPlanMessage";
+import renderPlanResponse from "./streaming/StreamingPlanResponse";
+import renderThinkingState from "./streaming/StreamingPlanState";
+import ContentNotFound from "../NotFound/ContentNotFound";
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
@@ -155,371 +160,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     }
   }, [planApprovalRequest, planData, onPlanApproval, navigate]);
 
-  // Extract user task with better fallback logic
-  const getUserTask = () => {
-    // Check initialTask first
-    if (initialTask && initialTask.trim() && initialTask !== 'Task submitted') {
-      return initialTask.trim();
-    }
-
-    // Check parsed plan data
-    if (planApprovalRequest) {
-      // Check user_request field
-      if (planApprovalRequest.user_request &&
-        planApprovalRequest.user_request.trim() &&
-        planApprovalRequest.user_request !== 'Plan approval required') {
-        return planApprovalRequest.user_request.trim();
-      }
-
-      // Check context task
-      if (planApprovalRequest.context?.task &&
-        planApprovalRequest.context.task.trim() &&
-        planApprovalRequest.context.task !== 'Plan approval required') {
-        return planApprovalRequest.context.task.trim();
-      }
-    }
-
-    // Check planData
-    if (planData?.plan?.initial_goal &&
-      planData.plan.initial_goal.trim() &&
-      planData.plan.initial_goal !== 'Task submitted') {
-      return planData.plan.initial_goal.trim();
-    }
-
-    // Default fallback
-    // return 'Please create a plan for me';
-  };
-
-  // Render user task message
-  const renderUserTaskMessage = () => {
-    const userTask = getUserTask();
-
+  if (!planData)
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '16px',
-        marginBottom: '32px',
-        padding: '0 24px'
-      }}>
-        {/* User Avatar */}
-        <div style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '50%',
-          backgroundColor: 'var(--colorBrandBackground)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}>
-          <PersonRegular style={{ fontSize: '16px', color: 'white' }} />
-        </div>
-
-        {/* User Message */}
-        <div style={{ flex: 1, maxWidth: 'calc(100% - 48px)' }}>
-          <div style={{
-            fontSize: '16px',
-            lineHeight: '1.6',
-            color: 'var(--colorNeutralForeground1)',
-            wordWrap: 'break-word'
-          }}>
-            {userTask}
-          </div>
-        </div>
-      </div>
+      <ContentNotFound subtitle="The requested page could not be found." />
     );
-  };
-
-  // Render AI thinking/planning state
-  const renderThinkingState = () => {
-    if (!waitingForPlan) return null;
-
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '16px',
-        marginBottom: '32px',
-        padding: '0 24px'
-      }}>
-        {/* AI Avatar */}
-        <div style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '50%',
-          backgroundColor: 'var(--colorNeutralBackground3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}>
-          <BotRegular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />
-        </div>
-
-        {/* Thinking Message */}
-        <div style={{ flex: 1, maxWidth: 'calc(100% - 48px)' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '16px 0',
-            color: 'var(--colorNeutralForeground2)',
-            fontSize: '15px'
-          }}>
-            <Spinner size="small" />
-            <span>Creating your plan...</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Render the complete plan with all information
-  const renderPlanResponse = () => {
-    if (!planApprovalRequest) return null;
-
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '16px',
-        marginBottom: '32px',
-        padding: '0 24px'
-      }}>
-        {/* AI Avatar */}
-        <div style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '50%',
-          backgroundColor: 'var(--colorNeutralBackground3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}>
-          <BotRegular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />
-        </div>
-
-        {/* Plan Content */}
-        <div style={{ flex: 1, maxWidth: 'calc(100% - 48px)' }}>
-
-          {/* Plan Header */}
-          <div style={{
-            marginBottom: '24px',
-            borderBottom: '1px solid var(--colorNeutralStroke2)',
-            paddingBottom: '16px'
-          }}>
-            <h3 style={{
-              margin: '0 0 8px 0',
-              fontSize: '20px',
-              fontWeight: '600',
-              color: 'var(--colorNeutralForeground1)'
-            }}>
-              📋 Plan Generated
-            </h3>
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              alignItems: 'center',
-              fontSize: '14px',
-              color: 'var(--colorNeutralForeground2)'
-            }}>
-              <span>Plan ID: {planApprovalRequest.id}</span>
-              <Tag size="extra-small" appearance="outline">
-                {planApprovalRequest.status?.replace(/^.*'([^']*)'.*$/, '$1') || planApprovalRequest.status || 'PENDING_APPROVAL'}
-              </Tag>
-            </div>
-          </div>
-
-          {/* Analysis Section */}
-          {planApprovalRequest.facts && (
-            <div style={{ marginBottom: '28px' }}>
-              <h4 style={{
-                margin: '0 0 12px 0',
-                fontSize: '16px',
-                fontWeight: '600',
-                color: 'var(--colorNeutralForeground1)'
-              }}>
-                🔍 Analysis & Context
-              </h4>
-              <div style={{
-                padding: '20px',
-                backgroundColor: 'var(--colorNeutralBackground2)',
-                borderRadius: '12px',
-                border: '1px solid var(--colorNeutralStroke2)',
-                fontSize: '15px',
-                lineHeight: '1.6'
-              }}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {planApprovalRequest.facts}
-                </ReactMarkdown>
-              </div>
-            </div>
-          )}
-
-          {/* Action Steps */}
-          {planApprovalRequest.steps && planApprovalRequest.steps.length > 0 && (
-            <div style={{ marginBottom: '28px' }}>
-              <h4 style={{
-                margin: '0 0 16px 0',
-                fontSize: '16px',
-                fontWeight: '600',
-                color: 'var(--colorNeutralForeground1)'
-              }}>
-                📝 Action Plan ({planApprovalRequest.steps.length} steps)
-              </h4>
-              <div style={{
-                backgroundColor: 'var(--colorNeutralBackground1)',
-                borderRadius: '12px',
-                border: '1px solid var(--colorNeutralStroke2)',
-                overflow: 'hidden'
-              }}>
-                {planApprovalRequest.steps.map((step, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      padding: '20px',
-                      borderBottom: index < planApprovalRequest.steps.length - 1 ? '1px solid var(--colorNeutralStroke2)' : 'none',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '16px'
-                    }}
-                  >
-                    <div style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--colorBrandBackground)',
-                      color: 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      flexShrink: 0
-                    }}>
-                      {step.id}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        fontSize: '15px',
-                        lineHeight: '1.6',
-                        marginBottom: step.agent && step.agent !== 'System' ? '8px' : '0'
-                      }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {step.cleanAction || step.action}
-                        </ReactMarkdown>
-                      </div>
-                      {step.agent && step.agent !== 'System' && (
-                        <Tag size="small" appearance="brand">
-                          {step.agent}
-                        </Tag>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Team Assignment */}
-          {planApprovalRequest.team && planApprovalRequest.team.length > 0 && (
-            <div style={{ marginBottom: '28px' }}>
-              <h4 style={{
-                margin: '0 0 12px 0',
-                fontSize: '16px',
-                fontWeight: '600',
-                color: 'var(--colorNeutralForeground1)'
-              }}>
-                👥 Assigned Team
-              </h4>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {planApprovalRequest.team.map((member, index) => (
-                  <Tag key={index} size="medium" appearance="brand">
-                    {member}
-                  </Tag>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Agent Capabilities */}
-          {planApprovalRequest.context?.participant_descriptions &&
-            Object.keys(planApprovalRequest.context.participant_descriptions).length > 0 && (
-              <div style={{ marginBottom: '28px' }}>
-                <h4 style={{
-                  margin: '0 0 12px 0',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: 'var(--colorNeutralForeground1)'
-                }}>
-                  Agent Capabilities
-                </h4>
-                <div style={{
-                  padding: '16px',
-                  backgroundColor: 'var(--colorNeutralBackground2)',
-                  borderRadius: '12px',
-                  border: '1px solid var(--colorNeutralStroke2)',
-                  fontSize: '14px'
-                }}>
-                  {Object.entries(planApprovalRequest.context.participant_descriptions).map(([agent, description]) => (
-                    <div key={agent} style={{ marginBottom: '12px' }}>
-                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>{agent}:</div>
-                      <div style={{ color: 'var(--colorNeutralForeground2)' }}>{description}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-
-          {/* Action Buttons - Separate section */}
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            alignItems: 'center',
-            padding: '20px',
-            backgroundColor: 'var(--colorNeutralBackground2)',
-            borderRadius: '12px',
-            border: '1px solid var(--colorNeutralStroke2)',
-            marginTop: '20px'
-          }}>
-            <div style={{
-              flex: 1,
-              fontSize: '14px',
-              color: 'var(--colorNeutralForeground2)'
-            }}>
-              <span>Ready for approval</span>
-
-            </div>
-
-            <Button
-              appearance="primary"
-              icon={processingApproval ? <Spinner size="extra-tiny" /> : <CheckmarkRegular />}
-              onClick={handleApprovePlan}
-              disabled={processingApproval}
-              size="medium"
-              style={{ minWidth: '140px' }}
-            >
-              {processingApproval ? 'Processing...' : 'Approve'}
-            </Button>
-            <Button
-              appearance="outline"
-              icon={<DismissRegular />}
-              onClick={handleRejectPlan}
-              disabled={processingApproval}
-              size="medium"
-              style={{ minWidth: '100px' }}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div style={{
       display: 'flex',
@@ -539,47 +183,45 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           width: '100%'
         }}
       >
-        {/* User task message */}
-        {renderUserTaskMessage()}
+        {/* User plan message */}
+        {renderUserPlanMessage(planApprovalRequest, initialTask, planData)}
 
         {/* AI thinking state */}
-        {renderThinkingState()}
+        {renderThinkingState(waitingForPlan)}
 
         {/* Plan response with all information */}
-        {renderPlanResponse()}
+        {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval)}
       </div>
 
-      {/* Chat Input - only show if no plan is waiting for approval */}
-      {!planApprovalRequest && (
-        <div style={{
-          padding: '20px 24px 32px',
-          borderTop: '1px solid var(--colorNeutralStroke2)',
-          backgroundColor: 'var(--colorNeutralBackground1)',
-          maxWidth: '800px',
-          margin: '0 auto',
-          width: '100%'
-        }}>
-          <ChatInput
-            value={input}
-            onChange={setInput}
-            onEnter={() => OnChatSubmit(input)}
-            disabledChat={submittingChatDisableInput || waitingForPlan}
-            placeholder={
-              waitingForPlan
-                ? "Creating plan..."
-                : "Send a message..."
-            }
-          >
-            <Button
-              appearance="transparent"
-              onClick={() => OnChatSubmit(input)}
-              icon={<SendRegular />}
-              disabled={submittingChatDisableInput || waitingForPlan}
-              style={{ height: '40px', width: '40px' }}
-            />
-          </ChatInput>
-        </div>
-      )}
+      <div style={{
+        padding: '20px 24px 32px',
+        borderTop: '1px solid var(--colorNeutralStroke2)',
+        backgroundColor: 'var(--colorNeutralBackground1)',
+        maxWidth: '800px',
+        margin: '0 auto',
+        width: '100%'
+      }}>
+        <ChatInput
+          value={input}
+          onChange={setInput}
+          onEnter={() => OnChatSubmit(input)}
+          disabledChat={submittingChatDisableInput || waitingForPlan}
+          placeholder={
+            waitingForPlan
+              ? "Creating plan..."
+              : "Send a message..."
+          }
+        >
+          <Button
+            appearance="transparent"
+            onClick={() => OnChatSubmit(input)}
+            icon={<SendRegular />}
+            disabled={submittingChatDisableInput || waitingForPlan}
+            style={{ height: '40px', width: '40px' }}
+          />
+        </ChatInput>
+      </div>
+
     </div>
   );
 };
