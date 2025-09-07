@@ -30,6 +30,7 @@ import renderUserPlanMessage from "./streaming/StreamingUserPlanMessage";
 import renderPlanResponse from "./streaming/StreamingPlanResponse";
 import renderThinkingState from "./streaming/StreamingPlanState";
 import ContentNotFound from "../NotFound/ContentNotFound";
+import PlanChatBody from "./PlanChatBody";
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
@@ -54,6 +55,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   const [waitingForPlan, setWaitingForPlan] = useState(true);
   const [userFeedback, setUserFeedback] = useState('');
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+
 
   // Auto-scroll helper
   const scrollToBottom = useCallback(() => {
@@ -193,35 +195,16 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval)}
       </div>
 
-      <div style={{
-        padding: '20px 24px 32px',
-        borderTop: '1px solid var(--colorNeutralStroke2)',
-        backgroundColor: 'var(--colorNeutralBackground1)',
-        maxWidth: '800px',
-        margin: '0 auto',
-        width: '100%'
-      }}>
-        <ChatInput
-          value={input}
-          onChange={setInput}
-          onEnter={() => OnChatSubmit(input)}
-          disabledChat={submittingChatDisableInput || waitingForPlan}
-          placeholder={
-            waitingForPlan
-              ? "Creating plan..."
-              : "Send a message..."
-          }
-        >
-          <Button
-            appearance="transparent"
-            onClick={() => OnChatSubmit(input)}
-            icon={<SendRegular />}
-            disabled={submittingChatDisableInput || waitingForPlan}
-            style={{ height: '40px', width: '40px' }}
-          />
-        </ChatInput>
-      </div>
-
+      {/* Chat Input - only show if no plan is waiting for approval */}
+      <PlanChatBody
+        planData={planData}
+        input={input}
+        setInput={setInput}
+        submittingChatDisableInput={submittingChatDisableInput}
+        OnChatSubmit={OnChatSubmit}
+        showChatInput={!planApprovalRequest}
+        waitingForPlan={waitingForPlan}
+        loading={false} />
     </div>
   );
 };

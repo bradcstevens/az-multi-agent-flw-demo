@@ -6,7 +6,7 @@ import { MPlanData, ProcessedPlanData } from "@/models";
 const renderUserPlanMessage = (planApprovalRequest: MPlanData | null,
     initialTask?: string,
     planData?: ProcessedPlanData) => {
-    const userTask = getUserTask(planApprovalRequest, initialTask, planData);
+    const userPlan = getUserTask(planApprovalRequest, initialTask, planData);
 
     return (
         <div style={{
@@ -38,7 +38,7 @@ const renderUserPlanMessage = (planApprovalRequest: MPlanData | null,
                     color: 'var(--colorNeutralForeground1)',
                     wordWrap: 'break-word'
                 }}>
-                    {userTask}
+                    {userPlan}
                 </div>
             </div>
         </div>
