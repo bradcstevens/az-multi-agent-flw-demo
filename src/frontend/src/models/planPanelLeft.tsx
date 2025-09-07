@@ -6,5 +6,6 @@ export interface PlanPanelLefProps {
     restReload?: () => void;
     onTeamSelect?: (team: TeamConfig | null) => void;
     onTeamUpload?: () => Promise<void>;
+    isHomePage: boolean;
     selectedTeam?: TeamConfig | null;
 }

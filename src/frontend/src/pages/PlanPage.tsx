@@ -146,6 +146,7 @@ const PlanPage: React.FC = () => {
     }, [planId, loading]);
 
     useEffect(() => {
+
         const loadTeamConfig = async () => {
             try {
                 setLoadingTeamConfig(true);
@@ -180,29 +181,6 @@ const PlanPage: React.FC = () => {
             try {
                 let actualPlanId = planId;
                 let planResult: ProcessedPlanData | null = null;
-
-                // Check if this looks like a session_id (starts with "sid_" or "session_")
-                if (planId.startsWith('sid_') || planId.startsWith('session_')) {
-                    console.log('Detected session_id, resolving to plan_id:', planId);
-
-                    try {
-                        // Try to find the plan by session_id
-                        const plansWithSteps = await apiService.getPlans();
-                        const matchingPlan = plansWithSteps.find((p: PlanWithSteps) => p.session_id === planId);
-
-                        if (matchingPlan) {
-                            actualPlanId = matchingPlan.id;
-                            planResult = convertToProcessedPlanData(matchingPlan);
-                            console.log('Resolved session_id to plan_id:', actualPlanId);
-                        } else {
-                            console.error('No plan found with session_id:', planId);
-                            throw new Error('Plan not found');
-                        }
-                    } catch (sessionError) {
-                        console.error('Failed to resolve session_id to plan_id:', sessionError);
-                        throw sessionError;
-                    }
-                }
 
                 if (actualPlanId && !planResult) {
                     console.log("Fetching plan with ID:", actualPlanId);
@@ -322,16 +300,7 @@ const PlanPage: React.FC = () => {
         navigate("/", { state: { focusInput: true } });
     }, [navigate]);
 
-    const handleTeamSelect = useCallback((team: TeamConfig | null) => {
-        setTeamConfig(team);
-    }, []);
 
-    const handleTeamUpload = useCallback(async () => {
-        // Reload team configurations
-        const teams = await TeamService.getUserTeams();
-        const config = teams.length > 0 ? teams[0] : null;
-        setTeamConfig(config);
-    }, []);
 
     const resetReload = useCallback(() => {
         setReloadLeftList(false);
@@ -379,8 +348,9 @@ const PlanPage: React.FC = () => {
                     reloadTasks={reloadLeftList}
                     onNewTaskButton={handleNewTaskButton}
                     restReload={resetReload}
-                    onTeamSelect={handleTeamSelect}
-                    onTeamUpload={handleTeamUpload}
+                    onTeamSelect={() => { }}
+                    onTeamUpload={async () => { }}
+                    isHomePage={false}
                     selectedTeam={teamConfig}
                 />
 

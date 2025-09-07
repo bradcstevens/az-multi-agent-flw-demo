@@ -31,12 +31,13 @@ import { getUserInfoGlobal } from "@/api/config";
 import TeamSelector from "../common/TeamSelector";
 import { TeamConfig } from "../../models/Team";
 
-const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({ 
-  reloadTasks, 
-  restReload, 
-  onTeamSelect, 
+const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
+  reloadTasks,
+  restReload,
+  onTeamSelect,
   onTeamUpload,
-  selectedTeam: parentSelectedTeam 
+  isHomePage,
+  selectedTeam: parentSelectedTeam
 }) => {
   const { dispatchToast } = useToastController("toast");
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   const [userInfo, setUserInfo] = useState<UserInfo | null>(
     getUserInfoGlobal()
   );
-  
+
   // Use parent's selected team if provided, otherwise use local state
   const [localSelectedTeam, setLocalSelectedTeam] = useState<TeamConfig | null>(null);
   const selectedTeam = parentSelectedTeam || localSelectedTeam;
@@ -78,7 +79,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
     }
   }, [reloadTasks, loadPlansData, restReload]);
   // Fetch plans
-  
+
 
   useEffect(() => {
     loadPlansData();
@@ -134,25 +135,25 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
           setLocalSelectedTeam(team);
           dispatchToast(
             <Toast>
-            <ToastTitle>Team Selected</ToastTitle>
-            <ToastBody>
-              {team.name} team has been selected with {team.agents.length} agents
-            </ToastBody>
-          </Toast>,
-          { intent: "success" }
-        );
+              <ToastTitle>Team Selected</ToastTitle>
+              <ToastBody>
+                {team.name} team has been selected with {team.agents.length} agents
+              </ToastBody>
+            </Toast>,
+            { intent: "success" }
+          );
         } else {
           // Handle team deselection (null case)
           setLocalSelectedTeam(null);
           dispatchToast(
             <Toast>
-            <ToastTitle>Team Deselected</ToastTitle>
-            <ToastBody>
-              No team is currently selected
-            </ToastBody>
-          </Toast>,
-          { intent: "info" }
-        );
+              <ToastTitle>Team Deselected</ToastTitle>
+              <ToastBody>
+                No team is currently selected
+              </ToastBody>
+            </Toast>,
+            { intent: "info" }
+          );
         }
       }
     },
@@ -171,11 +172,12 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         </PanelLeftToolbar>
 
         {/* Team Selector right under the toolbar */}
-        <div style={{  marginTop: '8px', marginBottom: '8px' }}>
+        <div style={{ marginTop: '8px', marginBottom: '8px' }}>
           <TeamSelector
             onTeamSelect={handleTeamSelect}
             onTeamUpload={onTeamUpload}
             selectedTeam={selectedTeam}
+            isHomePage={isHomePage}
           />
         </div>
         <div
