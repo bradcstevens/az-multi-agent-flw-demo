@@ -12,11 +12,10 @@ import {
   ClockRegular,
   PersonRegular,
 } from "@fluentui/react-icons";
-import { MPlanData } from "../../models";
+import { MPlanData, StreamingPlanUpdate } from "../../models";
 import { TaskService } from "../../services/TaskService";
-import { Step } from "../../models/plan";
 import { PlanDataService } from "../../services/PlanDataService";
-import webSocketService, { StreamingPlanUpdate } from "../../services/WebSocketService";
+import webSocketService from "../../services/WebSocketService";
 import ContentNotFound from "../NotFound/ContentNotFound";
 
 // Clean interface - only display-related props

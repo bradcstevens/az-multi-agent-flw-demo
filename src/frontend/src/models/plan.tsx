@@ -1,5 +1,5 @@
 import { AgentType, PlanStatus, StepStatus, HumanFeedbackStatus } from './enums';
-import { StreamingPlanUpdate } from '../services/WebSocketService';
+import { StreamingPlanUpdate } from './messages';
 
 /**
  * Base interface with common fields

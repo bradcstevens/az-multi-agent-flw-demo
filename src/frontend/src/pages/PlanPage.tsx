@@ -20,9 +20,9 @@ import LoadingMessage, { loadingMessages } from "../coral/components/LoadingMess
 import { RAIErrorCard, RAIErrorData } from "../components/errors";
 import { TeamConfig } from "../models/Team";
 import { TeamService } from "../services/TeamService";
-import webSocketService, { StreamMessage, StreamingPlanUpdate } from "../services/WebSocketService";
+import webSocketService from "../services/WebSocketService";
 import { APIService } from "../api/apiService";
-import { Step } from "../models/plan";
+import { StreamMessage, StreamingPlanUpdate } from "../models";
 
 import "../styles/PlanPage.css"
 

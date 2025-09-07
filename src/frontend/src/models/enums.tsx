@@ -235,3 +235,19 @@ export enum HumanFeedbackStatus {
     ACCEPTED = "accepted",
     REJECTED = "rejected"
 }
+
+export enum WebsocketMessageType {
+    SYSTEM_MESSAGE = "system_message",
+    AGENT_MESSAGE = "agent_message",
+    AGENT_STREAM_START = "agent_stream_start",
+    AGENT_STREAM_END = "agent_stream_end",
+    AGENT_MESSAGE_STREAMING = "agent_message_streaming",
+    AGENT_TOOL_MESSAGE = "agent_tool_message",
+    PLAN_APPROVAL_REQUEST = "plan_approval_request",
+    PLAN_APPROVAL_RESPONSE = "plan_approval_response",
+    REPLAN_APPROVAL_REQUEST = "replan_approval_request",
+    REPLAN_APPROVAL_RESPONSE = "replan_approval_response",
+    USER_CLARIFICATION_REQUEST = "user_clarification_request",
+    USER_CLARIFICATION_RESPONSE = "user_clarification_response",
+    FINAL_RESULT_MESSAGE = "final_result_message"
+}
