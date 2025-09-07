@@ -108,7 +108,7 @@ const PlanPage: React.FC = () => {
                 setPlanApprovalRequest(mPlanData);
                 setWaitingForPlan(false);
                 // onPlanReceived?.(mPlanData);
-                // scrollToBottom();
+                scrollToBottom();
             } else {
                 console.error('❌ Failed to parse plan data', approvalRequest);
             }
