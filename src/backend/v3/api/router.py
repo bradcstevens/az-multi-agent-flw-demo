@@ -1028,7 +1028,7 @@ async def get_plans(request: Request):
     if not current_team:
         return []
 
-    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
+    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.team_id)
 
     return all_plans
 
