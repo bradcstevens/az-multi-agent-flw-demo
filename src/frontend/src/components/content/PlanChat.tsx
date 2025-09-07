@@ -24,6 +24,7 @@ import ChatInput from "../../coral/modules/ChatInput";
 import InlineToaster, {
   useInlineToaster,
 } from "../toast/InlineToaster";
+import { WebsocketMessageType } from "@/models";
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
@@ -60,7 +61,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
   // Listen for m_plan streaming
   useEffect(() => {
-    const unsubscribe = webSocketService.on('parsed_plan_approval_request', (approvalRequest: any) => {
+    const unsubscribe = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, (approvalRequest: any) => {
       console.log('📋 Plan received:', approvalRequest);
 
       let mPlanData: MPlanData | null = null;

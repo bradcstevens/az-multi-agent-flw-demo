@@ -164,7 +164,7 @@ export interface PlanApprovalResponseData {
 
 // Structured plan approval request
 export interface ParsedPlanApprovalRequest {
-    type: 'parsed_plan_approval_request';
+    type: WebsocketMessageType.PLAN_APPROVAL_REQUEST;
     plan_id: string;
     parsedData: MPlanData;
     rawData: string;

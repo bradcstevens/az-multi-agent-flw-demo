@@ -5,7 +5,8 @@ import {
   ProcessedPlanData,
   PlanMessage,
   MPlanData,
-  StepStatus
+  StepStatus,
+  WebsocketMessageType
 } from "@/models";
 import { apiService } from "@/api";
 
@@ -156,7 +157,7 @@ export class PlanDataService {
       console.log('🔍 Parsing plan approval request:', rawData, 'Type:', typeof rawData);
 
       // Already parsed object passthrough
-      if (rawData && typeof rawData === 'object' && rawData.type === 'parsed_plan_approval_request') {
+      if (rawData && typeof rawData === 'object' && rawData.type === WebsocketMessageType.PLAN_APPROVAL_REQUEST) {
         return rawData.parsedData || null;
       }
 

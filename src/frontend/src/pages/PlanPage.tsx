@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, PlanWithSteps } from "../models";
+import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -131,7 +131,7 @@ const PlanPage: React.FC = () => {
             const unsubscribeStreaming = webSocketService.on('agent_message', handleStreamingMessage);
             const unsubscribePlanApproval = webSocketService.on('plan_approval_response', handlePlanApprovalResponse);
             const unsubscribePlanApprovalRequest = webSocketService.on('plan_approval_request', handlePlanApprovalRequest);
-            const unsubscribeParsedPlanApprovalRequest = webSocketService.on('parsed_plan_approval_request', handlePlanApprovalRequest);
+            const unsubscribeParsedPlanApprovalRequest = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, handlePlanApprovalRequest);
 
             return () => {
                 console.log('🔌 Cleaning up WebSocket connections');

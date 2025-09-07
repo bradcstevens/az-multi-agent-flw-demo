@@ -139,7 +139,7 @@ class WebSocketService {
     }
 
     onPlanApprovalRequest(callback: (approvalRequest: ParsedPlanApprovalRequest) => void): () => void {
-        return this.on('parsed_plan_approval_request', (message: StreamMessage) => {
+        return this.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, (message: StreamMessage) => {
             if (message.data) callback(message.data);
         });
     }
@@ -174,12 +174,12 @@ class WebSocketService {
                 const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
                 if (parsedData) {
                     const structuredMessage: ParsedPlanApprovalRequest = {
-                        type: 'parsed_plan_approval_request',
+                        type: WebsocketMessageType.PLAN_APPROVAL_REQUEST,
                         plan_id: parsedData.id,
                         parsedData,
                         rawData: message.data
                     };
-                    this.emit('parsed_plan_approval_request', structuredMessage);
+                    this.emit(WebsocketMessageType.PLAN_APPROVAL_REQUEST, structuredMessage);
                 } else {
                     this.emit('error', { error: 'Failed to parse plan approval request' });
                 }
