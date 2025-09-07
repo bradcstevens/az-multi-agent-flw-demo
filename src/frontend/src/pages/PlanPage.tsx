@@ -128,9 +128,9 @@ const PlanPage: React.FC = () => {
                 handleConnectionChange(message.data?.connected || false);
             });
 
-            const unsubscribeStreaming = webSocketService.on('agent_message', handleStreamingMessage);
-            const unsubscribePlanApproval = webSocketService.on('plan_approval_response', handlePlanApprovalResponse);
-            const unsubscribePlanApprovalRequest = webSocketService.on('plan_approval_request', handlePlanApprovalRequest);
+            const unsubscribeStreaming = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, handleStreamingMessage);
+            const unsubscribePlanApproval = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_RESPONSE, handlePlanApprovalResponse);
+            const unsubscribePlanApprovalRequest = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, handlePlanApprovalRequest);
             const unsubscribeParsedPlanApprovalRequest = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, handlePlanApprovalRequest);
 
             return () => {

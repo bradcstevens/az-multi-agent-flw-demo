@@ -379,7 +379,7 @@ export class PlanDataService {
   } | null {
     try {
       // Unwrap wrapper
-      if (rawData && typeof rawData === 'object' && rawData.type === 'agent_message' && typeof rawData.data === 'string') {
+      if (rawData && typeof rawData === 'object' && rawData.type === WebsocketMessageType.AGENT_MESSAGE && typeof rawData.data === 'string') {
         return this.parseAgentMessage(rawData.data);
       }
 
