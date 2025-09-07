@@ -180,10 +180,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     }
 
     // Check planData
-    if (planData?.plan?.description &&
-      planData.plan.description.trim() &&
-      planData.plan.description !== 'Task submitted') {
-      return planData.plan.description.trim();
+    if (planData?.plan?.initial_goal &&
+      planData.plan.initial_goal.trim() &&
+      planData.plan.initial_goal !== 'Task submitted') {
+      return planData.plan.initial_goal.trim();
     }
 
     // Default fallback

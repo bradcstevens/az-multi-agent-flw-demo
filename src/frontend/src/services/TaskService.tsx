@@ -39,7 +39,7 @@ export class TaskService {
 
       // Categorize based on plan status and completion
       if (
-        plan.status === PlanStatus.COMPLETED ||
+        plan.overall_status === PlanStatus.COMPLETED ||
         PlanDataService.isPlanComplete(plan)
       ) {
         completed.push(task);
