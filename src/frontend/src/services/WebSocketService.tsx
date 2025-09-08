@@ -166,11 +166,8 @@ class WebSocketService {
 
     private handleMessage(message: StreamMessage): void {
 
-        const currentPlanIds = Array.from(this.planSubscriptions);
-        const firstPlanId = currentPlanIds[0];
-        if (message.type !== WebsocketMessageType.AGENT_MESSAGE_STREAMING) {
-            console.log('WebSocket message received:', message);
-        }
+
+        console.log('WebSocket message received:', message);
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
                 console.log("enter plan approval request");
