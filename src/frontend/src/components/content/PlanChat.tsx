@@ -31,12 +31,15 @@ import renderPlanResponse from "./streaming/StreamingPlanResponse";
 import renderThinkingState from "./streaming/StreamingPlanState";
 import ContentNotFound from "../NotFound/ContentNotFound";
 import PlanChatBody from "./PlanChatBody";
+import renderBufferMessage from "./streaming/StreamingBufferMessage";
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
   planApprovalRequest: MPlanData | null;
   waitingForPlan: boolean;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
+  streamingMessageBuffer: string;
+  agentMessages: any[];
 }
 
 const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
@@ -50,7 +53,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   initialTask,
   planApprovalRequest,
   waitingForPlan,
-  messagesContainerRef
+  messagesContainerRef,
+  streamingMessageBuffer,
+  agentMessages
 
 }) => {
   const navigate = useNavigate();
@@ -154,6 +159,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
         {/* Plan response with all information */}
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
+
+        {/* Streaming plan updates */}
+        {renderBufferMessage(streamingMessageBuffer)}
       </div>
 
       {/* Chat Input - only show if no plan is waiting for approval */}

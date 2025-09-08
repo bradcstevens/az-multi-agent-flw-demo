@@ -53,10 +53,11 @@ const PlanPage: React.FC = () => {
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
-
+    const [streamingMessageBuffer, setStreamingMessageBuffer] = useState<string>("");
     // RAI Error state
     const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
 
+    const [agentMessages, setAgentMessages] = useState<any[]>([]);
     // Team config state
     const [teamConfig, setTeamConfig] = useState<TeamConfig | null>(null);
     const [loadingTeamConfig, setLoadingTeamConfig] = useState(true);
@@ -72,7 +73,11 @@ const PlanPage: React.FC = () => {
     const scrollToBottom = useCallback(() => {
         setTimeout(() => {
             if (messagesContainerRef.current) {
-                messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                //messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                messagesContainerRef.current?.scrollTo({
+                    top: messagesContainerRef.current.scrollHeight,
+                    behavior: "smooth",
+                });
             }
         }, 100);
     }, []);
@@ -116,6 +121,29 @@ const PlanPage: React.FC = () => {
 
         return () => unsubscribe();
     }, [scrollToBottom]); //onPlanReceived, scrollToBottom
+
+
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE_STREAMING, (streamingMessage: any) => {
+            // console.log('📋 Streaming Message', streamingMessage);
+            setStreamingMessageBuffer(prev => prev + streamingMessage.data.content);
+            scrollToBottom();
+
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
+
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, (agentMessage: any) => {
+            console.log('📋 Agent Message', agentMessage);
+            setAgentMessages(prev => [...prev, agentMessage]);
+            scrollToBottom();
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
+
     // Loading message rotation effect
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -429,19 +457,6 @@ const PlanPage: React.FC = () => {
                                 </PanelRightToggles>
                             </ContentToolbar>
 
-                            {/* Show RAI error if present */}
-                            {raiError && (
-                                <div style={{ padding: '16px 24px 0' }}>
-                                    <RAIErrorCard
-                                        error={raiError}
-                                        onRetry={() => {
-                                            setRAIError(null);
-                                        }}
-                                        onDismiss={() => setRAIError(null)}
-                                    />
-                                </div>
-                            )}
-
                             <PlanChat
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}
@@ -455,6 +470,9 @@ const PlanPage: React.FC = () => {
                                 planApprovalRequest={planApprovalRequest}
                                 waitingForPlan={waitingForPlan}
                                 messagesContainerRef={messagesContainerRef}
+                                streamingMessageBuffer={streamingMessageBuffer}
+                                agentMessages={agentMessages}
+
                             />
                         </>
                     )}

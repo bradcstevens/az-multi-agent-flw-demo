@@ -15,7 +15,6 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
     OnChatSubmit,
     showChatInput,
     waitingForPlan
-
 }) => {
     if (!showChatInput) {
         return null;

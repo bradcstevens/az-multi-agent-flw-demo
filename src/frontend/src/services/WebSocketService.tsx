@@ -165,13 +165,14 @@ class WebSocketService {
     }
 
     private handleMessage(message: StreamMessage): void {
-        console.log('WebSocket message received:', message);
+
         const currentPlanIds = Array.from(this.planSubscriptions);
         const firstPlanId = currentPlanIds[0];
 
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
                 console.log("enter plan approval request");
+                console.log('WebSocket message received:', message);
                 const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
                 if (parsedData) {
                     const structuredMessage: ParsedPlanApprovalRequest = {
@@ -189,44 +190,18 @@ class WebSocketService {
 
             case WebsocketMessageType.AGENT_MESSAGE: {
                 if (message.data) {
-                    const transformed: StreamMessage = {
-                        ...message,
-                        data: {
-                            plan_id: firstPlanId,
-                            agent_name: message.data.agent_name || 'Unknown Agent',
-                            content: message.data.content || '',
-                            message_type: 'thinking',
-                            status: 'in_progress',
-                            timestamp: Date.now() / 1000
-                        }
-                    };
+                    console.log('WebSocket message received:', message);
+                    const transformed = PlanDataService.parseAgentMessage(message);
                     this.emit(WebsocketMessageType.AGENT_MESSAGE, transformed);
-                } else {
-                    this.emit(WebsocketMessageType.AGENT_MESSAGE, message);
+
                 }
                 break;
             }
 
             case WebsocketMessageType.AGENT_MESSAGE_STREAMING: {
                 if (message.data) {
-                    const isFinal = !!message.data.is_final;
-                    const transformed: StreamMessage = {
-                        type: WebsocketMessageType.AGENT_MESSAGE,
-                        data: {
-                            plan_id: message.data.plan_id || firstPlanId,
-                            agent_name: message.data.agent_name || 'Unknown Agent',
-                            content: message.data.content || '',
-                            message_type: isFinal ? 'result' : 'thinking',
-                            status: isFinal ? 'completed' : 'in_progress',
-                            timestamp: Date.now() / 1000,
-                            is_final: isFinal
-                        }
-                    };
-                    if (!transformed.data.plan_id) {
-                        console.warn('Streaming message missing plan_id and no subscription context.');
-                        break;
-                    }
-                    this.emit(WebsocketMessageType.AGENT_MESSAGE, transformed);
+                    const streamedMessage = PlanDataService.parseAgentMessageStreaming(message);
+                    this.emit(WebsocketMessageType.AGENT_MESSAGE_STREAMING, streamedMessage);
                 }
                 break;
             }
