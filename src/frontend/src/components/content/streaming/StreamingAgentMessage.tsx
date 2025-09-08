@@ -1,39 +1,39 @@
 import { AgentMessageData } from "@/models";
-
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
-// Render AI thinking/planning state
-const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
-    if (!agentMessages || agentMessages.length === 0) return null;
 
-    return (
-        <div
-        // style={{
-        //     height: 200,
-        //     maxHeight: 200,
-        //     overflowY: 'auto',     // or 'hidden' if you don't want scrolling
-        //     overflowX: 'hidden',
-        //     flex: '0 0 200px'      // prevents flex parents from stretching it
-        // }}
+interface StreamingAgentMessageProps {
+  agentMessages: AgentMessageData[];
+}
 
-        >
-            {agentMessages.map((msg, index) => {
-                const trimmed = msg.raw_content?.trim();
-                if (!trimmed) return null; // skip if empty, null, or whitespace
-                return (
-                    <div key={index} style={{ marginBottom: '16px' }}>
-                        <strong>{msg.agent}</strong>:
-                        <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypePrism]}
-                        >
-                            {trimmed}
-                        </ReactMarkdown>
-                    </div>
-                );
-            })}
+const StreamingAgentMessage = ({ agentMessages }: StreamingAgentMessageProps) => {
+  if (!agentMessages?.length) return null;
+
+  // Filter out messages with empty content
+  const validMessages = agentMessages.filter(msg => msg.raw_content?.trim());
+
+  if (!validMessages.length) return null;
+
+  return (
+    <div className="streaming-agent-messages">
+      {validMessages.map((message, index) => (
+        <div key={`${message.agent}-${message.timestamp}-${index}`} className="agent-message">
+          <div className="agent-name">
+            <strong>{message.agent}</strong>:
+          </div>
+          <div className="agent-content">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypePrism]}
+            >
+              {message.raw_content.trim()}
+            </ReactMarkdown>
+          </div>
         </div>
-    );
+      ))}
+    </div>
+  );
 };
-export default renderAgentMessages;
+
+export default StreamingAgentMessage;
