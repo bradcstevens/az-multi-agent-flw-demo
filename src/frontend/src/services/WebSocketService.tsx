@@ -166,8 +166,11 @@ class WebSocketService {
 
     private handleMessage(message: StreamMessage): void {
 
-
-        console.log('WebSocket message received:', message);
+        //console.log('WebSocket message received:', message);
+        const hasClarification = /\bclarifications?\b/i.test(message.data || '');
+        if (hasClarification) {
+            console.log("Message contains 'clarification':", message.data);
+        }
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
                 console.log("enter plan approval request");
