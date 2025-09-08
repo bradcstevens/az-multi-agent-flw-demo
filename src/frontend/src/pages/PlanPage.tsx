@@ -504,11 +504,7 @@ const PlanPage: React.FC = () => {
 
                 <PlanPanelRight
                     planData={planData}
-                    submittingChatDisableInput={submittingChatDisableInput}
-                    processingSubtaskId={processingSubtaskId}
                     loading={loading}
-                    streamingMessages={streamingMessages}
-                    planApproved={planApproved}
                     planApprovalRequest={planApprovalRequest}
                 />
             </CoralShellRow>
