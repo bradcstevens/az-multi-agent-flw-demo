@@ -24,7 +24,7 @@ import ChatInput from "../../coral/modules/ChatInput";
 import InlineToaster, {
   useInlineToaster,
 } from "../toast/InlineToaster";
-import { WebsocketMessageType } from "@/models";
+import { AgentMessageData, WebsocketMessageType } from "@/models";
 import getUserPlan from "./streaming/StreamingUserPlan";
 import renderUserPlanMessage from "./streaming/StreamingUserPlanMessage";
 import renderPlanResponse from "./streaming/StreamingPlanResponse";
@@ -32,6 +32,7 @@ import renderThinkingState from "./streaming/StreamingPlanState";
 import ContentNotFound from "../NotFound/ContentNotFound";
 import PlanChatBody from "./PlanChatBody";
 import renderBufferMessage from "./streaming/StreamingBufferMessage";
+import renderAgentMessages from "./streaming/StreamingAgentMessage";
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
@@ -39,7 +40,7 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   waitingForPlan: boolean;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   streamingMessageBuffer: string;
-  agentMessages: any[];
+  agentMessages: AgentMessageData[];
 }
 
 const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
@@ -159,6 +160,8 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
         {/* Plan response with all information */}
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
+        {renderAgentMessages(agentMessages)}
+
 
         {/* Streaming plan updates */}
         {renderBufferMessage(streamingMessageBuffer)}

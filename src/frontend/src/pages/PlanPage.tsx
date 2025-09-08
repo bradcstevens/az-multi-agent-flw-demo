@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData } from "../models";
+import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -57,7 +57,7 @@ const PlanPage: React.FC = () => {
     // RAI Error state
     const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
 
-    const [agentMessages, setAgentMessages] = useState<any[]>([]);
+    const [agentMessages, setAgentMessages] = useState<AgentMessageData[]>([]);
     // Team config state
     const [teamConfig, setTeamConfig] = useState<TeamConfig | null>(null);
     const [loadingTeamConfig, setLoadingTeamConfig] = useState(true);
@@ -137,7 +137,8 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, (agentMessage: any) => {
             console.log('📋 Agent Message', agentMessage);
-            setAgentMessages(prev => [...prev, agentMessage]);
+            const agentMessageData = agentMessage.data as AgentMessageData;
+            setAgentMessages(prev => [...prev, agentMessageData]);
             scrollToBottom();
         });
 

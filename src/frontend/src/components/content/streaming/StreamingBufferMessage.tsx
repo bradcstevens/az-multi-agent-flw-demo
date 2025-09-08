@@ -7,7 +7,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
-import { useState } from "react";
+
 // Render AI thinking/planning state
 const renderBufferMessage = (streamingMessageBuffer: string) => {
     if (!streamingMessageBuffer || streamingMessageBuffer.trim() === "") return null;
