@@ -460,9 +460,9 @@ For more details, refer to [Azure Storage redundancy documentation](https://lear
 
 <details> <summary><b>DeploymentNotFound</b></summary>
 
-This issue occurs when the user deletes a previous deployment along with the resource group (RG), and then redeploys the same RG with the same environment name but in a different location.
+- This issue occurs when the user deletes a previous deployment along with the resource group (RG), and then redeploys the same RG with the same environment name but in a different location.
 
-To avoid the DeploymentNotFound error, Do not change the location when redeploying a deleted RG, or Use new names for the RG and environment during redeployment.
+- To avoid the DeploymentNotFound error, Do not change the location when redeploying a deleted RG, or Use new names for the RG and environment during redeployment.
 </details>
 
 
