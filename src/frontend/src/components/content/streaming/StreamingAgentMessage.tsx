@@ -7,7 +7,7 @@ interface StreamingAgentMessageProps {
   agentMessages: AgentMessageData[];
 }
 
-const StreamingAgentMessage = ({ agentMessages }: StreamingAgentMessageProps) => {
+const StreamingAgentMessage = (agentMessages: AgentMessageData[]) => {
   if (!agentMessages?.length) return null;
 
   // Filter out messages with empty content
