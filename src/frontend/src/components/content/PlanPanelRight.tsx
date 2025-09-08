@@ -1,78 +1,31 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React from "react";
 import {
   Body1,
-  Tag,
-  Spinner,
-  Title3,
 } from "@fluentui/react-components";
 import {
-  CheckmarkCircleRegular,
-  ErrorCircleRegular,
-  DiamondRegular,
-  ClockRegular,
   PersonRegular,
+  ArrowTurnDownRightRegular,
 } from "@fluentui/react-icons";
-import { MPlanData, StreamingPlanUpdate } from "../../models";
+import { MPlanData } from "../../models";
 import { TaskService } from "../../services/TaskService";
-import { PlanDataService } from "../../services/PlanDataService";
-import webSocketService from "../../services/WebSocketService";
+import { AgentTypeUtils, AgentType } from "../../models/enums";
 import ContentNotFound from "../NotFound/ContentNotFound";
 
-// Clean interface - only display-related props
 interface PlanPanelRightProps {
   planData: any;
-  submittingChatDisableInput: boolean;
-  processingSubtaskId: string | null;
   loading: boolean;
-  streamingMessages?: StreamingPlanUpdate[];
-  planApproved: boolean;
-  onPlanApproval?: (approved: boolean) => void;
-  wsConnected?: boolean;
   planApprovalRequest: MPlanData | null;
-
-}
-
-interface GroupedMessage {
-  id: string;
-  agent_name: string;
-  messages: StreamingPlanUpdate[];
-  status: string;
-  latest_timestamp: string;
-  step_id?: string;
-}
-
-// ✅ NEW: Interface for agent status tracking
-interface AgentStatus {
-  name: string;
-  displayName: string;
-  status: 'planned' | 'active' | 'completed' | 'error';
-  role: string;
-  latest_message?: string;
-  step_count?: number;
-  messages_count?: number;
 }
 
 const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
   planData,
   loading,
-  streamingMessages = [],
-  planApproved,
-  wsConnected = false,
   planApprovalRequest
 }) => {
-  const [groupedStreamingMessages, setGroupedStreamingMessages] = useState<GroupedMessage[]>([]);
-  const [hasStreamingStarted, setHasStreamingStarted] = useState(false);
 
   // Helper function to get clean agent display name
   const getAgentDisplayName = (agentName: string): string => {
     if (!agentName) return 'Assistant';
-
-    // Special handling for orchestrator/system agents
-    if (agentName.toLowerCase().includes('orchestrator') ||
-      agentName.toLowerCase() === 'system' ||
-      agentName.toLowerCase().includes('planner')) {
-      return 'BOT';
-    }
 
     let cleanName = TaskService.cleanTextToSpaces(agentName);
     if (cleanName.toLowerCase().includes('agent')) {
@@ -81,408 +34,210 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
     return cleanName.replace(/\b\w/g, l => l.toUpperCase()) || 'Assistant';
   };
 
-  // Helper function to normalize timestamp
-  const normalizeTimestamp = (timestamp?: string | number): string => {
-    if (!timestamp) return new Date().toISOString();
-    if (typeof timestamp === 'number') {
-      return new Date(timestamp * 1000).toISOString();
-    }
-    return timestamp;
-  };
+  // Helper function to get agent icon based on name and type
+  const getAgentIcon = (agentName: string) => {
+    // Try to determine agent type from name
+    const cleanName = agentName.toLowerCase();
+    let agentType: AgentType;
 
-  // Track when streaming starts
-  useEffect(() => {
-    console.log('🔍 Right panel - streaming messages changed:', streamingMessages.length, 'hasStreamingStarted:', hasStreamingStarted);
-
-    if (streamingMessages.length > 0 && !hasStreamingStarted) {
-      const hasRealAgentContent = streamingMessages.some(msg =>
-        msg.agent_name &&
-        msg.content &&
-        msg.content.trim().length > 0 &&
-        msg.agent_name !== 'system'
-      );
-
-      if (hasRealAgentContent) {
-        console.log('🚀 Real streaming content started in right panel');
-        setHasStreamingStarted(true);
-      }
-    }
-  }, [streamingMessages, hasStreamingStarted]);
-
-
-
-  // Group streaming messages by agent 
-  const groupStreamingMessages = useCallback((messages: StreamingPlanUpdate[]): GroupedMessage[] => {
-    const groups: { [key: string]: GroupedMessage } = {};
-
-    messages.forEach((msg) => {
-      const groupKey = `${msg.agent_name || 'system'}_${msg.step_id || 'general'}`;
-
-      if (!groups[groupKey]) {
-        groups[groupKey] = {
-          id: groupKey,
-          agent_name: msg.agent_name || 'Assistant',
-          messages: [],
-          status: msg.status || 'in_progress',
-          latest_timestamp: normalizeTimestamp(msg.timestamp),
-          step_id: msg.step_id,
-        };
-      }
-
-      groups[groupKey].messages.push(msg);
-
-      const msgTimestamp = normalizeTimestamp(msg.timestamp);
-      const groupTimestamp = groups[groupKey].latest_timestamp;
-      if (msgTimestamp > groupTimestamp) {
-        groups[groupKey].status = msg.status || groups[groupKey].status;
-        groups[groupKey].latest_timestamp = msgTimestamp;
-      }
-    });
-
-    return Object.values(groups).sort((a, b) =>
-      new Date(a.latest_timestamp).getTime() - new Date(b.latest_timestamp).getTime()
-    );
-  }, []);
-
-  // Update grouped messages when streaming messages change
-  useEffect(() => {
-    if (streamingMessages.length > 0) {
-      const grouped = groupStreamingMessages(streamingMessages);
-      setGroupedStreamingMessages(grouped);
+    if (cleanName.includes('coder')) {
+      agentType = AgentType.CODER;
+    } else if (cleanName.includes('executor')) {
+      agentType = AgentType.EXECUTOR;
+    } else if (cleanName.includes('filesurfer')) {
+      agentType = AgentType.FILE_SURFER;
+    } else if (cleanName.includes('websurfer')) {
+      agentType = AgentType.WEB_SURFER;
+    } else if (cleanName.includes('hr')) {
+      agentType = AgentType.HR;
+    } else if (cleanName.includes('marketing')) {
+      agentType = AgentType.MARKETING;
+    } else if (cleanName.includes('procurement')) {
+      agentType = AgentType.PROCUREMENT;
+    } else if (cleanName.includes('proxy')) {
+      agentType = AgentType.GENERIC;
     } else {
-      setGroupedStreamingMessages([]);
-    }
-  }, [streamingMessages, groupStreamingMessages]);
-
-  // ✅ NEW: Get comprehensive agent status combining planned and streaming agents
-  const getAgentStatus = useCallback((planApprovalRequest: MPlanData | null): AgentStatus[] => {
-    const agentStatusMap = new Map<string, AgentStatus>();
-
-    // Add planned agents from the plan approval request
-    if (planApprovalRequest?.team && planApprovalRequest.team.length > 0) {
-      planApprovalRequest.team.forEach(agentName => {
-        const displayName = getAgentDisplayName(agentName);
-        agentStatusMap.set(agentName, {
-          name: agentName,
-          displayName,
-          status: 'planned',
-          role: 'Agent',
-          step_count: 0,
-          messages_count: 0
-        });
-      });
+      agentType = AgentType.GENERIC;
     }
 
-    //  Update with streaming agent data
-    groupedStreamingMessages.forEach(group => {
-      const agentName = group.agent_name;
-      const displayName = getAgentDisplayName(agentName);
-
-      const existing = agentStatusMap.get(agentName);
-      const status = group.status === 'completed' ? 'completed' :
-        group.status === 'error' ? 'error' : 'active';
-
-      agentStatusMap.set(agentName, {
-        name: agentName,
-        displayName,
-        status,
-        role: 'Agent',
-        latest_message: group.messages[group.messages.length - 1]?.content?.substring(0, 80) + '...',
-        step_count: existing?.step_count || 0,
-        messages_count: group.messages.length
-      });
-    });
-
-    //  Count steps per agent from plan
-    if (planApprovalRequest?.steps) {
-      planApprovalRequest.steps.forEach(step => {
-        if (step.agent) {
-          const existing = agentStatusMap.get(step.agent);
-          if (existing) {
-            existing.step_count = (existing.step_count || 0) + 1;
-          }
-        }
-      });
-    }
-
-    return Array.from(agentStatusMap.values()).sort((a, b) => {
-      // Sort by status priority: active > planned > completed > error
-      const statusPriority = { active: 1, planned: 2, completed: 3, error: 4 };
-      return statusPriority[a.status] - statusPriority[b.status];
-    });
-  }, [planApprovalRequest, groupedStreamingMessages]);
-
-  // Get status icon for agents
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckmarkCircleRegular style={{ color: 'var(--colorPaletteGreenForeground1)' }} />;
-      case 'error':
-        return <ErrorCircleRegular style={{ color: 'var(--colorPaletteRedForeground1)' }} />;
-      case 'active':
-        return <Spinner size="extra-tiny" />;
-      case 'planned':
-        return <PersonRegular style={{ color: 'var(--colorPaletteBlueForeground2)' }} />;
-      default:
-        return <ClockRegular style={{ color: 'var(--colorNeutralForeground3)' }} />;
-    }
+    // Get the icon name from the utility
+    const iconName = AgentTypeUtils.getAgentIcon(agentType);
+    
+    // Return the appropriate icon component or fallback to PersonRegular
+    return <PersonRegular style={{ 
+      color: 'var(--colorPaletteBlueForeground2)',
+      fontSize: '16px'
+    }} />;
   };
 
   if (!planData && !loading) {
     return <ContentNotFound subtitle="The requested page could not be found." />;
   }
 
-  // ✅ ENHANCED: Show waiting message only when we don't have plan approval request
   if (!planApprovalRequest) {
     return null;
   }
 
-  // Render Plan Section - show once we have plan approval request
+  // Parse plan steps - items ending with colons are headings, others are substeps
+  const parsePlanSteps = () => {
+    if (!planApprovalRequest.steps || planApprovalRequest.steps.length === 0) return [];
+
+    const result: Array<{ type: 'heading' | 'substep'; text: string }> = [];
+    
+    planApprovalRequest.steps.forEach(step => {
+      const action = step.cleanAction || step.action || '';
+      const trimmedAction = action.trim();
+      
+      if (trimmedAction) {
+        // Check if the step ends with a colon
+        if (trimmedAction.endsWith(':')) {
+          // This is a heading
+          result.push({ type: 'heading', text: trimmedAction });
+        } else {
+          // This is a substep
+          result.push({ type: 'substep', text: trimmedAction });
+        }
+      }
+    });
+
+    return result;
+  };
+
+  // Render Plan Section with scrolling
   const renderPlanSection = () => {
+    const parsedSteps = parsePlanSteps();
+
     return (
       <div style={{
-        height: '45%',
-        overflow: 'auto',
-        marginBottom: '16px',
-        padding: '20px',
-        backgroundColor: 'var(--colorNeutralBackground2)',
-        borderRadius: '8px',
-        border: '1px solid var(--colorNeutralStroke2)'
+        paddingBottom: '20px',
+        marginBottom: '20px',
+        borderBottom: '1px solid var(--colorNeutralStroke2)',
+        maxHeight: '50vh',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '20px',
-          paddingBottom: '12px',
-          borderBottom: '1px solid var(--colorNeutralStroke2)'
+        <Body1 style={{ 
+          marginBottom: '16px', 
+          flexShrink: 0,
+          fontSize: '14px',
+          fontWeight: 600,
+          color: 'var(--colorNeutralForeground1)'
         }}>
-          <Title3>Plan</Title3>
-          <Tag
-            size="small"
-            shape="rounded"
-            appearance="outline"
-            icon={planApproved ? <CheckmarkCircleRegular /> : <ClockRegular />}
-          >
-            {planApproved ? 'Executing' : 'Awaiting Approval'}
-          </Tag>
-        </div>
+          Plan
+        </Body1>
 
-        <div>
-          <Body1 style={{
-            marginBottom: '16px',
-            fontStyle: 'italic',
-            color: 'var(--colorNeutralForeground2)'
-          }}>
-            {planApprovalRequest.user_request}
-          </Body1>
-
-          {/* Plan Steps */}
-          {planApprovalRequest.steps && planApprovalRequest.steps.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {planApprovalRequest.steps.map((step, index) => (
-                <div key={step.id || index} style={{
-                  padding: '12px',
-                  backgroundColor: 'var(--colorNeutralBackground1)',
-                  borderRadius: '6px',
-                  border: '1px solid var(--colorNeutralStroke2)'
-                }}>
+        {/* Scrollable Plan Steps */}
+        <div style={{
+          flex: 1,
+          overflow: 'auto',
+          paddingRight: '8px'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {parsedSteps.map((step, index) => (
+              <div key={index}>
+                {step.type === 'heading' ? (
+                  // Heading - no arrow, just the text
                   <Body1 style={{
-                    fontSize: '12px',
+                    fontSize: '14px',
+                    fontWeight: 600,
                     color: 'var(--colorNeutralForeground1)',
+                    marginBottom: '4px'
+                  }}>
+                    {step.text}
+                  </Body1>
+                ) : (
+                  // Sub-step - with arrow
+                  <div style={{
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: '8px'
+                    gap: '8px',
+                    marginBottom: '4px'
                   }}>
-                    <span style={{
-                      backgroundColor: 'var(--colorBrandBackground)',
-                      color: 'var(--colorNeutralForegroundOnBrand)',
-                      borderRadius: '50%',
-                      width: '20px',
-                      height: '20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      flexShrink: 0,
-                      marginTop: '2px'
+                    <ArrowTurnDownRightRegular style={{
+                      fontSize: '16px',
+                      color: 'var(--colorNeutralForeground2)',
+                      marginTop: '2px',
+                      flexShrink: 0
+                    }} />
+                    <Body1 style={{
+                      fontSize: '14px',
+                      color: 'var(--colorNeutralForeground1)',
+                      lineHeight: 1.4
                     }}>
-                      {step.id}
-                    </span>
-                    <span style={{ flex: 1, lineHeight: 1.3 }}>
-                      {step.cleanAction}
-                    </span>
-                  </Body1>
-                </div>
-              ))}
-            </div>
-          )}
+                      {step.text}
+                    </Body1>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
   };
 
-  // ✅ ENHANCED: Render Agents Section - show planned agents immediately, update with streaming status
+  // Render Agents Section
   const renderAgentsSection = () => {
-    const agents = getAgentStatus(planApprovalRequest);
+    const agents = planApprovalRequest?.team || [];
 
     return (
       <div style={{
-        height: '55%',
+        flex: 1,
         overflow: 'auto'
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+        <Body1 style={{ 
           marginBottom: '16px',
-          paddingBottom: '12px',
-          borderBottom: '1px solid var(--colorNeutralStroke2)'
+          fontSize: '14px',
+          fontWeight: 600,
+          color: 'var(--colorNeutralForeground1)'
         }}>
-          <Title3>Agents</Title3>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {wsConnected && hasStreamingStarted && (
-              <Tag
-                size="extra-small"
-                appearance="filled"
-                color="success"
-                icon={<DiamondRegular />}
-              >
-                Live
-              </Tag>
-            )}
-            <Tag
-              size="extra-small"
-              appearance="outline"
-            >
-              {agents.length} Assigned
-            </Tag>
-          </div>
-        </div>
+          Agents
+        </Body1>
 
         {agents.length === 0 ? (
           <div style={{
             textAlign: 'center',
             color: 'var(--colorNeutralForeground3)',
-            fontSize: '12px',
+            fontSize: '14px',
             fontStyle: 'italic',
             padding: '20px'
           }}>
             No agents assigned yet...
           </div>
         ) : (
-          agents.map((agent, index) => (
-            <div key={`${agent.name}-${index}`} style={{
-              padding: '12px',
-              marginBottom: '12px',
-              backgroundColor: 'var(--colorNeutralBackground2)',
-              borderRadius: '6px',
-              border: '1px solid var(--colorNeutralStroke2)',
-              position: 'relative'
-            }}>
-              {/* Agent Header */}
-              <div style={{
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {agents.map((agentName, index) => (
+              <div key={`${agentName}-${index}`} style={{
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '8px'
+                gap: '12px',
+                padding: '8px 0'
               }}>
-                <Body1 style={{ fontWeight: 600, fontSize: '14px' }}>
-                  {agent.displayName}
-                </Body1>
-                <Tag
-                  size="extra-small"
-                  appearance="outline"
-                  icon={getStatusIcon(agent.status)}
-                  color={
-                    agent.status === 'completed' ? 'success' :
-                      agent.status === 'active' ? 'brand' :
-                        agent.status === 'error' ? 'danger' :
-                          'neutral'
-                  }
-                >
-                  {agent.status === 'completed' ? 'Completed' :
-                    agent.status === 'active' ? 'Working' :
-                      agent.status === 'error' ? 'Error' :
-                        'Planned'}
-                </Tag>
-              </div>
-
-              {/* Agent Role */}
-              <Body1 style={{
-                fontSize: '11px',
-                color: 'var(--colorNeutralForeground3)',
-                fontStyle: 'italic',
-                marginBottom: '4px'
-              }}>
-                {agent.role}
-                {agent.step_count && agent.step_count > 0 && (
-                  <span style={{ marginLeft: '8px' }}>
-                    • {agent.step_count} step{agent.step_count !== 1 ? 's' : ''}
-                  </span>
-                )}
-                {agent.messages_count && agent.messages_count > 0 && (
-                  <span style={{ marginLeft: '8px' }}>
-                    • {agent.messages_count} message{agent.messages_count !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </Body1>
-
-              {/* Latest Message */}
-              {agent.latest_message && (
-                <Body1 style={{
-                  fontSize: '10px',
-                  color: 'var(--colorNeutralForeground2)',
-                  lineHeight: 1.3,
-                  marginTop: '4px'
-                }}>
-                  {agent.latest_message}
-                </Body1>
-              )}
-
-              {/* Active indicator for working agents */}
-              {agent.status === 'active' && (
+                {/* Agent Icon */}
                 <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  width: '8px',
-                  height: '8px',
-                  backgroundColor: 'var(--colorPaletteBlueForeground2)',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '50%',
-                  animation: 'pulse 2s infinite'
-                }} />
-              )}
-            </div>
-          ))
-        )}
-
-        {/* Recent Activity - only show if we have streaming messages */}
-        {groupedStreamingMessages.length > 0 && (
-          <div style={{
-            marginTop: '20px',
-            paddingTop: '16px',
-            borderTop: '1px solid var(--colorNeutralStroke2)'
-          }}>
-            <Body1 style={{
-              fontSize: '12px',
-              color: 'var(--colorNeutralForeground2)',
-              marginBottom: '8px',
-              fontWeight: 600
-            }}>
-              Recent Activity:
-            </Body1>
-            {groupedStreamingMessages.slice(-3).map((group, index) => (
-              <div key={group.id} style={{
-                fontSize: '10px',
-                color: 'var(--colorNeutralForeground3)',
-                marginBottom: '4px',
-                padding: '4px 8px',
-                backgroundColor: 'var(--colorNeutralBackground1)',
-                borderRadius: '4px'
-              }}>
-                <strong>{getAgentDisplayName(group.agent_name)}:</strong> {group.messages[group.messages.length - 1]?.content?.substring(0, 50)}...
+                  backgroundColor: 'var(--colorNeutralBackground3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  {getAgentIcon(agentName)}
+                </div>
+                
+                {/* Agent Info - just name */}
+                <div style={{ flex: 1 }}>
+                  <Body1 style={{ 
+                    fontWeight: 600, 
+                    fontSize: '14px',
+                    color: 'var(--colorNeutralForeground1)'
+                  }}>
+                    {getAgentDisplayName(agentName)} Agent
+                  </Body1>
+                </div>
               </div>
             ))}
           </div>
@@ -491,7 +246,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
     );
   };
 
-  // Main render - show content in proportional layout (280px width to match left panel)
+  // Main render
   return (
     <div style={{
       width: '280px',
@@ -499,28 +254,14 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
       padding: '20px',
       display: 'flex',
       flexDirection: 'column',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      backgroundColor: 'var(--colorNeutralBackground1)'
     }}>
-      {/* Plan section - 45% height, scrollable */}
+      {/* Plan section on top */}
       {renderPlanSection()}
 
-      {/* Agents section - 55% height, scrollable */}
+      {/* Agents section below with line demarcation */}
       {renderAgentsSection()}
-
-      {/* Add CSS animation for pulse effect */}
-      <style>{`
-        @keyframes pulse {
-          0% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-          100% {
-            opacity: 1;
-          }
-        }
-      `}</style>
     </div>
   );
 };
