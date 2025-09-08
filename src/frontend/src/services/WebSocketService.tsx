@@ -12,11 +12,12 @@ class WebSocketService {
     private planSubscriptions: Set<string> = new Set();
     private reconnectTimer: NodeJS.Timeout | null = null;
     private isConnecting = false;
-    private baseWsUrl = getApiUrl() || 'ws://localhost:8000';
+
 
     private buildSocketUrl(processId?: string, sessionId?: string): string {
+        const baseWsUrl = getApiUrl() || 'ws://localhost:8000';
         // Trim and remove trailing slashes
-        let base = (this.baseWsUrl || '').trim().replace(/\/+$/, '');
+        let base = (baseWsUrl || '').trim().replace(/\/+$/, '');
         // Normalize protocol: http -> ws, https -> wss
         base = base.replace(/^http:\/\//i, 'ws://')
             .replace(/^https:\/\//i, 'wss://');
