@@ -42,7 +42,7 @@ const PlanPage: React.FC = () => {
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
     const [allPlans, setAllPlans] = useState<ProcessedPlanData[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [submittingChatDisableInput, setSubmitting] = useState<boolean>(false);
+    const [submittingChatDisableInput, setSubmittingChatDisableInput] = useState<boolean>(false);
     const [error, setError] = useState<Error | null>(null);
 
     const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
@@ -325,9 +325,9 @@ const PlanPage: React.FC = () => {
                 return;
             }
             setInput("");
-            setRAIError(null); // Clear any previous RAI errors
+
             if (!planData?.plan) return;
-            setSubmitting(true);
+            setSubmittingChatDisableInput(true);
             let id = showToast("Submitting clarification", "progress");
 
             try {
@@ -373,7 +373,7 @@ const PlanPage: React.FC = () => {
                         ],
                         user_action: 'Please modify your input and try again.'
                     };
-                    setRAIError(raiErrorData);
+
                 } else {
                     // Handle other types of errors
                     showToast(
@@ -385,7 +385,7 @@ const PlanPage: React.FC = () => {
                     );
                 }
             } finally {
-                setSubmitting(false);
+                setSubmittingChatDisableInput(false);
             }
         },
         [planData?.plan, showToast, dismissToast, loadPlanData]

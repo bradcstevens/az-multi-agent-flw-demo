@@ -6,7 +6,8 @@ import {
   PlanMessage,
   MPlanData,
   StepStatus,
-  WebsocketMessageType
+  WebsocketMessageType,
+  ParsedUserClarification
 } from "@/models";
 import { apiService } from "@/api";
 
@@ -521,5 +522,71 @@ export class PlanDataService {
       return null;
     }
   }
+  // ...inside export class PlanDataService { (place near other parsers, e.g. after parseAgentMessageStreaming)
+
+  /**
+   * Parse a user clarification request message (possibly deeply nested).
+   * Accepts objects like:
+   * {
+   *   type: 'user_clarification_request',
+   *   data: { type: 'user_clarification_request', data: { type: 'user_clarification_request', data: "UserClarificationRequest(...)" } }
+   * }
+   * Returns ParsedUserClarification or null if not parsable.
+   */
+  static parseUserClarificationRequest(rawData: any): ParsedUserClarification | null {
+    try {
+      // Depth-first search to locate the innermost string starting with UserClarificationRequest(
+      const extractString = (val: any, depth = 0): string | null => {
+        if (depth > 10) return null; // safety
+        if (typeof val === 'string') {
+          if (val.startsWith('UserClarificationRequest(')) return val;
+          return null;
+        }
+        if (val && typeof val === 'object') {
+          // Common pattern: { type: 'user_clarification_request', data: ... }
+          if (val.data !== undefined) {
+            const inner = extractString(val.data, depth + 1);
+            if (inner) return inner;
+          }
+          // Also scan other enumerable props just in case
+          for (const k of Object.keys(val)) {
+            if (k === 'data') continue;
+            const inner = extractString(val[k], depth + 1);
+            if (inner) return inner;
+          }
+        }
+        return null;
+      };
+
+      const source = extractString(rawData);
+      if (!source) return null;
+
+      // Extract question and request_id
+      // question='...'
+      const questionMatch = source.match(/question='((?:\\'|[^'])*)'/);
+      const requestIdMatch = source.match(/request_id='([a-fA-F0-9-]+)'/);
+
+      if (!questionMatch || !requestIdMatch) return null;
+
+      let question = questionMatch[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+        .trim();
+
+      const request_id = requestIdMatch[1];
+
+      return {
+        type: WebsocketMessageType.USER_CLARIFICATION_REQUEST,
+        question,
+        request_id
+      };
+    } catch (e) {
+      console.error('parseUserClarificationRequest failed:', e);
+      return null;
+    }
+  }
+
 
 }

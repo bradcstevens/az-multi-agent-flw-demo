@@ -101,6 +101,8 @@ class UserClarificationResponse:
     """Response for user clarification from the frontend."""
     request_id: str
     answer: str = ""
+    plan_id: str = ""
+    m_plan_id: str = ""
 
 @dataclass(slots=True)
 class FinalResultMessage:

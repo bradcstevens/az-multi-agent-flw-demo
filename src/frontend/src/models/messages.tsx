@@ -169,3 +169,9 @@ export interface ParsedPlanApprovalRequest {
     parsedData: MPlanData;
     rawData: string;
 }
+
+export interface ParsedUserClarification {
+    type: WebsocketMessageType.USER_CLARIFICATION_REQUEST;
+    question: string;
+    request_id: string;
+}
