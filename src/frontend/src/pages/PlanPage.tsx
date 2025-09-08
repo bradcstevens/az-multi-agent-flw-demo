@@ -44,9 +44,7 @@ const PlanPage: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [submittingChatDisableInput, setSubmitting] = useState<boolean>(false);
     const [error, setError] = useState<Error | null>(null);
-    const [processingSubtaskId, setProcessingSubtaskId] = useState<string | null>(
-        null
-    );
+
     const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
     const [reloadLeftList, setReloadLeftList] = useState(true);
     const [waitingForPlan, setWaitingForPlan] = useState(true);
@@ -504,11 +502,7 @@ const PlanPage: React.FC = () => {
 
                 <PlanPanelRight
                     planData={planData}
-                    submittingChatDisableInput={submittingChatDisableInput}
-                    processingSubtaskId={processingSubtaskId}
                     loading={loading}
-                    streamingMessages={streamingMessages}
-                    planApproved={planApproved}
                     planApprovalRequest={planApprovalRequest}
                 />
             </CoralShellRow>

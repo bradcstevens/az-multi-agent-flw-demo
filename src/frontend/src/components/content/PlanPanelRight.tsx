@@ -6,18 +6,13 @@ import {
   PersonRegular,
   ArrowTurnDownRightRegular,
 } from "@fluentui/react-icons";
-import { MPlanData } from "../../models";
+import { MPlanData, PlanDetailsProps } from "../../models";
 import { TaskService } from "../../services/TaskService";
 import { AgentTypeUtils, AgentType } from "../../models/enums";
 import ContentNotFound from "../NotFound/ContentNotFound";
 
-interface PlanPanelRightProps {
-  planData: any;
-  loading: boolean;
-  planApprovalRequest: MPlanData | null;
-}
 
-const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
+const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   planData,
   loading,
   planApprovalRequest
@@ -62,9 +57,9 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
 
     // Get the icon name from the utility
     const iconName = AgentTypeUtils.getAgentIcon(agentType);
-    
+
     // Return the appropriate icon component or fallback to PersonRegular
-    return <PersonRegular style={{ 
+    return <PersonRegular style={{
       color: 'var(--colorPaletteBlueForeground2)',
       fontSize: '16px'
     }} />;
@@ -83,11 +78,11 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
     if (!planApprovalRequest.steps || planApprovalRequest.steps.length === 0) return [];
 
     const result: Array<{ type: 'heading' | 'substep'; text: string }> = [];
-    
+
     planApprovalRequest.steps.forEach(step => {
       const action = step.cleanAction || step.action || '';
       const trimmedAction = action.trim();
-      
+
       if (trimmedAction) {
         // Check if the step ends with a colon
         if (trimmedAction.endsWith(':')) {
@@ -117,8 +112,8 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
         display: 'flex',
         flexDirection: 'column'
       }}>
-        <Body1 style={{ 
-          marginBottom: '16px', 
+        <Body1 style={{
+          marginBottom: '16px',
           flexShrink: 0,
           fontSize: '14px',
           fontWeight: 600,
@@ -186,7 +181,7 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
         flex: 1,
         overflow: 'auto'
       }}>
-        <Body1 style={{ 
+        <Body1 style={{
           marginBottom: '16px',
           fontSize: '14px',
           fontWeight: 600,
@@ -227,11 +222,11 @@ const PlanPanelRight: React.FC<PlanPanelRightProps> = ({
                 }}>
                   {getAgentIcon(agentName)}
                 </div>
-                
+
                 {/* Agent Info - just name */}
                 <div style={{ flex: 1 }}>
-                  <Body1 style={{ 
-                    fontWeight: 600, 
+                  <Body1 style={{
+                    fontWeight: 600,
                     fontSize: '14px',
                     color: 'var(--colorNeutralForeground1)'
                   }}>

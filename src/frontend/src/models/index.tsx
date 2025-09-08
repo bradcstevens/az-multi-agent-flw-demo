@@ -16,7 +16,7 @@ export * from './homeInput';
 export * from './auth';
 
 // Export taskDetails with explicit naming to avoid Agent conflict
-export type { SubTask, Human, TaskDetailsProps } from './taskDetails';
+export type { SubTask, Human, PlanDetailsProps } from './taskDetails';
 export type { Agent as TaskAgent } from './taskDetails';
 
 // Export Team models (Agent interface takes precedence)
