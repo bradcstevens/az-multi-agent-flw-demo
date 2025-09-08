@@ -465,6 +465,31 @@ For more details, refer to [Azure Storage redundancy documentation](https://lear
 - To avoid the DeploymentNotFound error, Do not change the location when redeploying a deleted RG, or Use new names for the RG and environment during redeployment.
 </details>
 
+<details><summary><b>DeploymentCanceled(user.canceled)</b></summary>
+
+- Indicates the deployment was manually canceled by the user (Portal, CLI, or pipeline).
+
+- Check deployment history and logs to confirm who/when it was canceled.
+
+- If accidental, retry the deployment.
+
+- For pipelines, ensure no automation or timeout is triggering cancellation.
+
+- Use deployment locks or retry logic to prevent accidental cancellations.
+
+</details>
+
+<details><summary><b>ResourceGroupDeletionTimeout</b></summary>
+
+- Some resources in the resource group may be stuck deleting or have dependencies; check RG resources and status.
+
+- Ensure no resource locks or Azure Policies are blocking deletion.
+
+- Retry deletion via CLI/PowerShell `(az group delete --name <RG_NAME> --yes --no-wait)`.
+
+- Check Activity Log to identify failing resources; escalate to Azure Support if deletion is stuck.
+
+</details>
 
 💡 Note: If you encounter any other issues, you can refer to the [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) documentation.
 If the problem persists, you can also raise an bug in our [MACAE Github Issues](https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/issues) for further support.
