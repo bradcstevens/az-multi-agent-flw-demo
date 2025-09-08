@@ -199,12 +199,13 @@ class ConnectionConfig:
             )
             return
 
+        print(f" websocket {message}")
         try:
             if hasattr(message, "data") and hasattr(message, "type"):
                 message = message.data
         except Exception as e:
                 print(f"Error loading message data: {e}")
-
+        print(f" websocket after {message}")
         standard_message = {
             "type": message_type,
             "data": message

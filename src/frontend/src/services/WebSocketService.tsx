@@ -168,6 +168,7 @@ class WebSocketService {
 
         //console.log('WebSocket message received:', message);
         const hasClarification = /\bclarifications?\b/i.test(message.data || '');
+        console.log("Message ':", message);
         if (hasClarification) {
             console.log("Message contains 'clarification':", message.data);
         }

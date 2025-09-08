@@ -159,7 +159,7 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def get_all_teams_by_user(self, user_id: str) -> List[TeamConfiguration]:
+    async def get_all_teams(self) -> List[TeamConfiguration]:
         """Retrieve all team configurations for the given user."""
         pass
 

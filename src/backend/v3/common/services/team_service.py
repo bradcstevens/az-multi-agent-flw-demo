@@ -271,7 +271,7 @@ class TeamService:
             return False
 
     async def get_all_team_configurations(
-        self, user_id: str
+        self
     ) -> List[TeamConfiguration]:
         """
         Retrieve all team configurations for a user.
@@ -283,8 +283,8 @@ class TeamService:
             List of TeamConfiguration objects
         """
         try:
-            # Use the specific get_all_teams_by_user method
-            team_configs = await self.memory_context.get_all_teams_by_user(user_id)
+            # Use the specific get_all_teams method
+            team_configs = await self.memory_context.get_all_teams()
             return team_configs
 
         except (KeyError, TypeError, ValueError) as e:
