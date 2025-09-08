@@ -224,7 +224,9 @@ class WebSocketService {
 
             case WebsocketMessageType.USER_CLARIFICATION_REQUEST: {
                 if (message.data) {
-                    //const transformed = PlanDataService.parseUserClarificationRequest(message);
+                    //\const transformed = PlanDataService.parseUserClarificationRequest(message);
+                    console.log('WebSocket USER_CLARIFICATION_REQUEST message received:', message);
+
                     this.emit(WebsocketMessageType.USER_CLARIFICATION_REQUEST, message);
                 }
                 break;
