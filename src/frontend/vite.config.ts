@@ -13,23 +13,13 @@ export default defineConfig({
         },
     },
 
+
+
     // Server configuration
     server: {
         port: 3001,
         open: true,
-        host: true,
-        proxy: {
-            '/api': {
-                target: 'http://localhost:8000', // Backend API endpoints
-                changeOrigin: true,
-                secure: false,
-            },
-            '/config': {
-                target: 'http://localhost:3000', // Frontend server for config
-                changeOrigin: true,
-                secure: false,
-            }
-        }
+        host: true
     },
 
     // Build configuration
