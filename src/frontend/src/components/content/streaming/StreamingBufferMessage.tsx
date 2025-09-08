@@ -56,7 +56,7 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
                 <Button 
                     appearance="secondary" 
                     size="small"
-                    icon={isExpanded ? <ChevronDownRegular /> : <ChevronRightRegular />}
+                    // icon={isExpanded ? <ChevronDownRegular /> : <ChevronRightRegular />}
                     onClick={() => setIsExpanded(!isExpanded)}
                     style={{
                         backgroundColor: 'var(--colorNeutralBackground3)',
@@ -95,9 +95,9 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
             
             {isExpanded && (
                 <div style={{
-                    backgroundColor: 'var(--colorNeutralBackground1)',
-                    border: '1px solid var(--colorNeutralStroke1)',
-                    borderRadius: '6px',
+                    // backgroundColor: 'var(--colorNeutralBackground1)',
+                    // border: '1px solid var(--colorNeutralStroke1)',
+                    // borderRadius: '6px',
                     padding: '12px',
                     marginTop: '8px'
                 }}>
