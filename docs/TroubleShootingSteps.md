@@ -419,8 +419,7 @@ Example causes:
      --resource-group <resource-group> \
      --location <location>
     ```
-For more details, refer to [Soft delete and resource restore](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/delete-resource-group?tabs=azure-powershell)
-.
+For more details, refer to [Soft delete and resource restore](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/delete-resource-group?tabs=azure-powershell).
 </details>
 
 <details>
