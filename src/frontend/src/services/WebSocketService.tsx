@@ -1,4 +1,4 @@
-import { headerBuilder } from '../api/config';
+import { getApiUrl, headerBuilder } from '../api/config';
 import { PlanDataService } from './PlanDataService';
 import { MPlanData, ParsedPlanApprovalRequest, StreamingPlanUpdate, StreamMessage, WebsocketMessageType } from '../models';
 
@@ -12,8 +12,25 @@ class WebSocketService {
     private planSubscriptions: Set<string> = new Set();
     private reconnectTimer: NodeJS.Timeout | null = null;
     private isConnecting = false;
-    private baseWsUrl = process.env.REACT_APP_BACKEND_URL?.replace('http', 'ws') || 'ws://localhost:8000';
 
+
+    private buildSocketUrl(processId?: string, sessionId?: string): string {
+        const baseWsUrl = getApiUrl() || 'ws://localhost:8000';
+        // Trim and remove trailing slashes
+        let base = (baseWsUrl || '').trim().replace(/\/+$/, '');
+        // Normalize protocol: http -> ws, https -> wss
+        base = base.replace(/^http:\/\//i, 'ws://')
+            .replace(/^https:\/\//i, 'wss://');
+
+        // Leave ws/wss as-is; anything else is assumed already correct
+
+        // Decide path addition
+        const hasApiSegment = /\/api(\/|$)/i.test(base);
+        const socketPath = hasApiSegment ? '/v3/socket' : '/api/v3/socket';
+        const url = `${base}${socketPath}${processId ? `/${processId}` : `/${sessionId}`}`;
+        console.log("Constructed WebSocket URL:", url);
+        return url;
+    }
     connect(sessionId: string, processId?: string): Promise<void> {
         return new Promise((resolve, reject) => {
             if (this.isConnecting) {
@@ -26,9 +43,7 @@ class WebSocketService {
             }
             try {
                 this.isConnecting = true;
-                const wsUrl = processId
-                    ? `${this.baseWsUrl}/api/v3/socket/${processId}`
-                    : `${this.baseWsUrl}/api/v3/socket/${sessionId}`;
+                const wsUrl = this.buildSocketUrl(processId, sessionId);
                 this.ws = new WebSocket(wsUrl);
 
                 this.ws.onopen = () => {
@@ -166,13 +181,15 @@ class WebSocketService {
 
     private handleMessage(message: StreamMessage): void {
 
-        const currentPlanIds = Array.from(this.planSubscriptions);
-        const firstPlanId = currentPlanIds[0];
-
+        //console.log('WebSocket message received:', message);
+        const hasClarification = /\bclarifications?\b/i.test(message.data || '');
+        console.log("Message ':", message);
+        if (hasClarification) {
+            console.log("Message contains 'clarification':", message.data);
+        }
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
                 console.log("enter plan approval request");
-                console.log('WebSocket message received:', message);
                 const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
                 if (parsedData) {
                     const structuredMessage: ParsedPlanApprovalRequest = {
@@ -206,13 +223,35 @@ class WebSocketService {
                 break;
             }
 
-            case WebsocketMessageType.AGENT_TOOL_MESSAGE:
-            case WebsocketMessageType.USER_CLARIFICATION_REQUEST:
+            case WebsocketMessageType.USER_CLARIFICATION_REQUEST: {
+                if (message.data) {
+                    //\const transformed = PlanDataService.parseUserClarificationRequest(message);
+                    console.log('WebSocket USER_CLARIFICATION_REQUEST message received:', message);
+
+                    this.emit(WebsocketMessageType.USER_CLARIFICATION_REQUEST, message);
+                }
+                break;
+            }
+
+
+            case WebsocketMessageType.AGENT_TOOL_MESSAGE: {
+                if (message.data) {
+                    //const transformed = PlanDataService.parseUserClarificationRequest(message);
+                    this.emit(WebsocketMessageType.AGENT_TOOL_MESSAGE, message);
+                }
+                break;
+            }
+            case WebsocketMessageType.FINAL_RESULT_MESSAGE: {
+                if (message.data) {
+                    //const transformed = PlanDataService.parseFinalResultMessage(message);
+                    this.emit(WebsocketMessageType.FINAL_RESULT_MESSAGE, message);
+                }
+                break;
+            }
             case WebsocketMessageType.USER_CLARIFICATION_RESPONSE:
             case WebsocketMessageType.REPLAN_APPROVAL_REQUEST:
             case WebsocketMessageType.REPLAN_APPROVAL_RESPONSE:
             case WebsocketMessageType.PLAN_APPROVAL_RESPONSE:
-            case WebsocketMessageType.FINAL_RESULT_MESSAGE:
             case WebsocketMessageType.AGENT_STREAM_START:
             case WebsocketMessageType.AGENT_STREAM_END:
             case WebsocketMessageType.SYSTEM_MESSAGE: {

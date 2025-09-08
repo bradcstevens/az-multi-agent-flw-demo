@@ -28,12 +28,14 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
             maxWidth: '800px',
             margin: '0 auto',
             width: '100%'
-        }}>
+        }}
+
+        >
             <ChatInput
                 value={input}
                 onChange={setInput}
                 onEnter={() => OnChatSubmit(input)}
-                disabledChat={submittingChatDisableInput || waitingForPlan}
+                disabledChat={submittingChatDisableInput}
                 placeholder={
                     waitingForPlan
                         ? "Creating plan..."
@@ -44,7 +46,7 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
                     appearance="transparent"
                     onClick={() => OnChatSubmit(input)}
                     icon={<SendRegular />}
-                    disabled={submittingChatDisableInput || waitingForPlan}
+                    disabled={submittingChatDisableInput}
                     style={{ height: '40px', width: '40px' }}
                 />
             </ChatInput>

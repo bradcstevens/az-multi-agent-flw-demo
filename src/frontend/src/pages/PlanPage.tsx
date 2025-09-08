@@ -44,9 +44,7 @@ const PlanPage: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [submittingChatDisableInput, setSubmitting] = useState<boolean>(false);
     const [error, setError] = useState<Error | null>(null);
-    const [processingSubtaskId, setProcessingSubtaskId] = useState<string | null>(
-        null
-    );
+
     const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
     const [reloadLeftList, setReloadLeftList] = useState(true);
     const [waitingForPlan, setWaitingForPlan] = useState(true);
@@ -82,6 +80,7 @@ const PlanPage: React.FC = () => {
         }, 100);
     }, []);
 
+    //WebsocketMessageType.PLAN_APPROVAL_REQUEST
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, (approvalRequest: any) => {
             console.log('📋 Plan received:', approvalRequest);
@@ -122,7 +121,7 @@ const PlanPage: React.FC = () => {
         return () => unsubscribe();
     }, [scrollToBottom]); //onPlanReceived, scrollToBottom
 
-
+    //(WebsocketMessageType.AGENT_MESSAGE_STREAMING
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE_STREAMING, (streamingMessage: any) => {
             // console.log('📋 Streaming Message', streamingMessage);
@@ -134,6 +133,28 @@ const PlanPage: React.FC = () => {
         return () => unsubscribe();
     }, [scrollToBottom]); //onPlanReceived, scrollToBottom
 
+    //WebsocketMessageType.USER_CLARIFICATION_REQUEST
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.USER_CLARIFICATION_REQUEST, (clarificationMessage: any) => {
+            console.log('📋 Clarification Message', clarificationMessage);
+            scrollToBottom();
+
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]);
+    //WebsocketMessageType.AGENT_TOOL_MESSAGE
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_TOOL_MESSAGE, (toolMessage: any) => {
+            console.log('📋 Tool Message', toolMessage);
+            scrollToBottom();
+
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]);
+
+    //WebsocketMessageType.AGENT_MESSAGE
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, (agentMessage: any) => {
             console.log('📋 Agent Message', agentMessage);
@@ -481,11 +502,7 @@ const PlanPage: React.FC = () => {
 
                 <PlanPanelRight
                     planData={planData}
-                    submittingChatDisableInput={submittingChatDisableInput}
-                    processingSubtaskId={processingSubtaskId}
                     loading={loading}
-                    streamingMessages={streamingMessages}
-                    planApproved={planApproved}
                     planApprovalRequest={planApprovalRequest}
                 />
             </CoralShellRow>

@@ -688,7 +688,7 @@ async def get_team_configs(request: Request):
         team_service = TeamService(memory_store)
 
         # Retrieve all team configurations
-        team_configs = await team_service.get_all_team_configurations(user_id)
+        team_configs = await team_service.get_all_team_configurations()
 
         # Convert to dictionaries for response
         configs_dict = [config.model_dump() for config in team_configs]
