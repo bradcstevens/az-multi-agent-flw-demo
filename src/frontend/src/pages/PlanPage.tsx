@@ -145,7 +145,7 @@ const PlanPage: React.FC = () => {
     }, [scrollToBottom]);
 
     useEffect(() => {
-        const unsubscribe = webSocketService.on(WebsocketMessageType.USER_AGENT_TOOL_MESSAGE, (toolMessage: any) => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_TOOL_MESSAGE, (toolMessage: any) => {
             console.log('📋 Tool Message', toolMessage);
             scrollToBottom();
 
