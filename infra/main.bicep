@@ -22,12 +22,10 @@ param solutionUniqueText string = take(uniqueString(subscription().id, resourceG
   'australiaeast'
   'centralus'
   'eastasia'
-  'eastus'
   'eastus2'
   'japaneast'
   'northeurope'
   'southeastasia'
-  'westeurope'
   'uksouth'
 ])
 param location string
@@ -1251,6 +1249,7 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.15.0' = {
           {
             locationName: location
             failoverPriority: 0
+            isZoneRedundant: enableRedundancy
           }
         ]
   }
