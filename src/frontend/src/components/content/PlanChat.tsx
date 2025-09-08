@@ -159,7 +159,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         {renderThinkingState(waitingForPlan)}
 
         {/* Plan response with all information */}
-        {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
+        {showApprovalButtons && renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
         {renderAgentMessages(agentMessages)}
 
 

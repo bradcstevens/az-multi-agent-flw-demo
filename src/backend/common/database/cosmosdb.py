@@ -334,7 +334,7 @@ class CosmosDBClient(DatabaseBase):
         teams = await self.query_items(query, parameters, TeamConfiguration)
         return teams[0] if teams else None
 
-    async def get_all_teams_by_user(self, user_id: str) -> List[TeamConfiguration]:
+    async def get_all_teams(self) -> List[TeamConfiguration]:
         """Retrieve all team configurations for a specific user.
 
         Args:
@@ -343,9 +343,8 @@ class CosmosDBClient(DatabaseBase):
         Returns:
             List of TeamConfiguration objects
         """
-        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type ORDER BY c.created DESC"
+        query = "SELECT * FROM c WHERE c.data_type=@data_type ORDER BY c.created DESC"
         parameters = [
-            {"name": "@user_id", "value": user_id},
             {"name": "@data_type", "value": DataType.team_config},
         ]
         teams = await self.query_items(query, parameters, TeamConfiguration)

@@ -81,6 +81,7 @@ class DummyAgentThread(AgentThread):
             return None
         return await self._chat_history.reduce()
 
+
 class ProxyAgentResponseItem:
     """Response item wrapper for proxy agent responses."""
     
