@@ -38,12 +38,12 @@ class CosmosDBClient(DatabaseBase):
     """CosmosDB implementation of the database interface."""
 
     MODEL_CLASS_MAPPING = {
-        "session": Session,
-        "plan": Plan,
-        "step": Step,
-        "agent_message": AgentMessage,
-        "team_config": TeamConfiguration,
-        "user_current_team": UserCurrentTeam,
+        DataType.session: Session,
+        DataType.plan: Plan,
+        DataType.step: Step,
+        DataType.agent_message: AgentMessage,
+        DataType.team_config: TeamConfiguration,
+        DataType.user_current_team: UserCurrentTeam,
     }
 
     def __init__(
@@ -200,7 +200,7 @@ class CosmosDBClient(DatabaseBase):
         query = "SELECT * FROM c WHERE c.id=@id AND c.data_type=@data_type"
         parameters = [
             {"name": "@id", "value": session_id},
-            {"name": "@data_type", "value": "session"},
+            {"name": "@data_type", "value": DataType.session},
         ]
         results = await self.query_items(query, parameters, Session)
         return results[0] if results else None
@@ -210,7 +210,7 @@ class CosmosDBClient(DatabaseBase):
         query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type"
         parameters = [
             {"name": "@user_id", "value": self.user_id},
-            {"name": "@data_type", "value": "session"},
+            {"name": "@data_type", "value": DataType.session},
         ]
         return await self.query_items(query, parameters, Session)
 
@@ -230,7 +230,7 @@ class CosmosDBClient(DatabaseBase):
         )
         parameters = [
             {"name": "@session_id", "value": session_id},
-            {"name": "@data_type", "value": "plan"},
+            {"name": "@data_type", "value": DataType.plan},
         ]
         results = await self.query_items(query, parameters, Plan)
         return results[0] if results else None
@@ -240,7 +240,7 @@ class CosmosDBClient(DatabaseBase):
         query = "SELECT * FROM c WHERE c.id=@plan_id AND c.data_type=@data_type"
         parameters = [
             {"name": "@plan_id", "value": plan_id},
-            {"name": "@data_type", "value": "plan"},
+            {"name": "@data_type", "value": DataType.plan},
             {"name": "@user_id", "value": self.user_id},
         ]
         results = await self.query_items(query, parameters, Plan)
@@ -255,7 +255,7 @@ class CosmosDBClient(DatabaseBase):
         query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type"
         parameters = [
             {"name": "@user_id", "value": self.user_id},
-            {"name": "@data_type", "value": "plan"},
+            {"name": "@data_type", "value": DataType.plan},
         ]
         return await self.query_items(query, parameters, Plan)
 
@@ -265,7 +265,7 @@ class CosmosDBClient(DatabaseBase):
         parameters = [
             {"name": "@user_id", "value": self.user_id},
             {"name": "@team_id", "value": team_id},
-            {"name": "@data_type", "value": "plan"},
+            {"name": "@data_type", "value": DataType.plan},
         ]
         return await self.query_items(query, parameters, Plan)
 
@@ -283,7 +283,7 @@ class CosmosDBClient(DatabaseBase):
         query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type ORDER BY c.timestamp"
         parameters = [
             {"name": "@plan_id", "value": plan_id},
-            {"name": "@data_type", "value": "step"},
+            {"name": "@data_type", "value": DataType.step},
         ]
         return await self.query_items(query, parameters, Step)
 
@@ -293,7 +293,7 @@ class CosmosDBClient(DatabaseBase):
         parameters = [
             {"name": "@step_id", "value": step_id},
             {"name": "@session_id", "value": session_id},
-            {"name": "@data_type", "value": "step"},
+            {"name": "@data_type", "value": DataType.step},
         ]
         results = await self.query_items(query, parameters, Step)
         return results[0] if results else None
@@ -312,7 +312,7 @@ class CosmosDBClient(DatabaseBase):
         query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type"
         parameters = [
             {"name": "@team_id", "value": team_id},
-            {"name": "@data_type", "value": "team_config"},
+            {"name": "@data_type", "value": DataType.team_config},
         ]
         teams = await self.query_items(query, parameters, TeamConfiguration)
         return teams[0] if teams else None
@@ -329,7 +329,7 @@ class CosmosDBClient(DatabaseBase):
         query = "SELECT * FROM c WHERE c.id=@id AND c.data_type=@data_type"
         parameters = [
             {"name": "@id", "value": id},
-            {"name": "@data_type", "value": "team_config"},
+            {"name": "@data_type", "value": DataType.team_config},
         ]
         teams = await self.query_items(query, parameters, TeamConfiguration)
         return teams[0] if teams else None
@@ -346,7 +346,7 @@ class CosmosDBClient(DatabaseBase):
         query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type ORDER BY c.created DESC"
         parameters = [
             {"name": "@user_id", "value": user_id},
-            {"name": "@data_type", "value": "team_config"},
+            {"name": "@data_type", "value": DataType.team_config},
         ]
         teams = await self.query_items(query, parameters, TeamConfiguration)
         return teams
@@ -452,7 +452,7 @@ class CosmosDBClient(DatabaseBase):
 
         query = "SELECT * FROM c WHERE c.data_type=@data_type AND c.user_id=@user_id"
         parameters = [
-            {"name": "@data_type", "value": "user_current_team"},
+            {"name": "@data_type", "value": DataType.user_current_team},
             {"name": "@user_id", "value": user_id},
         ]
 

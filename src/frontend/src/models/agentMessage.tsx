@@ -17,3 +17,12 @@ export interface AgentMessage extends BaseModel {
     /** Optional step identifier associated with the message */
     step_id?: string;
 }
+
+export interface AgentMessageData {
+    agent: string;
+    timestamp: number;
+    steps: any[];       // intentionally always empty
+    next_steps: [];  // intentionally always empty
+    raw_content: string;
+    raw_data: string;
+}

@@ -22,11 +22,5 @@ export type { Agent as TaskAgent } from './taskDetails';
 // Export Team models (Agent interface takes precedence)
 export * from './Team';
 
-// Export WebSocket service types that are needed by components
-export type { 
-    StreamingPlanUpdate, 
-    StreamMessage, 
-    ParsedPlanApprovalRequest 
-} from '../services/WebSocketService';
 
 // Add other model exports as needed

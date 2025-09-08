@@ -7,6 +7,7 @@ from typing import Optional
 
 from common.utils.utils_date import format_dates_in_messages
 from common.config.app_config import config
+from v3.common.services.plan_service import PlanService
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.database.database_factory import DatabaseFactory
@@ -380,16 +381,12 @@ async def plan_approval(
                 #     orchestration_config.plans[human_feedback.m_plan_id],
                 # )
                 try:
-                    plan = orchestration_config.plans[human_feedback.m_plan_id]
-                    if hasattr(plan, "plan_id"):
-                        print(
-                            "Updated orchestration config:",
-                            orchestration_config.plans[human_feedback.m_plan_id],
-                        )
-                        plan.plan_id = human_feedback.plan_id
-                        orchestration_config.plans[human_feedback.m_plan_id] = plan
+                      result = await PlanService.handle_plan_approval(human_feedback, user_id)
+                      print("Plan approval processed:", result)
+                except ValueError as ve:
+                       print(f"ValueError processing plan approval: {ve}")
                 except Exception as e:
-                    print(f"Error processing plan approval: {e}")
+                        print(f"Error processing plan approval: {e}")
                 track_event_if_configured(
                     "PlanApprovalReceived",
                     {
@@ -400,6 +397,7 @@ async def plan_approval(
                         "feedback": human_feedback.feedback,
                     },
                 )
+                
                 return {"status": "approval recorded"}
             else:
                 logging.warning(
@@ -1030,9 +1028,18 @@ async def get_plans(request: Request):
     if not current_team:
         return []
 
-    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.id)
+    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.team_id)
 
-    return all_plans
+    steps_for_all_plans = []
+    # Create list of PlanWithSteps and update step counts
+    list_of_plans_with_steps = []
+    for plan in all_plans:
+        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=[])
+        plan_with_steps.overall_status
+        plan_with_steps.update_step_counts()
+        list_of_plans_with_steps.append(plan_with_steps)
+
+    return list_of_plans_with_steps
 
 
 # Get plans is called in the initial side rendering of the frontend

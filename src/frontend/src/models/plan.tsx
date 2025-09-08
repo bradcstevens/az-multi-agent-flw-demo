@@ -1,5 +1,5 @@
 import { AgentType, PlanStatus, StepStatus, HumanFeedbackStatus } from './enums';
-import { StreamingPlanUpdate } from '../services/WebSocketService';
+import { StreamingPlanUpdate } from './messages';
 
 /**
  * Base interface with common fields
@@ -8,9 +8,9 @@ export interface BaseModel {
     /** Unique identifier */
     id: string;
     /** Timestamp when created */
-    created_at: string;
+
     /** Timestamp when last updated */
-    updated_at: string;
+    timestamp: string;
 }
 
 /**
@@ -24,11 +24,10 @@ export interface Plan extends BaseModel {
     /** User identifier */
     user_id: string;
     /** Plan title */
-    title: string;
-    /** Plan description */
-    description: string;
+    initial_goal: string;
+
     /** Current status of the plan */
-    status: PlanStatus;
+    overall_status: PlanStatus;
     /** Human clarification request text */
     human_clarification_request?: string;
     /** Human clarification response text */

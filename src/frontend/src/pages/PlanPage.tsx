@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, PlanWithSteps } from "../models";
+import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -20,9 +20,9 @@ import LoadingMessage, { loadingMessages } from "../coral/components/LoadingMess
 import { RAIErrorCard, RAIErrorData } from "../components/errors";
 import { TeamConfig } from "../models/Team";
 import { TeamService } from "../services/TeamService";
-import webSocketService, { StreamMessage, StreamingPlanUpdate } from "../services/WebSocketService";
+import webSocketService from "../services/WebSocketService";
 import { APIService } from "../api/apiService";
-import { Step } from "../models/plan";
+import { StreamMessage, StreamingPlanUpdate } from "../models";
 
 import "../styles/PlanPage.css"
 
@@ -37,7 +37,7 @@ const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
     const { showToast, dismissToast } = useInlineToaster();
-
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [input, setInput] = useState("");
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
     const [allPlans, setAllPlans] = useState<ProcessedPlanData[]>([]);
@@ -47,15 +47,17 @@ const PlanPage: React.FC = () => {
     const [processingSubtaskId, setProcessingSubtaskId] = useState<string | null>(
         null
     );
+    const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
     const [reloadLeftList, setReloadLeftList] = useState(true);
-
+    const [waitingForPlan, setWaitingForPlan] = useState(true);
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
-
+    const [streamingMessageBuffer, setStreamingMessageBuffer] = useState<string>("");
     // RAI Error state
     const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
 
+    const [agentMessages, setAgentMessages] = useState<AgentMessageData[]>([]);
     // Team config state
     const [teamConfig, setTeamConfig] = useState<TeamConfig | null>(null);
     const [loadingTeamConfig, setLoadingTeamConfig] = useState(true);
@@ -67,7 +69,81 @@ const PlanPage: React.FC = () => {
 
     // Use ref to store the function to avoid stale closure issues
     const loadPlanDataRef = useRef<() => Promise<ProcessedPlanData[]>>();
+    // Auto-scroll helper
+    const scrollToBottom = useCallback(() => {
+        setTimeout(() => {
+            if (messagesContainerRef.current) {
+                //messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                messagesContainerRef.current?.scrollTo({
+                    top: messagesContainerRef.current.scrollHeight,
+                    behavior: "smooth",
+                });
+            }
+        }, 100);
+    }, []);
 
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, (approvalRequest: any) => {
+            console.log('📋 Plan received:', approvalRequest);
+
+            let mPlanData: MPlanData | null = null;
+
+            // Handle the different message structures
+            if (approvalRequest.parsedData) {
+                // Direct parsedData property
+                mPlanData = approvalRequest.parsedData;
+            } else if (approvalRequest.data && typeof approvalRequest.data === 'object') {
+                // Data property with nested object
+                if (approvalRequest.data.parsedData) {
+                    mPlanData = approvalRequest.data.parsedData;
+                } else {
+                    // Try to parse the data object directly
+                    mPlanData = approvalRequest.data;
+                }
+            } else if (approvalRequest.rawData) {
+                // Parse the raw data string
+                mPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest.rawData);
+            } else {
+                // Try to parse the entire object
+                mPlanData = PlanDataService.parsePlanApprovalRequest(approvalRequest);
+            }
+
+            if (mPlanData) {
+                console.log('✅ Parsed plan data:', mPlanData);
+                setPlanApprovalRequest(mPlanData);
+                setWaitingForPlan(false);
+                // onPlanReceived?.(mPlanData);
+                scrollToBottom();
+            } else {
+                console.error('❌ Failed to parse plan data', approvalRequest);
+            }
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
+
+
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE_STREAMING, (streamingMessage: any) => {
+            // console.log('📋 Streaming Message', streamingMessage);
+            setStreamingMessageBuffer(prev => prev + streamingMessage.data.content);
+            scrollToBottom();
+
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
+
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, (agentMessage: any) => {
+            console.log('📋 Agent Message', agentMessage);
+            const agentMessageData = agentMessage.data as AgentMessageData;
+            setAgentMessages(prev => [...prev, agentMessageData]);
+            scrollToBottom();
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
 
     // Loading message rotation effect
     useEffect(() => {
@@ -128,10 +204,10 @@ const PlanPage: React.FC = () => {
                 handleConnectionChange(message.data?.connected || false);
             });
 
-            const unsubscribeStreaming = webSocketService.on('agent_message', handleStreamingMessage);
-            const unsubscribePlanApproval = webSocketService.on('plan_approval_response', handlePlanApprovalResponse);
-            const unsubscribePlanApprovalRequest = webSocketService.on('plan_approval_request', handlePlanApprovalRequest);
-            const unsubscribeParsedPlanApprovalRequest = webSocketService.on('parsed_plan_approval_request', handlePlanApprovalRequest);
+            const unsubscribeStreaming = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, handleStreamingMessage);
+            const unsubscribePlanApproval = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_RESPONSE, handlePlanApprovalResponse);
+            const unsubscribePlanApprovalRequest = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, handlePlanApprovalRequest);
+            const unsubscribeParsedPlanApprovalRequest = webSocketService.on(WebsocketMessageType.PLAN_APPROVAL_REQUEST, handlePlanApprovalRequest);
 
             return () => {
                 console.log('🔌 Cleaning up WebSocket connections');
@@ -146,6 +222,7 @@ const PlanPage: React.FC = () => {
     }, [planId, loading]);
 
     useEffect(() => {
+
         const loadTeamConfig = async () => {
             try {
                 setLoadingTeamConfig(true);
@@ -180,29 +257,6 @@ const PlanPage: React.FC = () => {
             try {
                 let actualPlanId = planId;
                 let planResult: ProcessedPlanData | null = null;
-
-                // Check if this looks like a session_id (starts with "sid_" or "session_")
-                if (planId.startsWith('sid_') || planId.startsWith('session_')) {
-                    console.log('Detected session_id, resolving to plan_id:', planId);
-
-                    try {
-                        // Try to find the plan by session_id
-                        const plansWithSteps = await apiService.getPlans();
-                        const matchingPlan = plansWithSteps.find((p: PlanWithSteps) => p.session_id === planId);
-
-                        if (matchingPlan) {
-                            actualPlanId = matchingPlan.id;
-                            planResult = convertToProcessedPlanData(matchingPlan);
-                            console.log('Resolved session_id to plan_id:', actualPlanId);
-                        } else {
-                            console.error('No plan found with session_id:', planId);
-                            throw new Error('Plan not found');
-                        }
-                    } catch (sessionError) {
-                        console.error('Failed to resolve session_id to plan_id:', sessionError);
-                        throw sessionError;
-                    }
-                }
 
                 if (actualPlanId && !planResult) {
                     console.log("Fetching plan with ID:", actualPlanId);
@@ -322,16 +376,7 @@ const PlanPage: React.FC = () => {
         navigate("/", { state: { focusInput: true } });
     }, [navigate]);
 
-    const handleTeamSelect = useCallback((team: TeamConfig | null) => {
-        setTeamConfig(team);
-    }, []);
 
-    const handleTeamUpload = useCallback(async () => {
-        // Reload team configurations
-        const teams = await TeamService.getUserTeams();
-        const config = teams.length > 0 ? teams[0] : null;
-        setTeamConfig(config);
-    }, []);
 
     const resetReload = useCallback(() => {
         setReloadLeftList(false);
@@ -379,8 +424,9 @@ const PlanPage: React.FC = () => {
                     reloadTasks={reloadLeftList}
                     onNewTaskButton={handleNewTaskButton}
                     restReload={resetReload}
-                    onTeamSelect={handleTeamSelect}
-                    onTeamUpload={handleTeamUpload}
+                    onTeamSelect={() => { }}
+                    onTeamUpload={async () => { }}
+                    isHomePage={false}
                     selectedTeam={teamConfig}
                 />
 
@@ -412,19 +458,6 @@ const PlanPage: React.FC = () => {
                                 </PanelRightToggles>
                             </ContentToolbar>
 
-                            {/* Show RAI error if present */}
-                            {raiError && (
-                                <div style={{ padding: '16px 24px 0' }}>
-                                    <RAIErrorCard
-                                        error={raiError}
-                                        onRetry={() => {
-                                            setRAIError(null);
-                                        }}
-                                        onDismiss={() => setRAIError(null)}
-                                    />
-                                </div>
-                            )}
-
                             <PlanChat
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}
@@ -435,6 +468,12 @@ const PlanPage: React.FC = () => {
                                 streamingMessages={streamingMessages}
                                 wsConnected={wsConnected}
                                 onPlanApproval={(approved) => setPlanApproved(approved)}
+                                planApprovalRequest={planApprovalRequest}
+                                waitingForPlan={waitingForPlan}
+                                messagesContainerRef={messagesContainerRef}
+                                streamingMessageBuffer={streamingMessageBuffer}
+                                agentMessages={agentMessages}
+
                             />
                         </>
                     )}
@@ -447,6 +486,7 @@ const PlanPage: React.FC = () => {
                     loading={loading}
                     streamingMessages={streamingMessages}
                     planApproved={planApproved}
+                    planApprovalRequest={planApprovalRequest}
                 />
             </CoralShellRow>
         </CoralShellColumn>

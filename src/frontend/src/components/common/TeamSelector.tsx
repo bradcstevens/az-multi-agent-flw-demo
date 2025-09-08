@@ -37,14 +37,14 @@ interface TeamSelectorProps {
   onTeamSelect?: (team: TeamConfig | null) => void;
   onTeamUpload?: () => Promise<void>;
   selectedTeam?: TeamConfig | null;
-  sessionId?: string;
+  isHomePage: boolean;
 }
 
 const TeamSelector: React.FC<TeamSelectorProps> = ({
   onTeamSelect,
   onTeamUpload,
   selectedTeam,
-  sessionId,
+  isHomePage,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [teams, setTeams] = useState<TeamConfig[]>([]);
@@ -96,60 +96,60 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
     }
   };
 
-const handleContinue = async () => {
-  if (!tempSelectedTeam) return;
+  const handleContinue = async () => {
+    if (!tempSelectedTeam) return;
 
-  setSelectionLoading(true);
-  setError(null);
+    setSelectionLoading(true);
+    setError(null);
 
-  try {
-    // If this team was just uploaded, skip the selection API call and go directly to homepage
-    if (uploadedTeam && uploadedTeam.team_id === tempSelectedTeam.team_id) {
-      console.log('Uploaded team selected, going directly to homepage:', tempSelectedTeam.name);
-      onTeamSelect?.(tempSelectedTeam);
-      setIsOpen(false);
-      return; // Skip the selectTeam API call
+    try {
+      // If this team was just uploaded, skip the selection API call and go directly to homepage
+      if (uploadedTeam && uploadedTeam.team_id === tempSelectedTeam.team_id) {
+        console.log('Uploaded team selected, going directly to homepage:', tempSelectedTeam.name);
+        onTeamSelect?.(tempSelectedTeam);
+        setIsOpen(false);
+        return; // Skip the selectTeam API call
+      }
+
+      // For existing teams, do the normal selection process
+      const result = await TeamService.selectTeam(tempSelectedTeam.team_id);
+
+      if (result.success) {
+        console.log('Team selected:', result.data);
+        onTeamSelect?.(tempSelectedTeam);
+        setIsOpen(false);
+      } else {
+        setError(result.error || 'Failed to select team');
+      }
+    } catch (err: any) {
+      console.error('Error selecting team:', err);
+      setError('Failed to select team. Please try again.');
+    } finally {
+      setSelectionLoading(false);
     }
-
-    // For existing teams, do the normal selection process
-    const result = await TeamService.selectTeam(tempSelectedTeam.team_id);
-
-    if (result.success) {
-      console.log('Team selected:', result.data);
-      onTeamSelect?.(tempSelectedTeam);
-      setIsOpen(false);
-    } else {
-      setError(result.error || 'Failed to select team');
-    }
-  } catch (err: any) {
-    console.error('Error selecting team:', err);
-    setError('Failed to select team. Please try again.');
-  } finally {
-    setSelectionLoading(false);
-  }
-};
+  };
 
   const handleCancel = () => {
     setTempSelectedTeam(null);
     setIsOpen(false);
   };
 
-    const filteredTeams = teams
-      .filter(team => {
-        const searchLower = searchQuery.toLowerCase();
-        const nameMatch = team.name && team.name.toLowerCase().includes(searchLower);
-        const descriptionMatch = team.description && team.description.toLowerCase().includes(searchLower);
-        return nameMatch || descriptionMatch;
-      })
-      .sort((a, b) => {
-        const aIsUploaded = uploadedTeam?.team_id === a.team_id;
-        const bIsUploaded = uploadedTeam?.team_id === b.team_id;
-        
-        if (aIsUploaded && !bIsUploaded) return -1;
-        if (!aIsUploaded && bIsUploaded) return 1;
-        
-        return 0;
-      });
+  const filteredTeams = teams
+    .filter(team => {
+      const searchLower = searchQuery.toLowerCase();
+      const nameMatch = team.name && team.name.toLowerCase().includes(searchLower);
+      const descriptionMatch = team.description && team.description.toLowerCase().includes(searchLower);
+      return nameMatch || descriptionMatch;
+    })
+    .sort((a, b) => {
+      const aIsUploaded = uploadedTeam?.team_id === a.team_id;
+      const bIsUploaded = uploadedTeam?.team_id === b.team_id;
+
+      if (aIsUploaded && !bIsUploaded) return -1;
+      if (!aIsUploaded && bIsUploaded) return 1;
+
+      return 0;
+    });
 
   const handleDeleteTeam = (team: TeamConfig, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -214,14 +214,14 @@ const handleContinue = async () => {
     }
   };
 
- const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setUploadLoading(true);
     setError(null);
     setUploadMessage('Reading and validating team configuration...');
-    setUploadSuccessMessage(null); 
+    setUploadSuccessMessage(null);
 
     try {
       if (!file.name.toLowerCase().endsWith('.json')) {
@@ -242,11 +242,11 @@ const handleContinue = async () => {
 
       // Check for duplicate team names or IDs
       if (teamData.name) {
-        const existingTeam = teams.find(team => 
+        const existingTeam = teams.find(team =>
           team.name.toLowerCase() === teamData.name.toLowerCase() ||
           (teamData.team_id && team.team_id === teamData.team_id)
         );
-        
+
         if (existingTeam) {
           throw new Error(`A team with the name "${teamData.name}" already exists. Please choose a different name or modify the existing team.`);
         }
@@ -261,11 +261,11 @@ const handleContinue = async () => {
         if (result.team) {
           // Set success message with team name
           setUploadSuccessMessage(`${result.team.name} was uploaded`);
-          
+
           setTeams(currentTeams => [result.team!, ...currentTeams]);
           setUploadedTeam(result.team);
           setTempSelectedTeam(result.team);
-        
+
           setTimeout(() => {
             setUploadSuccessMessage(null);
           }, 15000);
@@ -343,11 +343,11 @@ const handleContinue = async () => {
 
       // Check for duplicate team names or IDs
       if (teamData.name) {
-        const existingTeam = teams.find(team => 
+        const existingTeam = teams.find(team =>
           team.name.toLowerCase() === teamData.name.toLowerCase() ||
           (teamData.team_id && team.team_id === teamData.team_id)
         );
-        
+
         if (existingTeam) {
           throw new Error(`A team with the name "${teamData.name}" already exists. Please choose a different name or modify the existing team.`);
         }
@@ -358,15 +358,15 @@ const handleContinue = async () => {
 
       if (result.success) {
         setUploadMessage(null);
-        
+
         if (result.team) {
           // Set success message with team name
           setUploadSuccessMessage(`${result.team.name} was uploaded and selected`);
-          
+
           setTeams(currentTeams => [result.team!, ...currentTeams]);
           setUploadedTeam(result.team);
           setTempSelectedTeam(result.team);
-          
+
           // Clear success message after 15 seconds if user doesn't act
           setTimeout(() => {
             setUploadSuccessMessage(null);
@@ -419,37 +419,37 @@ const handleContinue = async () => {
           <div className={styles.teamName}>
             {team.name}
           </div>
-          
+
           {/* Team description */}
           <div className={styles.teamDescription}>
             {team.description}
           </div>
-          
+
         </div>
 
         {/* Agent badges - show agent names only */}
-          <div className={styles.agentTags}>
-             {team.agents.slice(0, 4).map((agent) => (
-          <Badge
-            key={`${team.team_id}-agent-${agent.input_key || agent.name}`}
-            className={styles.agentBadge}
-            appearance="tint"
-            size="small"
-          >
-            {agent.name}
-          </Badge>
-        ))}
-        {team.agents.length > 4 && (
-          <Badge
-          key={`${team.team_id}-overflow`} 
-            className={styles.agentBadge}
-            appearance="tint"
-            size="small"
-          >
-            +{team.agents.length - 4}
-          </Badge>
-        )}
-          </div>
+        <div className={styles.agentTags}>
+          {team.agents.slice(0, 4).map((agent) => (
+            <Badge
+              key={`${team.team_id}-agent-${agent.input_key || agent.name}`}
+              className={styles.agentBadge}
+              appearance="tint"
+              size="small"
+            >
+              {agent.name}
+            </Badge>
+          ))}
+          {team.agents.length > 4 && (
+            <Badge
+              key={`${team.team_id}-overflow`}
+              className={styles.agentBadge}
+              appearance="tint"
+              size="small"
+            >
+              +{team.agents.length - 4}
+            </Badge>
+          )}
+        </div>
 
         {/* Three-dot Menu Button */}
         <Button
@@ -538,7 +538,7 @@ const handleContinue = async () => {
                           }}
                           contentBefore={<Search20Regular />}
                           autoComplete="off"
-                          style={{ 
+                          style={{
                             width: '100%',
                             pointerEvents: 'auto',
                             zIndex: 1,
@@ -583,97 +583,97 @@ const handleContinue = async () => {
                 )}
 
                 {activeTab === 'upload' && (
-  <div className={styles.uploadTabContent}>
-    {uploadMessage && (
-      <div className={styles.uploadMessage}>
-        <Spinner size="extra-small" />
-        <Text>{uploadMessage}</Text>
-      </div>
-    )}
+                  <div className={styles.uploadTabContent}>
+                    {uploadMessage && (
+                      <div className={styles.uploadMessage}>
+                        <Spinner size="extra-small" />
+                        <Text>{uploadMessage}</Text>
+                      </div>
+                    )}
 
-    {error && (
-      <div className={styles.errorMessage}>
-        <Text className={styles.errorText}>{error}</Text>
-      </div>
-    )}
+                    {error && (
+                      <div className={styles.errorMessage}>
+                        <Text className={styles.errorText}>{error}</Text>
+                      </div>
+                    )}
 
-    {/* Always show the drop zone with dashed border */}
-    <div
-      className={styles.dropZone}
-      onDragOver={uploadSuccessMessage ? undefined : handleDragOver}
-      onDragLeave={uploadSuccessMessage ? undefined : handleDragLeave}
-      onDrop={uploadSuccessMessage ? undefined : handleDrop}
-      onClick={uploadSuccessMessage ? undefined : () => document.getElementById('team-upload-input')?.click()}
-    >
-      {uploadSuccessMessage ? (
-        // Show success message inside the dashed border
-        <div className={styles.dropZoneSuccessContent}>
-          <CheckmarkCircle20Filled className={styles.successIcon} />
-          <Text className={styles.successText}>{uploadSuccessMessage}</Text>
-        </div>
-      ) : (
-        // Show normal upload content
-        <>
-          <div className={styles.dropZoneContent}>
-            <Text className={styles.uploadTitle}>
-              Drag & drop your team JSON here
-            </Text>
-            <Text className={styles.uploadSubtitle}>
-              or <span className={styles.browseLink}>click to browse</span>
-            </Text>
-          </div>
+                    {/* Always show the drop zone with dashed border */}
+                    <div
+                      className={styles.dropZone}
+                      onDragOver={uploadSuccessMessage ? undefined : handleDragOver}
+                      onDragLeave={uploadSuccessMessage ? undefined : handleDragLeave}
+                      onDrop={uploadSuccessMessage ? undefined : handleDrop}
+                      onClick={uploadSuccessMessage ? undefined : () => document.getElementById('team-upload-input')?.click()}
+                    >
+                      {uploadSuccessMessage ? (
+                        // Show success message inside the dashed border
+                        <div className={styles.dropZoneSuccessContent}>
+                          <CheckmarkCircle20Filled className={styles.successIcon} />
+                          <Text className={styles.successText}>{uploadSuccessMessage}</Text>
+                        </div>
+                      ) : (
+                        // Show normal upload content
+                        <>
+                          <div className={styles.dropZoneContent}>
+                            <Text className={styles.uploadTitle}>
+                              Drag & drop your team JSON here
+                            </Text>
+                            <Text className={styles.uploadSubtitle}>
+                              or <span className={styles.browseLink}>click to browse</span>
+                            </Text>
+                          </div>
 
-          <input
-            type="file"
-            accept=".json"
-            onChange={handleFileUpload}
-            className={styles.hiddenInput}
-            id="team-upload-input"
-            disabled={uploadLoading}
-          />
-        </>
-      )}
-    </div>
+                          <input
+                            type="file"
+                            accept=".json"
+                            onChange={handleFileUpload}
+                            className={styles.hiddenInput}
+                            id="team-upload-input"
+                            disabled={uploadLoading}
+                          />
+                        </>
+                      )}
+                    </div>
 
-    <div className={styles.requirementsBox}>
-      <Text className={styles.requirementsTitle}>
-        Upload Requirements
-      </Text>
-      <ul className={styles.requirementsList}>
-        <li key="req-basic"className={styles.requirementsItem}>
-          <Text className={styles.requirementsText}>
-            JSON must include <strong className={styles.requirementsStrong}>name</strong>, <strong className={styles.requirementsStrong}>description</strong>, and <strong className={styles.requirementsStrong}>status</strong>
-          </Text>
-        </li>
-        <li key="req-agents" className={styles.requirementsItem}>
-          <Text className={styles.requirementsText}>
-            At least one agent with <strong className={styles.requirementsStrong}>name</strong>, <strong className={styles.requirementsStrong}>type</strong>, <strong className={styles.requirementsStrong}>input_key</strong>, and <strong className={styles.requirementsStrong}>deployment_name</strong>
-          </Text>
-        </li>
-        <li key="req-max-agents" className={styles.requirementsItem}>
-          <Text className={styles.requirementsText}>
-            Maximum of <strong className={styles.requirementsStrong}>6 agents</strong> per team configuration
-          </Text>
-        </li>
-        <li key="req-rag-agents" className={styles.requirementsItem}>
-          <Text className={styles.requirementsText}>
-            RAG agents additionally require <strong className={styles.requirementsStrong}>index_name</strong>
-          </Text>
-        </li>
-        <li key="req-starting-tasks" className={styles.requirementsItem}>
-          <Text className={styles.requirementsText}>
-            Starting tasks are optional, but if provided must include <strong className={styles.requirementsStrong}>name</strong> and <strong className={styles.requirementsStrong}>prompt</strong>
-          </Text>
-        </li>
-      </ul>
-    </div>
-  </div>
-)}
+                    <div className={styles.requirementsBox}>
+                      <Text className={styles.requirementsTitle}>
+                        Upload Requirements
+                      </Text>
+                      <ul className={styles.requirementsList}>
+                        <li key="req-basic" className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            JSON must include <strong className={styles.requirementsStrong}>name</strong>, <strong className={styles.requirementsStrong}>description</strong>, and <strong className={styles.requirementsStrong}>status</strong>
+                          </Text>
+                        </li>
+                        <li key="req-agents" className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            At least one agent with <strong className={styles.requirementsStrong}>name</strong>, <strong className={styles.requirementsStrong}>type</strong>, <strong className={styles.requirementsStrong}>input_key</strong>, and <strong className={styles.requirementsStrong}>deployment_name</strong>
+                          </Text>
+                        </li>
+                        <li key="req-max-agents" className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            Maximum of <strong className={styles.requirementsStrong}>6 agents</strong> per team configuration
+                          </Text>
+                        </li>
+                        <li key="req-rag-agents" className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            RAG agents additionally require <strong className={styles.requirementsStrong}>index_name</strong>
+                          </Text>
+                        </li>
+                        <li key="req-starting-tasks" className={styles.requirementsItem}>
+                          <Text className={styles.requirementsText}>
+                            Starting tasks are optional, but if provided must include <strong className={styles.requirementsStrong}>name</strong> and <strong className={styles.requirementsStrong}>prompt</strong>
+                          </Text>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </div>
             </DialogBody>
           </DialogContent>
-          
-       
+
+
           {tempSelectedTeam && (
             <div className={styles.dialogActions}>
               <Button
@@ -721,7 +721,7 @@ const handleContinue = async () => {
                 style={{ backgroundColor: 'var(--colorStatusDangerBackground1)' }}
               >
                 {deleteLoading ? 'Deleting...' : 'Delete for Everyone'}
-            </Button>
+              </Button>
             </div>
           </DialogContent>
         </DialogSurface>

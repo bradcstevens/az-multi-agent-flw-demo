@@ -12,8 +12,8 @@ class DataType(str, Enum):
     session = "session"
     plan = "plan"
     step = "step"
-    message = "agent_message"
-    team = "team_config"
+    agent_message = "agent_message"
+    team_config = "team_config"
     user_current_team = "user_current_team"
     m_plan = "m_plan"
     m_plan_step = "m_plan_step"
@@ -84,7 +84,7 @@ class BaseDataModel(KernelBaseModel):
 class AgentMessage(BaseDataModel):
     """Base class for messages sent between agents."""
 
-    data_type: Literal["agent_message"] = Field("agent_message", Literal=True)
+    data_type: Literal[DataType.agent_message] = Field(DataType.agent_message, Literal=True)
     session_id: str
     user_id: str
     plan_id: str
@@ -96,7 +96,7 @@ class AgentMessage(BaseDataModel):
 class Session(BaseDataModel):
     """Represents a user session."""
 
-    data_type: Literal["session"] = Field("session", Literal=True)
+    data_type: Literal[DataType.session] = Field(DataType.session, Literal=True)
     user_id: str
     current_status: str
     message_to_user: Optional[str] = None
@@ -105,7 +105,7 @@ class Session(BaseDataModel):
 class UserCurrentTeam(BaseDataModel):
     """Represents the current team of a user."""
 
-    data_type: Literal["user_current_team"] = Field("user_current_team", Literal=True)
+    data_type: Literal[DataType.user_current_team] = Field(DataType.user_current_team, Literal=True)
     user_id: str
     team_id: str
 
@@ -113,7 +113,7 @@ class UserCurrentTeam(BaseDataModel):
 class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
-    data_type: Literal["plan"] = Field("plan", Literal=True)
+    data_type: Literal[DataType.plan] = Field(DataType.plan, Literal=True)
     plan_id: str
     session_id: str
     user_id: str
@@ -129,7 +129,7 @@ class Plan(BaseDataModel):
 class Step(BaseDataModel):
     """Represents an individual step (task) within a plan."""
 
-    data_type: Literal["step"] = Field("step", Literal=True)
+    data_type: Literal[DataType.step] = Field(DataType.step, Literal=True)
     plan_id: str
     session_id: str  # Partition key
     user_id: str
@@ -181,7 +181,7 @@ class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""
 
     team_id: str
-    data_type: Literal["team_config"] = Field("team_config", Literal=True)
+    data_type: Literal[DataType.team_config] = Field(DataType.team_config, Literal=True)
     session_id: str  # Partition key
     name: str
     status: str
@@ -232,9 +232,11 @@ class PlanWithSteps(Plan):
         self.completed = status_counts[StepStatus.completed]
         self.failed = status_counts[StepStatus.failed]
 
-        # Mark the plan as complete if the sum of completed and failed steps equals the total number of steps
-        if self.completed + self.failed == self.total_steps:
+
+        if self.total_steps > 0 and (self.completed + self.failed) == self.total_steps:
             self.overall_status = PlanStatus.completed
+        # Mark the plan as complete if the sum of completed and failed steps equals the total number of steps
+
 
 
 # Message classes for communication between agents

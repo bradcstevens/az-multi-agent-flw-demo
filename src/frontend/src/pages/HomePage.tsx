@@ -229,6 +229,7 @@ const HomePage: React.FC = () => {
                         onNewTaskButton={handleNewTaskButton}
                         onTeamSelect={handleTeamSelect}
                         onTeamUpload={handleTeamUpload}
+                        isHomePage={true}
                         selectedTeam={selectedTeam}
                     />
                     <Content>
