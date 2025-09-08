@@ -321,7 +321,7 @@ The subscription 'xxxx-xxxx' cannot have more than 1 Container App Environments 
 <details><summary><b>ResourceProviderError</b></summary>
 
 - This error occurs when the resource provider is not registered in your subscription. 
-- To register it, refer to [Register Resource Provider](https://learn.microsoft.com/en-us/azure/role-based-access-control/troubleshooting?tabs=bicep#:~:text=Copy-,PrincipalNotFound,-Principal%20%7BprincipalId%7D%20does) documentation.
+- To register it, refer to [Register Resource Provider](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/error-register-resource-provider?tabs=azure-cli) documentation.
 
 </details>
 
