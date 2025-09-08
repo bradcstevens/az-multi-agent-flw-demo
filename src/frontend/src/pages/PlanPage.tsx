@@ -135,6 +135,27 @@ const PlanPage: React.FC = () => {
     }, [scrollToBottom]); //onPlanReceived, scrollToBottom
 
     useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.USER_CLARIFICATION_REQUEST, (clarificationMessage: any) => {
+            console.log('📋 Clarification Message', clarificationMessage);
+            scrollToBottom();
+
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]);
+
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.USER_AGENT_TOOL_MESSAGE, (toolMessage: any) => {
+            console.log('📋 Tool Message', toolMessage);
+            scrollToBottom();
+
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]);
+
+
+    useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, (agentMessage: any) => {
             console.log('📋 Agent Message', agentMessage);
             const agentMessageData = agentMessage.data as AgentMessageData;
