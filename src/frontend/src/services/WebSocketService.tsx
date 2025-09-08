@@ -168,11 +168,12 @@ class WebSocketService {
 
         const currentPlanIds = Array.from(this.planSubscriptions);
         const firstPlanId = currentPlanIds[0];
-
+        if (message.type !== WebsocketMessageType.AGENT_MESSAGE_STREAMING) {
+            console.log('WebSocket message received:', message);
+        }
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
                 console.log("enter plan approval request");
-                console.log('WebSocket message received:', message);
                 const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
                 if (parsedData) {
                     const structuredMessage: ParsedPlanApprovalRequest = {
@@ -206,13 +207,33 @@ class WebSocketService {
                 break;
             }
 
-            case WebsocketMessageType.AGENT_TOOL_MESSAGE:
-            case WebsocketMessageType.USER_CLARIFICATION_REQUEST:
+            case WebsocketMessageType.USER_CLARIFICATION_REQUEST: {
+                if (message.data) {
+                    //const transformed = PlanDataService.parseUserClarificationRequest(message);
+                    this.emit(WebsocketMessageType.USER_CLARIFICATION_REQUEST, message);
+                }
+                break;
+            }
+
+
+            case WebsocketMessageType.AGENT_TOOL_MESSAGE: {
+                if (message.data) {
+                    //const transformed = PlanDataService.parseUserClarificationRequest(message);
+                    this.emit(WebsocketMessageType.AGENT_TOOL_MESSAGE, message);
+                }
+                break;
+            }
+            case WebsocketMessageType.FINAL_RESULT_MESSAGE: {
+                if (message.data) {
+                    //const transformed = PlanDataService.parseFinalResultMessage(message);
+                    this.emit(WebsocketMessageType.FINAL_RESULT_MESSAGE, message);
+                }
+                break;
+            }
             case WebsocketMessageType.USER_CLARIFICATION_RESPONSE:
             case WebsocketMessageType.REPLAN_APPROVAL_REQUEST:
             case WebsocketMessageType.REPLAN_APPROVAL_RESPONSE:
             case WebsocketMessageType.PLAN_APPROVAL_RESPONSE:
-            case WebsocketMessageType.FINAL_RESULT_MESSAGE:
             case WebsocketMessageType.AGENT_STREAM_START:
             case WebsocketMessageType.AGENT_STREAM_END:
             case WebsocketMessageType.SYSTEM_MESSAGE: {
