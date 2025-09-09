@@ -123,7 +123,6 @@ class ApprovalRequest(KernelBaseModel):
     agent_name: str
 
 
-
 class WebsocketMessageType(str, Enum):
     """Types of WebSocket messages."""
     SYSTEM_MESSAGE = "system_message" 

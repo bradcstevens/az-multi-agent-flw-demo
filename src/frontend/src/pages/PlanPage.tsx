@@ -146,7 +146,7 @@ const PlanPage: React.FC = () => {
                 timestamp: clarificationMessage.timestamp || Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                raw_content: clarificationMessage.data.question || '',
+                content: clarificationMessage.data.question || '',
                 raw_data: clarificationMessage.data || '',
             } as AgentMessageData;
             console.log('✅ Parsed clarification message:', agentMessageData);
@@ -183,7 +183,7 @@ const PlanPage: React.FC = () => {
                 timestamp: Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                raw_content: finalMessage.data.content || '',
+                content: finalMessage.data.content || '',
                 raw_data: finalMessage.data || '',
             } as AgentMessageData;
             console.log('✅ Parsed final result message:', agentMessageData);
@@ -395,7 +395,7 @@ const PlanPage: React.FC = () => {
                     timestamp: Date.now(),
                     steps: [],   // intentionally always empty
                     next_steps: [],  // intentionally always empty
-                    raw_content: chatInput || '',
+                    content: chatInput || '',
                     raw_data: chatInput || '',
                 } as AgentMessageData;
 

@@ -26,6 +26,6 @@ export interface AgentMessageData {
     timestamp: number;
     steps: any[];       // intentionally always empty
     next_steps: [];  // intentionally always empty
-    raw_content: string;
+    content: string;
     raw_data: string;
 }

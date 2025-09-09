@@ -12,28 +12,12 @@ const StreamingAgentMessage = (agentMessages: AgentMessageData[]) => {
   if (!agentMessages?.length) return null;
 
   // Filter out messages with empty content
-  const validMessages = agentMessages.filter(msg => msg.raw_content?.trim());
+  const validMessages = agentMessages.filter(msg => msg.content?.trim());
   const messages = validMessages;
   if (!validMessages.length) return null;
 
   return (
-    // <div className="streaming-agent-messages">
-    //   {validMessages.map((message, index) => (
-    //     <div key={`${message.agent}-${message.timestamp}-${index}`} className="agent-message">
-    //       <div className="agent-name">
-    //         <strong>{message.agent}</strong>:
-    //       </div>
-    //       <div className="agent-content">
-    //         <ReactMarkdown
-    //           remarkPlugins={[remarkGfm]}
-    //           rehypePlugins={[rehypePrism]}
-    //         >
-    //           {message.raw_content.trim()}
-    //         </ReactMarkdown>
-    //       </div>
-    //     </div>
-    //   ))}
-    // </div>
+
 
     <div className="message-wrapper">
       {messages.map((msg, index) => {
@@ -68,7 +52,7 @@ const StreamingAgentMessage = (agentMessages: AgentMessageData[]) => {
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypePrism]}
                 >
-                  {TaskService.cleanHRAgent(msg.raw_content) || ""}
+                  {TaskService.cleanHRAgent(msg.content) || ""}
                 </ReactMarkdown>
 
                 {!isHuman && (
@@ -77,8 +61,8 @@ const StreamingAgentMessage = (agentMessages: AgentMessageData[]) => {
                       <div>
                         <Button
                           onClick={() =>
-                            msg.raw_content &&
-                            navigator.clipboard.writeText(msg.raw_content)
+                            msg.content &&
+                            navigator.clipboard.writeText(msg.content)
                           }
                           title="Copy Response"
                           appearance="subtle"
