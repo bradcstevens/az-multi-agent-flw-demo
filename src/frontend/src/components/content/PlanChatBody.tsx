@@ -4,7 +4,6 @@ import { Button } from "@fluentui/react-components";
 import { SendRegular } from "@fluentui/react-icons";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
-    showChatInput: boolean;
     waitingForPlan: boolean;
 }
 const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
@@ -13,12 +12,10 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
     setInput,
     submittingChatDisableInput,
     OnChatSubmit,
-    showChatInput,
     waitingForPlan
 }) => {
-    if (!showChatInput) {
-        return null;
-    }
+    console.log("Rendering PlanChatBody", { planData, input, submittingChatDisableInput, waitingForPlan });
+
     return (
 
         <div style={{

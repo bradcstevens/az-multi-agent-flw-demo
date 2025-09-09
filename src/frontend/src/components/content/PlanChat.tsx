@@ -174,7 +174,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         setInput={setInput}
         submittingChatDisableInput={submittingChatDisableInput}
         OnChatSubmit={OnChatSubmit}
-        showChatInput={true}
         waitingForPlan={waitingForPlan}
         loading={false} />
     </div>

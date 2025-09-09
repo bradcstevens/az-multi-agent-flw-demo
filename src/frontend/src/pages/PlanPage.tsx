@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification } from "../models";
+import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -138,7 +138,7 @@ const PlanPage: React.FC = () => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.USER_CLARIFICATION_REQUEST, (clarificationMessage: any) => {
             console.log('📋 Clarification Message', clarificationMessage);
             const agentMessageData = {
-                agent: 'ProxyAgent',
+                agent: AgentType.GROUP_CHAT_MANAGER,
                 agent_type: AgentMessageType.AI_AGENT,
                 timestamp: clarificationMessage.timestamp || Date.now(),
                 steps: [],   // intentionally always empty
@@ -173,7 +173,7 @@ const PlanPage: React.FC = () => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.FINAL_RESULT_MESSAGE, (finalMessage: any) => {
             console.log('📋 Final Result Message', finalMessage);
             const agentMessageData = {
-                agent: 'ProxyAgent',
+                agent: AgentType.GROUP_CHAT_MANAGER,
                 agent_type: AgentMessageType.AI_AGENT,
                 timestamp: Date.now(),
                 steps: [],   // intentionally always empty
