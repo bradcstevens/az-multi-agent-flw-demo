@@ -155,20 +155,6 @@ const HomePage: React.FC = () => {
                             `${initializedTeam.name} team initialized successfully with ${initializedTeam.agents?.length || 0} agents`,
                             "success"
                         );
-                    } else {
-                        // Fallback: if we can't find the specific team, use HR team or first available
-                        console.log('Specific team not found, using default selection logic');
-                        const hrTeam = teams.find(team => team.name === "Human Resources Team");
-                        const defaultTeam = hrTeam || teams[0];
-
-                        if (defaultTeam) {
-                            setSelectedTeam(defaultTeam);
-                            TeamService.storageTeam(defaultTeam);
-                            showToast(
-                                `${defaultTeam.name} team loaded as default`,
-                                "success"
-                            );
-                        }
                     }
 
                 } else {

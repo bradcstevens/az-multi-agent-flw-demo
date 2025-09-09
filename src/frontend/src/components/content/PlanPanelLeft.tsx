@@ -30,6 +30,8 @@ import PanelUserCard from "../../coral/components/Panels/UserCard";
 import { getUserInfoGlobal } from "@/api/config";
 import TeamSelector from "../common/TeamSelector";
 import { TeamConfig } from "../../models/Team";
+import TeamSelected from "../common/TeamSelected";
+import TeamService from "@/services/TeamService";
 
 const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   reloadTasks,
@@ -172,13 +174,23 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         </PanelLeftToolbar>
 
         {/* Team Selector right under the toolbar */}
+
         <div style={{ marginTop: '8px', marginBottom: '8px' }}>
-          <TeamSelector
-            onTeamSelect={handleTeamSelect}
-            onTeamUpload={onTeamUpload}
-            selectedTeam={selectedTeam}
-            isHomePage={isHomePage}
-          />
+          {isHomePage && (
+            <TeamSelector
+              onTeamSelect={handleTeamSelect}
+              onTeamUpload={onTeamUpload}
+              selectedTeam={selectedTeam}
+              isHomePage={isHomePage}
+            />
+          )}
+
+          {!isHomePage && (
+            <TeamSelected
+              selectedTeam={TeamService.getStoredTeam()}
+            />
+          )}
+
         </div>
         <div
           className="tab tab-new-task"
