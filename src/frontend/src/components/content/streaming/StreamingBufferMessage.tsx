@@ -12,9 +12,10 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
 
     if (!streamingMessageBuffer || streamingMessageBuffer.trim() === "") return null;
 
-    const previewText = streamingMessageBuffer.length > 500
-        ? streamingMessageBuffer.substring(0, 500) + "..."
-        : streamingMessageBuffer;
+    const start = Math.max(0, streamingMessageBuffer.length - 500);
+    const previewText = start === 0
+        ? streamingMessageBuffer
+        : "..." + streamingMessageBuffer.substring(start);
 
     return (
         <div style={{

@@ -9,10 +9,10 @@ const TeamSelected: React.FC<TeamSelectedProps> = ({ selectedTeam }) => {
     return (
         <div className={styles.teamSelectorContent}>
             <Caption1 className={styles.currentTeamLabel}>
-                Current Team
+                &nbsp;&nbsp;Current Team
             </Caption1>
             <Body1 className={styles.currentTeamName}>
-                {"     "}  {selectedTeam ? selectedTeam.name : 'No team selected'}
+                &nbsp;&nbsp;{selectedTeam ? selectedTeam.name : 'No team selected'}
             </Body1>
         </div>
     );

@@ -518,7 +518,7 @@ const PlanPage: React.FC = () => {
                                 streamingMessages={streamingMessages}
                                 wsConnected={wsConnected}
                                 onPlanApproval={(approved) => setPlanApproved(approved)}
-                                onPlanProcessing={(showProcessingPlanSpinner) => setShowProcessingPlanSpinner(showProcessingPlanSpinner)}
+                                setShowProcessingPlanSpinner={(showProcessingPlanSpinner) => setShowProcessingPlanSpinner(showProcessingPlanSpinner)}
                                 planApprovalRequest={planApprovalRequest}
                                 waitingForPlan={waitingForPlan}
                                 messagesContainerRef={messagesContainerRef}
