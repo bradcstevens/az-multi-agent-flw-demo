@@ -35,7 +35,7 @@ factory.register_service(ProductService())
 factory.register_service(GeneralService())
 
 # Register DataToolService with the dataset path
-factory.register_service(DataToolService(dataset_path="datasets"))
+#factory.register_service(DataToolService(dataset_path="datasets"))
 
 
 def create_fastmcp_server():

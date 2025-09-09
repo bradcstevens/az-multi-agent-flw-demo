@@ -11,8 +11,10 @@ import v3.models.messages as messages
 from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
     MagenticContext, StandardMagenticManager)
-from semantic_kernel.agents.orchestration.prompts._magentic_prompts import \
-    ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT
+from semantic_kernel.agents.orchestration.prompts._magentic_prompts import (
+    ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT,
+    ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT,
+    ORCHESTRATOR_TASK_LEDGER_PLAN_UPDATE_PROMPT)
 from semantic_kernel.contents import ChatMessageContent
 from v3.config.settings import (connection_config, current_user_id,
                                 orchestration_config)
@@ -36,13 +38,29 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         # Use object.__setattr__ to bypass Pydantic validation
         # object.__setattr__(self, 'current_user_id', None)
 
-        custom_addition = """
-As part of the plan, ask the team members regarding what relevant tools they have access to, and what information those tools require.  Please query the user through 
-the ProxyAgent if you need any additional information to supply required data to use these tools. Always clarify with the user if you are unsure about any aspect of 
-the request or the information you need to complete it.
+        facts_append = """
+
+        """
+
+        plan_append = """
+Plan steps should always include a bullet point, followed by an agent name, followed by a description of the action
+to be taken. If a step involves multiple actions, separate them into distinct steps with an agent included in each step. If the step is taken by an agent that 
+is not part of the team, such as the MagenticManager, please always list the MagenticManager as the agent for that step. At any time, if more information is 
+needed from the user, use the ProxyAgent to request this information.
+
+Here is an example of a well-structured plan:
+- **EnhancedResearchAgent** to gather authoritative data on the latest industry trends and best practices in employee onboarding
+- **EnhancedResearchAgent** to gather authoritative data on Innovative onboarding techniques that enhance new hire engagement and retention.
+- **DocumentCreationAgent** to draft a comprehensive onboarding plan that includes a detailed schedule of onboarding activities and milestones.
+- **DocumentCreationAgent** to draft a comprehensive onboarding plan that includes a checklist of resources and materials needed for effective onboarding.
+- **ProxyAgent** to review the drafted onboarding plan for clarity and completeness.
+- **MagenticManager** to finalize the onboarding plan and prepare it for presentation to stakeholders.
+
 """
 
-        kwargs['task_ledger_facts_prompt'] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + custom_addition
+        # kwargs["task_ledger_facts_prompt"] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + facts_append
+        kwargs['task_ledger_plan_prompt'] = ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT + plan_append
+        kwargs['task_ledger_plan_update_prompt'] = ORCHESTRATOR_TASK_LEDGER_PLAN_UPDATE_PROMPT + plan_append
         
         super().__init__(*args, **kwargs)
 
@@ -104,15 +122,15 @@ the request or the information you need to complete it.
                 "data": approval_response
             }, user_id=current_user_id.get(), message_type=messages.WebsocketMessageType.PLAN_APPROVAL_RESPONSE)
             raise Exception("Plan execution cancelled by user") 
-            # return ChatMessageContent(
-            #     role="assistant",
-            #     content="Plan execution was cancelled by the user."
-            # )
             
     async def replan(self,magentic_context: MagenticContext) -> Any:
+        """ 
+        Override to add websocket messages for replanning events. 
+        """
+
         print(f"\nHuman-in-the-Loop Magentic Manager replanned:")
         replan = await super().replan(magentic_context=magentic_context)
-        print(replan)
+        print("Replanned: %s", replan)
         return replan
     
     async def _wait_for_user_approval(self, m_plan_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
@@ -125,7 +143,6 @@ the request or the information you need to complete it.
             await asyncio.sleep(0.2)
         return messages.PlanApprovalResponse(approved=orchestration_config.approvals[m_plan_id], m_plan_id=m_plan_id)
 
-    
     async def prepare_final_answer(self, magentic_context: MagenticContext) -> ChatMessageContent:
         """
         Override to ensure final answer is prepared after all steps are executed.
@@ -151,8 +168,7 @@ the request or the information you need to complete it.
     
 
     def plan_to_obj(self, magentic_context, ledger) -> MPlan:
-        """
-        """
+        """ Convert the generated plan from the ledger into a structured MPlan object. """
         
         return_plan: MPlan = MPlan()
 
