@@ -28,7 +28,7 @@ import { AgentMessageData, WebsocketMessageType } from "@/models";
 import getUserPlan from "./streaming/StreamingUserPlan";
 import renderUserPlanMessage from "./streaming/StreamingUserPlanMessage";
 import renderPlanResponse from "./streaming/StreamingPlanResponse";
-import renderThinkingState from "./streaming/StreamingPlanState";
+import { renderPlanExecutionMessage, renderThinkingState } from "./streaming/StreamingPlanState";
 import ContentNotFound from "../NotFound/ContentNotFound";
 import PlanChatBody from "./PlanChatBody";
 import renderBufferMessage from "./streaming/StreamingBufferMessage";
@@ -42,6 +42,8 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   streamingMessageBuffer: string;
   agentMessages: AgentMessageData[];
+  showProcessingPlanSpinner: boolean;
+  setShowProcessingPlanSpinner: (show: boolean) => void;
 }
 
 const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
@@ -57,7 +59,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   waitingForPlan,
   messagesContainerRef,
   streamingMessageBuffer,
-  agentMessages
+  agentMessages,
+  showProcessingPlanSpinner,
+  setShowProcessingPlanSpinner
 
 }) => {
   const navigate = useNavigate();
@@ -91,6 +95,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
       dismissToast(id);
       onPlanApproval?.(true);
+      setShowProcessingPlanSpinner?.(true);
       setShowApprovalButtons(false);
 
     } catch (error) {
@@ -100,7 +105,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     } finally {
       setProcessingApproval(false);
     }
-  }, [planApprovalRequest, planData, onPlanApproval]);
+  }, [planApprovalRequest, planData, onPlanApproval, setShowProcessingPlanSpinner]);
 
   // Handle plan rejection  
   const handleRejectPlan = useCallback(async () => {
@@ -164,9 +169,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
         {renderAgentMessages(agentMessages)}
 
-
+        {showProcessingPlanSpinner && renderPlanExecutionMessage()}
         {/* Streaming plan updates */}
         {renderBufferMessage(streamingMessageBuffer)}
+
       </div>
 
       {/* Chat Input - only show if no plan is waiting for approval */}

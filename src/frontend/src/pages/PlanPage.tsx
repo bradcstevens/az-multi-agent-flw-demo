@@ -49,6 +49,7 @@ const PlanPage: React.FC = () => {
     const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
     const [reloadLeftList, setReloadLeftList] = useState(true);
     const [waitingForPlan, setWaitingForPlan] = useState(true);
+    const [showProcessingPlanSpinner, setShowProcessingPlanSpinner] = useState<boolean>(false);
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
@@ -111,6 +112,7 @@ const PlanPage: React.FC = () => {
                 console.log('✅ Parsed plan data:', mPlanData);
                 setPlanApprovalRequest(mPlanData);
                 setWaitingForPlan(false);
+                setShowProcessingPlanSpinner(false);
                 // onPlanReceived?.(mPlanData);
                 scrollToBottom();
             } else {
@@ -151,6 +153,7 @@ const PlanPage: React.FC = () => {
             setClarificationMessage(clarificationMessage.data as ParsedUserClarification | null);
             setAgentMessages(prev => [...prev, agentMessageData]);
             setStreamingMessageBuffer("");
+            setShowProcessingPlanSpinner(false);
             setSubmittingChatDisableInput(false);
             scrollToBottom();
 
@@ -185,6 +188,7 @@ const PlanPage: React.FC = () => {
             } as AgentMessageData;
             console.log('✅ Parsed final result message:', agentMessageData);
             setStreamingMessageBuffer("");
+            setShowProcessingPlanSpinner(false);
             setAgentMessages(prev => [...prev, agentMessageData]);
             scrollToBottom();
 
@@ -200,6 +204,7 @@ const PlanPage: React.FC = () => {
             console.log('📋 Agent Message', agentMessage);
             const agentMessageData = agentMessage.data as AgentMessageData;
             setAgentMessages(prev => [...prev, agentMessageData]);
+            setShowProcessingPlanSpinner(true);
             scrollToBottom();
         });
 
@@ -396,9 +401,11 @@ const PlanPage: React.FC = () => {
 
                 setAgentMessages(prev => [...prev, agentMessageData]);
                 setSubmittingChatDisableInput(true);
+                setShowProcessingPlanSpinner(true);
                 scrollToBottom();
 
             } catch (error: any) {
+                setShowProcessingPlanSpinner(false);
                 dismissToast(id);
                 setSubmittingChatDisableInput(false);
                 showToast(
@@ -511,11 +518,13 @@ const PlanPage: React.FC = () => {
                                 streamingMessages={streamingMessages}
                                 wsConnected={wsConnected}
                                 onPlanApproval={(approved) => setPlanApproved(approved)}
+                                onPlanProcessing={(showProcessingPlanSpinner) => setShowProcessingPlanSpinner(showProcessingPlanSpinner)}
                                 planApprovalRequest={planApprovalRequest}
                                 waitingForPlan={waitingForPlan}
                                 messagesContainerRef={messagesContainerRef}
                                 streamingMessageBuffer={streamingMessageBuffer}
                                 agentMessages={agentMessages}
+                                showProcessingPlanSpinner={showProcessingPlanSpinner}
 
                             />
                         </>
