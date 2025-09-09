@@ -200,7 +200,6 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
         <br />
         <TaskList
-          inProgressTasks={inProgressTasks}
           completedTasks={completedTasks}
           onTaskSelect={handleTaskSelect}
           loading={plansLoading}

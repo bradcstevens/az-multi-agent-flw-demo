@@ -33,6 +33,7 @@ import ContentNotFound from "../NotFound/ContentNotFound";
 import PlanChatBody from "./PlanChatBody";
 import renderBufferMessage from "./streaming/StreamingBufferMessage";
 import renderAgentMessages from "./streaming/StreamingAgentMessage";
+
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
@@ -141,6 +142,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
       backgroundColor: 'var(--colorNeutralBackground1)'
     }}>
       {/* Messages Container */}
+      <InlineToaster />
       <div
         ref={messagesContainerRef}
         style={{
@@ -174,7 +176,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         setInput={setInput}
         submittingChatDisableInput={submittingChatDisableInput}
         OnChatSubmit={OnChatSubmit}
-        showChatInput={true}
         waitingForPlan={waitingForPlan}
         loading={false} />
     </div>
