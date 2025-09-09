@@ -3,9 +3,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 
-interface StreamingAgentMessageProps {
-  agentMessages: AgentMessageData[];
-}
 
 const StreamingAgentMessage = (agentMessages: AgentMessageData[]) => {
   if (!agentMessages?.length) return null;

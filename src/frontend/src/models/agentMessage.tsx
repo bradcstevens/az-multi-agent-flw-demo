@@ -1,4 +1,6 @@
+import { Agent } from 'http';
 import { BaseModel } from './plan';
+import { AgentMessageType, AgentType } from './enums';
 
 /**
  * Represents a message from an agent
@@ -20,6 +22,7 @@ export interface AgentMessage extends BaseModel {
 
 export interface AgentMessageData {
     agent: string;
+    agent_type: AgentMessageType;
     timestamp: number;
     steps: any[];       // intentionally always empty
     next_steps: [];  // intentionally always empty

@@ -7,7 +7,8 @@ import {
   MPlanData,
   StepStatus,
   WebsocketMessageType,
-  ParsedUserClarification
+  ParsedUserClarification,
+  AgentMessageType
 } from "@/models";
 import { apiService } from "@/api";
 
@@ -360,6 +361,7 @@ export class PlanDataService {
    */
   static parseAgentMessage(rawData: any): {
     agent: string;
+    agent_type: AgentMessageType;
     timestamp: number | null;
     steps: Array<{
       title: string;
@@ -461,6 +463,7 @@ export class PlanDataService {
 
       return {
         agent,
+        agent_type: AgentMessageType.AI_AGENT,
         timestamp,
         steps,
         next_steps: nextSteps,
