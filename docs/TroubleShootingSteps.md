@@ -360,7 +360,7 @@ The subscription 'xxxx-xxxx' cannot have more than 1 Container App Environments 
 
 <details><summary><b>ReadOnlyDisabledSubscription</b></summary>
 
-- Depending on the type of the Azure Subscription it might be an expiration date is reached.
+- Depending on the type of the Azure Subscription, the expiration date might have been reached.
 
 - You have to activate the Azure Subscription before creating any Azure resource.
 - You can refer [Reactivate a disabled Azure subscription](https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/subscription-disabled) Documentation.
