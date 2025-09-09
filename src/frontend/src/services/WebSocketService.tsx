@@ -183,13 +183,13 @@ class WebSocketService {
 
         //console.log('WebSocket message received:', message);
         const hasClarification = /\bclarifications?\b/i.test(message.data || '');
-        console.log("Message ':", message);
+
         if (hasClarification) {
             console.log("Message contains 'clarification':", message.data);
         }
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
-                console.log("enter plan approval request");
+                console.log("Message Plan Approval Request':", message);
                 const parsedData = PlanDataService.parsePlanApprovalRequest(message.data);
                 if (parsedData) {
                     const structuredMessage: ParsedPlanApprovalRequest = {
@@ -206,6 +206,7 @@ class WebSocketService {
             }
 
             case WebsocketMessageType.AGENT_MESSAGE: {
+                console.log("Message Agent':", message);
                 if (message.data) {
                     console.log('WebSocket message received:', message);
                     const transformed = PlanDataService.parseAgentMessage(message);
@@ -224,6 +225,7 @@ class WebSocketService {
             }
 
             case WebsocketMessageType.USER_CLARIFICATION_REQUEST: {
+                console.log("Message clarification':", message);
                 if (message.data) {
                     const transformed = PlanDataService.parseUserClarificationRequest(message);
                     console.log('WebSocket USER_CLARIFICATION_REQUEST message received:', transformed);
@@ -234,6 +236,7 @@ class WebSocketService {
 
 
             case WebsocketMessageType.AGENT_TOOL_MESSAGE: {
+                console.log("Message agent tool':", message);
                 if (message.data) {
                     //const transformed = PlanDataService.parseUserClarificationRequest(message);
                     this.emit(WebsocketMessageType.AGENT_TOOL_MESSAGE, message);
@@ -241,6 +244,7 @@ class WebSocketService {
                 break;
             }
             case WebsocketMessageType.FINAL_RESULT_MESSAGE: {
+                console.log("Message final result':", message);
                 if (message.data) {
                     //const transformed = PlanDataService.parseFinalResultMessage(message);
                     this.emit(WebsocketMessageType.FINAL_RESULT_MESSAGE, message);
@@ -254,11 +258,13 @@ class WebSocketService {
             case WebsocketMessageType.AGENT_STREAM_START:
             case WebsocketMessageType.AGENT_STREAM_END:
             case WebsocketMessageType.SYSTEM_MESSAGE: {
+                console.log("Message other types':", message);
                 this.emit(message.type, message);
                 break;
             }
 
             default: {
+                console.log("Message default':", message);
                 this.emit(message.type, message);
                 break;
             }

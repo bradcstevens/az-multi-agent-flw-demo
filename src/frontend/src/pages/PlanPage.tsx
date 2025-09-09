@@ -149,6 +149,7 @@ const PlanPage: React.FC = () => {
             console.log('✅ Parsed clarification message:', agentMessageData);
             setClarificationMessage(clarificationMessage.data as ParsedUserClarification | null);
             setAgentMessages(prev => [...prev, agentMessageData]);
+            setStreamingMessageBuffer("");
             setSubmittingChatDisableInput(false);
             scrollToBottom();
 
@@ -178,12 +179,12 @@ const PlanPage: React.FC = () => {
                 timestamp: Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                raw_content: finalMessage.content || '',
-                raw_data: finalMessage || '',
+                raw_content: finalMessage.data.content || '',
+                raw_data: finalMessage.data || '',
             } as AgentMessageData;
             console.log('✅ Parsed final result message:', agentMessageData);
+            setStreamingMessageBuffer("");
             setAgentMessages(prev => [...prev, agentMessageData]);
-            setSubmittingChatDisableInput(true);
             scrollToBottom();
 
         });
@@ -438,7 +439,7 @@ const PlanPage: React.FC = () => {
                     );
                 }
             } finally {
-                setSubmittingChatDisableInput(false);
+
             }
         },
         [planData?.plan, showToast, dismissToast, loadPlanData]

@@ -14,8 +14,6 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
     OnChatSubmit,
     waitingForPlan
 }) => {
-    console.log("Rendering PlanChatBody", { planData, input, submittingChatDisableInput, waitingForPlan });
-
     return (
 
         <div style={{
