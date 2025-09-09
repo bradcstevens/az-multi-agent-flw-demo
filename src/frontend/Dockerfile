@@ -14,6 +14,8 @@ RUN npm ci --silent
 # Copy source files
 COPY . ./
 
+RUN rm -rf node_modules && npm ci && npm rebuild esbuild --force
+
 # Build the React app
 RUN npm run build
 
