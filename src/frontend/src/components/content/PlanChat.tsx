@@ -43,7 +43,11 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   streamingMessageBuffer: string;
   agentMessages: AgentMessageData[];
   showProcessingPlanSpinner: boolean;
-  setShowProcessingPlanSpinner: (show: boolean) => void;
+  showApprovalButtons: boolean;
+  handleApprovePlan: () => Promise<void>;
+  handleRejectPlan: () => Promise<void>;
+  processingApproval: boolean;
+
 }
 
 const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
@@ -61,7 +65,11 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   streamingMessageBuffer,
   agentMessages,
   showProcessingPlanSpinner,
-  setShowProcessingPlanSpinner
+  showApprovalButtons,
+  handleApprovePlan,
+  handleRejectPlan,
+  processingApproval
+
 
 }) => {
   const navigate = useNavigate();
@@ -69,71 +77,11 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   const { showToast, dismissToast } = useInlineToaster();
   // States
 
-  const [processingApproval, setProcessingApproval] = useState(false);
-
-  const [showApprovalButtons, setShowApprovalButtons] = useState(true);
 
 
 
 
-  // Listen for m_plan streaming
 
-
-  // Handle plan approval
-  const handleApprovePlan = useCallback(async () => {
-    if (!planApprovalRequest) return;
-
-    setProcessingApproval(true);
-    let id = showToast("Submitting Approval", "progress");
-    try {
-      await apiService.approvePlan({
-        m_plan_id: planApprovalRequest.id,
-        plan_id: planData?.plan?.id,
-        approved: true,
-        feedback: 'Plan approved by user'
-      });
-
-      dismissToast(id);
-      onPlanApproval?.(true);
-      setShowProcessingPlanSpinner?.(true);
-      setShowApprovalButtons(false);
-
-    } catch (error) {
-      dismissToast(id);
-      showToast("Failed to submit approval", "error");
-      console.error('❌ Failed to approve plan:', error);
-    } finally {
-      setProcessingApproval(false);
-    }
-  }, [planApprovalRequest, planData, onPlanApproval, setShowProcessingPlanSpinner]);
-
-  // Handle plan rejection  
-  const handleRejectPlan = useCallback(async () => {
-    if (!planApprovalRequest) return;
-
-    setProcessingApproval(true);
-    let id = showToast("Submitting cancellation", "progress");
-    try {
-      await apiService.approvePlan({
-        m_plan_id: planApprovalRequest.id,
-        plan_id: planData?.plan?.id,
-        approved: false,
-        feedback: 'Plan rejected by user'
-      });
-
-      dismissToast(id);
-      onPlanApproval?.(false);
-      navigate('/');
-
-    } catch (error) {
-      dismissToast(id);
-      showToast("Failed to submit cancellation", "error");
-      console.error('❌ Failed to reject plan:', error);
-      navigate('/');
-    } finally {
-      setProcessingApproval(false);
-    }
-  }, [planApprovalRequest, planData, onPlanApproval, navigate]);
 
   if (!planData)
     return (

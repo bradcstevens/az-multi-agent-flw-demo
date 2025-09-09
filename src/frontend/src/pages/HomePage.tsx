@@ -77,39 +77,14 @@ const HomePage: React.FC = () => {
                         }
                     }
 
-                } else {
-                    throw new Error('Invalid response from init_team endpoint');
                 }
 
             } catch (error) {
                 console.error('Error initializing team from backend:', error);
-                showToast("Team initialization failed, using fallback", "warning");
+                showToast("Team initialization failed", "warning");
 
                 // Fallback to the old client-side method
-                try {
-                    console.log('Using fallback: client-side team loading...');
-                    const teams = await TeamService.getUserTeams();
-                    if (teams.length > 0) {
-                        const hrTeam = teams.find(team => team.name === "Human Resources Team");
-                        const defaultTeam = hrTeam || teams[0];
-                        setSelectedTeam(defaultTeam);
-                        TeamService.storageTeam(defaultTeam);
 
-                        showToast(
-                            `${defaultTeam.name} team loaded (fallback mode)`,
-                            "info"
-                        );
-                    } else {
-                        console.log('No teams found - user needs to upload a team configuration');
-                        showToast(
-                            "No teams found. Please upload a team configuration.",
-                            "warning"
-                        );
-                    }
-                } catch (fallbackError) {
-                    console.error('Fallback team loading also failed:', fallbackError);
-                    showToast("Failed to load team configuration", "error");
-                }
             } finally {
                 setIsLoadingTeam(false);
             }
@@ -155,20 +130,6 @@ const HomePage: React.FC = () => {
                             `${initializedTeam.name} team initialized successfully with ${initializedTeam.agents?.length || 0} agents`,
                             "success"
                         );
-                    } else {
-                        // Fallback: if we can't find the specific team, use HR team or first available
-                        console.log('Specific team not found, using default selection logic');
-                        const hrTeam = teams.find(team => team.name === "Human Resources Team");
-                        const defaultTeam = hrTeam || teams[0];
-
-                        if (defaultTeam) {
-                            setSelectedTeam(defaultTeam);
-                            TeamService.storageTeam(defaultTeam);
-                            showToast(
-                                `${defaultTeam.name} team loaded as default`,
-                                "success"
-                            );
-                        }
                     }
 
                 } else {

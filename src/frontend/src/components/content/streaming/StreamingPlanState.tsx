@@ -60,7 +60,8 @@ const renderPlanExecutionMessage = () => {
             backgroundColor: tokens.colorNeutralBackground2,
             borderRadius: tokens.borderRadiusMedium,
             border: `1px solid ${tokens.colorNeutralStroke1}`,
-            marginBottom: tokens.spacingVerticalXL
+            marginBottom: tokens.spacingVerticalXL,
+            marginTop: tokens.spacingVerticalXL
         }}>
             <Spinner size="small" />
             <span style={{

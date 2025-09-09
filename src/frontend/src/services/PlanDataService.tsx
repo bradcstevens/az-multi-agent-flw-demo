@@ -376,7 +376,7 @@ export class PlanDataService {
       raw_block: string;
     }>;
     next_steps: string[];
-    raw_content: string;
+    content: string;
     raw_data: any;
   } | null {
     try {
@@ -401,9 +401,9 @@ export class PlanDataService {
 
       // Extract content='...'
       const contentMatch = source.match(/content='((?:\\'|[^'])*)'/);
-      let raw_content = contentMatch ? contentMatch[1] : '';
+      let content = contentMatch ? contentMatch[1] : '';
       // Unescape
-      raw_content = raw_content
+      content = content
         .replace(/\\n/g, '\n')
         .replace(/\\'/g, "'")
         .replace(/\\"/g, '"')
@@ -411,7 +411,7 @@ export class PlanDataService {
 
       // Parse sections of the form "##### Title Completed"
       // Each block ends at --- line or next "##### " or end.
-      const lines = raw_content.split('\n');
+      const lines = content.split('\n');
       const steps: Array<{ title: string; fields: Record<string, string>; summary?: string; raw_block: string; }> = [];
       let i = 0;
       while (i < lines.length) {
@@ -473,7 +473,7 @@ export class PlanDataService {
         timestamp,
         steps,
         next_steps: nextSteps,
-        raw_content,
+        content,
         raw_data: rawData
       };
     } catch (e) {
