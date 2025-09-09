@@ -383,7 +383,7 @@ const PlanPage: React.FC = () => {
                 setInput("");
                 dismissToast(id);
                 showToast("Clarification submitted successfully", "success");
-                setClarificationMessage(null);
+
                 const agentMessageData = {
                     agent: 'You',
                     agent_type: AgentMessageType.HUMAN_AGENT,
@@ -400,45 +400,12 @@ const PlanPage: React.FC = () => {
 
             } catch (error: any) {
                 dismissToast(id);
+                setSubmittingChatDisableInput(false);
+                showToast(
+                    "Failed to submit clarification",
+                    "error"
+                );
 
-                // Enhanced error handling for v3 backend
-                let errorDetail = null;
-                try {
-                    // Try to parse the error detail if it's a string
-                    if (typeof error?.response?.data?.detail === 'string') {
-                        errorDetail = JSON.parse(error.response.data.detail);
-                    } else {
-                        errorDetail = error?.response?.data?.detail;
-                    }
-                } catch (parseError) {
-                    // If parsing fails, use the original error
-                    errorDetail = error?.response?.data?.detail;
-                }
-
-                // Handle RAI validation errors with better UX
-                if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
-                    const raiErrorData: RAIErrorData = {
-                        error_type: 'RAI_VALIDATION_FAILED',
-                        message: 'Content Policy Violation',
-                        description: errorDetail.message || 'Your input contains content that violates our content policy.',
-                        suggestions: errorDetail.suggestions || [
-                            'Please rephrase your message using professional language',
-                            'Avoid potentially harmful or inappropriate content',
-                            'Focus on business-appropriate requests'
-                        ],
-                        user_action: 'Please modify your input and try again.'
-                    };
-
-                } else {
-                    // Handle other types of errors
-                    showToast(
-                        error?.response?.data?.detail?.message ||
-                        error?.response?.data?.detail ||
-                        error?.message ||
-                        "Failed to submit clarification",
-                        "error"
-                    );
-                }
             } finally {
 
             }

@@ -16,14 +16,15 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
 }) => {
     return (
 
-        <div style={{
-            padding: '20px 24px 32px',
-            borderTop: '1px solid var(--colorNeutralStroke2)',
-            backgroundColor: 'var(--colorNeutralBackground1)',
-            maxWidth: '800px',
-            margin: '0 auto',
-            width: '100%'
-        }}
+        <div
+            style={{
+                padding: '20px 24px 32px',
+                borderTop: '1px solid var(--colorNeutralStroke2)',
+                backgroundColor: 'var(--colorNeutralBackground1)',
+                maxWidth: '800px',
+                margin: '0 auto',
+                width: '98%'
+            }}
 
         >
             <ChatInput
@@ -34,7 +35,7 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
                 placeholder={
                     waitingForPlan
                         ? "Creating plan..."
-                        : "Send a message..."
+                        : "Add more info to this plan..."
                 }
             >
                 <Button
