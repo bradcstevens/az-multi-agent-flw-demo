@@ -381,12 +381,14 @@ async def plan_approval(
                 #     orchestration_config.plans[human_feedback.m_plan_id],
                 # )
                 try:
-                      result = await PlanService.handle_plan_approval(human_feedback, user_id)
-                      print("Plan approval processed:", result)
+                    result = await PlanService.handle_plan_approval(
+                        human_feedback, user_id
+                    )
+                    print("Plan approval processed:", result)
                 except ValueError as ve:
-                       print(f"ValueError processing plan approval: {ve}")
+                    print(f"ValueError processing plan approval: {ve}")
                 except Exception as e:
-                        print(f"Error processing plan approval: {e}")
+                    print(f"Error processing plan approval: {e}")
                 track_event_if_configured(
                     "PlanApprovalReceived",
                     {
@@ -397,7 +399,7 @@ async def plan_approval(
                         "feedback": human_feedback.feedback,
                     },
                 )
-                
+
                 return {"status": "approval recorded"}
             else:
                 logging.warning(
@@ -424,9 +426,9 @@ async def user_clarification(
         )
     # Set the approval in the orchestration config
     if user_id and human_feedback.request_id:
-        ### validate rai 
-        if human_feedback.answer != None or human_feedback.answer !="":
-          if not await rai_success(human_feedback.answer, False):
+        ### validate rai
+        if human_feedback.answer != None or human_feedback.answer != "":
+            if not await rai_success(human_feedback.answer, False):
                 track_event_if_configured(
                     "RAI failed",
                     {
@@ -450,9 +452,6 @@ async def user_clarification(
                         "user_action": "Please revise your request and try again",
                     },
                 )
-
-
-
 
         if (
             orchestration_config
@@ -890,7 +889,6 @@ async def delete_team_config(team_id: str, request: Request):
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
 
-
 @app_v3.post("/select_team")
 async def select_team(selection: TeamSelectionRequest, request: Request):
     """
@@ -980,6 +978,7 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
         )
         raise HTTPException(status_code=500, detail="Internal server error occurred")
 
+
 # Get plans is called in the initial side rendering of the frontend
 @app_v3.get("/plans")
 async def get_plans(request: Request):
@@ -1058,9 +1057,10 @@ async def get_plans(request: Request):
     if not current_team:
         return []
 
-    all_plans = await memory_store.get_all_plans_by_team_id(team_id=current_team.team_id)
+    all_plans = await memory_store.get_all_plans_by_team_id_status(
+        team_id=current_team.team_id, status=PlanStatus.completed
+    )
 
-    steps_for_all_plans = []
     # Create list of PlanWithSteps and update step counts
     list_of_plans_with_steps = []
     for plan in all_plans:
@@ -1074,7 +1074,7 @@ async def get_plans(request: Request):
 
 # Get plans is called in the initial side rendering of the frontend
 @app_v3.get("/plan")
-async def get_plan_by_id(request: Request,   plan_id: str):
+async def get_plan_by_id(request: Request, plan_id: str):
     """
     Retrieve plans for the current user.
 

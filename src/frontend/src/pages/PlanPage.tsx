@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification } from "../models";
+import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -125,6 +125,7 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE_STREAMING, (streamingMessage: any) => {
             // console.log('📋 Streaming Message', streamingMessage);
+            // if is final true clear buffer and add final message to agent messages
             setStreamingMessageBuffer(prev => prev + streamingMessage.data.content);
             scrollToBottom();
 
@@ -138,7 +139,7 @@ const PlanPage: React.FC = () => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.USER_CLARIFICATION_REQUEST, (clarificationMessage: any) => {
             console.log('📋 Clarification Message', clarificationMessage);
             const agentMessageData = {
-                agent: 'ProxyAgent',
+                agent: AgentType.GROUP_CHAT_MANAGER,
                 agent_type: AgentMessageType.AI_AGENT,
                 timestamp: clarificationMessage.timestamp || Date.now(),
                 steps: [],   // intentionally always empty
@@ -149,6 +150,7 @@ const PlanPage: React.FC = () => {
             console.log('✅ Parsed clarification message:', agentMessageData);
             setClarificationMessage(clarificationMessage.data as ParsedUserClarification | null);
             setAgentMessages(prev => [...prev, agentMessageData]);
+            setStreamingMessageBuffer("");
             setSubmittingChatDisableInput(false);
             scrollToBottom();
 
@@ -173,17 +175,17 @@ const PlanPage: React.FC = () => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.FINAL_RESULT_MESSAGE, (finalMessage: any) => {
             console.log('📋 Final Result Message', finalMessage);
             const agentMessageData = {
-                agent: 'ProxyAgent',
+                agent: AgentType.GROUP_CHAT_MANAGER,
                 agent_type: AgentMessageType.AI_AGENT,
                 timestamp: Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                raw_content: finalMessage.content || '',
-                raw_data: finalMessage || '',
+                raw_content: finalMessage.data.content || '',
+                raw_data: finalMessage.data || '',
             } as AgentMessageData;
             console.log('✅ Parsed final result message:', agentMessageData);
+            setStreamingMessageBuffer("");
             setAgentMessages(prev => [...prev, agentMessageData]);
-            setSubmittingChatDisableInput(true);
             scrollToBottom();
 
         });
@@ -438,7 +440,7 @@ const PlanPage: React.FC = () => {
                     );
                 }
             } finally {
-                setSubmittingChatDisableInput(false);
+
             }
         },
         [planData?.plan, showToast, dismissToast, loadPlanData]

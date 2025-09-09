@@ -9,13 +9,13 @@ import rehypePrism from "rehype-prism";
 
 const renderBufferMessage = (streamingMessageBuffer: string) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    
+
     if (!streamingMessageBuffer || streamingMessageBuffer.trim() === "") return null;
-    
-    const previewText = streamingMessageBuffer.length > 500 
+
+    const previewText = streamingMessageBuffer.length > 500
         ? streamingMessageBuffer.substring(0, 500) + "..."
         : streamingMessageBuffer;
-    
+
     return (
         <div style={{
             backgroundColor: 'var(--colorNeutralBackground2)',
@@ -24,16 +24,16 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
             padding: '16px',
             marginBottom: '16px'
         }}>
-            
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 marginBottom: isExpanded ? '16px' : '8px'
             }}>
-               <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '12px'
                 }}>
                     <CheckmarkCircle20Regular style={{
@@ -43,8 +43,8 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
                         height: '20px',
                         flexShrink: 0
                     }} />
-                    <span style={{ 
-                        fontWeight: '500', 
+                    <span style={{
+                        fontWeight: '500',
                         color: 'var(--colorNeutralForeground1)',
                         fontSize: '14px',
                         lineHeight: '20px'
@@ -52,9 +52,9 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
                         AI Thinking Process
                     </span>
                 </div>
-                
-                <Button 
-                    appearance="secondary" 
+
+                <Button
+                    appearance="secondary"
                     size="small"
                     // icon={isExpanded ? <ChevronDownRegular /> : <ChevronRightRegular />}
                     onClick={() => setIsExpanded(!isExpanded)}
@@ -69,13 +69,13 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
                     Details
                 </Button>
             </div>
-            
+
             {!isExpanded && (
                 <div style={{
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '8px',
-                    marginLeft: '32px' 
+                    marginLeft: '32px'
                 }}>
                     <ArrowTurnDownRightRegular style={{
                         color: 'var(--colorNeutralForeground3)',
@@ -88,11 +88,17 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
                         fontSize: '14px',
                         lineHeight: '1.4'
                     }}>
-                        {previewText}
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypePrism]}
+                        >
+                            {previewText}
+                        </ReactMarkdown>
+
                     </div>
                 </div>
             )}
-            
+
             {isExpanded && (
                 <div style={{
                     // backgroundColor: 'var(--colorNeutralBackground1)',
