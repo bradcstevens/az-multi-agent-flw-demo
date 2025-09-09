@@ -65,12 +65,10 @@ export interface HumanFeedback {
  * Message containing human clarification on a plan
  */
 export interface HumanClarification {
-    /** Plan identifier */
+    request_id: string;
+    answer: string;
     plan_id: string;
-    /** Session identifier */
-    session_id: string;
-    /** Clarification from human */
-    human_clarification: string;
+    m_plan_id: string;
 }
 
 /**
