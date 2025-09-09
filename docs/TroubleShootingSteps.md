@@ -491,5 +491,45 @@ For more details, refer to [Azure Storage redundancy documentation](https://lear
 
 </details>
 
+<details>
+<summary><b>SubscriptionDoesNotHaveServer</b></summary>
+ 
+- This issue happens when you try to reference an **Azure SQL Server** (`Microsoft.Sql/servers`) that does not exist in the selected subscription.  
+- It can occur if:  
+  - The SQL server name is typed incorrectly.  
+  - The SQL server was **deleted** but is still being referenced.  
+  - You are working in the **wrong subscription context**.  
+  - The server exists in a **different subscription/tenant** where you don’t have access.
+ 
+**Reproduce:**  
+1. Run an Azure CLI command with a non-existent server name:
+```bash
+   az sql db list --server sql-doesnotexist --resource-group myResourceGroup
+```
+ 
+  or
+ 
+```bash
+  az sql server show --name sql-caqfrhxr4i3hyj --resource-group myResourceGroup
+ 
+```
+   
+Resolution:
+ 
+Verify the SQL Server name exists in your subscription:
+ 
+```bash
+    az sql server list --output table
+```
+Make sure you are targeting the correct subscription:
+ 
+```bash
+    az account show
+    az account set --subscription <subscription-id>
+```
+If the server was deleted, either restore it (if possible) or update references to use a valid existing server.
+ 
+</details>
+
 💡 Note: If you encounter any other issues, you can refer to the [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) documentation.
 If the problem persists, you can also raise an bug in our [MACAE Github Issues](https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/issues) for further support.
