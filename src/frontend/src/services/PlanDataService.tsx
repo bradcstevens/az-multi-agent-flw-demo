@@ -6,7 +6,9 @@ import {
   PlanMessage,
   MPlanData,
   StepStatus,
-  WebsocketMessageType
+  WebsocketMessageType,
+  ParsedUserClarification,
+  AgentMessageType
 } from "@/models";
 import { apiService } from "@/api";
 
@@ -46,7 +48,7 @@ export class PlanDataService {
     messages: PlanMessage[]
   ): ProcessedPlanData {
     // Extract unique agents from steps
-    console.log("Processing plan data for plan ID:", plan);
+
     const uniqueAgents = new Set<AgentType>();
     if (plan.steps && plan.steps.length > 0) {
       plan.steps.forEach((step) => {
@@ -139,13 +141,19 @@ export class PlanDataService {
    * @param clarification Clarification text
    * @returns Promise with API response
    */
-  static async submitClarification(
-    planId: string,
-    sessionId: string,
-    clarification: string
-  ) {
+  static async submitClarification({
+    request_id,
+    answer,
+    plan_id,
+    m_plan_id
+  }: {
+    request_id: string;
+    answer: string;
+    plan_id: string;
+    m_plan_id: string;
+  }) {
     try {
-      return apiService.submitClarification(planId, sessionId, clarification);
+      return apiService.submitClarification(request_id, answer, plan_id, m_plan_id);
     } catch (error) {
       console.log("Failed to submit clarification:", error);
       throw error;
@@ -359,6 +367,7 @@ export class PlanDataService {
    */
   static parseAgentMessage(rawData: any): {
     agent: string;
+    agent_type: AgentMessageType;
     timestamp: number | null;
     steps: Array<{
       title: string;
@@ -460,6 +469,7 @@ export class PlanDataService {
 
       return {
         agent,
+        agent_type: AgentMessageType.AI_AGENT,
         timestamp,
         steps,
         next_steps: nextSteps,
@@ -521,5 +531,147 @@ export class PlanDataService {
       return null;
     }
   }
+  // ...inside export class PlanDataService { (place near other parsers, e.g. after parseAgentMessageStreaming)
+
+  /**
+   * Parse a user clarification request message (possibly deeply nested).
+   * Accepts objects like:
+   * {
+   *   type: 'user_clarification_request',
+   *   data: { type: 'user_clarification_request', data: { type: 'user_clarification_request', data: "UserClarificationRequest(...)" } }
+   * }
+   * Returns ParsedUserClarification or null if not parsable.
+   */
+  // ...existing code...
+  /**
+   * Parse a user clarification request message (possibly deeply nested).
+   * Enhanced to support:
+   *  - question in single OR double quotes
+   *  - request_id in single OR double quotes
+   *  - escaped newline / quote sequences
+   */
+  static parseUserClarificationRequest(rawData: any): ParsedUserClarification | null {
+    try {
+      const extractString = (val: any, depth = 0): string | null => {
+        if (depth > 15) return null;
+        if (typeof val === 'string') {
+          return val.startsWith('UserClarificationRequest(') ? val : null;
+        }
+        if (val && typeof val === 'object') {
+          // Prefer .data traversal
+          if (val.data !== undefined) {
+            const inner = extractString(val.data, depth + 1);
+            if (inner) return inner;
+          }
+          for (const k of Object.keys(val)) {
+            if (k === 'data') continue;
+            const inner = extractString(val[k], depth + 1);
+            if (inner) return inner;
+          }
+        }
+        return null;
+      };
+
+      const source = extractString(rawData);
+      if (!source) return null;
+
+      // question=( "...") OR ('...')
+      const questionRegex = /question=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/;
+      const qMatch = source.match(questionRegex);
+      if (!qMatch) return null;
+
+      let question = (qMatch[1] ?? qMatch[2] ?? '')
+        .replace(/\\n/g, '\n')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+        .trim();
+
+      // request_id='uuid' or "uuid"
+      const requestIdRegex = /request_id=(?:"([a-fA-F0-9-]+)"|'([a-fA-F0-9-]+)')/;
+      const rMatch = source.match(requestIdRegex);
+      if (!rMatch) return null;
+      const request_id = rMatch[1] ?? rMatch[2];
+
+      return {
+        type: WebsocketMessageType.USER_CLARIFICATION_REQUEST,
+        question,
+        request_id
+      };
+    } catch (e) {
+      console.error('parseUserClarificationRequest failed:', e);
+      return null;
+    }
+  }
+  // ...inside export class PlanDataService (place near other parsers) ...
+
+  /**
+   * Parse a final result message (possibly nested).
+   * Accepts structures like:
+   * {
+   *   type: 'final_result_message',
+   *   data: { type: 'final_result_message', data: { content: '...', status: 'completed', timestamp: 12345.6 } }
+   * }
+   * Returns null if not parsable.
+   */
+  static parseFinalResultMessage(rawData: any): {
+    type: WebsocketMessageType;
+    content: string;
+    status: string;
+    timestamp: number | null;
+    raw_data: any;
+  } | null {
+    try {
+      const extractPayload = (val: any, depth = 0): any => {
+        if (depth > 10) return null;
+        if (!val || typeof val !== 'object') return null;
+        // If it has content & status, assume it's the payload
+        if (('content' in val) && ('status' in val)) return val;
+        if ('data' in val) {
+          const inner = extractPayload(val.data, depth + 1);
+          if (inner) return inner;
+        }
+        // Scan other keys as fallback
+        for (const k of Object.keys(val)) {
+          if (k === 'data') continue;
+          const inner = extractPayload(val[k], depth + 1);
+          if (inner) return inner;
+        }
+        return null;
+      };
+
+      const payload = extractPayload(rawData);
+      if (!payload) return null;
+
+      let content = typeof payload.content === 'string' ? payload.content : '';
+      content = content
+        .replace(/\\n/g, '\n')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+        .trim();
+
+      const statusRaw = (payload.status || 'completed').toString().trim();
+      const status = statusRaw.toLowerCase();
+
+      let timestamp: number | null = null;
+      if (payload.timestamp != null) {
+        const num = Number(payload.timestamp);
+        if (!Number.isNaN(num)) timestamp = num;
+      }
+
+      return {
+        type: WebsocketMessageType.FINAL_RESULT_MESSAGE,
+        content,
+        status,
+        timestamp,
+        raw_data: rawData
+      };
+    } catch (e) {
+      console.error('parseFinalResultMessage failed:', e);
+      return null;
+    }
+  }
+
 
 }

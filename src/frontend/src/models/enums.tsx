@@ -251,3 +251,8 @@ export enum WebsocketMessageType {
     USER_CLARIFICATION_RESPONSE = "user_clarification_response",
     FINAL_RESULT_MESSAGE = "final_result_message"
 }
+
+export enum AgentMessageType {
+    HUMAN_AGENT = "Human_Agent",
+    AI_AGENT = "AI_Agent",
+}

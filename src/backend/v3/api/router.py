@@ -424,6 +424,36 @@ async def user_clarification(
         )
     # Set the approval in the orchestration config
     if user_id and human_feedback.request_id:
+        ### validate rai 
+        if human_feedback.answer != None or human_feedback.answer !="":
+          if not await rai_success(human_feedback.answer, False):
+                track_event_if_configured(
+                    "RAI failed",
+                    {
+                        "status": "Plan Clarification ",
+                        "description": human_feedback.answer,
+                        "request_id": human_feedback.request_id,
+                    },
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error_type": "RAI_VALIDATION_FAILED",
+                        "message": "Content Safety Check Failed",
+                        "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
+                        "suggestions": [
+                            "Remove any potentially harmful, inappropriate, or unsafe content",
+                            "Use more professional and constructive language",
+                            "Focus on legitimate business or educational objectives",
+                            "Ensure your request complies with content policies",
+                        ],
+                        "user_action": "Please revise your request and try again",
+                    },
+                )
+
+
+
+
         if (
             orchestration_config
             and human_feedback.request_id in orchestration_config.clarifications

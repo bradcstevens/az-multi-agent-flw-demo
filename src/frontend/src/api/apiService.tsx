@@ -290,14 +290,16 @@ export class APIService {
      * @returns Promise with response object
      */
     async submitClarification(
-        planId: string,
-        sessionId: string,
-        clarification: string
+        request_id: string = "",
+        answer: string = "",
+        plan_id: string = "",
+        m_plan_id: string = ""
     ): Promise<{ status: string; session_id: string }> {
         const clarificationData: HumanClarification = {
-            plan_id: planId,
-            session_id: sessionId,
-            human_clarification: clarification
+            request_id,
+            answer,
+            plan_id,
+            m_plan_id
         };
 
         const response = await apiClient.post(
@@ -306,7 +308,7 @@ export class APIService {
         );
 
         // Invalidate cached data
-        this._cache.invalidate(new RegExp(`^(plan|steps)_${planId}`));
+        this._cache.invalidate(new RegExp(`^(plan|steps)_${plan_id}`));
         this._cache.invalidate(new RegExp(`^plans_`));
 
         return response;

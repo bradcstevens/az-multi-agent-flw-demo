@@ -65,12 +65,10 @@ export interface HumanFeedback {
  * Message containing human clarification on a plan
  */
 export interface HumanClarification {
-    /** Plan identifier */
+    request_id: string;
+    answer: string;
     plan_id: string;
-    /** Session identifier */
-    session_id: string;
-    /** Clarification from human */
-    human_clarification: string;
+    m_plan_id: string;
 }
 
 /**
@@ -168,4 +166,10 @@ export interface ParsedPlanApprovalRequest {
     plan_id: string;
     parsedData: MPlanData;
     rawData: string;
+}
+
+export interface ParsedUserClarification {
+    type: WebsocketMessageType.USER_CLARIFICATION_REQUEST;
+    question: string;
+    request_id: string;
 }

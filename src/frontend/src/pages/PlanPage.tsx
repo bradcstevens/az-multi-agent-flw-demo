@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData } from "../models";
+import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -42,8 +42,9 @@ const PlanPage: React.FC = () => {
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
     const [allPlans, setAllPlans] = useState<ProcessedPlanData[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [submittingChatDisableInput, setSubmitting] = useState<boolean>(false);
+    const [submittingChatDisableInput, setSubmittingChatDisableInput] = useState<boolean>(true);
     const [error, setError] = useState<Error | null>(null);
+    const [clarificationMessage, setClarificationMessage] = useState<ParsedUserClarification | null>(null);
 
     const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
     const [reloadLeftList, setReloadLeftList] = useState(true);
@@ -52,8 +53,7 @@ const PlanPage: React.FC = () => {
     const [wsConnected, setWsConnected] = useState(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
     const [streamingMessageBuffer, setStreamingMessageBuffer] = useState<string>("");
-    // RAI Error state
-    const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
+
 
     const [agentMessages, setAgentMessages] = useState<AgentMessageData[]>([]);
     // Team config state
@@ -137,6 +137,19 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.USER_CLARIFICATION_REQUEST, (clarificationMessage: any) => {
             console.log('📋 Clarification Message', clarificationMessage);
+            const agentMessageData = {
+                agent: 'ProxyAgent',
+                agent_type: AgentMessageType.AI_AGENT,
+                timestamp: clarificationMessage.timestamp || Date.now(),
+                steps: [],   // intentionally always empty
+                next_steps: [],  // intentionally always empty
+                raw_content: clarificationMessage.data.question || '',
+                raw_data: clarificationMessage.data || '',
+            } as AgentMessageData;
+            console.log('✅ Parsed clarification message:', agentMessageData);
+            setClarificationMessage(clarificationMessage.data as ParsedUserClarification | null);
+            setAgentMessages(prev => [...prev, agentMessageData]);
+            setSubmittingChatDisableInput(false);
             scrollToBottom();
 
         });
@@ -153,6 +166,31 @@ const PlanPage: React.FC = () => {
 
         return () => unsubscribe();
     }, [scrollToBottom]);
+
+
+    //WebsocketMessageType.FINAL_RESULT_MESSAGE
+    useEffect(() => {
+        const unsubscribe = webSocketService.on(WebsocketMessageType.FINAL_RESULT_MESSAGE, (finalMessage: any) => {
+            console.log('📋 Final Result Message', finalMessage);
+            const agentMessageData = {
+                agent: 'ProxyAgent',
+                agent_type: AgentMessageType.AI_AGENT,
+                timestamp: Date.now(),
+                steps: [],   // intentionally always empty
+                next_steps: [],  // intentionally always empty
+                raw_content: finalMessage.content || '',
+                raw_data: finalMessage || '',
+            } as AgentMessageData;
+            console.log('✅ Parsed final result message:', agentMessageData);
+            setAgentMessages(prev => [...prev, agentMessageData]);
+            setSubmittingChatDisableInput(true);
+            scrollToBottom();
+
+        });
+
+        return () => unsubscribe();
+    }, [scrollToBottom]);
+
 
     //WebsocketMessageType.AGENT_MESSAGE
     useEffect(() => {
@@ -325,24 +363,39 @@ const PlanPage: React.FC = () => {
                 return;
             }
             setInput("");
-            setRAIError(null); // Clear any previous RAI errors
+
             if (!planData?.plan) return;
-            setSubmitting(true);
+            setSubmittingChatDisableInput(true);
             let id = showToast("Submitting clarification", "progress");
 
             try {
                 // Use legacy method for non-v3 backends
-                await PlanDataService.submitClarification(
-                    planData.plan.id,
-                    planData.plan.session_id,
-                    chatInput
-                );
+                const response = await PlanDataService.submitClarification({
+                    request_id: clarificationMessage?.request_id || "",
+                    answer: chatInput,
+                    plan_id: planData?.plan.id,
+                    m_plan_id: planApprovalRequest?.id || ""
+                });
 
-
+                console.log("Clarification submitted successfully:", response);
                 setInput("");
                 dismissToast(id);
                 showToast("Clarification submitted successfully", "success");
-                await loadPlanData(false);
+                setClarificationMessage(null);
+                const agentMessageData = {
+                    agent: 'You',
+                    agent_type: AgentMessageType.HUMAN_AGENT,
+                    timestamp: Date.now(),
+                    steps: [],   // intentionally always empty
+                    next_steps: [],  // intentionally always empty
+                    raw_content: chatInput || '',
+                    raw_data: chatInput || '',
+                } as AgentMessageData;
+
+                setAgentMessages(prev => [...prev, agentMessageData]);
+                setSubmittingChatDisableInput(true);
+                scrollToBottom();
+
             } catch (error: any) {
                 dismissToast(id);
 
@@ -373,7 +426,7 @@ const PlanPage: React.FC = () => {
                         ],
                         user_action: 'Please modify your input and try again.'
                     };
-                    setRAIError(raiErrorData);
+
                 } else {
                     // Handle other types of errors
                     showToast(
@@ -385,7 +438,7 @@ const PlanPage: React.FC = () => {
                     );
                 }
             } finally {
-                setSubmitting(false);
+                setSubmittingChatDisableInput(false);
             }
         },
         [planData?.plan, showToast, dismissToast, loadPlanData]
