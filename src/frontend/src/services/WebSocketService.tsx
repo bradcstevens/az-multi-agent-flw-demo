@@ -246,8 +246,9 @@ class WebSocketService {
             case WebsocketMessageType.FINAL_RESULT_MESSAGE: {
                 console.log("Message final result':", message);
                 if (message.data) {
-                    //const transformed = PlanDataService.parseFinalResultMessage(message);
-                    this.emit(WebsocketMessageType.FINAL_RESULT_MESSAGE, message);
+                    const transformed = PlanDataService.parseFinalResultMessage(message);
+                    console.log('WebSocket FINAL_RESULT_MESSAGE received:', transformed);
+                    this.emit(WebsocketMessageType.FINAL_RESULT_MESSAGE, transformed);
                 }
                 break;
             }

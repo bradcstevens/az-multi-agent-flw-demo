@@ -125,6 +125,7 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE_STREAMING, (streamingMessage: any) => {
             // console.log('📋 Streaming Message', streamingMessage);
+            // if is final true clear buffer and add final message to agent messages
             setStreamingMessageBuffer(prev => prev + streamingMessage.data.content);
             scrollToBottom();
 
