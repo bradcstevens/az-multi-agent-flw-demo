@@ -56,10 +56,6 @@ Here is an example of a well-structured plan:
 - **ProxyAgent** to review the drafted onboarding plan for clarity and completeness.
 - **MagenticManager** to finalize the onboarding plan and prepare it for presentation to stakeholders.
 
-TOOLS AND ADDITIONAL INFORMATION:
-Before asking the user for any additional information, ask all team members to list any relevant tools they have access to (for example through MCP), and 
-their required parameters.  Use this information to determine if more information is required from the user to use these tools. 
-Then, use the ProxyAgent to retrieve this specific information if needed.
 """
 
         # kwargs["task_ledger_facts_prompt"] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + facts_append
