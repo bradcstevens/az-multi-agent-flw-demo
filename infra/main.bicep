@@ -110,32 +110,34 @@ param virtualMachineAdminUsername string = take(newGuid(), 20)
 @secure()
 param virtualMachineAdminPassword string = newGuid()
 
+// These parameters are changed for testing - please reset as part of publication
+
 @description('Optional. The Container Registry hostname where the docker images for the backend are located.')
-param backendContainerRegistryHostname string = 'biabcontainerreg.azurecr.io'
+param backendContainerRegistryHostname string = 'macaev3tst1acr.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the backend.')
 param backendContainerImageName string = 'macaebackend'
 
 @description('Optional. The Container Image Tag to deploy on the backend.')
-param backendContainerImageTag string = 'latest_2025-07-22_895'
+param backendContainerImageTag string = 'v3tst1'
 
 @description('Optional. The Container Registry hostname where the docker images for the frontend are located.')
-param frontendContainerRegistryHostname string = 'biabcontainerreg.azurecr.io'
+param frontendContainerRegistryHostname string = 'macaev3tst1acr.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the frontend.')
 param frontendContainerImageName string = 'macaefrontend'
 
 @description('Optional. The Container Image Tag to deploy on the frontend.')
-param frontendContainerImageTag string = 'latest_2025-07-22_895'
+param frontendContainerImageTag string = 'v3tst1'
 
 @description('Optional. The Container Registry hostname where the docker images for the MCP are located.')
-param MCPContainerRegistryHostname string = 'macaemcpacrdk.azurecr.io'
+param MCPContainerRegistryHostname string = 'macaev3tst1acr.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the MCP.')
-param MCPContainerImageName string = 'macae-mac-app'
+param MCPContainerImageName string = 'mcp_server'
 
 @description('Optional. The Container Image Tag to deploy on the MCP.')
-param MCPContainerImageTag string = 't9'
+param MCPContainerImageTag string = 'v3tst1'
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
