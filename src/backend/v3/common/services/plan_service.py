@@ -76,7 +76,7 @@ class PlanService:
         return True
 
     @staticmethod
-    async def handle_agent_messages(standard_message: messages.AgentMessage) -> bool:
+    async def handle_agent_messages(standard_message: messages.AgentMessage, user_id: str) -> bool:
         """
         Process an AgentMessage coming from the client.
 
@@ -93,7 +93,7 @@ class PlanService:
         return True
     
     @staticmethod
-    async def handle_human_clarification(human_feedback: messages.UserClarificationResponse) -> bool:
+    async def handle_human_clarification(human_feedback: messages.UserClarificationResponse, user_id: str) -> bool:
         """
         Process a UserClarificationResponse coming from the client.
 
