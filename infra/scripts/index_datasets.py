@@ -51,19 +51,19 @@ for idx, blob in enumerate(blob_list, start=1):
     #if blob.name.endswith(".csv"):
     title = blob.name.replace(".csv", "")
     title = blob.name.replace(".json", "")
-    csv_data = container_client.download_blob(blob.name).readall()
+    data = container_client.download_blob(blob.name).readall()
     
     try:
         print(f"Reading data from blob: {blob.name}...")
-        csv_text = csv_data.decode('utf-8')
+        text = data.decode('utf-8')
         data_list.append({
-            "content": csv_text,
+            "content": text,
             "id": str(idx),
             "title": title
         })
         success_count += 1
     except Exception as e:
-        print(f"Error reading CSV file - {blob.name}: {e}")
+        print(f"Error reading file - {blob.name}: {e}")
         fail_count += 1
         continue
 
