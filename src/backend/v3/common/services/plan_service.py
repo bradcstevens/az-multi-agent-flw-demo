@@ -51,3 +51,37 @@ class PlanService:
             print(f"Error processing plan approval: {e}")
             return False
         return True
+
+    @staticmethod
+    async def handle_agent_messages(standard_message: messages.AgentMessage) -> bool:
+        """
+        Process an AgentMessage coming from the client.
+
+        Args:
+            standard_message: messages.AgentMessage (contains relevant message data)
+            user_id: authenticated user id
+
+        Returns:
+            dict with status and metadata
+
+        Raises:
+            ValueError on invalid state
+        """
+        return True
+    
+    @staticmethod
+    async def handle_human_clarification(standard_message: messages.AgentMessage) -> bool:
+        """
+        Process an AgentMessage coming from the client.
+
+        Args:
+            standard_message: messages.AgentMessage (contains relevant message data)
+            user_id: authenticated user id
+
+        Returns:
+            dict with status and metadata
+
+        Raises:
+            ValueError on invalid state
+        """
+        return True

@@ -199,18 +199,19 @@ class ConnectionConfig:
             )
             return
 
-        print(f" websocket {message}")
+
         try:
             if hasattr(message, "data") and hasattr(message, "type"):
                 message = message.data
         except Exception as e:
-                print(f"Error loading message data: {e}")
-        print(f" websocket after {message}")
+            logger.debug(f"Error loading message data: {e}")
+
         standard_message = {
             "type": message_type,
             "data": message
         }
         connection = self.get_connection(process_id)
+        
         if connection:
             try:
                 str_message = json.dumps(standard_message, default=str)
