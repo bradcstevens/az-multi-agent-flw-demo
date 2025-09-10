@@ -1,86 +1,120 @@
 import { MPlanData } from "@/models";
 import { 
     Button, 
-    Text, 
-    Title3, 
+    Text,  
     Body1, 
-    Caption1,
     Badge,
     makeStyles,
     tokens
 } from "@fluentui/react-components";
 import { 
-    BotRegular, 
-    Copy20Regular, 
-    InfoRegular, 
-    ClockRegular,
     CheckmarkCircle20Regular 
 } from "@fluentui/react-icons";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypePrism from "rehype-prism";
 import React, { useState } from 'react';
+import { TeamService } from "@/services/TeamService";
+import { TaskService } from "@/services";
+import { iconMap } from "@/models/homeInput";
+import { Desktop20Regular } from "@fluentui/react-icons";
 
-// FluentUI styles using design tokens with 14px max font size
+// Function to get agent icon from team configuration
+const getAgentIconFromTeam = (agentName: string): React.ReactNode => {
+  const storedTeam = TeamService.getStoredTeam();
+  
+  if (!storedTeam?.agents) {
+    return <Desktop20Regular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />;
+  }
+
+  const cleanAgentName = TaskService.cleanTextToSpaces(agentName);
+  
+  const agent = storedTeam.agents.find(a => 
+    TaskService.cleanTextToSpaces(a.name).toLowerCase().includes(cleanAgentName.toLowerCase()) ||
+    a.type.toLowerCase().includes(cleanAgentName.toLowerCase()) ||
+    a.input_key.toLowerCase().includes(cleanAgentName.toLowerCase())
+  );
+
+  if (agent?.icon && iconMap[agent.icon]) {
+    return React.cloneElement(iconMap[agent.icon] as React.ReactElement, {
+      style: { fontSize: '16px', color: 'var(--colorNeutralForeground2)' }
+    });
+  }
+
+  // Use Desktop icon for AI agents instead of Person icon
+  return <Desktop20Regular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />;
+};
+
+// Updated styles to match consistent spacing and remove brand colors from bot elements
 const useStyles = makeStyles({
     container: {
         maxWidth: '800px',
-        margin: '0 auto',
-        padding: `${tokens.spacingVerticalXXL} ${tokens.spacingHorizontalXL}`,
-        backgroundColor: tokens.colorNeutralBackground1,
+        margin: '0 auto 32px auto',
+        padding: '0 24px',
         fontFamily: tokens.fontFamilyBase
     },
     agentHeader: {
         display: 'flex',
         alignItems: 'center',
-        gap: tokens.spacingHorizontalM,
-        marginBottom: tokens.spacingVerticalXL,
-        padding: tokens.spacingVerticalM,
-        backgroundColor: tokens.colorNeutralBackground2,
-        borderRadius: tokens.borderRadiusMedium
+        gap: '16px',
+        marginBottom: '8px'
     },
     agentAvatar: {
         width: '32px',
         height: '32px',
         borderRadius: '50%',
-        backgroundColor: tokens.colorBrandForeground1,
+        backgroundColor: 'var(--colorNeutralBackground3)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0
     },
+    hiddenAvatar: {
+        width: '32px',
+        height: '32px',
+        visibility: 'hidden',
+        flexShrink: 0
+    },
     agentInfo: {
         display: 'flex',
         alignItems: 'center',
-        gap: tokens.spacingHorizontalM,
+        gap: '12px',
         flex: 1
     },
     agentName: {
         fontSize: '14px',
-        fontWeight: tokens.fontWeightSemibold,
-        color: tokens.colorNeutralForeground1,
-        lineHeight: tokens.lineHeightBase400
+        fontWeight: '600',
+        color: 'var(--colorNeutralForeground1)',
+        lineHeight: '20px'
     },
     botBadge: {
-        border: 'none',
         fontSize: '11px',
-        fontWeight: tokens.fontWeightSemibold,
+        fontWeight: '600',
         textTransform: 'uppercase',
-        letterSpacing: '0.5px'
+        letterSpacing: '0.5px',
+        backgroundColor: 'var(--colorNeutralBackground3)',
+        color: 'var(--colorNeutralForeground1)',
+        border: '1px solid var(--colorNeutralStroke2)',
+        padding: '2px 8px',
+        borderRadius: '4px'
+    },
+    messageContainer: {
+        backgroundColor: 'var(--colorNeutralBackground2)',
+        padding: '12px 16px',
+        borderRadius: '8px',
+        fontSize: '14px',
+        lineHeight: '1.5',
+        wordWrap: 'break-word'
     },
     factsSection: {
-        marginBottom: tokens.spacingVerticalXL,
-        marginLeft: `calc(32px + ${tokens.spacingHorizontalM} + ${tokens.spacingVerticalM})`,
-        backgroundColor: tokens.colorNeutralBackground2,
-        border: `1px solid ${tokens.colorNeutralStroke1}`,
+        backgroundColor: 'var(--colorNeutralBackground2)',
+        border: '1px solid var(--colorNeutralStroke2)',
         borderRadius: '8px',
-        padding: '16px'
+        padding: '16px',
+        marginBottom: '16px'
     },
     factsHeader: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '8px'
+        marginBottom: '12px'
     },
     factsHeaderLeft: {
         display: 'flex',
@@ -89,78 +123,87 @@ const useStyles = makeStyles({
     },
     factsTitle: {
         fontWeight: '500',
-        color: tokens.colorNeutralForeground1,
+        color: 'var(--colorNeutralForeground1)',
         fontSize: '14px',
         lineHeight: '20px'
     },
     factsButton: {
-        backgroundColor: tokens.colorNeutralBackground3,
-        border: `1px solid ${tokens.colorNeutralStroke2}`,
+        backgroundColor: 'var(--colorNeutralBackground3)',
+        border: '1px solid var(--colorNeutralStroke2)',
         borderRadius: '16px',
         padding: '4px 12px',
-        fontSize: '12px'
+        fontSize: '14px',
+        fontWeight: '500',
+        cursor: 'pointer'
     },
     factsPreview: {
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '8px',
-        marginLeft: '32px'
+        fontSize: '14px',
+        lineHeight: '1.4',
+        color: 'var(--colorNeutralForeground2)',
+        marginTop: '8px'
     },
     factsContent: {
-        padding: '12px',
-        marginTop: '8px',
         fontSize: '14px',
-        lineHeight: '1.4'
+        lineHeight: '1.5',
+        color: 'var(--colorNeutralForeground2)',
+        marginTop: '8px',
+        whiteSpace: 'pre-wrap'
+    },
+    planTitle: {
+        marginBottom: '20px',
+        fontSize: '18px',
+        fontWeight: '600',
+        color: 'var(--colorNeutralForeground1)',
+        lineHeight: '24px'
     },
     stepsList: {
-        marginBottom: tokens.spacingVerticalXXL,
-        marginLeft: `calc(32px + ${tokens.spacingHorizontalM} + ${tokens.spacingVerticalM})`
+        marginBottom: '16px'
     },
     stepItem: {
-        marginBottom: tokens.spacingVerticalL,
         display: 'flex',
         alignItems: 'flex-start',
-        gap: tokens.spacingHorizontalS
+        gap: '12px',
+        marginBottom: '12px'
     },
     stepNumber: {
-        fontSize: '14px',
-        fontWeight: tokens.fontWeightSemibold,
-        color: tokens.colorNeutralForeground1,
         minWidth: '24px',
+        height: '24px',
+        borderRadius: '50%',
+       color: 'var(--colorNeutralForeground1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '12px',
+        fontWeight: '600',
         flexShrink: 0,
         marginTop: '2px'
     },
-    stepHeading: {
-        marginBottom: tokens.spacingVerticalM,
-        marginLeft: `calc(32px + ${tokens.spacingHorizontalM} + ${tokens.spacingVerticalM})`,
-        fontSize: '14px',
-        fontWeight: tokens.fontWeightSemibold,
-        color: tokens.colorNeutralForeground1,
-        lineHeight: '1.5'
-    },
     stepText: {
         fontSize: '14px',
-        color: tokens.colorNeutralForeground1,
+        color: 'var(--colorNeutralForeground1)',
         lineHeight: '1.5',
         flex: 1,
         wordWrap: 'break-word',
         overflowWrap: 'break-word'
     },
+    stepHeading: {
+        marginBottom: '12px',
+        fontSize: '16px',
+        fontWeight: '600',
+        color: 'var(--colorNeutralForeground1)',
+        lineHeight: '22px'
+    },
     instructionText: {
-        marginBottom: tokens.spacingVerticalXL,
-        color: tokens.colorNeutralForeground2,
+        color: 'var(--colorNeutralForeground2)',
         fontSize: '14px',
-        lineHeight: tokens.lineHeightBase400,
-        textAlign: 'left',
-        marginLeft: `calc(32px + ${tokens.spacingHorizontalM} + ${tokens.spacingVerticalM})`
+        lineHeight: '1.5',
+        marginBottom: '16px'
     },
     buttonContainer: {
         display: 'flex',
-        gap: tokens.spacingHorizontalM,
-        paddingTop: tokens.spacingVerticalM,
+        gap: '12px',
         alignItems: 'center',
-        justifyContent: 'flex-start',
-        marginLeft: `calc(32px + ${tokens.spacingHorizontalM} + ${tokens.spacingVerticalM})`
+        marginTop: '20px'
     }
 });
 
@@ -272,7 +315,7 @@ const getFactsPreview = (content: string): string => {
     return content.length > 200 ? content.substring(0, 200) + "..." : content;
 };
 
-// FluentUI-based plan response component
+// FluentUI-based plan response component with consistent spacing and proper colors
 const renderPlanResponse = (
     planApprovalRequest: MPlanData | null, 
     handleApprovePlan: () => void, 
@@ -289,133 +332,143 @@ const renderPlanResponse = (
     const { factsContent, planSteps } = extractDynamicContent(planApprovalRequest);
     const factsPreview = getFactsPreview(factsContent);
 
+    // Check if this is a "creating plan" state
+    const isCreatingPlan = !planSteps.length && !factsContent;
+
     let stepCounter = 0;
 
     return (
         <div className={styles.container}>
             {/* Agent Header */}
             <div className={styles.agentHeader}>
-                <div className={styles.agentAvatar}>
-                    <BotRegular style={{ fontSize: '16px', color: tokens.colorNeutralForeground2 }} />
-                </div>
+                {/* Hide avatar when creating plan */}
+                {isCreatingPlan ? (
+                    <div className={styles.hiddenAvatar}></div>
+                ) : (
+                    <div className={styles.agentAvatar}>
+                        {getAgentIconFromTeam(agentName)}
+                    </div>
+                )}
                 <div className={styles.agentInfo}>
                     <Text className={styles.agentName}>
                         {agentName}
                     </Text>
-                    <Badge 
-                        appearance="filled" 
-                        size="small"
-                        className={styles.botBadge}
-                    >
-                        BOT
-                    </Badge>
+                    {!isCreatingPlan && (
+                        <Badge 
+                            appearance="filled" 
+                            size="small"
+                            className={styles.botBadge}
+                        >
+                            BOT
+                        </Badge>
+                    )}
                 </div>
             </div>
 
-            {/* Facts Section */}
-            {factsContent && (
-                <div className={styles.factsSection}>
-                    <div className={styles.factsHeader}>
-                        <div className={styles.factsHeaderLeft}>
-                            <CheckmarkCircle20Regular style={{
-                                color: tokens.colorNeutralForeground2,
-                                fontSize: '20px',
-                                width: '20px',
-                                height: '20px',
-                                flexShrink: 0
-                            }} />
-                            <span className={styles.factsTitle}>
-                                Analysis & Context
-                            </span>
+            {/* Message Container */}
+            <div className={styles.messageContainer}>
+                {/* Facts Section */}
+                {factsContent && (
+                    <div className={styles.factsSection}>
+                        <div className={styles.factsHeader}>
+                            <div className={styles.factsHeaderLeft}>
+                                <CheckmarkCircle20Regular style={{
+                                    color: 'var(--colorNeutralForeground1)',
+                                    fontSize: '20px',
+                                    width: '20px',
+                                    height: '20px',
+                                    flexShrink: 0
+                                }} />
+                                <span className={styles.factsTitle}>
+                                    Analysis
+                                </span>
+                            </div>
+                            
+                            <Button 
+                                appearance="secondary" 
+                                size="small"
+                                onClick={() => setIsFactsExpanded(!isFactsExpanded)}
+                                className={styles.factsButton}
+                            >
+                                {isFactsExpanded ? 'Hide' : 'Details'}
+                            </Button>
                         </div>
                         
-                        <Button 
-                            appearance="secondary" 
-                            size="small"
-                            onClick={() => setIsFactsExpanded(!isFactsExpanded)}
-                            className={styles.factsButton}
-                        >
-                            {isFactsExpanded ? 'Hide' : 'Details'}
-                        </Button>
-                    </div>
-                    
-                    {!isFactsExpanded && (
-                        <div className={styles.factsPreview}>
-                            <div style={{
-                                color: tokens.colorNeutralForeground2,
-                                fontSize: '14px',
-                                lineHeight: '1.4'
-                            }}>
+                        {!isFactsExpanded && (
+                            <div className={styles.factsPreview}>
                                 {factsPreview}
                             </div>
-                        </div>
-                    )}
-                    
-                    {isFactsExpanded && (
-                        <div className={styles.factsContent}>
-                            <div style={{ whiteSpace: 'pre-wrap' }}>
+                        )}
+                        
+                        {isFactsExpanded && (
+                            <div className={styles.factsContent}>
                                 {factsContent}
                             </div>
-                        </div>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
+                )}
 
-            {/* Plan Steps - Better formatting like the image */}
-            {planSteps.length > 0 && (
-                <div className={styles.stepsList}>
-                    {planSteps.map((step, index) => {
-                        if (step.type === 'heading') {
-                            return (
-                                <div key={index} className={styles.stepHeading}>
-                                    {step.text}
-                                </div>
-                            );
-                        } else {
-                            stepCounter++;
-                            return (
-                                <div key={index} className={styles.stepItem}>
-                                    <div className={styles.stepNumber}>
-                                        {stepCounter}.
-                                    </div>
-                                    <div className={styles.stepText}>
+                {/* Plan Title */}
+                <div className={styles.planTitle}>
+                    {isCreatingPlan ? 'Creating plan...' : `Proposed Plan for ${planApprovalRequest.user_request || 'Task'}`}
+                </div>
+
+                {/* Plan Steps */}
+                {planSteps.length > 0 && (
+                    <div className={styles.stepsList}>
+                        {planSteps.map((step, index) => {
+                            if (step.type === 'heading') {
+                                return (
+                                    <div key={index} className={styles.stepHeading}>
                                         {step.text}
                                     </div>
-                                </div>
-                            );
-                        }
-                    })}
-                </div>
-            )}
+                                );
+                            } else {
+                                stepCounter++;
+                                return (
+                                    <div key={index} className={styles.stepItem}>
+                                        <div className={styles.stepNumber}>
+                                            {stepCounter}
+                                        </div>
+                                        <div className={styles.stepText}>
+                                            {step.text}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                        })}
+                    </div>
+                )}
 
-            {/* Instruction Text */}
-            <Body1 className={styles.instructionText}>
-                If the plan looks good we can move forward with the first step.
-            </Body1>
+                {/* Instruction Text */}
+                {!isCreatingPlan && (
+                    <Body1 className={styles.instructionText}>
+                        If the plan looks good we can move forward with the first step.
+                    </Body1>
+                )}
 
-            {/* Action Buttons */}
-            {showApprovalButtons && (
-                <div className={styles.buttonContainer}>
-                    <Button
-                        appearance="primary"
-                        size="medium"
-                        onClick={handleApprovePlan}
-                        disabled={processingApproval}
-                        style={{ fontSize: '14px' }}
-                    >
-                        {processingApproval ? 'Processing...' : 'Approve Task Plan'}
-                    </Button>
-                    <Button
-                        appearance="secondary"
-                        size="medium"
-                        onClick={handleRejectPlan}
-                        disabled={processingApproval}
-                        style={{ fontSize: '14px' }}
-                    >
-                        Cancel
-                    </Button>
-                </div>
-            )}
+                {/* Action Buttons */}
+                {showApprovalButtons && !isCreatingPlan && (
+                    <div className={styles.buttonContainer}>
+                        <Button
+                            appearance="primary"
+                            size="medium"
+                            onClick={handleApprovePlan}
+                            disabled={processingApproval}
+                        >
+                            {processingApproval ? 'Processing...' : 'Approve Task Plan'}
+                        </Button>
+                        <Button
+                            appearance="secondary"
+                            size="medium"
+                            onClick={handleRejectPlan}
+                            disabled={processingApproval}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

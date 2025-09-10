@@ -1,79 +1,86 @@
-import { Spinner, tokens } from "@fluentui/react-components";
-import { BotRegular } from "@fluentui/react-icons";
+import { Spinner } from "@fluentui/react-components";
 
-// Render AI thinking/planning state
+// Simple thinking message to show while creating plan
 const renderThinkingState = (waitingForPlan: boolean) => {
     if (!waitingForPlan) return null;
 
     return (
         <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '16px',
-            marginBottom: '32px',
+            maxWidth: '800px',
+            margin: '0 auto 32px auto',
             padding: '0 24px'
         }}>
-            {/* AI Avatar */}
             <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--colorNeutralBackground3)',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
+                alignItems: 'flex-start',
+                gap: '16px'
             }}>
-                <BotRegular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />
-            </div>
-
-            {/* Thinking Message */}
-            <div style={{ flex: 1, maxWidth: 'calc(100% - 48px)' }}>
-                <div style={{
+                {/* Bot Avatar */}
+                {/* <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--colorNeutralBackground3)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
-                    padding: '16px 0',
-                    color: 'var(--colorNeutralForeground2)',
-                    fontSize: '15px'
+                    justifyContent: 'center',
+                    flexShrink: 0
                 }}>
-                    <Spinner size="small" />
-                    <span>Creating your plan...</span>
+                    <div style={{
+                        width: '16px',
+                        height: '16px',
+                        backgroundColor: 'var(--colorBrandBackground)',
+                        borderRadius: '2px'
+                    }} />
+                </div> */}
+
+                {/* Thinking Message */}
+                <div style={{ flex: 1, maxWidth: 'calc(100% - 48px)' }}>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '16px 0',
+                        color: 'var(--colorNeutralForeground2)',
+                        fontSize: '14px'
+                    }}>
+                        <Spinner size="small" />
+                        <span>Creating your plan...</span>
+                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
-
 // Simple message to show while executing the plan
-
 const renderPlanExecutionMessage = () => {
     return (
         <div style={{
             maxWidth: '800px',
-            margin: '0 auto',
-            padding: `${tokens.spacingVerticalXL} ${tokens.spacingHorizontalXL}`,
-            display: 'flex',
-            alignItems: 'center',
-            gap: tokens.spacingHorizontalM,
-            backgroundColor: tokens.colorNeutralBackground2,
-            borderRadius: tokens.borderRadiusMedium,
-            border: `1px solid ${tokens.colorNeutralStroke1}`,
-            marginBottom: tokens.spacingVerticalXL,
-            marginTop: tokens.spacingVerticalXL
+            margin: '0 auto 32px auto',
+            padding: '0 24px'
         }}>
-            <Spinner size="small" />
-            <span style={{
-                fontSize: '14px',
-                color: tokens.colorNeutralForeground1,
-                fontWeight: tokens.fontWeightSemibold
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                backgroundColor: 'var(--colorNeutralBackground2)',
+                borderRadius: '8px',
+                border: '1px solid var(--colorNeutralStroke1)',
+                padding: '16px'
             }}>
-                Processing your plan and coordinating with AI agents...
-            </span>
+                <Spinner size="small" />
+                <span style={{
+                    fontSize: '14px',
+                    color: 'var(--colorNeutralForeground1)',
+                    fontWeight: '500'
+                }}>
+                    Processing your plan and coordinating with AI agents...
+                </span>
+            </div>
         </div>
     );
 };
-
 
 export { renderPlanExecutionMessage, renderThinkingState };
