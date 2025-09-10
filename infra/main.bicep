@@ -1525,7 +1525,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_AI_SEARCH_CONNECTION_NAME'
-            value: searchService.outputs.name
+            value: aiSearchConnectionName
           }
           {
             name: 'AZURE_AI_SEARCH_INDEX_NAME'
@@ -2041,7 +2041,7 @@ output COSMOSDB_ACCOUNT_NAME string = cosmosDbResourceName
 output AZURE_SEARCH_ENDPOINT string =searchService.outputs.endpoint
 output AZURE_CLIENT_ID string  = userAssignedIdentity!.outputs.clientId
 output AZURE_TENANT_ID string = tenant().tenantId
-output AZURE_AI_SEARCH_CONNECTION_NAME string  = searchService.outputs.name
+output AZURE_AI_SEARCH_CONNECTION_NAME string  = aiSearchConnectionName
 output AZURE_COGNITIVE_SERVICES string = 'https://cognitiveservices.azure.com/.default'
 output REASONING_MODEL_NAME string = aiFoundryAiServicesReasoningModelDeployment.name
 output MCP_SERVER_NAME string = 'MACAE MCP Server'
