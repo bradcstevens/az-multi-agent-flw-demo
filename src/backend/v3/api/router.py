@@ -5,40 +5,22 @@ import logging
 import uuid
 from typing import Optional
 
-from common.utils.utils_date import format_dates_in_messages
-from common.config.app_config import config
-from v3.common.services.plan_service import PlanService
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
+from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (
-    InputTask,
-    Plan,
-    PlanStatus,
-    PlanWithSteps,
-    TeamSelectionRequest,
-)
+from common.models.messages_kernel import (InputTask, Plan, PlanStatus,
+                                           PlanWithSteps, TeamSelectionRequest)
 from common.utils.event_utils import track_event_if_configured
+from common.utils.utils_date import format_dates_in_messages
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    File,
-    HTTPException,
-    Query,
-    Request,
-    UploadFile,
-    WebSocket,
-    WebSocketDisconnect,
-)
+from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
+                     Request, UploadFile, WebSocket, WebSocketDisconnect)
 from semantic_kernel.agents.runtime import InProcessRuntime
+from v3.common.services.plan_service import PlanService
 from v3.common.services.team_service import TeamService
-from v3.config.settings import (
-    connection_config,
-    current_user_id,
-    orchestration_config,
-    team_config,
-)
+from v3.config.settings import (connection_config, current_user_id,
+                                orchestration_config, team_config)
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
 router = APIRouter()
@@ -231,7 +213,7 @@ async def process_request(
               description: Error message
     """
 
-    if not await rai_success(input_task.description, False):
+    if not await rai_success(input_task.description):
         track_event_if_configured(
             "RAI failed",
             {
@@ -428,7 +410,7 @@ async def user_clarification(
     if user_id and human_feedback.request_id:
         ### validate rai
         if human_feedback.answer != None or human_feedback.answer != "":
-            if not await rai_success(human_feedback.answer, False):
+            if not await rai_success(human_feedback.answer):
                 track_event_if_configured(
                     "RAI failed",
                     {
