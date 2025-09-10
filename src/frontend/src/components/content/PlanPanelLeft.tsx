@@ -85,7 +85,8 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
   useEffect(() => {
     loadPlansData();
-  }, [loadPlansData]);
+    setUserInfo(getUserInfoGlobal());
+  }, [loadPlansData, setUserInfo]);
 
   useEffect(() => {
     if (plans) {

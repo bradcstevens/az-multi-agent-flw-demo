@@ -55,6 +55,7 @@ class PlanStatus(str, Enum):
     completed = "completed"
     failed = "failed"
     canceled = "canceled"
+    approved = "approved"
 
 
 class HumanFeedbackStatus(str, Enum):

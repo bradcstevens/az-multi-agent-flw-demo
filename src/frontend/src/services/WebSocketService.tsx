@@ -204,6 +204,7 @@ class WebSocketService {
                 if (message.data) {
                     console.log('WebSocket message received:', message);
                     const transformed = PlanDataService.parseAgentMessage(message);
+                    console.log('Transformed AGENT_MESSAGE:', transformed);
                     this.emit(WebsocketMessageType.AGENT_MESSAGE, transformed);
 
                 }

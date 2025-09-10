@@ -365,6 +365,7 @@ export class PlanDataService {
    *  - "AgentMessage(agent_name='X', timestamp=..., content='...')"
    * Returns a structured object with steps parsed from markdown-ish content.
    */
+  // ...inside class PlanDataService
   static parseAgentMessage(rawData: any): {
     agent: string;
     agent_type: AgentMessageType;
@@ -381,7 +382,9 @@ export class PlanDataService {
   } | null {
     try {
       // Unwrap wrapper
-      if (rawData && typeof rawData === 'object' && rawData.type === WebsocketMessageType.AGENT_MESSAGE && typeof rawData.data === 'string') {
+      if (rawData && typeof rawData === 'object' &&
+        rawData.type === WebsocketMessageType.AGENT_MESSAGE &&
+        typeof rawData.data === 'string') {
         return this.parseAgentMessage(rawData.data);
       }
 
@@ -395,22 +398,22 @@ export class PlanDataService {
         source.match(/agent_name="([^"]+)"/)?.[1] ||
         'UnknownAgent';
 
-      const timestampStr =
-        source.match(/timestamp=([\d.]+)/)?.[1];
+      const timestampStr = source.match(/timestamp=([\d.]+)/)?.[1];
       const timestamp = timestampStr ? Number(timestampStr) : null;
 
-      // Extract content='...'
-      const contentMatch = source.match(/content='((?:\\'|[^'])*)'/);
-      let content = contentMatch ? contentMatch[1] : '';
-      // Unescape
+      // Support single or double quoted content
+      const contentMatch = source.match(/content=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
+      let content = contentMatch ? (contentMatch[1] ?? contentMatch[2] ?? '') : '';
       content = content
         .replace(/\\n/g, '\n')
         .replace(/\\'/g, "'")
         .replace(/\\"/g, '"')
         .replace(/\\\\/g, '\\');
 
-      // Parse sections of the form "##### Title Completed"
-      // Each block ends at --- line or next "##### " or end.
+      // Simplify human clarification inline if present
+      content = this.simplifyHumanClarification(content);
+
+      // Parse sections
       const lines = content.split('\n');
       const steps: Array<{ title: string; fields: Record<string, string>; summary?: string; raw_block: string; }> = [];
       let i = 0;
@@ -424,7 +427,6 @@ export class PlanDataService {
             blockLines.push(lines[i]);
             i++;
           }
-          // Skip separator line if present
           if (i < lines.length && /^---\s*$/.test(lines[i])) i++;
 
           const fields: Record<string, string> = {};
@@ -437,9 +439,7 @@ export class PlanDataService {
               if (fieldName) fields[fieldName] = value;
             } else {
               const summaryMatch = bl.match(/^AGENT SUMMARY:\s*(.+)$/i);
-              if (summaryMatch) {
-                summary = summaryMatch[1].trim();
-              }
+              if (summaryMatch) summary = summaryMatch[1].trim();
             }
           }
 
@@ -454,7 +454,7 @@ export class PlanDataService {
         }
       }
 
-      // Next Steps section
+      // Next Steps
       const nextSteps: string[] = [];
       const nextIdx = lines.findIndex(l => /^Next Steps:/.test(l.trim()));
       if (nextIdx !== -1) {

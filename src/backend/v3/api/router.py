@@ -923,9 +923,9 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
             )
 
         # save to in-memory config for current user
-        team_config.set_current_team(
-            user_id=user_id, team_configuration=team_configuration
-        )
+        # team_config.set_current_team(
+        #     user_id=user_id, team_configuration=team_configuration
+        # )
 
         # Track the team selection event
         track_event_if_configured(
@@ -1142,17 +1142,13 @@ async def get_plan_by_id(request: Request, plan_id: str):
 
         # Use get_steps_by_plan to match the original implementation
         steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
-        messages = await memory_store.get_data_by_type_and_session_id(
-            "agent_message", session_id=plan.session_id
-        )
+        messages = []
 
         plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
         plan_with_steps.update_step_counts()
 
         # Format dates in messages according to locale
-        formatted_messages = format_dates_in_messages(
-            messages, config.get_user_local_browser_language()
-        )
+        formatted_messages = []
 
         return [plan_with_steps, formatted_messages]
     else:

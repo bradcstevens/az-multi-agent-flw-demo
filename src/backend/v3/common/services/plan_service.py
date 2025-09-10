@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional
 from common.database.database_factory import DatabaseFactory
 from common.database.database_base import DatabaseBase
 import v3.models.messages as messages
+from common.models.messages_kernel import PlanStatus
 from v3.config.settings import orchestration_config
 from common.utils.event_utils import track_event_if_configured
 
@@ -30,22 +31,44 @@ class PlanService:
             return False
         try:
             mplan = orchestration_config.plans[human_feedback.m_plan_id]
+            memory_store = await DatabaseFactory.get_database(user_id=user_id)
             if hasattr(mplan, "plan_id"):
                 print(
                     "Updated orchestration config:",
                     orchestration_config.plans[human_feedback.m_plan_id],
                 )
-                mplan.plan_id = human_feedback.plan_id
-                orchestration_config.plans[human_feedback.m_plan_id] = mplan
-                memory_store = await DatabaseFactory.get_database(user_id=user_id)
-                plan = await memory_store.get_plan(human_feedback.plan_id)
-                if plan:
-                    print("Retrieved plan from memory store:", plan)
+                if human_feedback.approved:
+                    mplan.plan_id = human_feedback.plan_id
+
+                    orchestration_config.plans[human_feedback.m_plan_id] = mplan
                     
-                    
-                else:
-                    print("Plan not found in memory store.")
-                    return False
+                    plan = await memory_store.get_plan(human_feedback.plan_id)
+                    mplan.team_id = plan.team_id # just to keep consistency 
+                    if plan:
+                        plan.overall_status = PlanStatus.approved
+                        await memory_store.update_plan(plan)
+                        await memory_store.add_mplan(mplan)
+                        track_event_if_configured(
+                            "PlanApproved",
+                            {
+                                "m_plan_id": human_feedback.m_plan_id,
+                                "plan_id": human_feedback.plan_id,
+                                "user_id": user_id,
+                            },
+                        )
+                    else:
+                        print("Plan not found in memory store.")
+                        return False
+                else: #reject plan
+                    track_event_if_configured(
+                            "PlanRejected",
+                            {
+                                "m_plan_id": human_feedback.m_plan_id,
+                                "plan_id": human_feedback.plan_id,
+                                "user_id": user_id,
+                            },
+                        )
+                    await memory_store.delete_plan_by_plan_id(human_feedback.plan_id)
 
         except Exception as e:
             print(f"Error processing plan approval: {e}")
@@ -70,12 +93,12 @@ class PlanService:
         return True
     
     @staticmethod
-    async def handle_human_clarification(standard_message: messages.AgentMessage) -> bool:
+    async def handle_human_clarification(human_feedback: messages.UserClarificationResponse) -> bool:
         """
-        Process an AgentMessage coming from the client.
+        Process a UserClarificationResponse coming from the client.
 
         Args:
-            standard_message: messages.AgentMessage (contains relevant message data)
+            human_feedback: messages.UserClarificationResponse (contains relevant message data)
             user_id: authenticated user id
 
         Returns:

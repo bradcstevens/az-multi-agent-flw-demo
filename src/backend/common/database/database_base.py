@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
-
+import v3.models.messages as messages
 from ..models.messages_kernel import (
     BaseDataModel,
     Plan,
@@ -97,11 +97,7 @@ class DatabaseBase(ABC):
         """Retrieve all plans for a specific team."""
         pass
 
-    @abstractmethod
-    async def get_data_by_type_and_session_id(
-        self, data_type: str, session_id: str
-    ) -> List[BaseDataModel]:
-        pass
+
 
     # Step Operations
     @abstractmethod
@@ -198,4 +194,24 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def update_current_team(self, current_team: UserCurrentTeam) -> None:
         """Update the current team for a user."""
+        pass
+    
+    @abstractmethod
+    async def delete_plan_by_plan_id(self, plan_id: str) -> bool:
+        """Retrieve the current team for a user."""
+        pass
+
+    @abstractmethod
+    async def add_mplan(self, mplan: messages.MPlan) -> None:
+        """Add a team configuration to the database."""
+        pass
+
+    @abstractmethod
+    async def update_mplan(self, mplan: messages.MPlan) -> None:
+        """Update a team configuration in the database."""
+        pass
+
+    @abstractmethod
+    async def get_mplan(self, plan_id: str) -> Optional[messages.MPlan]:
+        """Retrieve a mplan configuration by mplan_id."""
         pass
