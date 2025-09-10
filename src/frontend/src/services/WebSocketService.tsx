@@ -181,12 +181,6 @@ class WebSocketService {
 
     private handleMessage(message: StreamMessage): void {
 
-        //console.log('WebSocket message received:', message);
-        const hasClarification = /\bclarifications?\b/i.test(message.data || '');
-
-        if (hasClarification) {
-            console.log("Message contains 'clarification':", message.data);
-        }
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
                 console.log("Message Plan Approval Request':", message);
@@ -217,8 +211,10 @@ class WebSocketService {
             }
 
             case WebsocketMessageType.AGENT_MESSAGE_STREAMING: {
+                console.log("Message streamming agent buffer:", message);
                 if (message.data) {
                     const streamedMessage = PlanDataService.parseAgentMessageStreaming(message);
+                    console.log('WebSocket AGENT_MESSAGE_STREAMING message received:', streamedMessage);
                     this.emit(WebsocketMessageType.AGENT_MESSAGE_STREAMING, streamedMessage);
                 }
                 break;

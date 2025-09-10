@@ -489,6 +489,7 @@ export class PlanDataService {
    *  - { type: 'agent_message_streaming', data: "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)" }
    *  - "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)"
    */
+  // Replace the body of parseAgentMessageStreaming with this improved version
   static parseAgentMessageStreaming(rawData: any): {
     agent: string;
     content: string;
@@ -496,8 +497,13 @@ export class PlanDataService {
     raw_data: any;
   } | null {
     try {
-      // Unwrap wrapper
-      if (rawData && typeof rawData === 'object' && rawData.type === 'agent_message_streaming' && typeof rawData.data === 'string') {
+      // Unwrap wrapper object
+      if (
+        rawData &&
+        typeof rawData === 'object' &&
+        rawData.type === WebsocketMessageType.AGENT_MESSAGE_STREAMING &&
+        typeof rawData.data === 'string'
+      ) {
         return this.parseAgentMessageStreaming(rawData.data);
       }
 
@@ -511,13 +517,15 @@ export class PlanDataService {
         source.match(/agent_name="([^"]+)"/)?.[1] ||
         'UnknownAgent';
 
-      const contentMatch = source.match(/content='((?:\\'|[^'])*)'/);
-      let content = contentMatch ? contentMatch[1] : '';
+      // Support content='...' OR content="..." with escapes
+      const contentMatch = source.match(/content=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
+      let content = contentMatch ? (contentMatch[1] ?? contentMatch[2] ?? '') : '';
       content = content
         .replace(/\\n/g, '\n')
         .replace(/\\'/g, "'")
         .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\');
+        .replace(/\\\\/g, '\\')
+        .trim();
 
       let is_final = false;
       const finalMatch = source.match(/is_final=(True|False)/i);
@@ -531,8 +539,46 @@ export class PlanDataService {
       return null;
     }
   }
-  // ...inside export class PlanDataService { (place near other parsers, e.g. after parseAgentMessageStreaming)
+  // Place inside export class PlanDataService (near other parsers)
 
+  /**
+   * Simplify a human clarification streaming line.
+   * Input example:
+   *   Human clarification: UserClarificationResponse(request_id='uuid', answer='no more steps', plan_id='', m_plan_id='')
+   * Output (markdown/plain):
+   *   Human clarification: no more steps
+   * If pattern not found, returns the original string.
+   */
+  static simplifyHumanClarification(line: string): string {
+    if (
+      typeof line !== 'string' ||
+      !line.includes('Human clarification:') ||
+      !line.includes('UserClarificationResponse(')
+    ) {
+      return line;
+    }
+
+    // Capture the inside of UserClarificationResponse(...)
+    const outerMatch = line.match(/Human clarification:\s*UserClarificationResponse\((.*?)\)/s);
+    if (!outerMatch) return line;
+
+    const inner = outerMatch[1];
+
+    // Find answer= '...' | "..."
+    const answerMatch = inner.match(/answer=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
+    if (!answerMatch) return line;
+
+    let answer = answerMatch[1] ?? answerMatch[2] ?? '';
+    // Unescape common sequences
+    answer = answer
+      .replace(/\\n/g, '\n')
+      .replace(/\\'/g, "'")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .trim();
+
+    return `Human clarification: ${answer}`;
+  }
   /**
    * Parse a user clarification request message (possibly deeply nested).
    * Accepts objects like:

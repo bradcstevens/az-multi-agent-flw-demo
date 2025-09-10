@@ -8,8 +8,8 @@ import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 
 const renderBufferMessage = (streamingMessageBuffer: string) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-
+    const [isExpanded, setIsExpanded] = useState<boolean>(false);
+    // console.log(`streamingMessageBuffer: ${streamingMessageBuffer}`);
     if (!streamingMessageBuffer || streamingMessageBuffer.trim() === "") return null;
 
     const start = Math.max(0, streamingMessageBuffer.length - 500);

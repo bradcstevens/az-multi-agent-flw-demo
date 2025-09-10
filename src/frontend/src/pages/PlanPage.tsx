@@ -38,37 +38,30 @@ const PlanPage: React.FC = () => {
     const navigate = useNavigate();
     const { showToast, dismissToast } = useInlineToaster();
     const messagesContainerRef = useRef<HTMLDivElement>(null);
-    const [input, setInput] = useState("");
+    const [input, setInput] = useState<string>("");
     const [planData, setPlanData] = useState<ProcessedPlanData | any>(null);
-    const [allPlans, setAllPlans] = useState<ProcessedPlanData[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [submittingChatDisableInput, setSubmittingChatDisableInput] = useState<boolean>(true);
-    const [error, setError] = useState<Error | null>(null);
+    const [errorLoading, setErrorLoading] = useState<boolean>(false);
     const [clarificationMessage, setClarificationMessage] = useState<ParsedUserClarification | null>(null);
-    const [processingApproval, setProcessingApproval] = useState(false);
+    const [processingApproval, setProcessingApproval] = useState<boolean>(false);
     const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
-    const [reloadLeftList, setReloadLeftList] = useState(true);
-    const [waitingForPlan, setWaitingForPlan] = useState(true);
+    const [reloadLeftList, setReloadLeftList] = useState<boolean>(true);
+    const [waitingForPlan, setWaitingForPlan] = useState<boolean>(true);
     const [showProcessingPlanSpinner, setShowProcessingPlanSpinner] = useState<boolean>(false);
     const [showApprovalButtons, setShowApprovalButtons] = useState<boolean>(true);
     // WebSocket connection state
-    const [wsConnected, setWsConnected] = useState(false);
+    const [wsConnected, setWsConnected] = useState<boolean>(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
     const [streamingMessageBuffer, setStreamingMessageBuffer] = useState<string>("");
 
-
     const [agentMessages, setAgentMessages] = useState<AgentMessageData[]>([]);
-    // Team config state
-    const [teamConfig, setTeamConfig] = useState<TeamConfig | null>(null);
-    const [loadingTeamConfig, setLoadingTeamConfig] = useState(true);
 
     // Plan approval state - track when plan is approved
-    const [planApproved, setPlanApproved] = useState(false);
+    const [planApproved, setPlanApproved] = useState<boolean>(false);
 
     const [loadingMessage, setLoadingMessage] = useState<string>(loadingMessages[0]);
 
-    // Use ref to store the function to avoid stale closure issues
-    const loadPlanDataRef = useRef<() => Promise<ProcessedPlanData[]>>();
     // Auto-scroll helper
     const scrollToBottom = useCallback(() => {
         setTimeout(() => {
@@ -114,7 +107,6 @@ const PlanPage: React.FC = () => {
                 setPlanApprovalRequest(mPlanData);
                 setWaitingForPlan(false);
                 setShowProcessingPlanSpinner(false);
-                // onPlanReceived?.(mPlanData);
                 scrollToBottom();
             } else {
                 console.error('❌ Failed to parse plan data', approvalRequest);
@@ -129,8 +121,9 @@ const PlanPage: React.FC = () => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE_STREAMING, (streamingMessage: any) => {
             // console.log('📋 Streaming Message', streamingMessage);
             // if is final true clear buffer and add final message to agent messages
-            setStreamingMessageBuffer(prev => prev + streamingMessage.data.content);
-            scrollToBottom();
+            const line = PlanDataService.simplifyHumanClarification(streamingMessage.data.content);
+            setStreamingMessageBuffer(prev => prev + line);
+            //scrollToBottom();
 
         });
 
@@ -166,7 +159,7 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_TOOL_MESSAGE, (toolMessage: any) => {
             console.log('📋 Tool Message', toolMessage);
-            scrollToBottom();
+            // scrollToBottom();
 
         });
 
@@ -184,7 +177,7 @@ const PlanPage: React.FC = () => {
                 timestamp: Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                content: finalMessage.data.content || '',
+                content: "🎉🎉 " + (finalMessage.data.content || ''),
                 raw_data: finalMessage.data || '',
             } as AgentMessageData;
             console.log('✅ Parsed final result message:', agentMessageData);
@@ -197,7 +190,6 @@ const PlanPage: React.FC = () => {
 
         return () => unsubscribe();
     }, [scrollToBottom]);
-
 
     //WebsocketMessageType.AGENT_MESSAGE
     useEffect(() => {
@@ -288,69 +280,28 @@ const PlanPage: React.FC = () => {
         }
     }, [planId, loading]);
 
-    useEffect(() => {
-
-        const loadTeamConfig = async () => {
-            try {
-                setLoadingTeamConfig(true);
-                const teams = await TeamService.getUserTeams();
-                // Get the first team as default config, or you can implement logic to get current team
-                const config = teams.length > 0 ? teams[0] : null;
-                setTeamConfig(config);
-            } catch (error) {
-                console.error('Failed to load team config:', error);
-                // Don't show error for team config loading - it's optional
-            } finally {
-                setLoadingTeamConfig(false);
-            }
-        };
-
-        loadTeamConfig();
-    }, []);
-
-    // Helper function to convert PlanWithSteps to ProcessedPlanData
-    const convertToProcessedPlanData = (planWithSteps: PlanWithSteps): ProcessedPlanData => {
-        return PlanDataService.processPlanData(planWithSteps, []);
-    };
-
     // Create loadPlanData function with useCallback to memoize it
     const loadPlanData = useCallback(
-        async (useCache = true): Promise<ProcessedPlanData[]> => {
-            if (!planId) return [];
+        async (useCache = true): Promise<ProcessedPlanData | null> => {
+            if (!planId) return null;
 
             setLoading(true);
-            setError(null);
 
             try {
                 let actualPlanId = planId;
                 let planResult: ProcessedPlanData | null = null;
 
-                if (actualPlanId && !planResult) {
-                    console.log("Fetching plan with ID:", actualPlanId);
-                    planResult = await PlanDataService.fetchPlanData(actualPlanId, useCache);
-                    console.log("Plan data loaded successfully");
-                }
 
-                const allPlansWithSteps = await apiService.getPlans();
-                const allPlansData = allPlansWithSteps.map(convertToProcessedPlanData);
-                setAllPlans(allPlansData);
+                console.log("Fetching plan with ID:", actualPlanId);
+                planResult = await PlanDataService.fetchPlanData(actualPlanId, useCache);
 
-                if (planResult?.plan?.id && planResult.plan.id !== actualPlanId) {
-                    console.log('Plan ID mismatch detected, redirecting...', {
-                        requested: actualPlanId,
-                        actual: planResult.plan.id
-                    });
-                    navigate(`/plan/${planResult.plan.id}`, { replace: true });
-                }
+
 
                 setPlanData(planResult);
-                return allPlansData;
+                return planResult;
             } catch (err) {
                 console.log("Failed to load plan data:", err);
-                setError(
-                    err instanceof Error ? err : new Error("Failed to load plan data")
-                );
-                return [];
+                return null;
             } finally {
                 setLoading(false);
             }
@@ -358,10 +309,6 @@ const PlanPage: React.FC = () => {
         [planId, navigate]
     );
 
-    // Update the ref whenever loadPlanData changes
-    useEffect(() => {
-        loadPlanDataRef.current = loadPlanData;
-    }, [loadPlanData]);
 
     // Handle plan approval
     const handleApprovePlan = useCallback(async () => {
@@ -418,6 +365,7 @@ const PlanPage: React.FC = () => {
         }
     }, [planApprovalRequest, planData, navigate, setProcessingApproval]);
     // Chat submission handler - updated for v3 backend compatibility
+
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
             if (!chatInput.trim()) {
@@ -482,14 +430,17 @@ const PlanPage: React.FC = () => {
     }, [navigate]);
 
 
-
     const resetReload = useCallback(() => {
         setReloadLeftList(false);
     }, []);
 
     useEffect(() => {
         const initializePlanLoading = async () => {
-            if (!planId) return;
+            if (!planId) {
+
+                setErrorLoading(true);
+                return;
+            }
 
             try {
                 await loadPlanData(true);
@@ -501,7 +452,7 @@ const PlanPage: React.FC = () => {
         initializePlanLoading();
     }, [planId, loadPlanData]);
 
-    if (error) {
+    if (errorLoading) {
         return (
             <CoralShellColumn>
                 <CoralShellRow>
@@ -512,7 +463,7 @@ const PlanPage: React.FC = () => {
                             color: 'var(--colorNeutralForeground2)'
                         }}>
                             <Text size={500}>
-                                {error.message || "An error occurred while loading the plan"}
+                                {"An error occurred while loading the plan"}
                             </Text>
                         </div>
                     </Content>
@@ -532,7 +483,7 @@ const PlanPage: React.FC = () => {
                     onTeamSelect={() => { }}
                     onTeamUpload={async () => { }}
                     isHomePage={false}
-                    selectedTeam={teamConfig}
+                    selectedTeam={null}
                 />
 
                 <Content>
