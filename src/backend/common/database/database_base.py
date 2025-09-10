@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional, Type
 
 from ..models.messages_kernel import (
     BaseDataModel,
-    Session,
     Plan,
     Step,
     TeamConfiguration,
@@ -59,21 +58,6 @@ class DatabaseBase(ABC):
         """Delete an item from the database."""
         pass
 
-    # Session Operations
-    @abstractmethod
-    async def add_session(self, session: Session) -> None:
-        """Add a session to the database."""
-        pass
-
-    @abstractmethod
-    async def get_session(self, session_id: str) -> Optional[Session]:
-        """Retrieve a session by session_id."""
-        pass
-
-    @abstractmethod
-    async def get_all_sessions(self) -> List[Session]:
-        """Retrieve all sessions for the user."""
-        pass
 
     # Plan Operations
     @abstractmethod
@@ -84,11 +68,6 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def update_plan(self, plan: Plan) -> None:
         """Update a plan in the database."""
-        pass
-
-    @abstractmethod
-    async def get_plan_by_session(self, session_id: str) -> Optional[Plan]:
-        """Retrieve a plan by session_id."""
         pass
 
     @abstractmethod
@@ -204,6 +183,11 @@ class DatabaseBase(ABC):
 
     @abstractmethod
     async def get_current_team(self, user_id: str) -> Optional[UserCurrentTeam]:
+        """Retrieve the current team for a user."""
+        pass
+
+    @abstractmethod
+    async def delete_current_team(self, user_id: str) -> Optional[UserCurrentTeam]:
         """Retrieve the current team for a user."""
         pass
 

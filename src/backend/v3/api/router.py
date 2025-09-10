@@ -117,9 +117,12 @@ async def init_team(
         team_service = TeamService(memory_store)
         user_current_team = await memory_store.get_current_team(user_id=user_id)
         if not user_current_team:
-            await team_service.handle_team_selection(
+            print("User has no current team, setting to default:", init_team_id)
+            user_current_team =  await team_service.handle_team_selection(
                 user_id=user_id, team_id=init_team_id
             )
+            if user_current_team:
+                init_team_id = user_current_team.team_id
         else:
             init_team_id = user_current_team.team_id
         # Verify the team exists and user has access to it
@@ -896,7 +899,7 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
         team_configuration = await team_service.get_team_configuration(
             selection.team_id, user_id
         )
-        if team_config is None:
+        if team_configuration is None: # ensure that id is valid
             raise HTTPException(
                 status_code=404,
                 detail=f"Team configuration '{selection.team_id}' not found or access denied",

@@ -190,29 +190,6 @@ class CosmosDBClient(DatabaseBase):
             self.logger.error("Failed to delete item from CosmosDB: %s", str(e))
             raise
 
-    # Session Operations
-    async def add_session(self, session: Session) -> None:
-        """Add a session to CosmosDB."""
-        await self.add_item(session)
-
-    async def get_session(self, session_id: str) -> Optional[Session]:
-        """Retrieve a session by session_id."""
-        query = "SELECT * FROM c WHERE c.id=@id AND c.data_type=@data_type"
-        parameters = [
-            {"name": "@id", "value": session_id},
-            {"name": "@data_type", "value": DataType.session},
-        ]
-        results = await self.query_items(query, parameters, Session)
-        return results[0] if results else None
-
-    async def get_all_sessions(self) -> List[Session]:
-        """Retrieve all sessions for the user."""
-        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type"
-        parameters = [
-            {"name": "@user_id", "value": self.user_id},
-            {"name": "@data_type", "value": DataType.session},
-        ]
-        return await self.query_items(query, parameters, Session)
 
     # Plan Operations
     async def add_plan(self, plan: Plan) -> None:
@@ -470,11 +447,31 @@ class CosmosDBClient(DatabaseBase):
         teams = await self.query_items(query, parameters, UserCurrentTeam)
         return teams[0] if teams else None
 
+
+
+    async def delete_current_team(self, user_id: str) -> bool:
+        """Delete the current team for a user."""
+        query = "SELECT c.id, c.session_id FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type"
+
+        params = [
+            {"name": "@user_id", "value": user_id},
+            {"name": "@data_type", "value": DataType.user_current_team},
+        ]
+        items = self.container.query_items(query=query, parameters=params)
+        print("Items to delete:", items)
+        if items:
+            async for doc in items:
+                try:
+                    await self.container.delete_item(doc["id"], partition_key=doc["session_id"])
+                except Exception as e:
+                    self.logger.warning("Failed deleting current team doc %s: %s", doc.get("id"), e)
+
+        return True
+
     async def set_current_team(self, current_team: UserCurrentTeam) -> None:
         """Set the current team for a user."""
         await self._ensure_initialized()
         await self.add_item(current_team)
-
 
     async def update_current_team(self, current_team: UserCurrentTeam) -> None:
         """Update the current team for a user."""

@@ -78,6 +78,7 @@ class BaseDataModel(KernelBaseModel):
     """Base data model with common fields."""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -87,8 +88,6 @@ class AgentMessage(BaseDataModel):
     """Base class for messages sent between agents."""
 
     data_type: Literal[DataType.agent_message] = Field(DataType.agent_message, Literal=True)
-    session_id: str
-    user_id: str
     plan_id: str
     content: str
     source: str
@@ -118,7 +117,6 @@ class Plan(BaseDataModel):
 
     data_type: Literal[DataType.plan] = Field(DataType.plan, Literal=True)
     plan_id: str
-    session_id: str
     user_id: str
     initial_goal: str
     overall_status: PlanStatus = PlanStatus.in_progress
@@ -135,7 +133,6 @@ class Step(BaseDataModel):
 
     data_type: Literal[DataType.step] = Field(DataType.step, Literal=True)
     plan_id: str
-    session_id: str  # Partition key
     user_id: str
     action: str
     agent: AgentType
@@ -146,7 +143,7 @@ class Step(BaseDataModel):
     updated_action: Optional[str] = None
 
 
-class TeamSelectionRequest(KernelBaseModel):
+class TeamSelectionRequest(BaseDataModel):
     """Request model for team selection."""
 
     team_id: str
