@@ -1,4 +1,4 @@
-import { Spinner } from "@fluentui/react-components";
+import { Spinner, tokens } from "@fluentui/react-components";
 import { BotRegular } from "@fluentui/react-icons";
 
 // Render AI thinking/planning state
@@ -44,4 +44,36 @@ const renderThinkingState = (waitingForPlan: boolean) => {
         </div>
     );
 };
-export default renderThinkingState;
+
+
+// Simple message to show while executing the plan
+
+const renderPlanExecutionMessage = () => {
+    return (
+        <div style={{
+            maxWidth: '800px',
+            margin: '0 auto',
+            padding: `${tokens.spacingVerticalXL} ${tokens.spacingHorizontalXL}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: tokens.spacingHorizontalM,
+            backgroundColor: tokens.colorNeutralBackground2,
+            borderRadius: tokens.borderRadiusMedium,
+            border: `1px solid ${tokens.colorNeutralStroke1}`,
+            marginBottom: tokens.spacingVerticalXL,
+            marginTop: tokens.spacingVerticalXL
+        }}>
+            <Spinner size="small" />
+            <span style={{
+                fontSize: '14px',
+                color: tokens.colorNeutralForeground1,
+                fontWeight: tokens.fontWeightSemibold
+            }}>
+                Processing your plan and coordinating with AI agents...
+            </span>
+        </div>
+    );
+};
+
+
+export { renderPlanExecutionMessage, renderThinkingState };

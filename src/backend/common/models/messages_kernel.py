@@ -3,8 +3,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
 
+from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
+from dataclasses import  dataclass
 
 class DataType(str, Enum):
     """Enumeration of possible data types for documents in the database."""
@@ -16,7 +17,7 @@ class DataType(str, Enum):
     team_config = "team_config"
     user_current_team = "user_current_team"
     m_plan = "m_plan"
-    m_plan_step = "m_plan_step"
+    m_plan_message = "m_plan_message"
 
 
 class AgentType(str, Enum):
@@ -53,6 +54,7 @@ class PlanStatus(str, Enum):
     in_progress = "in_progress"
     completed = "completed"
     failed = "failed"
+    canceled = "canceled"
 
 
 class HumanFeedbackStatus(str, Enum):
@@ -93,6 +95,7 @@ class AgentMessage(BaseDataModel):
     step_id: Optional[str] = None
 
 
+    
 class Session(BaseDataModel):
     """Represents a user session."""
 
@@ -119,6 +122,7 @@ class Plan(BaseDataModel):
     user_id: str
     initial_goal: str
     overall_status: PlanStatus = PlanStatus.in_progress
+    approved: bool = False
     source: str = AgentType.PLANNER.value
     summary: Optional[str] = None
     team_id: Optional[str] = None
@@ -250,3 +254,14 @@ class InputTask(KernelBaseModel):
 
 class UserLanguage(KernelBaseModel):
     language: str
+
+
+class AgentMessageType(str, Enum):
+    HUMAN_AGENT = "Human_Agent",
+    AI_AGENT = "AI_Agent",
+
+
+class AgentMessageData (BaseDataModel):
+    agent: str
+    agent_type: AgentMessageType = AgentMessageType.AI_AGENT 
+    content: str

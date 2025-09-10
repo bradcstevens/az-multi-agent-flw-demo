@@ -28,7 +28,7 @@ import { AgentMessageData, WebsocketMessageType } from "@/models";
 import getUserPlan from "./streaming/StreamingUserPlan";
 import renderUserPlanMessage from "./streaming/StreamingUserPlanMessage";
 import renderPlanResponse from "./streaming/StreamingPlanResponse";
-import renderThinkingState from "./streaming/StreamingPlanState";
+import { renderPlanExecutionMessage, renderThinkingState } from "./streaming/StreamingPlanState";
 import ContentNotFound from "../NotFound/ContentNotFound";
 import PlanChatBody from "./PlanChatBody";
 import renderBufferMessage from "./streaming/StreamingBufferMessage";
@@ -42,6 +42,12 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   streamingMessageBuffer: string;
   agentMessages: AgentMessageData[];
+  showProcessingPlanSpinner: boolean;
+  showApprovalButtons: boolean;
+  handleApprovePlan: () => Promise<void>;
+  handleRejectPlan: () => Promise<void>;
+  processingApproval: boolean;
+
 }
 
 const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
@@ -57,7 +63,13 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   waitingForPlan,
   messagesContainerRef,
   streamingMessageBuffer,
-  agentMessages
+  agentMessages,
+  showProcessingPlanSpinner,
+  showApprovalButtons,
+  handleApprovePlan,
+  handleRejectPlan,
+  processingApproval
+
 
 }) => {
   const navigate = useNavigate();
@@ -65,70 +77,11 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   const { showToast, dismissToast } = useInlineToaster();
   // States
 
-  const [processingApproval, setProcessingApproval] = useState(false);
-
-  const [showApprovalButtons, setShowApprovalButtons] = useState(true);
 
 
 
 
-  // Listen for m_plan streaming
 
-
-  // Handle plan approval
-  const handleApprovePlan = useCallback(async () => {
-    if (!planApprovalRequest) return;
-
-    setProcessingApproval(true);
-    let id = showToast("Submitting Approval", "progress");
-    try {
-      await apiService.approvePlan({
-        m_plan_id: planApprovalRequest.id,
-        plan_id: planData?.plan?.id,
-        approved: true,
-        feedback: 'Plan approved by user'
-      });
-
-      dismissToast(id);
-      onPlanApproval?.(true);
-      setShowApprovalButtons(false);
-
-    } catch (error) {
-      dismissToast(id);
-      showToast("Failed to submit approval", "error");
-      console.error('❌ Failed to approve plan:', error);
-    } finally {
-      setProcessingApproval(false);
-    }
-  }, [planApprovalRequest, planData, onPlanApproval]);
-
-  // Handle plan rejection  
-  const handleRejectPlan = useCallback(async () => {
-    if (!planApprovalRequest) return;
-
-    setProcessingApproval(true);
-    let id = showToast("Submitting cancellation", "progress");
-    try {
-      await apiService.approvePlan({
-        m_plan_id: planApprovalRequest.id,
-        plan_id: planData?.plan?.id,
-        approved: false,
-        feedback: 'Plan rejected by user'
-      });
-
-      dismissToast(id);
-      onPlanApproval?.(false);
-      navigate('/');
-
-    } catch (error) {
-      dismissToast(id);
-      showToast("Failed to submit cancellation", "error");
-      console.error('❌ Failed to reject plan:', error);
-      navigate('/');
-    } finally {
-      setProcessingApproval(false);
-    }
-  }, [planApprovalRequest, planData, onPlanApproval, navigate]);
 
   if (!planData)
     return (
@@ -164,9 +117,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
         {renderAgentMessages(agentMessages)}
 
-
+        {showProcessingPlanSpinner && renderPlanExecutionMessage()}
         {/* Streaming plan updates */}
         {renderBufferMessage(streamingMessageBuffer)}
+
       </div>
 
       {/* Chat Input - only show if no plan is waiting for approval */}

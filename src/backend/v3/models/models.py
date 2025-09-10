@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+from common.models.messages_kernel import DataType
 
 
 class PlanStatus(str, Enum):
@@ -22,6 +24,7 @@ class MStep(BaseModel):
 class MPlan(BaseModel):
     """model of a plan"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    data_type: Literal[DataType.m_plan] = Field(DataType.m_plan, Literal=True)
     user_id: str = ""
     team_id: str = ""
     plan_id: str = ""

@@ -45,10 +45,12 @@ const PlanPage: React.FC = () => {
     const [submittingChatDisableInput, setSubmittingChatDisableInput] = useState<boolean>(true);
     const [error, setError] = useState<Error | null>(null);
     const [clarificationMessage, setClarificationMessage] = useState<ParsedUserClarification | null>(null);
-
+    const [processingApproval, setProcessingApproval] = useState(false);
     const [planApprovalRequest, setPlanApprovalRequest] = useState<MPlanData | null>(null);
     const [reloadLeftList, setReloadLeftList] = useState(true);
     const [waitingForPlan, setWaitingForPlan] = useState(true);
+    const [showProcessingPlanSpinner, setShowProcessingPlanSpinner] = useState<boolean>(false);
+    const [showApprovalButtons, setShowApprovalButtons] = useState<boolean>(true);
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
@@ -111,6 +113,7 @@ const PlanPage: React.FC = () => {
                 console.log('✅ Parsed plan data:', mPlanData);
                 setPlanApprovalRequest(mPlanData);
                 setWaitingForPlan(false);
+                setShowProcessingPlanSpinner(false);
                 // onPlanReceived?.(mPlanData);
                 scrollToBottom();
             } else {
@@ -144,13 +147,14 @@ const PlanPage: React.FC = () => {
                 timestamp: clarificationMessage.timestamp || Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                raw_content: clarificationMessage.data.question || '',
+                content: clarificationMessage.data.question || '',
                 raw_data: clarificationMessage.data || '',
             } as AgentMessageData;
             console.log('✅ Parsed clarification message:', agentMessageData);
             setClarificationMessage(clarificationMessage.data as ParsedUserClarification | null);
             setAgentMessages(prev => [...prev, agentMessageData]);
             setStreamingMessageBuffer("");
+            setShowProcessingPlanSpinner(false);
             setSubmittingChatDisableInput(false);
             scrollToBottom();
 
@@ -180,11 +184,12 @@ const PlanPage: React.FC = () => {
                 timestamp: Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                raw_content: finalMessage.data.content || '',
+                content: finalMessage.data.content || '',
                 raw_data: finalMessage.data || '',
             } as AgentMessageData;
             console.log('✅ Parsed final result message:', agentMessageData);
             setStreamingMessageBuffer("");
+            setShowProcessingPlanSpinner(false);
             setAgentMessages(prev => [...prev, agentMessageData]);
             scrollToBottom();
 
@@ -200,6 +205,7 @@ const PlanPage: React.FC = () => {
             console.log('📋 Agent Message', agentMessage);
             const agentMessageData = agentMessage.data as AgentMessageData;
             setAgentMessages(prev => [...prev, agentMessageData]);
+            setShowProcessingPlanSpinner(true);
             scrollToBottom();
         });
 
@@ -357,6 +363,60 @@ const PlanPage: React.FC = () => {
         loadPlanDataRef.current = loadPlanData;
     }, [loadPlanData]);
 
+    // Handle plan approval
+    const handleApprovePlan = useCallback(async () => {
+        if (!planApprovalRequest) return;
+
+        setProcessingApproval(true);
+        let id = showToast("Submitting Approval", "progress");
+        try {
+            await apiService.approvePlan({
+                m_plan_id: planApprovalRequest.id,
+                plan_id: planData?.plan?.id,
+                approved: true,
+                feedback: 'Plan approved by user'
+            });
+
+            dismissToast(id);
+            setShowProcessingPlanSpinner(true);
+            setShowApprovalButtons(false);
+
+        } catch (error) {
+            dismissToast(id);
+            showToast("Failed to submit approval", "error");
+            console.error('❌ Failed to approve plan:', error);
+        } finally {
+            setProcessingApproval(false);
+        }
+    }, [planApprovalRequest, planData, setProcessingApproval]);
+
+    // Handle plan rejection  
+    const handleRejectPlan = useCallback(async () => {
+        if (!planApprovalRequest) return;
+
+        setProcessingApproval(true);
+        let id = showToast("Submitting cancellation", "progress");
+        try {
+            await apiService.approvePlan({
+                m_plan_id: planApprovalRequest.id,
+                plan_id: planData?.plan?.id,
+                approved: false,
+                feedback: 'Plan rejected by user'
+            });
+
+            dismissToast(id);
+
+            navigate('/');
+
+        } catch (error) {
+            dismissToast(id);
+            showToast("Failed to submit cancellation", "error");
+            console.error('❌ Failed to reject plan:', error);
+            navigate('/');
+        } finally {
+            setProcessingApproval(false);
+        }
+    }, [planApprovalRequest, planData, navigate, setProcessingApproval]);
     // Chat submission handler - updated for v3 backend compatibility
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
@@ -390,15 +450,17 @@ const PlanPage: React.FC = () => {
                     timestamp: Date.now(),
                     steps: [],   // intentionally always empty
                     next_steps: [],  // intentionally always empty
-                    raw_content: chatInput || '',
+                    content: chatInput || '',
                     raw_data: chatInput || '',
                 } as AgentMessageData;
 
                 setAgentMessages(prev => [...prev, agentMessageData]);
                 setSubmittingChatDisableInput(true);
+                setShowProcessingPlanSpinner(true);
                 scrollToBottom();
 
             } catch (error: any) {
+                setShowProcessingPlanSpinner(false);
                 dismissToast(id);
                 setSubmittingChatDisableInput(false);
                 showToast(
@@ -516,6 +578,11 @@ const PlanPage: React.FC = () => {
                                 messagesContainerRef={messagesContainerRef}
                                 streamingMessageBuffer={streamingMessageBuffer}
                                 agentMessages={agentMessages}
+                                showProcessingPlanSpinner={showProcessingPlanSpinner}
+                                showApprovalButtons={showApprovalButtons}
+                                processingApproval={processingApproval}
+                                handleApprovePlan={handleApprovePlan}
+                                handleRejectPlan={handleRejectPlan}
 
                             />
                         </>
