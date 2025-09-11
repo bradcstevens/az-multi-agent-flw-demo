@@ -6,7 +6,9 @@ Extends StandardMagenticManager to add approval gates before plan execution.
 import asyncio
 import re
 from typing import Any, List, Optional
-
+            # Create a progress ledger that indicates the request is satisfied (task complete)
+from semantic_kernel.agents.orchestration.magentic import (
+                ProgressLedger, ProgressLedgerItem)
 import v3.models.messages as messages
 from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
@@ -148,9 +150,6 @@ Here is an example of a well-structured plan:
                 user_id=current_user_id.get(),
                 message_type=messages.WebsocketMessageType.FINAL_RESULT_MESSAGE)
             
-            # Create a progress ledger that indicates the request is satisfied (task complete)
-            from semantic_kernel.agents.orchestration.magentic import (
-                ProgressLedger, ProgressLedgerItem)
             return ProgressLedger(
                 is_request_satisfied=ProgressLedgerItem(reason="Maximum rounds exceeded", answer=True),
                 is_in_loop=ProgressLedgerItem(reason="Terminating", answer=False),
