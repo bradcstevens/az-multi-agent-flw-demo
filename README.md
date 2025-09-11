@@ -105,24 +105,6 @@ Use the [Azure pricing calculator](https://azure.microsoft.com/en-us/pricing/cal
 
 <br/>
 
-  Prerequisite — enable the Microsoft.Compute/EncryptionAtHost feature for every subscription (and region, if applicable) where you plan to deploy VMs or scale sets with encryptionAtHost: true. Repeat the steps below for each target subscription.
-
-  Steps to enable the feature:
-  1. Set the target subscription:
-     Run: <code>az account set --subscription "&lt;YourSubscriptionId&gt;"</code>
-  2. Register the feature (one time per subscription):
-     Run: <code>az feature register --name EncryptionAtHost --namespace Microsoft.Compute</code>
-  3. Wait until registration completes and shows "Registered":
-     Run: <code>az feature show --name EncryptionAtHost --namespace Microsoft.Compute --query properties.state -o tsv</code>
-  4. Refresh the provider (if required):
-     Run: <code>az provider register --namespace Microsoft.Compute</code>
-  5. Re-run the deployment after registration is complete.
-
-  Note: Feature registration can take several minutes. Ensure the feature is registered before attempting deployments that require encryptionAtHost.
-
-  Reference: Azure Host Encryption — https://learn.microsoft.com/azure/virtual-machines/disks-enable-host-based-encryption-portal?tabs=azure-cli
-
-
 >⚠️ **Important:** To avoid unnecessary costs, remember to take down your app if it's no longer in use,
 either by deleting the resource group in the Portal or running `azd down`.
 
