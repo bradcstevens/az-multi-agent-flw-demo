@@ -489,6 +489,21 @@ async def user_clarification(
                 status_code=404, detail="No active plan found for clarification"
             )
 
+@app_v3.post("/agent_message")
+async def agent_message_user(
+    agent_message: messages.AgentMessageResponse, request: Request
+):
+    """Endpoint to receive agent messages."""
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+    # Set the approval in the orchestration config
+   
+
+
 
 @app_v3.post("/upload_team_config")
 async def upload_team_config(

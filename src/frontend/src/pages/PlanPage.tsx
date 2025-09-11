@@ -437,7 +437,6 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const initializePlanLoading = async () => {
             if (!planId) {
-
                 setErrorLoading(true);
                 return;
             }

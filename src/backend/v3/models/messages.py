@@ -128,14 +128,14 @@ class AgentMessageResponse:
     """Message sent to HumanAgent to request approval for a step."""
     plan_id: str
     m_plan_id: Optional[str] = None
-    user_id: str
+    user_id: Optional[str]
     agent: str
     agent_type: AgentMessageType
-    timestamp: int
+    timestamp: Optional[str]
     content: str
-    raw_data: str
-    steps: List[Any] = Field(default_factory=list)       
-    next_steps: List[Any] = Field(default_factory=list)  
+    raw_data: Optional[str]
+    steps: List[Any] = Field(default_factory=list)
+    next_steps: List[Any] = Field(default_factory=list)
 
 class WebsocketMessageType(str, Enum):
     """Types of WebSocket messages."""
