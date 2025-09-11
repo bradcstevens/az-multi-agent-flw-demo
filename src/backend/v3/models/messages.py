@@ -4,7 +4,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
-
+import time
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
 from src.backend.common.models.messages_kernel import AgentMessageType
 from v3.models.models import MPlan, PlanStatus
@@ -115,7 +115,7 @@ class FinalResultMessage:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the FinalResultMessage to a dictionary for JSON serialization."""
-        import time
+
         data = {
             "content": self.content,
             "status": self.status,
