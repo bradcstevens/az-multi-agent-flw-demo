@@ -14,10 +14,7 @@ from common.models.messages_kernel import TeamConfiguration
 from fastapi import WebSocket
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.connectors.ai.open_ai import (
-    AzureChatCompletion,
-    OpenAIChatPromptExecutionSettings,
-)
-
+    AzureChatCompletion, OpenAIChatPromptExecutionSettings)
 from v3.models.messages import WebsocketMessageType
 
 logger = logging.getLogger(__name__)
@@ -35,7 +32,7 @@ class AzureConfig:
         self.endpoint = config.AZURE_OPENAI_ENDPOINT
         self.reasoning_model = config.REASONING_MODEL_NAME
         self.standard_model = config.AZURE_OPENAI_DEPLOYMENT_NAME
-        self.bing_connection_name = config.AZURE_BING_CONNECTION_NAME
+        #self.bing_connection_name = config.AZURE_BING_CONNECTION_NAME
 
         # Create credential
         self.credential = config.get_azure_credentials()
@@ -89,6 +86,7 @@ class OrchestrationConfig:
         self.approvals: Dict[str, bool] = {}  # m_plan_id -> approval status
         self.sockets: Dict[str, WebSocket] = {}  # user_id -> WebSocket
         self.clarifications: Dict[str, str] = {}  # m_plan_id -> clarification response
+        self.max_rounds: int = 20  # Maximum number of replanning rounds 20 needed to accommodate complex tasks
 
     def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
         """get existing orchestration instance."""

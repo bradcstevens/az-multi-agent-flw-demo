@@ -10,7 +10,7 @@ from typing import Any, List, Optional
 import v3.models.messages as messages
 from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
-    MagenticContext, StandardMagenticManager)
+    MagenticContext, ProgressLedger, StandardMagenticManager)
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import (
     ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT,
     ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT,
@@ -133,6 +133,12 @@ Here is an example of a well-structured plan:
         print("Replanned: %s", replan)
         return replan
     
+    async def create_progress_ledger(self, magentic_context: MagenticContext) -> ProgressLedger:
+        if magentic_context.round_count >= orchestration_config.max_rounds:
+            # Returning None will stop further background processing
+            return None
+        return await super().create_progress_ledger(magentic_context=magentic_context)
+    
     async def _wait_for_user_approval(self, m_plan_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
         """Wait for user approval response."""
         
@@ -150,6 +156,7 @@ Here is an example of a well-structured plan:
         print("\n Magentic Manager - Preparing final answer...")
 
         return await super().prepare_final_answer(magentic_context)
+
     
     async def _get_plan_approval_with_details(self, task: str, participant_descriptions: dict, plan: Any) -> bool:
         while True:

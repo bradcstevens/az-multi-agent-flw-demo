@@ -8,14 +8,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import List, Union
 
+from common.config.app_config import config
 from common.models.messages_kernel import TeamConfiguration
 from v3.config.settings import current_user_id
 from v3.magentic_agents.foundry_agent import FoundryAgentTemplate
-from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
-                                                    SearchConfig)
+from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
+# from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
+#                                                     SearchConfig)
 from v3.magentic_agents.proxy_agent import ProxyAgent
 from v3.magentic_agents.reasoning_agent import ReasoningAgentTemplate
-from common.config.app_config import config
+
 
 class UnsupportedModelError(Exception):
     """Raised when an unsupported model is specified."""
@@ -87,7 +89,7 @@ class MagenticAgentFactory:
         # Only create configs for explicitly requested capabilities
         search_config = SearchConfig.from_env() if getattr(agent_obj, 'use_rag', False) else None
         mcp_config = MCPConfig.from_env() if getattr(agent_obj, 'use_mcp', False) else None
-        bing_config = BingConfig.from_env() if getattr(agent_obj, 'use_bing', False) else None
+        # bing_config = BingConfig.from_env() if getattr(agent_obj, 'use_bing', False) else None
         
         self.logger.info(f"Creating agent '{agent_obj.name}' with model '{deployment_name}' "
                         f"(Template: {'Reasoning' if use_reasoning else 'Foundry'})")
@@ -114,7 +116,7 @@ class MagenticAgentFactory:
                 model_deployment_name=deployment_name,
                 enable_code_interpreter=getattr(agent_obj, 'coding_tools', False),
                 mcp_config=mcp_config,
-                bing_config=bing_config,
+                #bing_config=bing_config,
                 search_config=search_config
             )
         

@@ -4,8 +4,10 @@ import os
 from typing import Optional
 
 from azure.ai.projects.aio import AIProjectClient
+from azure.cosmos import CosmosClient
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
+from semantic_kernel import Kernel
 
 # Load environment variables from .env file
 load_dotenv()
@@ -52,9 +54,9 @@ class AppConfig:
         )
         self.AZURE_OPENAI_ENDPOINT = self._get_required("AZURE_OPENAI_ENDPOINT")
         self.REASONING_MODEL_NAME = self._get_optional("REASONING_MODEL_NAME", "o3")
-        self.AZURE_BING_CONNECTION_NAME = self._get_optional(
-            "AZURE_BING_CONNECTION_NAME"
-        )
+        # self.AZURE_BING_CONNECTION_NAME = self._get_optional(
+        #     "AZURE_BING_CONNECTION_NAME"
+        # )
         self.SUPPORTED_MODELS = self._get_optional("SUPPORTED_MODELS")
         # Frontend settings
         self.FRONTEND_SITE_NAME = self._get_optional(
@@ -82,7 +84,7 @@ class AppConfig:
         self.AZURE_AI_SEARCH_INDEX_NAME = self._get_optional("AZURE_AI_SEARCH_INDEX_NAME")
         self.AZURE_AI_SEARCH_ENDPOINT = self._get_optional("AZURE_AI_SEARCH_ENDPOINT")
         self.AZURE_AI_SEARCH_API_KEY = self._get_optional("AZURE_AI_SEARCH_API_KEY")
-        self.BING_CONNECTION_NAME = self._get_optional("BING_CONNECTION_NAME")  
+        # self.BING_CONNECTION_NAME = self._get_optional("BING_CONNECTION_NAME")  
 
         test_team_json = self._get_optional("TEST_TEAM_JSON")
 
@@ -125,7 +127,7 @@ class AppConfig:
     async def get_access_token(self) -> str:
         """Get Azure access token for API calls."""
         try:
-            credential = self.get_azure_credentials(self.AZURE_CLIENT_ID)
+            credential = self.get_azure_credentials()
             token = credential.get_token(self.AZURE_COGNITIVE_SERVICES)
             return token.token
         except Exception as e:
@@ -190,7 +192,7 @@ class AppConfig:
         try:
             if self._cosmos_client is None:
                 self._cosmos_client = CosmosClient(
-                    self.COSMOSDB_ENDPOINT, credential=get_azure_credential(self.AZURE_CLIENT_ID)
+                    self.COSMOSDB_ENDPOINT, credential=self.get_azure_credential(self.AZURE_CLIENT_ID)
                 )
 
             if self._cosmos_database is None:
@@ -227,7 +229,7 @@ class AppConfig:
             return self._ai_project_client
 
         try:
-            credential = get_azure_credential(self.AZURE_CLIENT_ID)
+            credential = self.get_azure_credential(self.AZURE_CLIENT_ID)
             if credential is None:
                 raise RuntimeError(
                     "Unable to acquire Azure credentials; ensure Managed Identity is configured"
