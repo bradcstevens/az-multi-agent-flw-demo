@@ -51,7 +51,34 @@
         "value": "${AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID}"
     },
     "existingAiFoundryAiProjectResourceId": {
-      "value": "${AZURE_ENV_FOUNDRY_PROJECT_ID}"
+      "value": "${AZURE_EXISTING_AI_PROJECT_RESOURCE_ID}"
+    },
+    "customerManagedKey": {
+      "value": {
+        "keyVaultResourceId": "/subscriptions/1d5876cd-7603-407a-96d2-ae5ca9a9c5f3/resourceGroups/macae-keyvault/providers/Microsoft.KeyVault/vaults/macae-cmk",
+        "keyName": "macae-key",
+        "keyVersion": "c9c62b36289342eca6fffb111f3634be",
+        "userAssignedIdentityResourceId": "/subscriptions/1d5876cd-7603-407a-96d2-ae5ca9a9c5f3/resourceGroups/macae-keyvault/providers/Microsoft.ManagedIdentity/userAssignedIdentities/macae-identity"
+      }
+    },
+    "allowedFqdnList": {
+      "value": [
+        "mcr.microsoft.com",
+        "openai.azure.com",
+        "cognitiveservices.azure.com",
+        "login.microsoftonline.com",
+        "management.azure.com",
+        "aiinfra.azure.com",
+        "aiinfra.azure.net",
+        "aiinfra.azureedge.net",
+        "blob.core.windows.net",
+        "database.windows.net",
+        "vault.azure.net",
+        "monitoring.azure.com",
+        "dc.services.visualstudio.com",
+        "azconfig.io",
+        "azconfig.azure.net"
+      ]
     }
   }
 }

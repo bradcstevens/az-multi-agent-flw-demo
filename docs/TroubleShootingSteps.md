@@ -297,5 +297,35 @@ The subscription 'xxxx-xxxx' cannot have more than 1 Container App Environments 
  
 </details>
 
+<details>
+<summary><b>EncryptionAtHostFeatureNotEnabled</b></summary>
+
+This error appears when a resource (typically a Virtual Machine or scale set) sets the property <code>encryptionAtHost: true</code> but the subscription isn't enabled for the feature <code>Microsoft.Compute/EncryptionAtHost</code> in that region.
+
+Example error snippet:
+
+<pre>
+{"code":"InvalidTemplateDeployment","message":"The template deployment failed with error: 'The feature Microsoft.Compute/EncryptionAtHost is not enabled for subscription <sub-id> in location <region>.'"}
+</pre>
+
+Why it happens:
+ - The host-level encryption capability is a gated feature. Subscriptions must register the feature (and sometimes wait for registration to complete) before provisioning VMs with it enabled.
+ - Attempting to force it on before registration completes blocks deployment.
+
+How to fix:
+ 1. Set the subscription
+        - Run: <code>az account set --subscription "yourSubIDHere"</code>
+ 2. Register the feature (one time per subscription):
+        - Run: <code>az feature register --name EncryptionAtHost --namespace Microsoft.Compute</code>
+ 3. Check status until it shows "Registered":
+        - <code>az feature show --name EncryptionAtHost --namespace Microsoft.Compute</code>
+ 4. Re-run the deployment.
+
+Reference docs:
+ - Azure Host Encryption: https://learn.microsoft.com/en-us/azure/virtual-machines/disks-enable-host-based-encryption-portal?tabs=azure-cli
+
+</details>
+<br/>
+<br/>
 💡 Note: If you encounter any other issues, you can refer to the [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) documentation.
 If the problem persists, you can also raise an bug in our [MACAE Github Issues](https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/issues) for further support.
