@@ -116,7 +116,7 @@ param virtualMachineAdminPassword string = newGuid()
 param backendContainerRegistryHostname string = 'macaev3tst1acr.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the backend.')
-param backendContainerImageName string = 'macaebackend'
+param backendContainerImageName string = 'macae-backend'
 
 @description('Optional. The Container Image Tag to deploy on the backend.')
 param backendContainerImageTag string = 'v3tst1'
@@ -125,7 +125,7 @@ param backendContainerImageTag string = 'v3tst1'
 param frontendContainerRegistryHostname string = 'macaev3tst1acr.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the frontend.')
-param frontendContainerImageName string = 'macaefrontend'
+param frontendContainerImageName string = 'macae-frontend'
 
 @description('Optional. The Container Image Tag to deploy on the frontend.')
 param frontendContainerImageTag string = 'v3tst1'
@@ -1439,6 +1439,13 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
       allowedOrigins: [
         'https://${webSiteResourceName}.azurewebsites.net'
         'http://${webSiteResourceName}.azurewebsites.net'
+      ]
+      allowedMethods:[
+        'GET'
+        'POST'
+        'PUT'
+        'DELETE'
+        'OPTIONS'
       ]
     }
     // WAF aligned configuration for Scalability
