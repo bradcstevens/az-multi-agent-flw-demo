@@ -362,10 +362,10 @@ export class PlanDataService {
    * Parse an agent message object or repr string:
    * Input forms supported:
    *  - { type: 'agent_message', data: "AgentMessage(agent_name='X', timestamp=..., content='...')"}
+   *  - { type: 'agent_message', data: { agent_name: 'X', timestamp: 12345, content: '...' } }
    *  - "AgentMessage(agent_name='X', timestamp=..., content='...')"
    * Returns a structured object with steps parsed from markdown-ish content.
    */
-  // ...inside class PlanDataService
   static parseAgentMessage(rawData: any): {
     agent: string;
     agent_type: AgentMessageType;
@@ -381,13 +381,62 @@ export class PlanDataService {
     raw_data: any;
   } | null {
     try {
-      // Unwrap wrapper
-      if (rawData && typeof rawData === 'object' &&
-        rawData.type === WebsocketMessageType.AGENT_MESSAGE &&
-        typeof rawData.data === 'string') {
-        return this.parseAgentMessage(rawData.data);
+      // Handle JSON string input - parse it first
+      if (typeof rawData === 'string' && rawData.startsWith('{')) {
+        try {
+          rawData = JSON.parse(rawData);
+        } catch (e) {
+          console.error('Failed to parse JSON string:', e);
+          // Fall through to handle as regular string
+        }
       }
 
+      // Unwrap wrapper - handle object format
+      if (rawData && typeof rawData === 'object' && rawData.type === WebsocketMessageType.AGENT_MESSAGE) {
+        if (typeof rawData.data === 'object' && rawData.data.agent_name) {
+          // New format: { type: 'agent_message', data: { agent_name: '...', timestamp: 123, content: '...' } }
+          const data = rawData.data;
+          const content = data.content || '';
+          const timestamp = typeof data.timestamp === 'number' ? data.timestamp : null;
+
+          // Parse the content for steps and next_steps (reuse existing logic)
+          const { steps, next_steps } = this.parseContentForStepsAndNextSteps(content);
+
+          return {
+            agent: data.agent_name || 'UnknownAgent',
+            agent_type: AgentMessageType.AI_AGENT,
+            timestamp,
+            steps,
+            next_steps,
+            content,
+            raw_data: rawData
+          };
+        } else if (typeof rawData.data === 'string') {
+          // Old format: { type: 'agent_message', data: "AgentMessage(...)" }
+          return this.parseAgentMessage(rawData.data);
+        }
+      }
+
+      // Handle direct object format
+      if (rawData && typeof rawData === 'object' && rawData.agent_name) {
+        const content = rawData.content || '';
+        const timestamp = typeof rawData.timestamp === 'number' ? rawData.timestamp : null;
+
+        // Parse the content for steps and next_steps
+        const { steps, next_steps } = this.parseContentForStepsAndNextSteps(content);
+
+        return {
+          agent: rawData.agent_name || 'UnknownAgent',
+          agent_type: AgentMessageType.AI_AGENT,
+          timestamp,
+          steps,
+          next_steps,
+          content,
+          raw_data: rawData
+        };
+      }
+
+      // Handle old string format: "AgentMessage(...)"
       if (typeof rawData !== 'string') return null;
       if (!rawData.startsWith('AgentMessage(')) return null;
 
@@ -398,81 +447,29 @@ export class PlanDataService {
         source.match(/agent_name="([^"]+)"/)?.[1] ||
         'UnknownAgent';
 
-      const timestampStr = source.match(/timestamp=([\d.]+)/)?.[1];
+      const timestampStr =
+        source.match(/timestamp=([\d.]+)/)?.[1];
       const timestamp = timestampStr ? Number(timestampStr) : null;
 
-      // Support single or double quoted content
-      const contentMatch = source.match(/content=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
-      let content = contentMatch ? (contentMatch[1] ?? contentMatch[2] ?? '') : '';
+      // Extract content='...'
+      const contentMatch = source.match(/content='((?:\\'|[^'])*)'/);
+      let content = contentMatch ? contentMatch[1] : '';
+      // Unescape
       content = content
         .replace(/\\n/g, '\n')
         .replace(/\\'/g, "'")
         .replace(/\\"/g, '"')
         .replace(/\\\\/g, '\\');
 
-      // Simplify human clarification inline if present
-      content = this.simplifyHumanClarification(content);
-
-      // Parse sections
-      const lines = content.split('\n');
-      const steps: Array<{ title: string; fields: Record<string, string>; summary?: string; raw_block: string; }> = [];
-      let i = 0;
-      while (i < lines.length) {
-        const headingMatch = lines[i].match(/^#####\s+(.+?)\s+Completed\s*$/i);
-        if (headingMatch) {
-          const title = headingMatch[1].trim();
-          const blockLines: string[] = [];
-          i++;
-          while (i < lines.length && !/^---\s*$/.test(lines[i]) && !/^#####\s+/.test(lines[i])) {
-            blockLines.push(lines[i]);
-            i++;
-          }
-          if (i < lines.length && /^---\s*$/.test(lines[i])) i++;
-
-          const fields: Record<string, string> = {};
-          let summary: string | undefined;
-          for (const bl of blockLines) {
-            const fieldMatch = bl.match(/^\*\*(.+?)\*\*:\s*(.*)$/);
-            if (fieldMatch) {
-              const fieldName = fieldMatch[1].trim().replace(/:$/, '');
-              const value = fieldMatch[2].trim().replace(/\\s+$/, '');
-              if (fieldName) fields[fieldName] = value;
-            } else {
-              const summaryMatch = bl.match(/^AGENT SUMMARY:\s*(.+)$/i);
-              if (summaryMatch) summary = summaryMatch[1].trim();
-            }
-          }
-
-          steps.push({
-            title,
-            fields,
-            summary,
-            raw_block: blockLines.join('\n').trim()
-          });
-        } else {
-          i++;
-        }
-      }
-
-      // Next Steps
-      const nextSteps: string[] = [];
-      const nextIdx = lines.findIndex(l => /^Next Steps:/.test(l.trim()));
-      if (nextIdx !== -1) {
-        for (let j = nextIdx + 1; j < lines.length; j++) {
-          const l = lines[j].trim();
-          if (!l) continue;
-          if (/^[-*]\s+/.test(l)) {
-            nextSteps.push(l.replace(/^[-*]\s+/, '').trim());
-          }
-        }
-      }
+      // Parse the content for steps and next_steps
+      const { steps, next_steps } = this.parseContentForStepsAndNextSteps(content);
 
       return {
         agent,
         agent_type: AgentMessageType.AI_AGENT,
         timestamp,
         steps,
-        next_steps: nextSteps,
+        next_steps,
         content,
         raw_data: rawData
       };
@@ -481,15 +478,88 @@ export class PlanDataService {
       return null;
     }
   }
-  // ...inside export class PlanDataService { (place near other parsers)
+
+  /**
+   * Helper method to parse content for steps and next_steps
+   * Extracted to avoid code duplication
+   */
+  private static parseContentForStepsAndNextSteps(content: string): {
+    steps: Array<{
+      title: string;
+      fields: Record<string, string>;
+      summary?: string;
+      raw_block: string;
+    }>;
+    next_steps: string[];
+  } {
+    // Parse sections of the form "##### Title Completed"
+    // Each block ends at --- line or next "##### " or end.
+    const lines = content.split('\n');
+    const steps: Array<{ title: string; fields: Record<string, string>; summary?: string; raw_block: string; }> = [];
+    let i = 0;
+    while (i < lines.length) {
+      const headingMatch = lines[i].match(/^#####\s+(.+?)\s+Completed\s*$/i);
+      if (headingMatch) {
+        const title = headingMatch[1].trim();
+        const blockLines: string[] = [];
+        i++;
+        while (i < lines.length && !/^---\s*$/.test(lines[i]) && !/^#####\s+/.test(lines[i])) {
+          blockLines.push(lines[i]);
+          i++;
+        }
+        // Skip separator line if present
+        if (i < lines.length && /^---\s*$/.test(lines[i])) i++;
+
+        const fields: Record<string, string> = {};
+        let summary: string | undefined;
+        for (const bl of blockLines) {
+          const fieldMatch = bl.match(/^\*\*(.+?)\*\*:\s*(.*)$/);
+          if (fieldMatch) {
+            const fieldName = fieldMatch[1].trim().replace(/:$/, '');
+            const value = fieldMatch[2].trim().replace(/\\s+$/, '');
+            if (fieldName) fields[fieldName] = value;
+          } else {
+            const summaryMatch = bl.match(/^AGENT SUMMARY:\s*(.+)$/i);
+            if (summaryMatch) {
+              summary = summaryMatch[1].trim();
+            }
+          }
+        }
+
+        steps.push({
+          title,
+          fields,
+          summary,
+          raw_block: blockLines.join('\n').trim()
+        });
+      } else {
+        i++;
+      }
+    }
+
+    // Next Steps section
+    const next_steps: string[] = [];
+    const nextIdx = lines.findIndex(l => /^Next Steps:/.test(l.trim()));
+    if (nextIdx !== -1) {
+      for (let j = nextIdx + 1; j < lines.length; j++) {
+        const l = lines[j].trim();
+        if (!l) continue;
+        if (/^[-*]\s+/.test(l)) {
+          next_steps.push(l.replace(/^[-*]\s+/, '').trim());
+        }
+      }
+    }
+
+    return { steps, next_steps };
+  }
 
   /**
    * Parse streaming agent message fragments.
    * Supports:
    *  - { type: 'agent_message_streaming', data: "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)" }
+   *  - { type: 'agent_message_streaming', data: { agent_name: 'X', content: 'partial', is_final: true } }
    *  - "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)"
    */
-  // Replace the body of parseAgentMessageStreaming with this improved version
   static parseAgentMessageStreaming(rawData: any): {
     agent: string;
     content: string;
@@ -497,16 +567,44 @@ export class PlanDataService {
     raw_data: any;
   } | null {
     try {
-      // Unwrap wrapper object
-      if (
-        rawData &&
-        typeof rawData === 'object' &&
-        rawData.type === WebsocketMessageType.AGENT_MESSAGE_STREAMING &&
-        typeof rawData.data === 'string'
-      ) {
-        return this.parseAgentMessageStreaming(rawData.data);
+      // Handle JSON string input - parse it first
+      if (typeof rawData === 'string' && rawData.startsWith('{')) {
+        try {
+          rawData = JSON.parse(rawData);
+        } catch (e) {
+          console.error('Failed to parse JSON string:', e);
+          // Fall through to handle as regular string
+        }
       }
 
+      // Unwrap wrapper - handle object format
+      if (rawData && typeof rawData === 'object' && rawData.type === 'agent_message_streaming') {
+        if (typeof rawData.data === 'object' && rawData.data.agent_name) {
+          // New format: { type: 'agent_message_streaming', data: { agent_name: '...', content: '...', is_final: true } }
+          const data = rawData.data;
+          return {
+            agent: data.agent_name || 'UnknownAgent',
+            content: data.content || '',
+            is_final: Boolean(data.is_final),
+            raw_data: rawData
+          };
+        } else if (typeof rawData.data === 'string') {
+          // Old format: { type: 'agent_message_streaming', data: "AgentMessageStreaming(...)" }
+          return this.parseAgentMessageStreaming(rawData.data);
+        }
+      }
+
+      // Handle direct object format
+      if (rawData && typeof rawData === 'object' && rawData.agent_name) {
+        return {
+          agent: rawData.agent_name || 'UnknownAgent',
+          content: rawData.content || '',
+          is_final: Boolean(rawData.is_final),
+          raw_data: rawData
+        };
+      }
+
+      // Handle old string format: "AgentMessageStreaming(...)"
       if (typeof rawData !== 'string') return null;
       if (!rawData.startsWith('AgentMessageStreaming(')) return null;
 
@@ -517,15 +615,13 @@ export class PlanDataService {
         source.match(/agent_name="([^"]+)"/)?.[1] ||
         'UnknownAgent';
 
-      // Support content='...' OR content="..." with escapes
-      const contentMatch = source.match(/content=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
-      let content = contentMatch ? (contentMatch[1] ?? contentMatch[2] ?? '') : '';
+      const contentMatch = source.match(/content='((?:\\'|[^'])*)'/);
+      let content = contentMatch ? contentMatch[1] : '';
       content = content
         .replace(/\\n/g, '\n')
         .replace(/\\'/g, "'")
         .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\')
-        .trim();
+        .replace(/\\\\/g, '\\');
 
       let is_final = false;
       const finalMatch = source.match(/is_final=(True|False)/i);
@@ -539,46 +635,8 @@ export class PlanDataService {
       return null;
     }
   }
-  // Place inside export class PlanDataService (near other parsers)
+  // ...inside export class PlanDataService { (place near other parsers, e.g. after parseAgentMessageStreaming)
 
-  /**
-   * Simplify a human clarification streaming line.
-   * Input example:
-   *   Human clarification: UserClarificationResponse(request_id='uuid', answer='no more steps', plan_id='', m_plan_id='')
-   * Output (markdown/plain):
-   *   Human clarification: no more steps
-   * If pattern not found, returns the original string.
-   */
-  static simplifyHumanClarification(line: string): string {
-    if (
-      typeof line !== 'string' ||
-      !line.includes('Human clarification:') ||
-      !line.includes('UserClarificationResponse(')
-    ) {
-      return line;
-    }
-
-    // Capture the inside of UserClarificationResponse(...)
-    const outerMatch = line.match(/Human clarification:\s*UserClarificationResponse\((.*?)\)/s);
-    if (!outerMatch) return line;
-
-    const inner = outerMatch[1];
-
-    // Find answer= '...' | "..."
-    const answerMatch = inner.match(/answer=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
-    if (!answerMatch) return line;
-
-    let answer = answerMatch[1] ?? answerMatch[2] ?? '';
-    // Unescape common sequences
-    answer = answer
-      .replace(/\\n/g, '\n')
-      .replace(/\\'/g, "'")
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, '\\')
-      .trim();
-
-    return `Human clarification: ${answer}`;
-  }
   /**
    * Parse a user clarification request message (possibly deeply nested).
    * Accepts objects like:
@@ -719,5 +777,34 @@ export class PlanDataService {
     }
   }
 
+  static simplifyHumanClarification(line: string): string {
+    if (
+      typeof line !== 'string' ||
+      !line.includes('Human clarification:') ||
+      !line.includes('UserClarificationResponse(')
+    ) {
+      return line;
+    }
 
+    // Capture the inside of UserClarificationResponse(...)
+    const outerMatch = line.match(/Human clarification:\s*UserClarificationResponse\((.*?)\)/s);
+    if (!outerMatch) return line;
+
+    const inner = outerMatch[1];
+
+    // Find answer= '...' | "..."
+    const answerMatch = inner.match(/answer=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
+    if (!answerMatch) return line;
+
+    let answer = answerMatch[1] ?? answerMatch[2] ?? '';
+    // Unescape common sequences
+    answer = answer
+      .replace(/\\n/g, '\n')
+      .replace(/\\'/g, "'")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .trim();
+
+    return `Human clarification: ${answer}`;
+  }
 }
