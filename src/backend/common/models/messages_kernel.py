@@ -2,10 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
-
-
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
-from dataclasses import  dataclass
 
 class DataType(str, Enum):
     """Enumeration of possible data types for documents in the database."""
@@ -260,6 +257,16 @@ class AgentMessageType(str, Enum):
 
 
 class AgentMessageData (BaseDataModel):
+
+    data_type: Literal[DataType.m_plan_message] = Field(DataType.m_plan_message, Literal=True)
+    plan_id: str
+    user_id: str
+    m_plan_id: Optional[str] = None
     agent: str
     agent_type: AgentMessageType = AgentMessageType.AI_AGENT 
+    timestamp: int
     content: str
+    raw_data: str
+    steps: List[Any] = Field(default_factory=list)       
+    next_steps: List[Any] = Field(default_factory=list)  
+    

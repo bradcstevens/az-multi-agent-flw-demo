@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Literal, Optional
 
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
+from src.backend.common.models.messages_kernel import AgentMessageType
 from v3.models.models import MPlan, PlanStatus
 
 
@@ -122,6 +123,19 @@ class ApprovalRequest(KernelBaseModel):
     action: str
     agent_name: str
 
+@dataclass(slots=True)
+class AgentMessageResponse:
+    """Message sent to HumanAgent to request approval for a step."""
+    plan_id: str
+    m_plan_id: Optional[str] = None
+    user_id: str
+    agent: str
+    agent_type: AgentMessageType
+    timestamp: int
+    content: str
+    raw_data: str
+    steps: List[Any] = Field(default_factory=list)       
+    next_steps: List[Any] = Field(default_factory=list)  
 
 class WebsocketMessageType(str, Enum):
     """Types of WebSocket messages."""
