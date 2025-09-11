@@ -1,8 +1,8 @@
 """Messages from the backend to the frontend via WebSocket."""
 
-from enum import Enum
 import uuid
 from dataclasses import asdict, dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
@@ -107,8 +107,22 @@ class UserClarificationResponse:
 @dataclass(slots=True)
 class FinalResultMessage:
     """Final result message from the backend to the frontend."""
-    result: str
-    summary: str | None = None
+    content: str  # Changed from 'result' to 'content' to match frontend expectations
+    status: str = "completed"  # Added status field (defaults to 'completed')
+    timestamp: Optional[float] = None  # Added timestamp field
+    summary: str | None = None  # Keep summary for backward compatibility
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the FinalResultMessage to a dictionary for JSON serialization."""
+        import time
+        data = {
+            "content": self.content,
+            "status": self.status,
+            "timestamp": self.timestamp or time.time()
+        }
+        if self.summary:
+            data["summary"] = self.summary
+        return data
 
 
 @dataclass(slots=True)

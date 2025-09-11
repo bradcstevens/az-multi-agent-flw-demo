@@ -197,16 +197,36 @@ class ConnectionConfig:
             )
             return
 
-        print(f" websocket {message}")
+        print(f" websocket original message: {message}")
+        print(f" websocket message type: {type(message)}")
+        
+        # Convert message to proper format for frontend
         try:
-            if hasattr(message, "data") and hasattr(message, "type"):
-                message = message.data
+            if hasattr(message, "to_dict"):
+                # Use the custom to_dict method if available
+                message_data = message.to_dict()
+                print(f" websocket used to_dict(): {message_data}")
+            elif hasattr(message, "data") and hasattr(message, "type"):
+                # Handle structured messages with data property
+                message_data = message.data
+                print(f" websocket used message.data: {message_data}")
+            elif isinstance(message, dict):
+                # Already a dictionary
+                message_data = message
+                print(f" websocket already dict: {message_data}")
+            else:
+                # Convert to string if it's a simple type
+                message_data = str(message)
+                print(f" websocket converted to string: {message_data}")
         except Exception as e:
-                print(f"Error loading message data: {e}")
-        print(f" websocket after {message}")
+            print(f"Error processing message data: {e}")
+            message_data = str(message)
+            
+        print(f" websocket final message_data: {message_data}")
+        
         standard_message = {
             "type": message_type,
-            "data": message
+            "data": message_data
         }
         connection = self.get_connection(process_id)
         if connection:
