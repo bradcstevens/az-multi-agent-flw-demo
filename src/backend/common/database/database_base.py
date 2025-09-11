@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 import v3.models.messages as messages
 from ..models.messages_kernel import (
+    AgentMessageData,
     BaseDataModel,
     Plan,
     Step,
@@ -213,5 +214,19 @@ class DatabaseBase(ABC):
 
     @abstractmethod
     async def get_mplan(self, plan_id: str) -> Optional[messages.MPlan]:
-        """Retrieve a mplan configuration by mplan_id."""
+        """Retrieve a mplan configuration by plan_id."""
+        pass
+    
+    @abstractmethod
+    async def add_agent_message(self, message: AgentMessageData) -> None:
+        pass
+
+    @abstractmethod
+    async def update_agent_message(self, message: AgentMessageResponse) -> None:
+        """Update an agent message in the database."""
+        pass
+
+    @abstractmethod
+    async def get_agent_messages(self, plan_id: str) -> Optional[AgentMessageResponse]:
+        """Retrieve an agent message by message_id."""
         pass

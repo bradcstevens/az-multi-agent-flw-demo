@@ -13,8 +13,6 @@ from common.utils.event_utils import track_event_if_configured
 import uuid
 from semantic_kernel.kernel_pydantic import Field
 
-class MPlanExpanded(MPlan):
-    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     
 logger = logging.getLogger(__name__)
 def build_agent_message_from_user_clarification(
@@ -37,6 +35,70 @@ def build_agent_message_from_user_clarification(
         raw_data = json.dumps(asdict(human_feedback)),
         steps = [],          # intentionally empty
         next_steps = []      # intentionally empty
+    )
+
+def build_agent_message_from_agent_message_response(
+    agent_response: messages.AgentMessageResponse,
+    user_id: str,
+) -> AgentMessageData:
+    """
+    Convert a messages.AgentMessageResponse into common.models.messages_kernel.AgentMessageData.
+    This is defensive: it tolerates missing fields and different timestamp formats.
+    """
+    # Robust timestamp parsing (accepts seconds or ms or missing)
+
+
+    # Raw data serialization
+    raw = getattr(agent_response, "raw_data", None)
+    try:
+        if raw is None:
+            # try asdict if it's a dataclass-like
+            try:
+                raw_str = json.dumps(asdict(agent_response))
+            except Exception:
+                raw_str = json.dumps({k: getattr(agent_response, k) for k in dir(agent_response) if not k.startswith("_")})
+        elif isinstance(raw, (dict, list)):
+            raw_str = json.dumps(raw)
+        else:
+            raw_str = str(raw)
+    except Exception:
+        raw_str = json.dumps({"raw": str(raw)})
+
+    # Steps / next_steps defaulting
+    steps = getattr(agent_response, "steps", []) or []
+    next_steps = getattr(agent_response, "next_steps", []) or []
+
+    # Agent name and type
+    agent_name = getattr(agent_response, "agent", "") or getattr(agent_response, "agent_name", "") or getattr(agent_response, "source", "")
+    # Try to infer agent_type, fallback to AI_AGENT
+    agent_type_raw = getattr(agent_response, "agent_type", None)
+    if isinstance(agent_type_raw, AgentMessageType):
+        agent_type = agent_type_raw
+    else:
+        # Normalize common strings
+        agent_type_str = str(agent_type_raw or "").lower()
+        if "human" in agent_type_str:
+            agent_type = AgentMessageType.HUMAN_AGENT
+        else:
+            agent_type = AgentMessageType.AI_AGENT
+
+    # Content
+    content = getattr(agent_response, "content", "") or getattr(agent_response, "text", "") or ""
+
+    # plan_id / user_id fallback
+    plan_id_val = getattr(agent_response, "plan_id", "") or ""
+    user_id_val = getattr(agent_response, "user_id", "") or user_id
+
+    return AgentMessageData(
+        plan_id=plan_id_val,
+        user_id=user_id_val,
+        m_plan_id=getattr(agent_response, "m_plan_id", ""),
+        agent=agent_name,
+        agent_type=agent_type,
+        content=content,
+        raw_data=raw_str,
+        steps=list(steps),
+        next_steps=list(next_steps),
     )
 
 
@@ -118,7 +180,18 @@ class PlanService:
         Raises:
             ValueError on invalid state
         """
-        return True
+        try:
+            agent_msg = build_agent_message_from_agent_message_response(agent_message, user_id)
+
+            # Persist if your database layer supports it.
+            # Look for or implement something like: memory_store.add_agent_message(agent_msg)
+            memory_store = await DatabaseFactory.get_database(user_id=user_id)
+            await memory_store.add_agent_message(agent_msg)
+            return True
+        except Exception as e:
+            logger.exception("Failed to handle human clarification -> agent message: %s", e)
+            return False
+
     
     @staticmethod
     async def handle_human_clarification(human_feedback: messages.UserClarificationResponse, user_id: str) -> bool:
@@ -141,14 +214,7 @@ class PlanService:
             # Persist if your database layer supports it.
             # Look for or implement something like: memory_store.add_agent_message(agent_msg)
             memory_store = await DatabaseFactory.get_database(user_id=user_id)
-            if hasattr(memory_store, "add_agent_message"):
-                await memory_store.add_agent_message(agent_msg)
-            else:
-                # Fallback: log or ignore if persistence not yet implemented
-                logging.debug("add_agent_message not implemented; skipping persistence")
-
-            # Optionally emit over websocket if you have a broadcaster:
-            # await websocket_manager.broadcast(WebsocketMessageType.AGENT_MESSAGE, agent_msg.model_dump())
+            await memory_store.add_agent_message(agent_msg)
 
             return True
         except Exception as e:

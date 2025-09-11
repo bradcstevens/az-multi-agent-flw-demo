@@ -23,6 +23,7 @@ from common.utils.utils_date import DateTimeEncoder
 
 from .database_base import DatabaseBase
 from ..models.messages_kernel import (
+    AgentMessageData,
     BaseDataModel,
     Plan,
     Step,
@@ -480,3 +481,22 @@ class CosmosDBClient(DatabaseBase):
         ]
         results = await self.query_items(query, parameters, messages.MPlan)
         return results[0] if results else None
+    
+
+    async def add_agent_message(self, message: messages.AgentMessageResponse) -> None:
+        """Add an agent message to the database."""
+        await self.add_item(message)
+
+    async def update_agent_message(self, message: messages.AgentMessageResponse) -> None:
+        """Update an agent message in the database."""
+        await self.update_item(message)
+
+    async def get_agent_messages(self, plan_id: str) -> List[messages.AgentMessageResponse]:
+        """Retrieve an agent message by message_id."""
+        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type"
+        parameters = [
+            {"name": "@plan_id", "value": plan_id},
+            {"name": "@data_type", "value": DataType.m_plan_message},
+        ]
+
+        return await self.query_items(query, parameters, messages.AgentMessageResponse)
