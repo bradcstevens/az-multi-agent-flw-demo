@@ -141,14 +141,14 @@ class ApprovalRequest(KernelBaseModel):
 class AgentMessageResponse:
     """Message sent to HumanAgent to request approval for a step."""
     plan_id: str
-    m_plan_id: Optional[str] = None
-    user_id: Optional[str]
     agent: str
-    agent_type: AgentMessageType
-    timestamp: Optional[str]
     content: str
-    raw_data: Optional[str]
-    steps: List[Any] = Field(default_factory=list)
+    agent_type: AgentMessageType
+    m_plan_id: Optional[str] = None
+    user_id: Optional[str] = None
+    timestamp: Optional[str] = field(default_factory=lambda: str(time.time()))
+    raw_data: Optional[str] = None
+    steps: List[Any] = Field(default_factory=list) 
     next_steps: List[Any] = Field(default_factory=list)
 
 class WebsocketMessageType(str, Enum):
