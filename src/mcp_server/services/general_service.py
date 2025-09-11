@@ -2,9 +2,9 @@
 General purpose MCP tools service.
 """
 
-from core.factory import MCPToolBase, Domain
-from utils.formatters import format_success_response, format_error_response
+from core.factory import Domain, MCPToolBase
 from utils.date_utils import get_current_timestamp
+from utils.formatters import format_error_response, format_success_response
 
 
 class GeneralService(MCPToolBase):
@@ -17,8 +17,8 @@ class GeneralService(MCPToolBase):
         """Register general tools with the MCP server."""
 
         @mcp.tool(tags={self.domain.value})
-        def greet(name: str) -> str:
-            """Greets the user with the provided name."""
+        def greet_test(name: str) -> str:
+            """Test for MCP - Greets the user with the provided name."""
             try:
                 details = {
                     "name": name,
