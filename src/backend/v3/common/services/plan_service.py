@@ -38,12 +38,10 @@ class PlanService:
                     orchestration_config.plans[human_feedback.m_plan_id],
                 )
                 if human_feedback.approved:
-                    mplan.plan_id = human_feedback.plan_id
-
-                    orchestration_config.plans[human_feedback.m_plan_id] = mplan
-                    
                     plan = await memory_store.get_plan(human_feedback.plan_id)
+                    mplan.plan_id = human_feedback.plan_id
                     mplan.team_id = plan.team_id # just to keep consistency 
+                    orchestration_config.plans[human_feedback.m_plan_id] = mplan
                     if plan:
                         plan.overall_status = PlanStatus.approved
                         await memory_store.update_plan(plan)

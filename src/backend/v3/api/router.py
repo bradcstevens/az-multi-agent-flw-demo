@@ -9,18 +9,36 @@ import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (InputTask, Plan, PlanStatus,
-                                           PlanWithSteps, TeamSelectionRequest)
+from common.models.messages_kernel import (
+    InputTask,
+    Plan,
+    PlanStatus,
+    PlanWithSteps,
+    TeamSelectionRequest,
+)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_date import format_dates_in_messages
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
-                     Request, UploadFile, WebSocket, WebSocketDisconnect)
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.plan_service import PlanService
 from v3.common.services.team_service import TeamService
-from v3.config.settings import (connection_config, current_user_id,
-                                orchestration_config, team_config)
+from v3.config.settings import (
+    connection_config,
+    current_user_id,
+    orchestration_config,
+    team_config,
+)
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
 router = APIRouter()
@@ -118,7 +136,7 @@ async def init_team(
         user_current_team = await memory_store.get_current_team(user_id=user_id)
         if not user_current_team:
             print("User has no current team, setting to default:", init_team_id)
-            user_current_team =  await team_service.handle_team_selection(
+            user_current_team = await team_service.handle_team_selection(
                 user_id=user_id, team_id=init_team_id
             )
             if user_current_team:
@@ -445,15 +463,24 @@ async def user_clarification(
             orchestration_config.clarifications[human_feedback.request_id] = (
                 human_feedback.answer
             )
+
+            try:
+                result = await PlanService.handle_human_clarification(
+                    human_feedback, user_id)
+                print("Human clarification processed:", result)
+            except ValueError as ve:
+                print(f"ValueError processing human clarification: {ve}")
+            except Exception as e:
+                print(f"Error processing human clarification: {e}")
             track_event_if_configured(
-                "PlanApprovalReceived",
+                "HumanClarificationReceived",
                 {
                     "request_id": human_feedback.request_id,
                     "answer": human_feedback.answer,
                     "user_id": user_id,
                 },
             )
-            return {"status": "clarification recorded"}
+            return {"status": "clarification recorded",}
         else:
             logging.warning(
                 f"No orchestration or plan found for request_id: {human_feedback.request_id}"
@@ -899,7 +926,7 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
         team_configuration = await team_service.get_team_configuration(
             selection.team_id, user_id
         )
-        if team_configuration is None: # ensure that id is valid
+        if team_configuration is None:  # ensure that id is valid
             raise HTTPException(
                 status_code=404,
                 detail=f"Team configuration '{selection.team_id}' not found or access denied",
