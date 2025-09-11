@@ -261,10 +261,9 @@ class AgentMessageData (BaseDataModel):
     data_type: Literal[DataType.m_plan_message] = Field(DataType.m_plan_message, Literal=True)
     plan_id: str
     user_id: str
-    m_plan_id: Optional[str] = None
     agent: str
+    m_plan_id: Optional[str] = None
     agent_type: AgentMessageType = AgentMessageType.AI_AGENT 
-    timestamp: int
     content: str
     raw_data: str
     steps: List[Any] = Field(default_factory=list)       

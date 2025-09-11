@@ -501,8 +501,25 @@ async def agent_message_user(
             status_code=401, detail="Missing or invalid user information"
         )
     # Set the approval in the orchestration config
-   
 
+    try:
+    
+        result = await PlanService.handle_agent_messages(agent_message, user_id)
+        print("Agent message processed:", result)
+    except ValueError as ve:
+        print(f"ValueError processing agent message: {ve}")
+    except Exception as e:
+        print(f"Error processing agent message: {e}")
+   
+    track_event_if_configured(
+        "AgentMessageReceived",
+        {
+            "agent": agent_message.agent,
+            "content": agent_message.content,
+            "user_id": user_id,
+        },
+    )
+    return {"status": "message recorded",}
 
 
 @app_v3.post("/upload_team_config")
@@ -564,24 +581,25 @@ async def upload_team_config(
             )
 
         # Validate content with RAI before processing
-        rai_valid, rai_error = await rai_validate_team_config(json_data)
-        if not rai_valid:
-            track_event_if_configured(
-                "Team configuration RAI validation failed",
-                {
+        if not team_id:
+            rai_valid, rai_error = await rai_validate_team_config(json_data)
+            if not rai_valid:
+                track_event_if_configured(
+                    "Team configuration RAI validation failed",
+                    {
                     "status": "failed",
                     "user_id": user_id,
                     "filename": file.filename,
                     "reason": rai_error,
                 },
             )
+            
             raise HTTPException(status_code=400, detail=rai_error)
 
         track_event_if_configured(
-            "Team configuration RAI validation passed",
-            {"status": "passed", "user_id": user_id, "filename": file.filename},
-        )
-
+                "Team configuration RAI validation passed",
+                {"status": "passed", "user_id": user_id, "filename": file.filename},
+    )
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
         team_service = TeamService(memory_store)

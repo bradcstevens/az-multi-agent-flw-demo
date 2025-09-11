@@ -1,16 +1,46 @@
+from dataclasses import Field, asdict
+import json
 import logging
+import time
 from typing import Dict, Any, Optional
 from common.database.database_factory import DatabaseFactory
-from common.database.database_base import DatabaseBase
+
+from v3.models.models import MPlan
 import v3.models.messages as messages
-from common.models.messages_kernel import PlanStatus
+from common.models.messages_kernel import AgentMessageData, AgentMessageType, AgentType, PlanStatus
 from v3.config.settings import orchestration_config
 from common.utils.event_utils import track_event_if_configured
+import uuid
+from semantic_kernel.kernel_pydantic import Field
 
+class MPlanExpanded(MPlan):
+    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    
 logger = logging.getLogger(__name__)
+def build_agent_message_from_user_clarification(
+    human_feedback: messages.UserClarificationResponse,
+    user_id: str
+) -> AgentMessageData:
+    """
+    Convert a UserClarificationResponse (human feedback) into an AgentMessageData.
+    """
+    # NOTE: AgentMessageType enum currently defines values with trailing commas in messages_kernel.py.
+    # e.g. HUMAN_AGENT = "Human_Agent",  -> value becomes ('Human_Agent',)
+    # Consider fixing that enum (remove trailing commas) so .value is a string.
+    return AgentMessageData(
+        plan_id = human_feedback.plan_id or "",
+        user_id = user_id,
+        m_plan_id = human_feedback.m_plan_id or None,
+        agent = AgentType.HUMAN.value,              # or simply "Human_Agent"
+        agent_type = AgentMessageType.HUMAN_AGENT,  # will serialize per current enum definition
+        content = human_feedback.answer or "",
+        raw_data = json.dumps(asdict(human_feedback)),
+        steps = [],          # intentionally empty
+        next_steps = []      # intentionally empty
+    )
+
 
 class PlanService:
-
 
     @staticmethod
     async def handle_plan_approval(human_feedback: messages.PlanApprovalResponse, user_id: str) ->  bool:
@@ -74,7 +104,7 @@ class PlanService:
         return True
 
     @staticmethod
-    async def handle_agent_messages(standard_message: messages.AgentMessage, user_id: str) -> bool:
+    async def handle_agent_messages(agent_message: messages.AgentMessageResponse, user_id: str) -> bool:
         """
         Process an AgentMessage coming from the client.
 
@@ -105,4 +135,22 @@ class PlanService:
         Raises:
             ValueError on invalid state
         """
-        return True
+        try:
+            agent_msg = build_agent_message_from_user_clarification(human_feedback, user_id)
+
+            # Persist if your database layer supports it.
+            # Look for or implement something like: memory_store.add_agent_message(agent_msg)
+            memory_store = await DatabaseFactory.get_database(user_id=user_id)
+            if hasattr(memory_store, "add_agent_message"):
+                await memory_store.add_agent_message(agent_msg)
+            else:
+                # Fallback: log or ignore if persistence not yet implemented
+                logging.debug("add_agent_message not implemented; skipping persistence")
+
+            # Optionally emit over websocket if you have a broadcaster:
+            # await websocket_manager.broadcast(WebsocketMessageType.AGENT_MESSAGE, agent_msg.model_dump())
+
+            return True
+        except Exception as e:
+            logger.exception("Failed to handle human clarification -> agent message: %s", e)
+            return False

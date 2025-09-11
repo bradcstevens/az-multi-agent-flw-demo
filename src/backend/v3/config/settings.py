@@ -15,7 +15,7 @@ from fastapi import WebSocket
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion, OpenAIChatPromptExecutionSettings)
-from v3.models.messages import WebsocketMessageType
+from v3.models.messages import WebsocketMessageType, MPlan
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class OrchestrationConfig:
         self.orchestrations: Dict[str, MagenticOrchestration] = (
             {}
         )  # user_id -> orchestration instance
-        self.plans: Dict[str, any] = {}  # plan_id -> plan details
+        self.plans: Dict[str, MPlan] = {}  # plan_id -> plan details
         self.approvals: Dict[str, bool] = {}  # m_plan_id -> approval status
         self.sockets: Dict[str, WebSocket] = {}  # user_id -> WebSocket
         self.clarifications: Dict[str, str] = {}  # m_plan_id -> clarification response
