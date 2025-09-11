@@ -9,8 +9,10 @@ backend_path = Path(__file__).parent.parent.parent / "backend"
 sys.path.insert(0, str(backend_path))
 
 from v3.magentic_agents.foundry_agent import FoundryAgentTemplate
-from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
-                                                    SearchConfig)
+from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
+
+# from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
+#                                                     SearchConfig)
 
 # Manual Test harness
 AGENT_NAME = "TestFoundryAgent"
@@ -36,7 +38,7 @@ async def test_agent():
         # If environment variables are missing, catch exception and abort
         try:
             mcp_init = MCPConfig().from_env()
-            bing_init = BingConfig().from_env()
+            #bing_init = BingConfig().from_env()
             search_init = SearchConfig().from_env()
         except ValueError as ve:
             print(f"❌ Configuration error: {ve}")
@@ -47,7 +49,7 @@ async def test_agent():
                                         model_deployment_name=MODEL_DEPLOYMENT_NAME,
                                         enable_code_interpreter=True,
                                         mcp_config=mcp_init,
-                                        bing_config=bing_init,
+                                        #bing_config=bing_init,
                                         search_config=search_init) as agent:
             print("💬 Type 'quit' or 'exit' to stop\n")
 
@@ -71,10 +73,10 @@ async def test_agent():
                     print()
 
                 except Exception as e:
-                    print(f"❌ Error: {e}")
+                    print(f"Error: {e}")
 
     except Exception as e:
-        print(f"❌ Failed to create agent: {e}")
+        print(f"Failed to create agent: {e}")
 
 
 if __name__ == "__main__":

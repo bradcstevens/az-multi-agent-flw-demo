@@ -10,7 +10,7 @@ from typing import Any, List, Optional
 import v3.models.messages as messages
 from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
-    MagenticContext, StandardMagenticManager)
+    MagenticContext, ProgressLedger, StandardMagenticManager)
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import (
     ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT,
     ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT,
@@ -104,10 +104,10 @@ Here is an example of a well-structured plan:
 
         # Send the approval request to the user's WebSocket
         # The user_id will be automatically retrieved from context
-        await connection_config.send_status_update_async({
-            "type": messages.WebsocketMessageType.PLAN_APPROVAL_REQUEST, 
-            "data": approval_message
-        }, user_id=current_user_id.get(), message_type=messages.WebsocketMessageType.PLAN_APPROVAL_REQUEST)
+        await connection_config.send_status_update_async(
+            message=approval_message,
+            user_id=current_user_id.get(),
+            message_type=messages.WebsocketMessageType.PLAN_APPROVAL_REQUEST)
         
         # Wait for user approval
         approval_response = await self._wait_for_user_approval(approval_message.plan.id)
@@ -133,6 +133,34 @@ Here is an example of a well-structured plan:
         print("Replanned: %s", replan)
         return replan
     
+    async def create_progress_ledger(self, magentic_context: MagenticContext) -> ProgressLedger:
+        """ Check for max rounds exceeded and send final message if so. """
+        if magentic_context.round_count >= orchestration_config.max_rounds:
+            # Send final message to user
+            final_message = messages.FinalResultMessage(
+                content="Process terminated: Maximum rounds exceeded",
+                status="terminated",
+                summary=f"Stopped after {magentic_context.round_count} rounds (max: {orchestration_config.max_rounds})"
+            )
+            
+            await connection_config.send_status_update_async(
+                message= final_message,
+                user_id=current_user_id.get(),
+                message_type=messages.WebsocketMessageType.FINAL_RESULT_MESSAGE)
+            
+            # Create a progress ledger that indicates the request is satisfied (task complete)
+            from semantic_kernel.agents.orchestration.magentic import (
+                ProgressLedger, ProgressLedgerItem)
+            return ProgressLedger(
+                is_request_satisfied=ProgressLedgerItem(reason="Maximum rounds exceeded", answer=True),
+                is_in_loop=ProgressLedgerItem(reason="Terminating", answer=False),
+                is_progress_being_made=ProgressLedgerItem(reason="Terminating", answer=False),
+                next_speaker=ProgressLedgerItem(reason="Task complete", answer=""),
+                instruction_or_question=ProgressLedgerItem(reason="Task complete", answer="Process terminated due to maximum rounds exceeded")
+            )
+        
+        return await super().create_progress_ledger(magentic_context)
+    
     async def _wait_for_user_approval(self, m_plan_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
         """Wait for user approval response."""
         
@@ -150,6 +178,7 @@ Here is an example of a well-structured plan:
         print("\n Magentic Manager - Preparing final answer...")
 
         return await super().prepare_final_answer(magentic_context)
+
     
     async def _get_plan_approval_with_details(self, task: str, participant_descriptions: dict, plan: Any) -> bool:
         while True:

@@ -40,7 +40,7 @@ async def create_RAI_agent() -> FoundryAgentTemplate:
         model_deployment_name=model_deployment_name,
         enable_code_interpreter=False,
         mcp_config=None,
-        bing_config=None,
+        #bing_config=None,
         search_config=None
     )
 
