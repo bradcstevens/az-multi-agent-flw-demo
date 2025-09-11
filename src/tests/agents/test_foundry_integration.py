@@ -29,12 +29,12 @@ class TestFoundryAgentIntegration:
         """Create agent configurations from environment variables."""
         # These will return None if env vars are missing, which is expected behavior
         mcp_config = MCPConfig.from_env()
-        bing_config = BingConfig.from_env()
+        #bing_config = BingConfig.from_env()
         search_config = SearchConfig.from_env()
         
         return {
             'mcp_config': mcp_config,
-            'bing_config': bing_config,
+            #'bing_config': bing_config,
             'search_config': search_config
         }
 
@@ -68,7 +68,7 @@ class TestFoundryAgentIntegration:
             model_deployment_name=model_deployment_name,
             enable_code_interpreter=True,
             mcp_config=agent_configs['mcp_config'],
-            bing_config=agent_configs['bing_config'],
+            #bing_config=agent_configs['bing_config'],
             search_config=agent_configs['search_config']
         )
 
@@ -228,7 +228,7 @@ class TestFoundryAgentIntegration:
             model_deployment_name=model_deployment_name,
             enable_code_interpreter=False,
             mcp_config=None,
-            bing_config=None,
+            #bing_config=None,
             search_config=None
         )
         

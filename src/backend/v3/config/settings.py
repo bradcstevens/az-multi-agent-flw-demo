@@ -14,10 +14,7 @@ from common.models.messages_kernel import TeamConfiguration
 from fastapi import WebSocket
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
 from semantic_kernel.connectors.ai.open_ai import (
-    AzureChatCompletion,
-    OpenAIChatPromptExecutionSettings,
-)
-
+    AzureChatCompletion, OpenAIChatPromptExecutionSettings)
 from v3.models.messages import WebsocketMessageType
 
 logger = logging.getLogger(__name__)
@@ -35,7 +32,7 @@ class AzureConfig:
         self.endpoint = config.AZURE_OPENAI_ENDPOINT
         self.reasoning_model = config.REASONING_MODEL_NAME
         self.standard_model = config.AZURE_OPENAI_DEPLOYMENT_NAME
-        self.bing_connection_name = config.AZURE_BING_CONNECTION_NAME
+        #self.bing_connection_name = config.AZURE_BING_CONNECTION_NAME
 
         # Create credential
         self.credential = config.get_azure_credentials()
@@ -89,6 +86,7 @@ class OrchestrationConfig:
         self.approvals: Dict[str, bool] = {}  # m_plan_id -> approval status
         self.sockets: Dict[str, WebSocket] = {}  # user_id -> WebSocket
         self.clarifications: Dict[str, str] = {}  # m_plan_id -> clarification response
+        self.max_rounds: int = 20  # Maximum number of replanning rounds 20 needed to accommodate complex tasks
 
     def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
         """get existing orchestration instance."""
@@ -199,16 +197,36 @@ class ConnectionConfig:
             )
             return
 
-        print(f" websocket {message}")
+        print(f" websocket original message: {message}")
+        print(f" websocket message type: {type(message)}")
+        
+        # Convert message to proper format for frontend
         try:
-            if hasattr(message, "data") and hasattr(message, "type"):
-                message = message.data
+            if hasattr(message, "to_dict"):
+                # Use the custom to_dict method if available
+                message_data = message.to_dict()
+                print(f" websocket used to_dict(): {message_data}")
+            elif hasattr(message, "data") and hasattr(message, "type"):
+                # Handle structured messages with data property
+                message_data = message.data
+                print(f" websocket used message.data: {message_data}")
+            elif isinstance(message, dict):
+                # Already a dictionary
+                message_data = message
+                print(f" websocket already dict: {message_data}")
+            else:
+                # Convert to string if it's a simple type
+                message_data = str(message)
+                print(f" websocket converted to string: {message_data}")
         except Exception as e:
-                print(f"Error loading message data: {e}")
-        print(f" websocket after {message}")
+            print(f"Error processing message data: {e}")
+            message_data = str(message)
+            
+        print(f" websocket final message_data: {message_data}")
+        
         standard_message = {
             "type": message_type,
-            "data": message
+            "data": message_data
         }
         connection = self.get_connection(process_id)
         if connection:
