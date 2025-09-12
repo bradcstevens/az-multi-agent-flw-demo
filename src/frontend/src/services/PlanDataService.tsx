@@ -17,7 +17,10 @@ import {
   TeamConfig,
   TeamConfigurationBE,
   MPlanBE,
-  MStepBE
+  MStepBE,
+  AgentMessageResponse,
+  FinalMessage,
+  StreamingMessage
 } from "@/models";
 import { apiService } from "@/api";
 
@@ -179,6 +182,31 @@ export class PlanDataService {
     };
   }
 
+  /**
+ * Converts AgentMessageData to AgentMessageResponse using ProcessedPlanData context
+ * @param agentMessage - AgentMessageData to convert
+ * @param planData - ProcessedPlanData for context (plan_id, user_id, etc.)
+ * @returns AgentMessageResponse
+ */
+  static createAgentMessageResponse(
+    agentMessage: AgentMessageData,
+    planData: ProcessedPlanData,
+    is_final: boolean = false
+  ): AgentMessageResponse {
+    return {
+      is_final: is_final,
+      plan_id: planData.plan.plan_id,
+      agent: agentMessage.agent,
+      content: agentMessage.content,
+      agent_type: agentMessage.agent_type,
+      m_plan_id: planData.mplan?.id || undefined,
+      user_id: planData.plan.user_id,
+      timestamp: agentMessage.timestamp ? agentMessage.timestamp.toString() : new Date().getTime().toString(),
+      raw_data: agentMessage.raw_data,
+      steps: agentMessage.steps,
+      next_steps: agentMessage.next_steps
+    };
+  }
 
   /**
    * Submit human clarification for a plan
@@ -606,12 +634,7 @@ export class PlanDataService {
    *  - { type: 'agent_message_streaming', data: { agent_name: 'X', content: 'partial', is_final: true } }
    *  - "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)"
    */
-  static parseAgentMessageStreaming(rawData: any): {
-    agent: string;
-    content: string;
-    is_final: boolean;
-    raw_data: any;
-  } | null {
+  static parseAgentMessageStreaming(rawData: any): StreamingMessage | null {
     try {
       // Handle JSON string input - parse it first
       if (typeof rawData === 'string' && rawData.startsWith('{')) {
@@ -629,6 +652,7 @@ export class PlanDataService {
           // New format: { type: 'agent_message_streaming', data: { agent_name: '...', content: '...', is_final: true } }
           const data = rawData.data;
           return {
+            type: WebsocketMessageType.AGENT_MESSAGE_STREAMING,
             agent: data.agent_name || 'UnknownAgent',
             content: data.content || '',
             is_final: Boolean(data.is_final),
@@ -643,6 +667,7 @@ export class PlanDataService {
       // Handle direct object format
       if (rawData && typeof rawData === 'object' && rawData.agent_name) {
         return {
+          type: WebsocketMessageType.AGENT_MESSAGE_STREAMING,
           agent: rawData.agent_name || 'UnknownAgent',
           content: rawData.content || '',
           is_final: Boolean(rawData.is_final),
@@ -675,7 +700,10 @@ export class PlanDataService {
         is_final = /True/i.test(finalMatch[1]);
       }
 
-      return { agent, content, is_final, raw_data: rawData };
+      return {
+        type: WebsocketMessageType.AGENT_MESSAGE_STREAMING,
+        agent, content, is_final, raw_data: rawData
+      };
     } catch (e) {
       console.error('Failed to parse streaming agent message:', e);
       return null;
@@ -764,13 +792,7 @@ export class PlanDataService {
    * }
    * Returns null if not parsable.
    */
-  static parseFinalResultMessage(rawData: any): {
-    type: WebsocketMessageType;
-    content: string;
-    status: string;
-    timestamp: number | null;
-    raw_data: any;
-  } | null {
+  static parseFinalResultMessage(rawData: any): FinalMessage | null {
     try {
       const extractPayload = (val: any, depth = 0): any => {
         if (depth > 10) return null;

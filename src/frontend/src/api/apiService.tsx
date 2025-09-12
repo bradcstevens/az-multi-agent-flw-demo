@@ -14,7 +14,8 @@ import {
     AgentMessageBE,
     MPlanBE,
     TeamConfigurationBE,
-    PlanFromAPI
+    PlanFromAPI,
+    AgentMessageResponse
 } from '../models';
 
 // Constants for endpoints
@@ -262,7 +263,7 @@ export class APIService {
         });
         return response;
     }
-    async sendAgentMessage(data: AgentMessageData): Promise<AgentMessage> {
+    async sendAgentMessage(data: AgentMessageResponse): Promise<AgentMessage> {
         const t0 = performance.now();
         const result = await apiClient.post(API_ENDPOINTS.AGENT_MESSAGE, data);
         console.log('[agent_message] sent', {

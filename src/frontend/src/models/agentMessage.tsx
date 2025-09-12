@@ -1,6 +1,6 @@
 import { Agent } from 'http';
 import { BaseModel } from './plan';
-import { AgentMessageType, AgentType } from './enums';
+import { AgentMessageType, AgentType, WebsocketMessageType } from './enums';
 
 /**
  * Represents a message from an agent
@@ -28,4 +28,48 @@ export interface AgentMessageData {
     next_steps: any[];
     content: string;
     raw_data: string;
+}
+
+/**
+ * Message sent to HumanAgent to request approval for a step.
+ * Corresponds to the Python AgentMessageResponse class.
+ */
+export interface AgentMessageResponse {
+    is_final?: boolean;
+    /** Plan identifier */
+    plan_id: string;
+    /** Agent name or identifier */
+    agent: string;
+    /** Message content */
+    content: string;
+    /** Type of agent (Human or AI) */
+    agent_type: AgentMessageType;
+    /** Associated m_plan identifier */
+    m_plan_id?: string;
+    /** User identifier */
+    user_id?: string;
+    /** Timestamp when the message was created */
+    timestamp?: string;
+    /** Raw data associated with the message */
+    raw_data?: string;
+    /** Steps associated with the message */
+    steps?: any[];
+    /** Next steps associated with the message */
+    next_steps?: any[];
+}
+
+export interface FinalMessage {
+    type: WebsocketMessageType;
+    content: string;
+    status: string;
+    timestamp: number | null;
+    raw_data: any;
+}
+
+export interface StreamingMessage {
+    type: WebsocketMessageType;
+    agent: string;
+    content: string;
+    is_final: boolean;
+    raw_data: any;
 }

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType, PlanStatus } from "../models";
+import { ProcessedPlanData, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType, PlanStatus, FinalMessage } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -62,10 +62,11 @@ const PlanPage: React.FC = () => {
 
 
 
-    const processAgentMessage = useCallback((agentMessageData: AgentMessageData) => {
+    const processAgentMessage = useCallback((agentMessageData: AgentMessageData, is_final: boolean = false) => {
 
         // Persist / forward to backend (fire-and-forget with logging)
-        void apiService.sendAgentMessage(agentMessageData)
+        const agentMessageResponse = PlanDataService.createAgentMessageResponse(agentMessageData, planData, is_final);
+        void apiService.sendAgentMessage(agentMessageResponse)
             .then(saved => {
                 console.log('[agent_message][persisted]', {
                     agent: agentMessageData.agent,
@@ -76,6 +77,7 @@ const PlanPage: React.FC = () => {
             .catch(err => {
                 console.warn('[agent_message][persist-failed]', err);
             });
+
     }, []);
 
     const resetPlanVariables = useCallback(() => {
@@ -140,7 +142,7 @@ const PlanPage: React.FC = () => {
     //(WebsocketMessageType.AGENT_MESSAGE_STREAMING
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE_STREAMING, (streamingMessage: any) => {
-            // console.log('📋 Streaming Message', streamingMessage);
+            //console.log('📋 Streaming Message', streamingMessage);
             // if is final true clear buffer and add final message to agent messages
             const line = PlanDataService.simplifyHumanClarification(streamingMessage.data.content);
             setStreamingMessageBuffer(prev => prev + line);
@@ -155,6 +157,10 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.USER_CLARIFICATION_REQUEST, (clarificationMessage: any) => {
             console.log('📋 Clarification Message', clarificationMessage);
+            if (!clarificationMessage) {
+                console.warn('⚠️ clarification message missing data:', clarificationMessage);
+                return;
+            }
             const agentMessageData = {
                 agent: AgentType.GROUP_CHAT_MANAGER,
                 agent_type: AgentMessageType.AI_AGENT,
@@ -182,7 +188,7 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_TOOL_MESSAGE, (toolMessage: any) => {
             console.log('📋 Tool Message', toolMessage);
-            // scrollToBottom();
+            // scrollToBottom()
 
         });
 
@@ -194,22 +200,35 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.FINAL_RESULT_MESSAGE, (finalMessage: any) => {
             console.log('📋 Final Result Message', finalMessage);
+            if (!finalMessage) {
+
+                console.warn('⚠️ Final result message missing data:', finalMessage);
+                return;
+            }
             const agentMessageData = {
                 agent: AgentType.GROUP_CHAT_MANAGER,
                 agent_type: AgentMessageType.AI_AGENT,
                 timestamp: Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                content: "🎉🎉 " + (finalMessage.data.content || ''),
-                raw_data: finalMessage.data || '',
+                content: "🎉🎉 " + (finalMessage.content || ''),
+                raw_data: finalMessage || '',
             } as AgentMessageData;
+
+
             console.log('✅ Parsed final result message:', agentMessageData);
             setStreamingMessageBuffer("");
             setShowProcessingPlanSpinner(false);
             setAgentMessages(prev => [...prev, agentMessageData]);
             scrollToBottom();
             // Persist the agent message
-            processAgentMessage(agentMessageData);
+            const is_final = finalMessage?.status === 'completed' || false;
+            if (finalMessage?.status === 'completed' && planData?.plan) {
+                planData.plan.overall_status = PlanStatus.COMPLETED;
+                setPlanData({ ...planData });
+            }
+
+            processAgentMessage(agentMessageData, is_final);
 
         });
 
@@ -426,7 +445,7 @@ const PlanPage: React.FC = () => {
                 showToast("Clarification submitted successfully", "success");
 
                 const agentMessageData = {
-                    agent: 'You',
+                    agent: 'human',
                     agent_type: AgentMessageType.HUMAN_AGENT,
                     timestamp: Date.now(),
                     steps: [],   // intentionally always empty
