@@ -11,6 +11,7 @@ services:
     language: py
     host: containerapp
     docker:
+      path: ./Dockerfile.NoCache
       image: backend
       remoteBuild: true
   

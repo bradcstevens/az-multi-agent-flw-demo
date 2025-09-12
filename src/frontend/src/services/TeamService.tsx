@@ -234,6 +234,14 @@ export class TeamService {
                     }
                 }
 
+            const isProxyAgent = agent.name && agent.name.toLowerCase() === 'proxyagent';
+
+            // Deployment name validation (skip for proxy agents)
+            if (!isProxyAgent && !agent.deployment_name) {
+                errors.push(`Agent ${index + 1} (${agent.name}): Missing required field: deployment_name (required for non-proxy agents)`);
+            }
+
+
                 // RAG agent validation
                 if (agent.use_rag === true && !agent.index_name) {
                     errors.push(`Agent ${index + 1} (${agent.name}): RAG agents must have an index_name`);

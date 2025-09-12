@@ -205,7 +205,7 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
                     appearance="filled"
                     className={styles.botBadge}
                   >
-                    BOT
+                    AI Agent
                   </Tag>
                 </div>
               )}
