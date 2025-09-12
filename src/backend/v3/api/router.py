@@ -738,8 +738,7 @@ async def upload_team_config(
                         "reason": rai_error,
                     },
                 )
-
-            raise HTTPException(status_code=400, detail=rai_error)
+                raise HTTPException(status_code=400, detail=rai_error)
 
         track_event_if_configured(
             "Team configuration RAI validation passed",
