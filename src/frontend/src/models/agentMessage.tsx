@@ -25,7 +25,7 @@ export interface AgentMessageData {
     agent_type: AgentMessageType;
     timestamp: number;
     steps: any[];
-    next_steps: [];
+    next_steps: any[];
     content: string;
     raw_data: string;
 }

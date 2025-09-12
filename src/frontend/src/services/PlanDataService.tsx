@@ -1,14 +1,23 @@
 import {
-  PlanWithSteps,
-  Step,
+
   AgentType,
   ProcessedPlanData,
-  PlanMessage,
   MPlanData,
   StepStatus,
   WebsocketMessageType,
   ParsedUserClarification,
-  AgentMessageType
+  AgentMessageType,
+  PlanFromAPI,
+  AgentMessageData,
+  AgentMessageBE,
+  StartingTaskBE,
+  StartingTask,
+  TeamAgentBE,
+  Agent,
+  TeamConfig,
+  TeamConfigurationBE,
+  MPlanBE,
+  MStepBE
 } from "@/models";
 import { apiService } from "@/api";
 
@@ -28,10 +37,7 @@ export class PlanDataService {
     try {
       // Use optimized getPlanById method for better performance
       const planBody = await apiService.getPlanById(planId, useCache);
-      return this.processPlanData(
-        planBody.plan_with_steps,
-        planBody.messages || []
-      );
+      return this.processPlanData(planBody);
     } catch (error) {
       console.log("Failed to fetch plan data:", error);
       throw error;
@@ -43,95 +49,135 @@ export class PlanDataService {
    * @param plan PlanWithSteps object to process
    * @returns Processed plan data
    */
-  static processPlanData(
-    plan: PlanWithSteps,
-    messages: PlanMessage[]
-  ): ProcessedPlanData {
-    // Extract unique agents from steps
-
-    const uniqueAgents = new Set<AgentType>();
-    if (plan.steps && plan.steps.length > 0) {
-      plan.steps.forEach((step) => {
-        if (step.agent) {
-          uniqueAgents.add(step.agent);
-        }
-      });
+  /**
+ * Converts AgentMessageBE array to AgentMessageData array
+ * @param messages - Array of AgentMessageBE from backend
+ * @returns Array of AgentMessageData or empty array if input is null/empty
+ */
+  static convertAgentMessages(messages: AgentMessageBE[]): AgentMessageData[] {
+    if (!messages || messages.length === 0) {
+      return [];
     }
 
-    // Convert Set to Array for easier handling
-    const agents = Array.from(uniqueAgents);
+    return messages.map((message: AgentMessageBE): AgentMessageData => ({
+      agent: message.agent,
+      agent_type: message.agent_type,
+      timestamp: message.timestamp ? new Date(message.timestamp).getTime() : Date.now(),
+      steps: message.steps || [],
+      next_steps: message.next_steps ?? [],
+      content: message.content,
+      raw_data: message.raw_data
+    }));
+  }
 
-    // Get all steps
-    const steps = plan.steps ?? [];
+  /**
+   * Converts TeamConfigurationBE to TeamConfig
+   * @param teamConfigBE - TeamConfigurationBE from backend
+   * @returns TeamConfig or null if input is null/undefined
+   */
+  static convertTeamConfiguration(teamConfigBE: TeamConfigurationBE | null): TeamConfig | null {
+    if (!teamConfigBE) {
+      return null;
+    }
 
-    // Check if human_clarification_request is not null
-    const hasClarificationRequest =
-      plan.human_clarification_request != null &&
-      plan.human_clarification_request.trim().length > 0;
-    const hasClarificationResponse =
-      plan.human_clarification_response != null &&
-      plan.human_clarification_response.trim().length > 0;
-    const enableChat = hasClarificationRequest && !hasClarificationResponse;
-    const enableStepButtons =
-      (hasClarificationRequest && hasClarificationResponse) ||
-      (!hasClarificationRequest && !hasClarificationResponse);
     return {
-      plan,
-      agents,
-      steps,
-      hasClarificationRequest,
-      hasClarificationResponse,
-      enableChat,
-      enableStepButtons,
-      messages,
+      id: teamConfigBE.id,
+      team_id: teamConfigBE.team_id,
+      name: teamConfigBE.name,
+      description: teamConfigBE.description || '',
+      status: teamConfigBE.status as 'visible' | 'hidden',
+      protected: false, // Default value since it's not in TeamConfigurationBE
+      created: teamConfigBE.created,
+      created_by: teamConfigBE.created_by,
+      logo: teamConfigBE.logo || '',
+      plan: teamConfigBE.plan || '',
+      agents: teamConfigBE.agents.map((agentBE: TeamAgentBE): Agent => ({
+        input_key: agentBE.input_key,
+        type: agentBE.type,
+        name: agentBE.name,
+        deployment_name: agentBE.deployment_name,
+        system_message: agentBE.system_message,
+        description: agentBE.description,
+        icon: agentBE.icon,
+        index_name: agentBE.index_name,
+        use_rag: agentBE.use_rag,
+        use_mcp: agentBE.use_mcp,
+        coding_tools: agentBE.coding_tools,
+        // Additional fields that exist in Agent but not in TeamAgentBE
+        index_endpoint: undefined,
+        id: undefined,
+        capabilities: undefined,
+        role: undefined
+      })),
+      starting_tasks: teamConfigBE.starting_tasks.map((taskBE: StartingTaskBE): StartingTask => ({
+        id: taskBE.id,
+        name: taskBE.name,
+        prompt: taskBE.prompt,
+        created: taskBE.created,
+        creator: taskBE.creator,
+        logo: taskBE.logo
+      }))
     };
   }
-
   /**
-   * Get steps for a specific agent type
-   * @param plan Plan with steps
-   * @param agentType Agent type to filter by
-   * @returns Array of steps for the specified agent
+   * Converts MPlanBE to MPlanData
+   * @param mplanBE - MPlanBE from backend
+   * @returns MPlanData or null if input is null/undefined
    */
-  static getStepsForAgent(plan: PlanWithSteps, agentType: AgentType): Step[] {
-    return plan.steps.filter(step => step.agent === agentType);
+  static convertMPlan(mplanBE: MPlanBE | null): MPlanData | null {
+    if (!mplanBE) {
+      return null;
+    }
+
+    // Convert MStepBE[] to the MPlanData steps format
+    const steps = mplanBE.steps.map((stepBE: MStepBE, index: number) => ({
+      id: index + 1, // MPlanData expects numeric id starting from 1
+      action: stepBE.action,
+      cleanAction: stepBE.action
+        .replace(/\*\*/g, '') // Remove markdown bold
+        .replace(/^Certainly!\s*/i, '')
+        .replace(/^Given the team composition and the available facts,?\s*/i, '')
+        .replace(/^here is a (?:concise )?plan to[^.]*\.\s*/i, '')
+        .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ')
+        .replace(/^[-•]\s*/, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      agent: stepBE.agent
+    }));
+
+    return {
+      id: mplanBE.id,
+      status: mplanBE.overall_status.toString().toUpperCase(),
+      user_request: mplanBE.user_request,
+      team: mplanBE.team,
+      facts: mplanBE.facts,
+      steps: steps,
+      context: {
+        task: mplanBE.user_request,
+        participant_descriptions: {} // Default empty object since it's not in MPlanBE
+      },
+      // Additional fields from m_plan
+      user_id: mplanBE.user_id,
+      team_id: mplanBE.team_id,
+      plan_id: mplanBE.plan_id,
+      overall_status: mplanBE.overall_status.toString(),
+      raw_data: mplanBE // Store the original object as raw_data
+    };
   }
+  static processPlanData(planFromAPI: PlanFromAPI): ProcessedPlanData {
+    // Extract unique agents from steps
 
-  /**
-   * Get steps that are awaiting human feedback
-   * @param plan Plan with steps
-   * @returns Array of steps awaiting feedback
-   */
-  static getStepsAwaitingFeedback(plan: PlanWithSteps): Step[] {
-    return plan.steps.filter(step => step.status === StepStatus.AWAITING_FEEDBACK);
+    const plan = planFromAPI.plan;
+    const team = this.convertTeamConfiguration(planFromAPI.team);
+    const mplan = this.convertMPlan(planFromAPI.m_plan);
+    const messages: AgentMessageData[] = this.convertAgentMessages(planFromAPI.messages || []);
+    return {
+      plan,
+      team,
+      mplan,
+      messages
+    };
   }
-
-  /**
-   * Check if plan is complete
-   * @param plan Plan with steps
-   * @returns Boolean indicating if plan is complete
-   */
-  static isPlanComplete(plan: PlanWithSteps): boolean {
-    return plan.steps.every(step =>
-      [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
-    );
-  }
-
-  /**
-   * Get plan completion percentage
-   * @param plan Plan with steps
-   * @returns Completion percentage (0-100)
-   */
-  static getPlanCompletionPercentage(plan: PlanWithSteps): number {
-    if (!plan.steps.length) return 0;
-
-    const completedSteps = plan.steps.filter(
-      step => [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
-    ).length;
-
-    return Math.round((completedSteps / plan.steps.length) * 100);
-  }
-
 
 
   /**

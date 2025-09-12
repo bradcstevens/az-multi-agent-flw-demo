@@ -1,8 +1,7 @@
-import { PlanWithSteps, PlanStatus } from "../models";
+import { Plan, PlanStatus } from "../models";
 import { Task } from "../models/taskList";
 import { apiService } from "../api/apiService";
 import { InputTask, InputTaskResponse } from "../models/inputTask";
-import { PlanDataService } from "./PlanDataService";
 
 /**
  * TaskService - Service for handling task-related operations and transformations
@@ -13,7 +12,7 @@ export class TaskService {
    * @param plansData Array of PlanWithSteps to transform
    * @returns Object containing inProgress and completed task arrays
    */
-  static transformPlansToTasks(plansData: PlanWithSteps[]): {
+  static transformPlansToTasks(plansData: Plan[]): {
     inProgress: Task[];
     completed: Task[];
   } {
@@ -28,8 +27,6 @@ export class TaskService {
       const task: Task = {
         id: plan.session_id,
         name: plan.initial_goal,
-        completed_steps: plan.completed,
-        total_steps: plan.total_steps,
         status: plan.overall_status === PlanStatus.COMPLETED ? "completed" : "inprogress",
         date: new Intl.DateTimeFormat(undefined, {
           dateStyle: "long",
@@ -153,13 +150,13 @@ export class TaskService {
     // Convert camelCase and PascalCase to spaces
     // This regex finds lowercase letter followed by uppercase letter
     cleanedText = cleanedText.replace(/([a-z])([A-Z])/g, '$1 $2');
-    
+
     // Replace any remaining non-alphanumeric characters with spaces
     cleanedText = cleanedText.replace(/[^a-zA-Z0-9]/g, ' ');
-    
+
     // Clean up multiple spaces and trim
     cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
-    
+
     // Capitalize each word for better readability
     cleanedText = cleanedText.replace(/\b\w/g, (char) => char.toUpperCase());
 

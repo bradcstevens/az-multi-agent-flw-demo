@@ -14,7 +14,7 @@ class WebSocketService {
     private isConnecting = false;
 
 
-    private buildSocketUrl(processId?: string, sessionId?: string): string {
+    private buildSocketUrl(processId?: string, planId?: string): string {
         const baseWsUrl = getApiUrl() || 'ws://localhost:8000';
         // Trim and remove trailing slashes
         let base = (baseWsUrl || '').trim().replace(/\/+$/, '');
@@ -27,11 +27,11 @@ class WebSocketService {
         // Decide path addition
         const hasApiSegment = /\/api(\/|$)/i.test(base);
         const socketPath = hasApiSegment ? '/v3/socket' : '/api/v3/socket';
-        const url = `${base}${socketPath}${processId ? `/${processId}` : `/${sessionId}`}`;
+        const url = `${base}${socketPath}${processId ? `/${processId}` : `/${planId}`}`;
         console.log("Constructed WebSocket URL:", url);
         return url;
     }
-    connect(sessionId: string, processId?: string): Promise<void> {
+    connect(planId: string, processId?: string): Promise<void> {
         return new Promise((resolve, reject) => {
             if (this.isConnecting) {
                 reject(new Error('Connection already in progress'));
@@ -43,7 +43,7 @@ class WebSocketService {
             }
             try {
                 this.isConnecting = true;
-                const wsUrl = this.buildSocketUrl(processId, sessionId);
+                const wsUrl = this.buildSocketUrl(processId, planId);
                 this.ws = new WebSocket(wsUrl);
 
                 this.ws.onopen = () => {

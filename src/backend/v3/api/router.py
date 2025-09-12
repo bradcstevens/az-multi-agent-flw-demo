@@ -1250,15 +1250,7 @@ async def get_plans(request: Request):
         team_id=current_team.team_id, status=PlanStatus.completed
     )
 
-    # Create list of PlanWithSteps and update step counts
-    list_of_plans_with_steps = []
-    for plan in all_plans:
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=[])
-        plan_with_steps.overall_status
-        plan_with_steps.update_step_counts()
-        list_of_plans_with_steps.append(plan_with_steps)
-
-    return list_of_plans_with_steps
+    return all_plans
 
 
 # Get plans is called in the initial side rendering of the frontend
@@ -1347,13 +1339,13 @@ async def get_plan_by_id(request: Request, plan_id: str):
         # Use get_steps_by_plan to match the original implementation
 
         team = await memory_store.get_team_by_id(team_id=plan.team_id)
-        messages = await memory_store.get_agent_messages(plan_id=plan.plan_id)
-        m_plan = await memory_store.get_m_plan_by_plan_id(plan_id=plan.plan_id)
+        agent_messages = await memory_store.get_agent_messages(plan_id=plan.plan_id)
+        m_plan = await memory_store.get_mplan(plan_id=plan.plan_id)
         return {
-            "plan": plan.model_dump(),
-            "team": team.model_dump() if team else None,
-            "messages": [msg.model_dump() for msg in messages],
-            "m_plan": m_plan.model_dump() if m_plan else None,
+            "plan": plan,
+            "team": team if team else None,
+            "messages": agent_messages,
+            "m_plan": m_plan if m_plan else None,
         }
     else:
         track_event_if_configured(

@@ -1,29 +1,7 @@
 import { AgentType, StepStatus, PlanStatus, WebsocketMessageType } from './enums';
 import { MPlanData } from './plan';
 
-/**
- * Message roles compatible with Semantic Kernel
- * Currently unused but kept for potential future use
- */
-// export enum MessageRole {
-//     SYSTEM = "system",
-//     USER = "user",
-//     ASSISTANT = "assistant",
-//     FUNCTION = "function"
-// }
 
-/**
- * Base class for generic chat messages with roles
- * Currently unused but kept for potential future use with Semantic Kernel integration
- */
-// export interface GenericChatMessage {
-//     /** Role of the message sender */
-//     role: MessageRole;
-//     /** Content of the message */
-//     content: string;
-//     /** Additional metadata */
-//     metadata: Record<string, any>;
-// }
 
 /**
  * Message sent to request approval for a step

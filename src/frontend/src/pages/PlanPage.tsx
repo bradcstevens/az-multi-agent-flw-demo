@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, PlanWithSteps, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType } from "../models";
+import { ProcessedPlanData, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -47,6 +47,7 @@ const PlanPage: React.FC = () => {
     const [waitingForPlan, setWaitingForPlan] = useState<boolean>(true);
     const [showProcessingPlanSpinner, setShowProcessingPlanSpinner] = useState<boolean>(false);
     const [showApprovalButtons, setShowApprovalButtons] = useState<boolean>(true);
+    const [continueWithWebsocketFlow, setContinueWithWebsocketFlow] = useState<boolean>(true);
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState<boolean>(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
@@ -76,6 +77,12 @@ const PlanPage: React.FC = () => {
                 console.warn('[agent_message][persist-failed]', err);
             });
     }, []);
+
+    const resetPlanVariables = useCallback(() => {
+
+
+    }, []);
+
     // Auto-scroll helper
     const scrollToBottom = useCallback(() => {
         setTimeout(() => {
@@ -238,7 +245,7 @@ const PlanPage: React.FC = () => {
 
     // WebSocket connection with proper error handling and v3 backend compatibility
     useEffect(() => {
-        if (planId && !loading) {
+        if (planId && continueWithWebsocketFlow) {
             console.log('🔌 Connecting WebSocket:', { planId });
 
             const connectWebSocket = async () => {
@@ -305,14 +312,11 @@ const PlanPage: React.FC = () => {
             if (!planId) return null;
 
             setLoading(true);
-
             try {
-                let actualPlanId = planId;
+
                 let planResult: ProcessedPlanData | null = null;
-
-
-                console.log("Fetching plan with ID:", actualPlanId);
-                planResult = await PlanDataService.fetchPlanData(actualPlanId, useCache);
+                console.log("Fetching plan with ID:", planId);
+                planResult = await PlanDataService.fetchPlanData(planId, useCache);
 
 
 
@@ -456,19 +460,20 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const initializePlanLoading = async () => {
             if (!planId) {
+                resetPlanVariables();
                 setErrorLoading(true);
                 return;
             }
 
             try {
-                await loadPlanData(true);
+                await loadPlanData(false);
             } catch (err) {
                 console.error("Failed to initialize plan loading:", err);
             }
         };
 
         initializePlanLoading();
-    }, [planId, loadPlanData]);
+    }, [planId, loadPlanData, resetPlanVariables, setErrorLoading]);
 
     if (errorLoading) {
         return (
