@@ -4,14 +4,18 @@ import {
     HumanClarification,
     InputTask,
     InputTaskResponse,
-    PlanWithSteps,
     Plan,
-    Step,
     StepStatus,
     AgentType,
-    PlanMessage,
     PlanApprovalRequest,
-    PlanApprovalResponse
+    PlanApprovalResponse,
+    AgentMessageData,
+    MPlanData,
+    AgentMessageBE,
+    MPlanBE,
+    TeamConfigurationBE,
+    PlanFromAPI,
+    AgentMessageResponse
 } from '../models';
 
 // Constants for endpoints
@@ -21,8 +25,8 @@ const API_ENDPOINTS = {
     PLAN: '/v3/plan',
     PLAN_APPROVAL: '/v3/plan_approval',
     HUMAN_CLARIFICATION: '/v3/user_clarification',
-    USER_BROWSER_LANGUAGE: '/user_browser_language'
-
+    USER_BROWSER_LANGUAGE: '/user_browser_language',
+    AGENT_MESSAGE: '/v3/agent_message',
 };
 
 // Simple cache implementation
@@ -121,7 +125,7 @@ export class APIService {
      * @param useCache Whether to use cached data or force fresh fetch
      * @returns Promise with array of plans with their steps
      */
-    async getPlans(sessionId?: string, useCache = true): Promise<PlanWithSteps[]> {
+    async getPlans(sessionId?: string, useCache = true): Promise<Plan[]> {
         const cacheKey = `plans_${sessionId || 'all'}`;
         const params = sessionId ? { session_id: sessionId } : {};
         // TODO replace session for team_id 
@@ -146,7 +150,7 @@ export class APIService {
      * @param useCache Whether to use cached data or force fresh fetch
      * @returns Promise with the plan and its steps
      */
-    async getPlanById(planId: string, useCache = true): Promise<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }> {
+    async getPlanById(planId: string, useCache = true): Promise<PlanFromAPI> {
         const cacheKey = `plan_by_id_${planId}`;
         const params = { plan_id: planId };
 
@@ -157,56 +161,23 @@ export class APIService {
             if (!data) {
                 throw new Error(`Plan with ID ${planId} not found`);
             }
-
-            const plan = data[0] as PlanWithSteps;
-            const messages = data[1] || [];
+            console.log('Fetched plan by ID:', data);
+            const results = {
+                plan: data.plan as Plan,
+                messages: data.messages as AgentMessageBE[],
+                m_plan: data.m_plan as MPlanBE | null,
+                team: data.team as TeamConfigurationBE | null
+            } as PlanFromAPI;
             if (useCache) {
-                this._cache.set(cacheKey, { plan_with_steps: plan, messages }, 30000); // Cache for 30 seconds
+                this._cache.set(cacheKey, results, 30000); // Cache for 30 seconds
             }
-            return { plan_with_steps: plan, messages };
+            return results;
         };
 
         if (useCache) {
-            const cachedPlan = this._cache.get<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }>(cacheKey);
+            const cachedPlan = this._cache.get<PlanFromAPI>(cacheKey);
             if (cachedPlan) return cachedPlan;
 
-            return this._requestTracker.trackRequest(cacheKey, fetcher);
-        }
-
-        return fetcher();
-    }
-
-    /**
-     * Get a specific plan with its steps
-     * @param sessionId Session ID
-     * @param planId Plan ID
-     * @param useCache Whether to use cached data or force fresh fetch
-     * @returns Promise with the plan and its steps
-     */
-    async getPlanWithSteps(sessionId: string, planId: string, useCache = true): Promise<PlanWithSteps> {
-        const cacheKey = `plan_${sessionId}_${planId}`;
-
-        if (useCache) {
-            const cachedPlan = this._cache.get<PlanWithSteps>(cacheKey);
-            if (cachedPlan) return cachedPlan;
-        }
-
-        const fetcher = async () => {
-            const plans = await this.getPlans(sessionId, useCache);
-            const plan = plans.find(p => p.id === planId);
-
-            if (!plan) {
-                throw new Error(`Plan with ID ${planId} not found`);
-            }
-
-            if (useCache) {
-                this._cache.set(cacheKey, plan, 30000); // Cache for 30 seconds
-            }
-
-            return plan;
-        };
-
-        if (useCache) {
             return this._requestTracker.trackRequest(cacheKey, fetcher);
         }
 
@@ -237,49 +208,6 @@ export class APIService {
             return response;
         });
     }
-
-    /**
-     * Get final plan execution results after approval
-     * @param planId 
-     * @param useCache 
-     * @returns Promise with final plan execution data
-     */
-    async getFinalPlanResults(planId: string, useCache = true): Promise<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }> {
-        const cacheKey = `final_plan_results_${planId}`;
-
-        const fetcher = async () => {
-            console.log('📤 Fetching final plan results for plan_id:', planId);
-
-            // ✅ Call /api/plans?plan_id={plan_id} to get executed plan
-            const data = await apiClient.get(API_ENDPOINTS.PLANS, {
-                params: { plan_id: planId }
-            });
-
-            if (!data || !Array.isArray(data) || data.length === 0) {
-                throw new Error(`No plan results found for plan_id: ${planId}`);
-            }
-
-            const plan = data[0] as PlanWithSteps;
-            const messages = data[1] || [];
-
-            if (useCache) {
-                this._cache.set(cacheKey, { plan_with_steps: plan, messages }, 30000);
-            }
-
-            console.log('✅ Final plan results received:', { plan, messages });
-            return { plan_with_steps: plan, messages };
-        };
-
-        if (useCache) {
-            const cachedData = this._cache.get<{ plan_with_steps: PlanWithSteps; messages: PlanMessage[] }>(cacheKey);
-            if (cachedData) return cachedData;
-
-            return this._requestTracker.trackRequest(cacheKey, fetcher);
-        }
-
-        return fetcher();
-    }
-
 
 
     /**
@@ -334,6 +262,16 @@ export class APIService {
             language
         });
         return response;
+    }
+    async sendAgentMessage(data: AgentMessageResponse): Promise<AgentMessage> {
+        const t0 = performance.now();
+        const result = await apiClient.post(API_ENDPOINTS.AGENT_MESSAGE, data);
+        console.log('[agent_message] sent', {
+            ms: +(performance.now() - t0).toFixed(1),
+            agent: data.agent,
+            type: data.agent_type
+        });
+        return result;
     }
 }
 

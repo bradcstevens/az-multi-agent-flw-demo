@@ -14,7 +14,7 @@ class WebSocketService {
     private isConnecting = false;
 
 
-    private buildSocketUrl(processId?: string, sessionId?: string): string {
+    private buildSocketUrl(processId?: string, planId?: string): string {
         const baseWsUrl = getApiUrl() || 'ws://localhost:8000';
         // Trim and remove trailing slashes
         let base = (baseWsUrl || '').trim().replace(/\/+$/, '');
@@ -27,11 +27,11 @@ class WebSocketService {
         // Decide path addition
         const hasApiSegment = /\/api(\/|$)/i.test(base);
         const socketPath = hasApiSegment ? '/v3/socket' : '/api/v3/socket';
-        const url = `${base}${socketPath}${processId ? `/${processId}` : `/${sessionId}`}`;
+        const url = `${base}${socketPath}${processId ? `/${processId}` : `/${planId}`}`;
         console.log("Constructed WebSocket URL:", url);
         return url;
     }
-    connect(sessionId: string, processId?: string): Promise<void> {
+    connect(planId: string, processId?: string): Promise<void> {
         return new Promise((resolve, reject) => {
             if (this.isConnecting) {
                 reject(new Error('Connection already in progress'));
@@ -43,7 +43,7 @@ class WebSocketService {
             }
             try {
                 this.isConnecting = true;
-                const wsUrl = this.buildSocketUrl(processId, sessionId);
+                const wsUrl = this.buildSocketUrl(processId, planId);
                 this.ws = new WebSocket(wsUrl);
 
                 this.ws.onopen = () => {
@@ -181,12 +181,6 @@ class WebSocketService {
 
     private handleMessage(message: StreamMessage): void {
 
-        //console.log('WebSocket message received:', message);
-        const hasClarification = /\bclarifications?\b/i.test(message.data || '');
-
-        if (hasClarification) {
-            console.log("Message contains 'clarification':", message.data);
-        }
         switch (message.type) {
             case WebsocketMessageType.PLAN_APPROVAL_REQUEST: {
                 console.log("Message Plan Approval Request':", message);
@@ -210,6 +204,7 @@ class WebSocketService {
                 if (message.data) {
                     console.log('WebSocket message received:', message);
                     const transformed = PlanDataService.parseAgentMessage(message);
+                    console.log('Transformed AGENT_MESSAGE:', transformed);
                     this.emit(WebsocketMessageType.AGENT_MESSAGE, transformed);
 
                 }
@@ -217,8 +212,10 @@ class WebSocketService {
             }
 
             case WebsocketMessageType.AGENT_MESSAGE_STREAMING: {
+                console.log("Message streamming agent buffer:", message);
                 if (message.data) {
                     const streamedMessage = PlanDataService.parseAgentMessageStreaming(message);
+                    console.log('WebSocket AGENT_MESSAGE_STREAMING message received:', streamedMessage);
                     this.emit(WebsocketMessageType.AGENT_MESSAGE_STREAMING, streamedMessage);
                 }
                 break;

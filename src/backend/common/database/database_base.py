@@ -2,10 +2,10 @@
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
-
+import v3.models.messages as messages
 from ..models.messages_kernel import (
+    AgentMessageData,
     BaseDataModel,
-    Session,
     Plan,
     Step,
     TeamConfiguration,
@@ -59,21 +59,6 @@ class DatabaseBase(ABC):
         """Delete an item from the database."""
         pass
 
-    # Session Operations
-    @abstractmethod
-    async def add_session(self, session: Session) -> None:
-        """Add a session to the database."""
-        pass
-
-    @abstractmethod
-    async def get_session(self, session_id: str) -> Optional[Session]:
-        """Retrieve a session by session_id."""
-        pass
-
-    @abstractmethod
-    async def get_all_sessions(self) -> List[Session]:
-        """Retrieve all sessions for the user."""
-        pass
 
     # Plan Operations
     @abstractmethod
@@ -84,11 +69,6 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def update_plan(self, plan: Plan) -> None:
         """Update a plan in the database."""
-        pass
-
-    @abstractmethod
-    async def get_plan_by_session(self, session_id: str) -> Optional[Plan]:
-        """Retrieve a plan by session_id."""
         pass
 
     @abstractmethod
@@ -118,11 +98,7 @@ class DatabaseBase(ABC):
         """Retrieve all plans for a specific team."""
         pass
 
-    @abstractmethod
-    async def get_data_by_type_and_session_id(
-        self, data_type: str, session_id: str
-    ) -> List[BaseDataModel]:
-        pass
+
 
     # Step Operations
     @abstractmethod
@@ -162,7 +138,7 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def get_team_by_id(self, id: str) -> Optional[TeamConfiguration]:
+    async def get_team_by_id(self, team_id: str) -> Optional[TeamConfiguration]:
         """Retrieve a team configuration by internal id."""
         pass
 
@@ -208,10 +184,49 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
+    async def delete_current_team(self, user_id: str) -> Optional[UserCurrentTeam]:
+        """Retrieve the current team for a user."""
+        pass
+
+    @abstractmethod
     async def set_current_team(self, current_team: UserCurrentTeam) -> None:
         pass
 
     @abstractmethod
     async def update_current_team(self, current_team: UserCurrentTeam) -> None:
         """Update the current team for a user."""
+        pass
+    
+    @abstractmethod
+    async def delete_plan_by_plan_id(self, plan_id: str) -> bool:
+        """Retrieve the current team for a user."""
+        pass
+
+    @abstractmethod
+    async def add_mplan(self, mplan: messages.MPlan) -> None:
+        """Add a team configuration to the database."""
+        pass
+
+    @abstractmethod
+    async def update_mplan(self, mplan: messages.MPlan) -> None:
+        """Update a team configuration in the database."""
+        pass
+
+    @abstractmethod
+    async def get_mplan(self, plan_id: str) -> Optional[messages.MPlan]:
+        """Retrieve a mplan configuration by plan_id."""
+        pass
+    
+    @abstractmethod
+    async def add_agent_message(self, message: AgentMessageData) -> None:
+        pass
+
+    @abstractmethod
+    async def update_agent_message(self, message: AgentMessageData) -> None:
+        """Update an agent message in the database."""
+        pass
+
+    @abstractmethod
+    async def get_agent_messages(self, plan_id: str) -> Optional[AgentMessageData]:
+        """Retrieve an agent message by message_id."""
         pass

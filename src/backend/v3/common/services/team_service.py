@@ -235,7 +235,7 @@ class TeamService:
             True if successful, False otherwise
         """
         try:
-            await self.memory_context.delete_user_current_team(user_id)
+            await self.memory_context.delete_current_team(user_id)
             self.logger.info("Successfully deleted current team for user %s", user_id)
             return True
 
@@ -243,7 +243,7 @@ class TeamService:
             self.logger.error("Error deleting current team: %s", str(e))
             return False
 
-    async def handle_team_selection(self, user_id: str, team_id: str) -> bool:
+    async def handle_team_selection(self, user_id: str, team_id: str) -> UserCurrentTeam:
         """
         Set a default team for a user.
 
@@ -254,25 +254,21 @@ class TeamService:
         Returns:
             True if successful, False otherwise
         """
+        print("Handling team selection for user:", user_id, "team:", team_id)
         try:
-            current_team = await self.memory_context.get_current_team(user_id)
-
-            if current_team is None:
-                current_team = UserCurrentTeam(user_id=user_id, team_id=team_id)
-                await self.memory_context.set_current_team(current_team)
-                return True
-            else:
-                current_team.team_id = team_id
-                await self.memory_context.update_current_team(current_team)
-                return True
+            await self.memory_context.delete_current_team(user_id)
+            current_team = UserCurrentTeam(
+                user_id=user_id,
+                team_id=team_id,
+            )
+            await self.memory_context.set_current_team(current_team)
+            return current_team
 
         except Exception as e:
             self.logger.error("Error setting default team: %s", str(e))
-            return False
+            return None
 
-    async def get_all_team_configurations(
-        self
-    ) -> List[TeamConfiguration]:
+    async def get_all_team_configurations(self) -> List[TeamConfiguration]:
         """
         Retrieve all team configurations for a user.
 

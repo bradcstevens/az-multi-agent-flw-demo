@@ -8,7 +8,7 @@ import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 
 const renderBufferMessage = (streamingMessageBuffer: string) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
     if (!streamingMessageBuffer || streamingMessageBuffer.trim() === "") return null;
 
@@ -98,23 +98,23 @@ const renderBufferMessage = (streamingMessageBuffer: string) => {
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 rehypePlugins={[rehypePrism]}
-                                 components={{
-                      a: ({ node, ...props }) => (
-                        <a
-                          {...props}
-                          style={{
-                            color: 'var(--colorNeutralBrandForeground1)',
-                            textDecoration: 'none'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.textDecoration = 'underline';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.textDecoration = 'none';
-                          }}
-                        />
-                      )
-                    }}
+                                components={{
+                                    a: ({ node, ...props }) => (
+                                        <a
+                                            {...props}
+                                            style={{
+                                                color: 'var(--colorNeutralBrandForeground1)',
+                                                textDecoration: 'none'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.textDecoration = 'underline';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.textDecoration = 'none';
+                                            }}
+                                        />
+                                    )
+                                }}
                             >
                                 {previewText}
                             </ReactMarkdown>

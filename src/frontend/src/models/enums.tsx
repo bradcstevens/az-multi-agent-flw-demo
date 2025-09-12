@@ -222,9 +222,12 @@ export enum StepStatus {
  * Enumeration of possible statuses for a plan.
  */
 export enum PlanStatus {
+    CREATED = "created",
     IN_PROGRESS = "in_progress",
     COMPLETED = "completed",
-    FAILED = "failed"
+    FAILED = "failed",
+    CANCELED = "canceled",
+    APPROVED = "approved"
 }
 
 /**

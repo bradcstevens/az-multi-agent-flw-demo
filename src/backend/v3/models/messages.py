@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 import time
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
+from src.backend.common.models.messages_kernel import AgentMessageType
 from v3.models.models import MPlan, PlanStatus
 
 
@@ -135,6 +136,16 @@ class ApprovalRequest(KernelBaseModel):
     user_id: str
     action: str
     agent_name: str
+
+@dataclass(slots=True)
+class AgentMessageResponse:
+    """Response message representing an agent's message."""
+    plan_id: str
+    agent: str
+    content: str
+    agent_type: AgentMessageType
+    is_final: bool = False
+    raw_data: str = None
 
 
 class WebsocketMessageType(str, Enum):

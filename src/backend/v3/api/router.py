@@ -9,18 +9,36 @@ import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (InputTask, Plan, PlanStatus,
-                                           PlanWithSteps, TeamSelectionRequest)
+from common.models.messages_kernel import (
+    InputTask,
+    Plan,
+    PlanStatus,
+    PlanWithSteps,
+    TeamSelectionRequest,
+)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.utils_date import format_dates_in_messages
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
-                     Request, UploadFile, WebSocket, WebSocketDisconnect)
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.plan_service import PlanService
 from v3.common.services.team_service import TeamService
-from v3.config.settings import (connection_config, current_user_id,
-                                orchestration_config, team_config)
+from v3.config.settings import (
+    connection_config,
+    current_user_id,
+    orchestration_config,
+    team_config,
+)
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
 router = APIRouter()
@@ -117,9 +135,12 @@ async def init_team(
         team_service = TeamService(memory_store)
         user_current_team = await memory_store.get_current_team(user_id=user_id)
         if not user_current_team:
-            await team_service.handle_team_selection(
+            print("User has no current team, setting to default:", init_team_id)
+            user_current_team = await team_service.handle_team_selection(
                 user_id=user_id, team_id=init_team_id
             )
+            if user_current_team:
+                init_team_id = user_current_team.team_id
         else:
             init_team_id = user_current_team.team_id
         # Verify the team exists and user has access to it
@@ -337,7 +358,56 @@ async def process_request(
 async def plan_approval(
     human_feedback: messages.PlanApprovalResponse, request: Request
 ):
-    """Endpoint to receive plan approval or rejection from the user."""
+    """
+    Endpoint to receive plan approval or rejection from the user.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    requestBody:
+      description: Plan approval payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              m_plan_id:
+                type: string
+                description: The internal m_plan id for the plan (required)
+              approved:
+                type: boolean
+                description: Whether the plan is approved (true) or rejected (false)
+              feedback:
+                type: string
+                description: Optional feedback or comment from the user
+              plan_id:
+                type: string
+                description: Optional user-facing plan_id
+    responses:
+      200:
+        description: Approval recorded successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+      401:
+        description: Missing or invalid user information
+      404:
+        description: No active plan found for approval
+      500:
+        description: Internal server error
+    """
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
@@ -399,7 +469,51 @@ async def plan_approval(
 async def user_clarification(
     human_feedback: messages.UserClarificationResponse, request: Request
 ):
-    """Endpoint to receive plan approval or rejection from the user."""
+    """
+    Endpoint to receive user clarification responses for clarification requests sent by the system.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    requestBody:
+      description: User clarification payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              request_id:
+                type: string
+                description: The clarification request id sent by the system (required)
+              answer:
+                type: string
+                description: The user's answer or clarification text
+              plan_id:
+                type: string
+                description: (Optional) Associated plan_id
+              m_plan_id:
+                type: string
+                description: (Optional) Internal m_plan id
+    responses:
+      200:
+        description: Clarification recorded successfully
+      400:
+        description: RAI check failed or invalid input
+      401:
+        description: Missing or invalid user information
+      404:
+        description: No active plan found for clarification
+      500:
+        description: Internal server error
+    """
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
@@ -442,15 +556,27 @@ async def user_clarification(
             orchestration_config.clarifications[human_feedback.request_id] = (
                 human_feedback.answer
             )
+
+            try:
+                result = await PlanService.handle_human_clarification(
+                    human_feedback, user_id
+                )
+                print("Human clarification processed:", result)
+            except ValueError as ve:
+                print(f"ValueError processing human clarification: {ve}")
+            except Exception as e:
+                print(f"Error processing human clarification: {e}")
             track_event_if_configured(
-                "PlanApprovalReceived",
+                "HumanClarificationReceived",
                 {
                     "request_id": human_feedback.request_id,
                     "answer": human_feedback.answer,
                     "user_id": user_id,
                 },
             )
-            return {"status": "clarification recorded"}
+            return {
+                "status": "clarification recorded",
+            }
         else:
             logging.warning(
                 f"No orchestration or plan found for request_id: {human_feedback.request_id}"
@@ -458,6 +584,87 @@ async def user_clarification(
             raise HTTPException(
                 status_code=404, detail="No active plan found for clarification"
             )
+
+
+@app_v3.post("/agent_message")
+async def agent_message_user(
+    agent_message: messages.AgentMessageResponse, request: Request
+):
+    """
+    Endpoint to receive messages from agents (agent -> user communication).
+
+    ---
+    tags:
+      - Agents
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    requestBody:
+      description: Agent message payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              plan_id:
+                type: string
+                description: ID of the plan this message relates to
+              agent:
+                type: string
+                description: Name or identifier of the agent sending the message
+              content:
+                type: string
+                description: The message content
+              agent_type:
+                type: string
+                description: Type of agent (AI/Human)
+              m_plan_id:
+                type: string
+                description: Optional internal m_plan id
+    responses:
+      200:
+        description: Message recorded successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+      401:
+        description: Missing or invalid user information
+    """
+
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid user information"
+        )
+    # Set the approval in the orchestration config
+
+    try:
+
+        result = await PlanService.handle_agent_messages(agent_message, user_id)
+        print("Agent message processed:", result)
+    except ValueError as ve:
+        print(f"ValueError processing agent message: {ve}")
+    except Exception as e:
+        print(f"Error processing agent message: {e}")
+
+    track_event_if_configured(
+        "AgentMessageReceived",
+        {
+            "agent": agent_message.agent,
+            "content": agent_message.content,
+            "user_id": user_id,
+        },
+    )
+    return {
+        "status": "message recorded",
+    }
 
 
 @app_v3.post("/upload_team_config")
@@ -519,24 +726,24 @@ async def upload_team_config(
             )
 
         # Validate content with RAI before processing
-        rai_valid, rai_error = await rai_validate_team_config(json_data)
-        if not rai_valid:
-            track_event_if_configured(
-                "Team configuration RAI validation failed",
-                {
-                    "status": "failed",
-                    "user_id": user_id,
-                    "filename": file.filename,
-                    "reason": rai_error,
-                },
-            )
-            raise HTTPException(status_code=400, detail=rai_error)
+        if not team_id:
+            rai_valid, rai_error = await rai_validate_team_config(json_data)
+            if not rai_valid:
+                track_event_if_configured(
+                    "Team configuration RAI validation failed",
+                    {
+                        "status": "failed",
+                        "user_id": user_id,
+                        "filename": file.filename,
+                        "reason": rai_error,
+                    },
+                )
+                raise HTTPException(status_code=400, detail=rai_error)
 
         track_event_if_configured(
             "Team configuration RAI validation passed",
             {"status": "passed", "user_id": user_id, "filename": file.filename},
         )
-
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
         team_service = TeamService(memory_store)
@@ -896,7 +1103,7 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
         team_configuration = await team_service.get_team_configuration(
             selection.team_id, user_id
         )
-        if team_config is None:
+        if team_configuration is None:  # ensure that id is valid
             raise HTTPException(
                 status_code=404,
                 detail=f"Team configuration '{selection.team_id}' not found or access denied",
@@ -920,9 +1127,9 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
             )
 
         # save to in-memory config for current user
-        team_config.set_current_team(
-            user_id=user_id, team_configuration=team_configuration
-        )
+        # team_config.set_current_team(
+        #     user_id=user_id, team_configuration=team_configuration
+        # )
 
         # Track the team selection event
         track_event_if_configured(
@@ -1043,20 +1250,12 @@ async def get_plans(request: Request):
         team_id=current_team.team_id, status=PlanStatus.completed
     )
 
-    # Create list of PlanWithSteps and update step counts
-    list_of_plans_with_steps = []
-    for plan in all_plans:
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=[])
-        plan_with_steps.overall_status
-        plan_with_steps.update_step_counts()
-        list_of_plans_with_steps.append(plan_with_steps)
-
-    return list_of_plans_with_steps
+    return all_plans
 
 
 # Get plans is called in the initial side rendering of the frontend
 @app_v3.get("/plan")
-async def get_plan_by_id(request: Request, plan_id: str):
+async def get_plan_by_id(request: Request,  plan_id: Optional[str] = Query(None),):
     """
     Retrieve plans for the current user.
 
@@ -1127,33 +1326,32 @@ async def get_plan_by_id(request: Request, plan_id: str):
 
     # # Initialize memory context
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    try:
+        if plan_id:
+            plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
+            if not plan:
+                track_event_if_configured(
+                    "GetPlanBySessionNotFound",
+                    {"status_code": 400, "detail": "Plan not found"},
+                )
+                raise HTTPException(status_code=404, detail="Plan not found")
 
-    if plan_id:
-        plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
-        if not plan:
+            # Use get_steps_by_plan to match the original implementation
+
+            team = await memory_store.get_team_by_id(team_id=plan.team_id)
+            agent_messages = await memory_store.get_agent_messages(plan_id=plan.plan_id)
+
+            return {
+                "plan": plan,
+                "team": team if team else None,
+                "messages": agent_messages,
+                "m_plan": plan.m_plan,
+            }
+        else:
             track_event_if_configured(
-                "GetPlanBySessionNotFound",
-                {"status_code": 400, "detail": "Plan not found"},
+                "GetPlanId", {"status_code": 400, "detail": "no plan id"}
             )
-            raise HTTPException(status_code=404, detail="Plan not found")
-
-        # Use get_steps_by_plan to match the original implementation
-        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
-        messages = await memory_store.get_data_by_type_and_session_id(
-            "agent_message", session_id=plan.session_id
-        )
-
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
-
-        # Format dates in messages according to locale
-        formatted_messages = format_dates_in_messages(
-            messages, config.get_user_local_browser_language()
-        )
-
-        return [plan_with_steps, formatted_messages]
-    else:
-        track_event_if_configured(
-            "GetPlanId", {"status_code": 400, "detail": "no plan id"}
-        )
-        raise HTTPException(status_code=400, detail="no plan id")
+            raise HTTPException(status_code=400, detail="no plan id")
+    except Exception as e:
+        logging.error(f"Error retrieving plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")

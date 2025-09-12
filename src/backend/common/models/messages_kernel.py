@@ -2,10 +2,8 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
-
-
+from pydantic import BaseModel
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
-from dataclasses import  dataclass
 
 class DataType(str, Enum):
     """Enumeration of possible data types for documents in the database."""
@@ -55,6 +53,8 @@ class PlanStatus(str, Enum):
     completed = "completed"
     failed = "failed"
     canceled = "canceled"
+    approved = "approved"
+    created = "created"
 
 
 class HumanFeedbackStatus(str, Enum):
@@ -78,6 +78,7 @@ class BaseDataModel(KernelBaseModel):
     """Base data model with common fields."""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -87,8 +88,6 @@ class AgentMessage(BaseDataModel):
     """Base class for messages sent between agents."""
 
     data_type: Literal[DataType.agent_message] = Field(DataType.agent_message, Literal=True)
-    session_id: str
-    user_id: str
     plan_id: str
     content: str
     source: str
@@ -112,18 +111,32 @@ class UserCurrentTeam(BaseDataModel):
     user_id: str
     team_id: str
 
-
+class MStep(BaseModel):
+    """model of a step in a plan"""
+    agent: str = ""
+    action: str = ""
+class MPlan(BaseModel):
+    """model of a plan"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str = ""
+    team_id: str = ""
+    plan_id: str = ""
+    overall_status: PlanStatus = PlanStatus.created
+    user_request: str = ""
+    team: List[str] = []
+    facts: str = ""
+    steps: List[MStep] = []
 class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
     data_type: Literal[DataType.plan] = Field(DataType.plan, Literal=True)
     plan_id: str
-    session_id: str
     user_id: str
     initial_goal: str
     overall_status: PlanStatus = PlanStatus.in_progress
     approved: bool = False
     source: str = AgentType.PLANNER.value
+    m_plan: Optional[MPlan] = None
     summary: Optional[str] = None
     team_id: Optional[str] = None
     human_clarification_request: Optional[str] = None
@@ -135,7 +148,6 @@ class Step(BaseDataModel):
 
     data_type: Literal[DataType.step] = Field(DataType.step, Literal=True)
     plan_id: str
-    session_id: str  # Partition key
     user_id: str
     action: str
     agent: AgentType
@@ -146,7 +158,7 @@ class Step(BaseDataModel):
     updated_action: Optional[str] = None
 
 
-class TeamSelectionRequest(KernelBaseModel):
+class TeamSelectionRequest(BaseDataModel):
     """Request model for team selection."""
 
     team_id: str
@@ -262,6 +274,15 @@ class AgentMessageType(str, Enum):
 
 
 class AgentMessageData (BaseDataModel):
+
+    data_type: Literal[DataType.m_plan_message] = Field(DataType.m_plan_message, Literal=True)
+    plan_id: str
+    user_id: str
     agent: str
+    m_plan_id: Optional[str] = None
     agent_type: AgentMessageType = AgentMessageType.AI_AGENT 
     content: str
+    raw_data: str
+    steps: List[Any] = Field(default_factory=list)       
+    next_steps: List[Any] = Field(default_factory=list)  
+    

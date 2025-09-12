@@ -1,14 +1,26 @@
 import {
-  PlanWithSteps,
-  Step,
+
   AgentType,
   ProcessedPlanData,
-  PlanMessage,
   MPlanData,
   StepStatus,
   WebsocketMessageType,
   ParsedUserClarification,
-  AgentMessageType
+  AgentMessageType,
+  PlanFromAPI,
+  AgentMessageData,
+  AgentMessageBE,
+  StartingTaskBE,
+  StartingTask,
+  TeamAgentBE,
+  Agent,
+  TeamConfig,
+  TeamConfigurationBE,
+  MPlanBE,
+  MStepBE,
+  AgentMessageResponse,
+  FinalMessage,
+  StreamingMessage
 } from "@/models";
 import { apiService } from "@/api";
 
@@ -28,10 +40,7 @@ export class PlanDataService {
     try {
       // Use optimized getPlanById method for better performance
       const planBody = await apiService.getPlanById(planId, useCache);
-      return this.processPlanData(
-        planBody.plan_with_steps,
-        planBody.messages || []
-      );
+      return this.processPlanData(planBody);
     } catch (error) {
       console.log("Failed to fetch plan data:", error);
       throw error;
@@ -43,96 +52,161 @@ export class PlanDataService {
    * @param plan PlanWithSteps object to process
    * @returns Processed plan data
    */
-  static processPlanData(
-    plan: PlanWithSteps,
-    messages: PlanMessage[]
-  ): ProcessedPlanData {
-    // Extract unique agents from steps
-
-    const uniqueAgents = new Set<AgentType>();
-    if (plan.steps && plan.steps.length > 0) {
-      plan.steps.forEach((step) => {
-        if (step.agent) {
-          uniqueAgents.add(step.agent);
-        }
-      });
+  /**
+ * Converts AgentMessageBE array to AgentMessageData array
+ * @param messages - Array of AgentMessageBE from backend
+ * @returns Array of AgentMessageData or empty array if input is null/empty
+ */
+  static convertAgentMessages(messages: AgentMessageBE[]): AgentMessageData[] {
+    if (!messages || messages.length === 0) {
+      return [];
     }
 
-    // Convert Set to Array for easier handling
-    const agents = Array.from(uniqueAgents);
+    return messages.map((message: AgentMessageBE): AgentMessageData => ({
+      agent: message.agent,
+      agent_type: message.agent_type,
+      timestamp: message.timestamp ? new Date(message.timestamp).getTime() : Date.now(),
+      steps: message.steps || [],
+      next_steps: message.next_steps ?? [],
+      content: message.content,
+      raw_data: message.raw_data
+    }));
+  }
 
-    // Get all steps
-    const steps = plan.steps ?? [];
+  /**
+   * Converts TeamConfigurationBE to TeamConfig
+   * @param teamConfigBE - TeamConfigurationBE from backend
+   * @returns TeamConfig or null if input is null/undefined
+   */
+  static convertTeamConfiguration(teamConfigBE: TeamConfigurationBE | null): TeamConfig | null {
+    if (!teamConfigBE) {
+      return null;
+    }
 
-    // Check if human_clarification_request is not null
-    const hasClarificationRequest =
-      plan.human_clarification_request != null &&
-      plan.human_clarification_request.trim().length > 0;
-    const hasClarificationResponse =
-      plan.human_clarification_response != null &&
-      plan.human_clarification_response.trim().length > 0;
-    const enableChat = hasClarificationRequest && !hasClarificationResponse;
-    const enableStepButtons =
-      (hasClarificationRequest && hasClarificationResponse) ||
-      (!hasClarificationRequest && !hasClarificationResponse);
+    return {
+      id: teamConfigBE.id,
+      team_id: teamConfigBE.team_id,
+      name: teamConfigBE.name,
+      description: teamConfigBE.description || '',
+      status: teamConfigBE.status as 'visible' | 'hidden',
+      protected: false, // Default value since it's not in TeamConfigurationBE
+      created: teamConfigBE.created,
+      created_by: teamConfigBE.created_by,
+      logo: teamConfigBE.logo || '',
+      plan: teamConfigBE.plan || '',
+      agents: teamConfigBE.agents.map((agentBE: TeamAgentBE): Agent => ({
+        input_key: agentBE.input_key,
+        type: agentBE.type,
+        name: agentBE.name,
+        deployment_name: agentBE.deployment_name,
+        system_message: agentBE.system_message,
+        description: agentBE.description,
+        icon: agentBE.icon,
+        index_name: agentBE.index_name,
+        use_rag: agentBE.use_rag,
+        use_mcp: agentBE.use_mcp,
+        coding_tools: agentBE.coding_tools,
+        // Additional fields that exist in Agent but not in TeamAgentBE
+        index_endpoint: undefined,
+        id: undefined,
+        capabilities: undefined,
+        role: undefined
+      })),
+      starting_tasks: teamConfigBE.starting_tasks.map((taskBE: StartingTaskBE): StartingTask => ({
+        id: taskBE.id,
+        name: taskBE.name,
+        prompt: taskBE.prompt,
+        created: taskBE.created,
+        creator: taskBE.creator,
+        logo: taskBE.logo
+      }))
+    };
+  }
+  /**
+   * Converts MPlanBE to MPlanData
+   * @param mplanBE - MPlanBE from backend
+   * @returns MPlanData or null if input is null/undefined
+   */
+  static convertMPlan(mplanBE: MPlanBE | null): MPlanData | null {
+    if (!mplanBE) {
+      return null;
+    }
+
+    // Convert MStepBE[] to the MPlanData steps format
+    const steps = mplanBE.steps.map((stepBE: MStepBE, index: number) => ({
+      id: index + 1, // MPlanData expects numeric id starting from 1
+      action: stepBE.action,
+      cleanAction: stepBE.action
+        .replace(/\*\*/g, '') // Remove markdown bold
+        .replace(/^Certainly!\s*/i, '')
+        .replace(/^Given the team composition and the available facts,?\s*/i, '')
+        .replace(/^here is a (?:concise )?plan to[^.]*\.\s*/i, '')
+        .replace(/^\*\*([^*]+)\*\*:?\s*/g, '$1: ')
+        .replace(/^[-•]\s*/, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      agent: stepBE.agent
+    }));
+
+    return {
+      id: mplanBE.id,
+      status: mplanBE.overall_status.toString().toUpperCase(),
+      user_request: mplanBE.user_request,
+      team: mplanBE.team,
+      facts: mplanBE.facts,
+      steps: steps,
+      context: {
+        task: mplanBE.user_request,
+        participant_descriptions: {} // Default empty object since it's not in MPlanBE
+      },
+      // Additional fields from m_plan
+      user_id: mplanBE.user_id,
+      team_id: mplanBE.team_id,
+      plan_id: mplanBE.plan_id,
+      overall_status: mplanBE.overall_status.toString(),
+      raw_data: mplanBE // Store the original object as raw_data
+    };
+  }
+  static processPlanData(planFromAPI: PlanFromAPI): ProcessedPlanData {
+    // Extract unique agents from steps
+
+    const plan = planFromAPI.plan;
+    const team = this.convertTeamConfiguration(planFromAPI.team);
+    const mplan = this.convertMPlan(planFromAPI.m_plan);
+    const messages: AgentMessageData[] = this.convertAgentMessages(planFromAPI.messages || []);
     return {
       plan,
-      agents,
-      steps,
-      hasClarificationRequest,
-      hasClarificationResponse,
-      enableChat,
-      enableStepButtons,
-      messages,
+      team,
+      mplan,
+      messages
     };
   }
 
   /**
-   * Get steps for a specific agent type
-   * @param plan Plan with steps
-   * @param agentType Agent type to filter by
-   * @returns Array of steps for the specified agent
-   */
-  static getStepsForAgent(plan: PlanWithSteps, agentType: AgentType): Step[] {
-    return plan.steps.filter(step => step.agent === agentType);
+ * Converts AgentMessageData to AgentMessageResponse using ProcessedPlanData context
+ * @param agentMessage - AgentMessageData to convert
+ * @param planData - ProcessedPlanData for context (plan_id, user_id, etc.)
+ * @returns AgentMessageResponse
+ */
+  static createAgentMessageResponse(
+    agentMessage: AgentMessageData,
+    planData: ProcessedPlanData,
+    is_final: boolean = false
+  ): AgentMessageResponse {
+    if (!planData || !planData.plan) {
+      console.log("Invalid plan data provided to createAgentMessageResponse");
+    }
+    return {
+
+      plan_id: planData.plan.plan_id,
+      agent: agentMessage.agent,
+      content: agentMessage.content,
+      agent_type: agentMessage.agent_type,
+      is_final: is_final,
+      raw_data: JSON.stringify(agentMessage.raw_data),
+
+    };
   }
-
-  /**
-   * Get steps that are awaiting human feedback
-   * @param plan Plan with steps
-   * @returns Array of steps awaiting feedback
-   */
-  static getStepsAwaitingFeedback(plan: PlanWithSteps): Step[] {
-    return plan.steps.filter(step => step.status === StepStatus.AWAITING_FEEDBACK);
-  }
-
-  /**
-   * Check if plan is complete
-   * @param plan Plan with steps
-   * @returns Boolean indicating if plan is complete
-   */
-  static isPlanComplete(plan: PlanWithSteps): boolean {
-    return plan.steps.every(step =>
-      [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
-    );
-  }
-
-  /**
-   * Get plan completion percentage
-   * @param plan Plan with steps
-   * @returns Completion percentage (0-100)
-   */
-  static getPlanCompletionPercentage(plan: PlanWithSteps): number {
-    if (!plan.steps.length) return 0;
-
-    const completedSteps = plan.steps.filter(
-      step => [StepStatus.COMPLETED, StepStatus.FAILED].includes(step.status)
-    ).length;
-
-    return Math.round((completedSteps / plan.steps.length) * 100);
-  }
-
-
 
   /**
    * Submit human clarification for a plan
@@ -398,10 +472,10 @@ export class PlanDataService {
           const data = rawData.data;
           const content = data.content || '';
           const timestamp = typeof data.timestamp === 'number' ? data.timestamp : null;
-          
+
           // Parse the content for steps and next_steps (reuse existing logic)
           const { steps, next_steps } = this.parseContentForStepsAndNextSteps(content);
-          
+
           return {
             agent: data.agent_name || 'UnknownAgent',
             agent_type: AgentMessageType.AI_AGENT,
@@ -421,10 +495,10 @@ export class PlanDataService {
       if (rawData && typeof rawData === 'object' && rawData.agent_name) {
         const content = rawData.content || '';
         const timestamp = typeof rawData.timestamp === 'number' ? rawData.timestamp : null;
-        
+
         // Parse the content for steps and next_steps
         const { steps, next_steps } = this.parseContentForStepsAndNextSteps(content);
-        
+
         return {
           agent: rawData.agent_name || 'UnknownAgent',
           agent_type: AgentMessageType.AI_AGENT,
@@ -560,12 +634,7 @@ export class PlanDataService {
    *  - { type: 'agent_message_streaming', data: { agent_name: 'X', content: 'partial', is_final: true } }
    *  - "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)"
    */
-  static parseAgentMessageStreaming(rawData: any): {
-    agent: string;
-    content: string;
-    is_final: boolean;
-    raw_data: any;
-  } | null {
+  static parseAgentMessageStreaming(rawData: any): StreamingMessage | null {
     try {
       // Handle JSON string input - parse it first
       if (typeof rawData === 'string' && rawData.startsWith('{')) {
@@ -583,6 +652,7 @@ export class PlanDataService {
           // New format: { type: 'agent_message_streaming', data: { agent_name: '...', content: '...', is_final: true } }
           const data = rawData.data;
           return {
+            type: WebsocketMessageType.AGENT_MESSAGE_STREAMING,
             agent: data.agent_name || 'UnknownAgent',
             content: data.content || '',
             is_final: Boolean(data.is_final),
@@ -597,6 +667,7 @@ export class PlanDataService {
       // Handle direct object format
       if (rawData && typeof rawData === 'object' && rawData.agent_name) {
         return {
+          type: WebsocketMessageType.AGENT_MESSAGE_STREAMING,
           agent: rawData.agent_name || 'UnknownAgent',
           content: rawData.content || '',
           is_final: Boolean(rawData.is_final),
@@ -629,7 +700,10 @@ export class PlanDataService {
         is_final = /True/i.test(finalMatch[1]);
       }
 
-      return { agent, content, is_final, raw_data: rawData };
+      return {
+        type: WebsocketMessageType.AGENT_MESSAGE_STREAMING,
+        agent, content, is_final, raw_data: rawData
+      };
     } catch (e) {
       console.error('Failed to parse streaming agent message:', e);
       return null;
@@ -718,13 +792,7 @@ export class PlanDataService {
    * }
    * Returns null if not parsable.
    */
-  static parseFinalResultMessage(rawData: any): {
-    type: WebsocketMessageType;
-    content: string;
-    status: string;
-    timestamp: number | null;
-    raw_data: any;
-  } | null {
+  static parseFinalResultMessage(rawData: any): FinalMessage | null {
     try {
       const extractPayload = (val: any, depth = 0): any => {
         if (depth > 10) return null;
@@ -777,5 +845,34 @@ export class PlanDataService {
     }
   }
 
+  static simplifyHumanClarification(line: string): string {
+    if (
+      typeof line !== 'string' ||
+      !line.includes('Human clarification:') ||
+      !line.includes('UserClarificationResponse(')
+    ) {
+      return line;
+    }
 
+    // Capture the inside of UserClarificationResponse(...)
+    const outerMatch = line.match(/Human clarification:\s*UserClarificationResponse\((.*?)\)/s);
+    if (!outerMatch) return line;
+
+    const inner = outerMatch[1];
+
+    // Find answer= '...' | "..."
+    const answerMatch = inner.match(/answer=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
+    if (!answerMatch) return line;
+
+    let answer = answerMatch[1] ?? answerMatch[2] ?? '';
+    // Unescape common sequences
+    answer = answer
+      .replace(/\\n/g, '\n')
+      .replace(/\\'/g, "'")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .trim();
+
+    return `Human clarification: ${answer}`;
+  }
 }

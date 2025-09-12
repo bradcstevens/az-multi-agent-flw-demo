@@ -19,7 +19,7 @@ import {
 import TaskList from "./TaskList";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { PlanPanelLefProps, PlanWithSteps, Task, UserInfo } from "@/models";
+import { Plan, PlanPanelLefProps, Task, UserInfo } from "@/models";
 import { apiService } from "@/api";
 import { TaskService } from "@/services";
 import MsftColor from "@/coral/imports/MsftColor";
@@ -47,7 +47,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
   const [inProgressTasks, setInProgressTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
-  const [plans, setPlans] = useState<PlanWithSteps[] | null>(null);
+  const [plans, setPlans] = useState<Plan[] | null>(null);
   const [plansLoading, setPlansLoading] = useState<boolean>(false);
   const [plansError, setPlansError] = useState<Error | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(
@@ -85,7 +85,8 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
   useEffect(() => {
     loadPlansData();
-  }, [loadPlansData]);
+    setUserInfo(getUserInfoGlobal());
+  }, [loadPlansData, setUserInfo]);
 
   useEffect(() => {
     if (plans) {
@@ -118,7 +119,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   const handleTaskSelect = useCallback(
     (taskId: string) => {
       const selectedPlan = plans?.find(
-        (plan: PlanWithSteps) => plan.session_id === taskId
+        (plan: Plan) => plan.session_id === taskId
       );
       if (selectedPlan) {
         navigate(`/plan/${selectedPlan.id}`);

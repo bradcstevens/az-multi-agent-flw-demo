@@ -11,7 +11,7 @@ from azure.cosmos import PartitionKey, exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos.aio._database import DatabaseProxy
 from azure.cosmos.exceptions import CosmosResourceExistsError
-from pytest import Session
+import v3.models.messages as messages
 
 from common.models.messages_kernel import (
     AgentMessage,
@@ -23,8 +23,8 @@ from common.utils.utils_date import DateTimeEncoder
 
 from .database_base import DatabaseBase
 from ..models.messages_kernel import (
+    AgentMessageData,
     BaseDataModel,
-    Session,
     Plan,
     Step,
     AgentMessage,
@@ -38,7 +38,6 @@ class CosmosDBClient(DatabaseBase):
     """CosmosDB implementation of the database interface."""
 
     MODEL_CLASS_MAPPING = {
-        DataType.session: Session,
         DataType.plan: Plan,
         DataType.step: Step,
         DataType.agent_message: AgentMessage,
@@ -190,29 +189,6 @@ class CosmosDBClient(DatabaseBase):
             self.logger.error("Failed to delete item from CosmosDB: %s", str(e))
             raise
 
-    # Session Operations
-    async def add_session(self, session: Session) -> None:
-        """Add a session to CosmosDB."""
-        await self.add_item(session)
-
-    async def get_session(self, session_id: str) -> Optional[Session]:
-        """Retrieve a session by session_id."""
-        query = "SELECT * FROM c WHERE c.id=@id AND c.data_type=@data_type"
-        parameters = [
-            {"name": "@id", "value": session_id},
-            {"name": "@data_type", "value": DataType.session},
-        ]
-        results = await self.query_items(query, parameters, Session)
-        return results[0] if results else None
-
-    async def get_all_sessions(self) -> List[Session]:
-        """Retrieve all sessions for the user."""
-        query = "SELECT * FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type"
-        parameters = [
-            {"name": "@user_id", "value": self.user_id},
-            {"name": "@data_type", "value": DataType.session},
-        ]
-        return await self.query_items(query, parameters, Session)
 
     # Plan Operations
     async def add_plan(self, plan: Plan) -> None:
@@ -223,17 +199,6 @@ class CosmosDBClient(DatabaseBase):
         """Update a plan in CosmosDB."""
         await self.update_item(plan)
 
-    async def get_plan_by_session(self, session_id: str) -> Optional[Plan]:
-        """Retrieve a plan by session_id."""
-        query = (
-            "SELECT * FROM c WHERE c.session_id=@session_id AND c.data_type=@data_type"
-        )
-        parameters = [
-            {"name": "@session_id", "value": session_id},
-            {"name": "@data_type", "value": DataType.plan},
-        ]
-        results = await self.query_items(query, parameters, Plan)
-        return results[0] if results else None
 
     async def get_plan_by_plan_id(self, plan_id: str) -> Optional[Plan]:
         """Retrieve a plan by plan_id."""
@@ -272,7 +237,7 @@ class CosmosDBClient(DatabaseBase):
 
     async def get_all_plans_by_team_id_status(self, team_id: str, status: str) -> List[Plan]:
         """Retrieve all plans for a specific team."""
-        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id and c.overall_status=@status"
+        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id and c.overall_status=@status ORDER BY c._ts DESC"
         parameters = [
             {"name": "@user_id", "value": self.user_id},
             {"name": "@team_id", "value": team_id},
@@ -328,7 +293,7 @@ class CosmosDBClient(DatabaseBase):
         teams = await self.query_items(query, parameters, TeamConfiguration)
         return teams[0] if teams else None
 
-    async def get_team_by_id(self, id: str) -> Optional[TeamConfiguration]:
+    async def get_team_by_id(self, team_id: str) -> Optional[TeamConfiguration]:
         """Retrieve a specific team configuration by its document id.
 
         Args:
@@ -337,9 +302,9 @@ class CosmosDBClient(DatabaseBase):
         Returns:
             TeamConfiguration object or None if not found
         """
-        query = "SELECT * FROM c WHERE c.id=@id AND c.data_type=@data_type"
+        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type"
         parameters = [
-            {"name": "@id", "value": id},
+            {"name": "@team_id", "value": team_id},
             {"name": "@data_type", "value": DataType.team_config},
         ]
         teams = await self.query_items(query, parameters, TeamConfiguration)
@@ -382,27 +347,6 @@ class CosmosDBClient(DatabaseBase):
         except Exception as e:
             logging.exception(f"Failed to delete team from Cosmos DB: {e}")
             return False
-
-    async def get_data_by_type_and_session_id(
-        self, data_type: str, session_id: str
-    ) -> List[BaseDataModel]:
-        """Query the Cosmos DB for documents with the matching data_type, session_id and user_id."""
-        await self._ensure_initialized()
-        if self.container is None:
-            return []
-
-        model_class = self.MODEL_CLASS_MAPPING.get(data_type, BaseDataModel)
-        try:
-            query = "SELECT * FROM c WHERE c.session_id=@session_id AND c.user_id=@user_id AND c.data_type=@data_type ORDER BY c._ts ASC"
-            parameters = [
-                {"name": "@session_id", "value": session_id},
-                {"name": "@data_type", "value": data_type},
-                {"name": "@user_id", "value": self.user_id},
-            ]
-            return await self.query_items(query, parameters, model_class)
-        except Exception as e:
-            logging.exception(f"Failed to query data by type from Cosmos DB: {e}")
-            return []
 
     # Data Management Operations
     async def get_data_by_type(self, data_type: str) -> List[BaseDataModel]:
@@ -470,13 +414,89 @@ class CosmosDBClient(DatabaseBase):
         teams = await self.query_items(query, parameters, UserCurrentTeam)
         return teams[0] if teams else None
 
+
+
+    async def delete_current_team(self, user_id: str) -> bool:
+        """Delete the current team for a user."""
+        query = "SELECT c.id, c.session_id FROM c WHERE c.user_id=@user_id AND c.data_type=@data_type"
+
+        params = [
+            {"name": "@user_id", "value": user_id},
+            {"name": "@data_type", "value": DataType.user_current_team},
+        ]
+        items = self.container.query_items(query=query, parameters=params)
+        print("Items to delete:", items)
+        if items:
+            async for doc in items:
+                try:
+                    await self.container.delete_item(doc["id"], partition_key=doc["session_id"])
+                except Exception as e:
+                    self.logger.warning("Failed deleting current team doc %s: %s", doc.get("id"), e)
+
+        return True
+
     async def set_current_team(self, current_team: UserCurrentTeam) -> None:
         """Set the current team for a user."""
         await self._ensure_initialized()
         await self.add_item(current_team)
 
-
     async def update_current_team(self, current_team: UserCurrentTeam) -> None:
         """Update the current team for a user."""
         await self._ensure_initialized()
         await self.update_item(current_team)
+
+    async def delete_plan_by_plan_id(self, plan_id: str) -> bool:
+        """Delete a plan by its ID."""
+        query = "SELECT c.id, c.session_id FROM c WHERE c.id=@plan_id "
+
+        params = [
+            {"name": "@plan_id", "value": plan_id},
+        ]
+        items = self.container.query_items(query=query, parameters=params)
+        print("Items to delete planid:", items)
+        if items:
+            async for doc in items:
+                try:
+                    await self.container.delete_item(doc["id"], partition_key=doc["session_id"])
+                except Exception as e:
+                    self.logger.warning("Failed deleting current team doc %s: %s", doc.get("id"), e)
+
+        return True
+
+    async def add_mplan(self, mplan: messages.MPlan) -> None:
+        """Add a team configuration to the database."""
+        await self.add_item(mplan)
+
+    async def update_mplan(self, mplan: messages.MPlan) -> None:
+        """Update a team configuration in the database."""
+        await self.update_item(mplan)
+
+
+    async def get_mplan(self, plan_id: str) -> Optional[messages.MPlan]:
+        """Retrieve a mplan configuration by mplan_id."""
+        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type"
+        parameters = [
+            {"name": "@plan_id", "value": plan_id},
+            {"name": "@data_type", "value": DataType.m_plan},
+        ]
+        results = await self.query_items(query, parameters, messages.MPlan)
+        return results[0] if results else None
+    
+
+    async def add_agent_message(self, message: AgentMessageData) -> None:
+        """Add an agent message to the database."""
+        await self.add_item(message)
+
+    async def update_agent_message(self, message: AgentMessageData) -> None:
+        """Update an agent message in the database."""
+        await self.update_item(message)
+
+    async def get_agent_messages(self, plan_id: str) -> List[AgentMessageData]:
+        """Retrieve an agent message by message_id."""
+        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type ORDER BY c._ts ASC"
+        parameters = [
+            {"name": "@plan_id", "value": plan_id},
+            {"name": "@data_type", "value": DataType.m_plan_message},
+        ]
+
+        return await self.query_items(query, parameters, AgentMessageData)

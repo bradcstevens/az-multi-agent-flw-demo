@@ -1,4 +1,4 @@
-import { MPlanData, ProcessedPlanData, Step } from "./plan";
+import { MPlanData, ProcessedPlanData } from "./plan";
 
 export interface SubTask {
     id: string;

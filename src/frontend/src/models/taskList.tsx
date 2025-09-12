@@ -1,10 +1,8 @@
 export interface Task {
     id: string;
     name: string;
-    status: 'inprogress' | 'completed';
+    status: string;
     date?: string;
-    completed_steps?: number;
-    total_steps?: number;
 }
 
 export interface TaskListProps {
