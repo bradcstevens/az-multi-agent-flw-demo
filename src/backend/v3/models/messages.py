@@ -140,11 +140,11 @@ class ApprovalRequest(KernelBaseModel):
 @dataclass(slots=True)
 class AgentMessageResponse:
     """Message sent to HumanAgent to request approval for a step."""
-    is_final: bool = False
     plan_id: str
     agent: str
     content: str
     agent_type: AgentMessageType
+    is_final: bool = False
     m_plan_id: Optional[str] = None
     user_id: Optional[str] = None
     timestamp: Optional[str] = field(default_factory=lambda: str(time.time()))
