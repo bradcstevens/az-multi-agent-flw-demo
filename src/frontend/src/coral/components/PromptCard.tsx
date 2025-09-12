@@ -29,7 +29,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
         backgroundColor: disabled
           ? "var(--colorNeutralBackgroundDisabled)"
           : "var(--colorNeutralBackground3)",
-        border: "1px solid var(--colorNeutralStroke2)",
+        border: "1px solid var(--colorNeutralStroke1)",
         borderRadius: "8px",
         cursor: disabled ? "not-allowed" : "pointer",
         boxShadow: "none",

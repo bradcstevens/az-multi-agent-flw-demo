@@ -4,6 +4,11 @@ import { Button, Caption1 } from "@fluentui/react-components";
 import { Send } from "@/coral/imports/bundleicons";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
+    planData: any;
+    input: string;
+    setInput: (input: string) => void;
+    submittingChatDisableInput: boolean;
+    OnChatSubmit: (input: string) => void;
     waitingForPlan: boolean;
 }
 
@@ -18,87 +23,56 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
     return (
         <div
             style={{
+                position: 'sticky',
+                bottom: 0,
                 backgroundColor: 'var(--colorNeutralBackground1)',
-                padding: '20px 0'
+                // borderTop: '1px solid var(--colorNeutralStroke2)',
+                padding: '16px 24px',
+                maxWidth: '800px',
+                margin: '0 auto',
+                width: '100%',
+                boxSizing: 'border-box',
+                zIndex: 10,
             }}
         >
-            <div
+            <ChatInput
+                value={input}
+                onChange={setInput}
+                onEnter={() => OnChatSubmit(input)}
+                disabledChat={submittingChatDisableInput}
+                placeholder={
+                    waitingForPlan
+                        ? "Creating plan..."
+                        : "Type your message here..."
+                }
                 style={{
-                    maxWidth: '800px',
-                    margin: '0 auto',
-                    padding: '0 24px'
+                    fontSize: '16px',
+                    borderRadius: '8px',
+                    // border: '1px solid var(--colorNeutralStroke1)',
+                    backgroundColor: 'var(--colorNeutralBackground1)',
+                    width: '100%',
+                    boxSizing: 'border-box',
                 }}
             >
-                {/* Chat Input Container */}
-                <div style={{
-                    position: 'relative',
-                    width: '100%'
-                }}>
-                    <ChatInput
-                        value={input}
-                        onChange={setInput}
-                        onEnter={() => OnChatSubmit(input)}
-                        disabledChat={submittingChatDisableInput}
-                        placeholder={
-                            waitingForPlan
-                                ? "Creating plan..."
-                                : "Tell us what needs planning, building, or connecting—we'll handle the rest."
-                        }
-                        style={{
-                            minHeight: '56px',
-                            fontSize: '16px',
-                            borderRadius: '8px',
-                            border: '2px solid var(--colorNeutralStroke2)',
-                            backgroundColor: 'var(--colorNeutralBackground1)',
-                            padding: '16px 60px 16px 20px',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            alignItems: 'flex-start',
-                            textAlign: 'left',
-                            verticalAlign: 'top'
-                        }}
-                    >
-                        <Button
-                            appearance="subtle"
-                            className="home-input-send-button"
-                            onClick={() => OnChatSubmit(input)}
-                            disabled={submittingChatDisableInput}
-                            icon={<Send />}
-                            style={{
-                                position: 'absolute',
-                                right: '12px',
-                                top: '16px',
-                                height: '32px',
-                                width: '32px',
-                                borderRadius: '4px',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                color: submittingChatDisableInput 
-                                    ? 'var(--colorNeutralForegroundDisabled)' 
-                                    : 'var(--colorBrandForeground1)'
-                            }}
-                        />
-                    </ChatInput>
-
-                    {/* AI disclaimer */}
-                    <div style={{
-                        color: 'var(--colorNeutralForeground3)',
-                        marginTop: '8px',
-                        paddingBottom: '8px',
-                        textAlign: 'center'
-                    }}>
-                        {/* <Caption1>AI-generated content may be incorrect</Caption1> */}
-                    </div>
-                </div>
-            </div>
-            <div
-                style={{
-                    marginTop: '8px',
-                    paddingBottom: '8px',
-                }}
-            >
-               
-            </div>
+                <Button
+                    appearance="subtle"
+                    className="home-input-send-button"
+                    onClick={() => OnChatSubmit(input)}
+                    disabled={submittingChatDisableInput || !input.trim()}
+                    icon={<Send />}
+                    style={{
+                        height: '32px',
+                        width: '32px',
+                        borderRadius: '4px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        color: (submittingChatDisableInput || !input.trim())
+                            ? 'var(--colorNeutralForegroundDisabled)' 
+                            : 'var(--colorBrandForeground1)',
+                        flexShrink: 0,
+                    }}
+                />
+            </ChatInput>
         </div>
     );
 }
