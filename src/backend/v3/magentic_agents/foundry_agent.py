@@ -133,11 +133,15 @@ class FoundryAgentTemplate(AzureAgentBase):
         # Add MCP plugins if available
         plugins = [self.mcp_plugin] if self.mcp_plugin else []
 
-        self._agent = AzureAIAgent(
-            client=self.client,
-            definition=definition,
-            plugins=plugins,
-        )
+        try:
+            self._agent = AzureAIAgent(
+                client=self.client,
+                definition=definition,
+                plugins=plugins,
+            )
+        except Exception as ex:
+            self.logger.error("Failed to create AzureAIAgent: %s", ex)
+            raise
 
         self.logger.info("%s initialized with %d tools and %d plugins", self.agent_name, len(tools), len(plugins))
 
