@@ -237,7 +237,7 @@ class CosmosDBClient(DatabaseBase):
 
     async def get_all_plans_by_team_id_status(self, team_id: str, status: str) -> List[Plan]:
         """Retrieve all plans for a specific team."""
-        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id and c.overall_status=@status"
+        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id and c.overall_status=@status ORDER BY c._ts DESC"
         parameters = [
             {"name": "@user_id", "value": self.user_id},
             {"name": "@team_id", "value": team_id},
@@ -474,7 +474,7 @@ class CosmosDBClient(DatabaseBase):
 
     async def get_mplan(self, plan_id: str) -> Optional[messages.MPlan]:
         """Retrieve a mplan configuration by mplan_id."""
-        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type"
+        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type ORDER BY c._ts ASC"
         parameters = [
             {"name": "@plan_id", "value": plan_id},
             {"name": "@data_type", "value": DataType.m_plan},
@@ -483,20 +483,20 @@ class CosmosDBClient(DatabaseBase):
         return results[0] if results else None
     
 
-    async def add_agent_message(self, message: messages.AgentMessageResponse) -> None:
+    async def add_agent_message(self, message: AgentMessageData) -> None:
         """Add an agent message to the database."""
         await self.add_item(message)
 
-    async def update_agent_message(self, message: messages.AgentMessageResponse) -> None:
+    async def update_agent_message(self, message: AgentMessageData) -> None:
         """Update an agent message in the database."""
         await self.update_item(message)
 
-    async def get_agent_messages(self, plan_id: str) -> List[messages.AgentMessageResponse]:
+    async def get_agent_messages(self, plan_id: str) -> List[AgentMessageData]:
         """Retrieve an agent message by message_id."""
-        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type"
+        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type ORDER BY c._ts ASC"
         parameters = [
             {"name": "@plan_id", "value": plan_id},
             {"name": "@data_type", "value": DataType.m_plan_message},
         ]
 
-        return await self.query_items(query, parameters, messages.AgentMessageResponse)
+        return await self.query_items(query, parameters, AgentMessageData)

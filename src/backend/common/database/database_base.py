@@ -222,11 +222,11 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def update_agent_message(self, message: AgentMessageResponse) -> None:
+    async def update_agent_message(self, message: AgentMessageData) -> None:
         """Update an agent message in the database."""
         pass
 
     @abstractmethod
-    async def get_agent_messages(self, plan_id: str) -> Optional[AgentMessageResponse]:
+    async def get_agent_messages(self, plan_id: str) -> Optional[AgentMessageData]:
         """Retrieve an agent message by message_id."""
         pass

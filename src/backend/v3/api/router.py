@@ -559,7 +559,8 @@ async def user_clarification(
 
             try:
                 result = await PlanService.handle_human_clarification(
-                    human_feedback, user_id)
+                    human_feedback, user_id
+                )
                 print("Human clarification processed:", result)
             except ValueError as ve:
                 print(f"ValueError processing human clarification: {ve}")
@@ -573,7 +574,9 @@ async def user_clarification(
                     "user_id": user_id,
                 },
             )
-            return {"status": "clarification recorded",}
+            return {
+                "status": "clarification recorded",
+            }
         else:
             logging.warning(
                 f"No orchestration or plan found for request_id: {human_feedback.request_id}"
@@ -581,6 +584,7 @@ async def user_clarification(
             raise HTTPException(
                 status_code=404, detail="No active plan found for clarification"
             )
+
 
 @app_v3.post("/agent_message")
 async def agent_message_user(
@@ -642,14 +646,14 @@ async def agent_message_user(
     # Set the approval in the orchestration config
 
     try:
-    
+
         result = await PlanService.handle_agent_messages(agent_message, user_id)
         print("Agent message processed:", result)
     except ValueError as ve:
         print(f"ValueError processing agent message: {ve}")
     except Exception as e:
         print(f"Error processing agent message: {e}")
-   
+
     track_event_if_configured(
         "AgentMessageReceived",
         {
@@ -658,7 +662,9 @@ async def agent_message_user(
             "user_id": user_id,
         },
     )
-    return {"status": "message recorded",}
+    return {
+        "status": "message recorded",
+    }
 
 
 @app_v3.post("/upload_team_config")
@@ -726,19 +732,19 @@ async def upload_team_config(
                 track_event_if_configured(
                     "Team configuration RAI validation failed",
                     {
-                    "status": "failed",
-                    "user_id": user_id,
-                    "filename": file.filename,
-                    "reason": rai_error,
-                },
-            )
-            
+                        "status": "failed",
+                        "user_id": user_id,
+                        "filename": file.filename,
+                        "reason": rai_error,
+                    },
+                )
+
             raise HTTPException(status_code=400, detail=rai_error)
 
         track_event_if_configured(
-                "Team configuration RAI validation passed",
-                {"status": "passed", "user_id": user_id, "filename": file.filename},
-    )
+            "Team configuration RAI validation passed",
+            {"status": "passed", "user_id": user_id, "filename": file.filename},
+        )
         # Initialize memory store and service
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
         team_service = TeamService(memory_store)
@@ -1340,16 +1346,16 @@ async def get_plan_by_id(request: Request, plan_id: str):
             raise HTTPException(status_code=404, detail="Plan not found")
 
         # Use get_steps_by_plan to match the original implementation
-        steps = await memory_store.get_steps_by_plan(plan_id=plan.id)
-        messages = []
 
-        plan_with_steps = PlanWithSteps(**plan.model_dump(), steps=steps)
-        plan_with_steps.update_step_counts()
-
-        # Format dates in messages according to locale
-        formatted_messages = []
-
-        return [plan_with_steps, formatted_messages]
+        team = await memory_store.get_team_by_id(team_id=plan.team_id)
+        messages = await memory_store.get_agent_messages(plan_id=plan.plan_id)
+        m_plan = await memory_store.get_m_plan_by_plan_id(plan_id=plan.plan_id)
+        return {
+            "plan": plan.model_dump(),
+            "team": team.model_dump() if team else None,
+            "messages": [msg.model_dump() for msg in messages],
+            "m_plan": m_plan.model_dump() if m_plan else None,
+        }
     else:
         track_event_if_configured(
             "GetPlanId", {"status_code": 400, "detail": "no plan id"}
