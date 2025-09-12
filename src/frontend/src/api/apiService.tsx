@@ -11,7 +11,8 @@ import {
     AgentType,
     PlanMessage,
     PlanApprovalRequest,
-    PlanApprovalResponse
+    PlanApprovalResponse,
+    AgentMessageData
 } from '../models';
 
 // Constants for endpoints
@@ -21,8 +22,8 @@ const API_ENDPOINTS = {
     PLAN: '/v3/plan',
     PLAN_APPROVAL: '/v3/plan_approval',
     HUMAN_CLARIFICATION: '/v3/user_clarification',
-    USER_BROWSER_LANGUAGE: '/user_browser_language'
-
+    USER_BROWSER_LANGUAGE: '/user_browser_language',
+    AGENT_MESSAGE: '/v3/agent_message',
 };
 
 // Simple cache implementation
@@ -334,6 +335,16 @@ export class APIService {
             language
         });
         return response;
+    }
+    async sendAgentMessage(data: AgentMessageData): Promise<AgentMessage> {
+        const t0 = performance.now();
+        const result = await apiClient.post(API_ENDPOINTS.AGENT_MESSAGE, data);
+        console.log('[agent_message] sent', {
+            ms: +(performance.now() - t0).toFixed(1),
+            agent: data.agent,
+            type: data.agent_type
+        });
+        return result;
     }
 }
 

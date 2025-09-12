@@ -59,6 +59,23 @@ const PlanPage: React.FC = () => {
 
     const [loadingMessage, setLoadingMessage] = useState<string>(loadingMessages[0]);
 
+
+
+    const processAgentMessage = useCallback((agentMessageData: AgentMessageData) => {
+
+        // Persist / forward to backend (fire-and-forget with logging)
+        void apiService.sendAgentMessage(agentMessageData)
+            .then(saved => {
+                console.log('[agent_message][persisted]', {
+                    agent: agentMessageData.agent,
+                    type: agentMessageData.agent_type,
+                    ts: agentMessageData.timestamp
+                });
+            })
+            .catch(err => {
+                console.warn('[agent_message][persist-failed]', err);
+            });
+    }, []);
     // Auto-scroll helper
     const scrollToBottom = useCallback(() => {
         setTimeout(() => {
@@ -111,7 +128,7 @@ const PlanPage: React.FC = () => {
         });
 
         return () => unsubscribe();
-    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
+    }, [scrollToBottom]);
 
     //(WebsocketMessageType.AGENT_MESSAGE_STREAMING
     useEffect(() => {
@@ -125,7 +142,7 @@ const PlanPage: React.FC = () => {
         });
 
         return () => unsubscribe();
-    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
+    }, [scrollToBottom]);
 
     //WebsocketMessageType.USER_CLARIFICATION_REQUEST
     useEffect(() => {
@@ -147,6 +164,8 @@ const PlanPage: React.FC = () => {
             setShowProcessingPlanSpinner(false);
             setSubmittingChatDisableInput(false);
             scrollToBottom();
+            // Persist the agent message
+            processAgentMessage(agentMessageData);
 
         });
 
@@ -182,6 +201,8 @@ const PlanPage: React.FC = () => {
             setShowProcessingPlanSpinner(false);
             setAgentMessages(prev => [...prev, agentMessageData]);
             scrollToBottom();
+            // Persist the agent message
+            processAgentMessage(agentMessageData);
 
         });
 
@@ -196,6 +217,7 @@ const PlanPage: React.FC = () => {
             setAgentMessages(prev => [...prev, agentMessageData]);
             setShowProcessingPlanSpinner(true);
             scrollToBottom();
+            processAgentMessage(agentMessageData);
         });
 
         return () => unsubscribe();
