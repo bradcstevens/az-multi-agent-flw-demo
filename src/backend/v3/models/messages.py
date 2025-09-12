@@ -139,18 +139,14 @@ class ApprovalRequest(KernelBaseModel):
 
 @dataclass(slots=True)
 class AgentMessageResponse:
-    """Message sent to HumanAgent to request approval for a step."""
+    """Response message representing an agent's message."""
     plan_id: str
     agent: str
     content: str
     agent_type: AgentMessageType
     is_final: bool = False
-    m_plan_id: Optional[str] = None
-    user_id: Optional[str] = None
-    timestamp: Optional[str] = field(default_factory=lambda: str(time.time()))
-    raw_data: Optional[str] = None
-    steps: List[Any] = Field(default_factory=list) 
-    next_steps: List[Any] = Field(default_factory=list)
+    raw_data: str = None
+
 
 class WebsocketMessageType(str, Enum):
     """Types of WebSocket messages."""

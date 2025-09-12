@@ -24,8 +24,6 @@ class MStep(BaseModel):
 class MPlan(BaseModel):
     """model of a plan"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    data_type: Literal[DataType.m_plan] = Field(DataType.m_plan, Literal=True)
-    session_id: str = Field(default_factory=lambda: str(uuid.uuid4())) # db partition key
     user_id: str = ""
     team_id: str = ""
     plan_id: str = ""

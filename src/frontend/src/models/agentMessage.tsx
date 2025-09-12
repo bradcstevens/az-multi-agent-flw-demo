@@ -35,7 +35,7 @@ export interface AgentMessageData {
  * Corresponds to the Python AgentMessageResponse class.
  */
 export interface AgentMessageResponse {
-    is_final?: boolean;
+
     /** Plan identifier */
     plan_id: string;
     /** Agent name or identifier */
@@ -44,18 +44,10 @@ export interface AgentMessageResponse {
     content: string;
     /** Type of agent (Human or AI) */
     agent_type: AgentMessageType;
-    /** Associated m_plan identifier */
-    m_plan_id?: string;
-    /** User identifier */
-    user_id?: string;
-    /** Timestamp when the message was created */
-    timestamp?: string;
+    is_final: boolean;
     /** Raw data associated with the message */
-    raw_data?: string;
-    /** Steps associated with the message */
-    steps?: any[];
-    /** Next steps associated with the message */
-    next_steps?: any[];
+    raw_data: string;
+
 }
 
 export interface FinalMessage {

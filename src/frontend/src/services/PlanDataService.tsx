@@ -197,17 +197,14 @@ export class PlanDataService {
       console.log("Invalid plan data provided to createAgentMessageResponse");
     }
     return {
-      is_final: is_final,
+
       plan_id: planData.plan.plan_id,
       agent: agentMessage.agent,
       content: agentMessage.content,
       agent_type: agentMessage.agent_type,
-      m_plan_id: planData.mplan?.id || undefined,
-      user_id: planData.plan.user_id,
-      timestamp: agentMessage.timestamp ? agentMessage.timestamp.toString() : new Date().getTime().toString(),
-      raw_data: agentMessage.raw_data,
-      steps: agentMessage.steps,
-      next_steps: agentMessage.next_steps
+      is_final: is_final,
+      raw_data: JSON.stringify(agentMessage.raw_data),
+
     };
   }
 

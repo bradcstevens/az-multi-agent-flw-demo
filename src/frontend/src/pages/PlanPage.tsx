@@ -69,6 +69,7 @@ const PlanPage: React.FC = () => {
         console.log(is_final)
         console.log(agentMessageData)
         const agentMessageResponse = PlanDataService.createAgentMessageResponse(agentMessageData, planData, is_final);
+        console.log('📤 Persisting agent message:', agentMessageResponse);
         void apiService.sendAgentMessage(agentMessageResponse)
             .then(saved => {
                 console.log('[agent_message][persisted]', {
@@ -215,24 +216,28 @@ const PlanPage: React.FC = () => {
                 timestamp: Date.now(),
                 steps: [],   // intentionally always empty
                 next_steps: [],  // intentionally always empty
-                content: "🎉🎉 " + (finalMessage.content || ''),
+                content: "🎉🎉 " + (finalMessage.data?.content || ''),
                 raw_data: finalMessage || '',
             } as AgentMessageData;
 
 
             console.log('✅ Parsed final result message:', agentMessageData);
-            setStreamingMessageBuffer("");
-            setShowProcessingPlanSpinner(false);
-            setAgentMessages(prev => [...prev, agentMessageData]);
-            scrollToBottom();
-            // Persist the agent message
-            const is_final = finalMessage?.status === 'completed' || false;
-            if (finalMessage?.status === 'completed' && planData?.plan) {
-                planData.plan.overall_status = PlanStatus.COMPLETED;
-                setPlanData({ ...planData });
+            // we ignore the terminated message 
+            if (finalMessage?.data?.status === PlanStatus.COMPLETED) {
+                setStreamingMessageBuffer("");
+                setShowProcessingPlanSpinner(false);
+                setAgentMessages(prev => [...prev, agentMessageData]);
+                scrollToBottom();
+                // Persist the agent message
+                const is_final = true;
+                if (planData?.plan) {
+                    planData.plan.overall_status = PlanStatus.COMPLETED;
+                    setPlanData({ ...planData });
+                }
+
+                processAgentMessage(agentMessageData, planData, is_final);
             }
 
-            processAgentMessage(agentMessageData, planData, is_final);
 
         });
 
@@ -344,6 +349,9 @@ const PlanPage: React.FC = () => {
                 console.log("Plan data fetched:", planResult);
                 if (planResult?.plan?.overall_status === PlanStatus.IN_PROGRESS) {
                     setShowApprovalButtons(true);
+
+                } else {
+                    setWaitingForPlan(false);
                 }
                 if (planResult?.plan?.overall_status !== PlanStatus.COMPLETED) {
                     setContinueWithWebsocketFlow(true);
