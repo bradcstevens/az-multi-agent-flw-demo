@@ -138,7 +138,7 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def get_team_by_id(self, id: str) -> Optional[TeamConfiguration]:
+    async def get_team_by_id(self, team_id: str) -> Optional[TeamConfiguration]:
         """Retrieve a team configuration by internal id."""
         pass
 

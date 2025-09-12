@@ -1255,7 +1255,7 @@ async def get_plans(request: Request):
 
 # Get plans is called in the initial side rendering of the frontend
 @app_v3.get("/plan")
-async def get_plan_by_id(request: Request, plan_id: str):
+async def get_plan_by_id(request: Request,  plan_id: Optional[str] = Query(None),):
     """
     Retrieve plans for the current user.
 
@@ -1326,29 +1326,32 @@ async def get_plan_by_id(request: Request, plan_id: str):
 
     # # Initialize memory context
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    try:
+        if plan_id:
+            plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
+            if not plan:
+                track_event_if_configured(
+                    "GetPlanBySessionNotFound",
+                    {"status_code": 400, "detail": "Plan not found"},
+                )
+                raise HTTPException(status_code=404, detail="Plan not found")
 
-    if plan_id:
-        plan = await memory_store.get_plan_by_plan_id(plan_id=plan_id)
-        if not plan:
+            # Use get_steps_by_plan to match the original implementation
+
+            team = await memory_store.get_team_by_id(team_id=plan.team_id)
+            agent_messages = await memory_store.get_agent_messages(plan_id=plan.plan_id)
+            m_plan = await memory_store.get_mplan(plan_id=plan.plan_id)
+            return {
+                "plan": plan,
+                "team": team if team else None,
+                "messages": agent_messages,
+                "m_plan": m_plan if m_plan else None,
+            }
+        else:
             track_event_if_configured(
-                "GetPlanBySessionNotFound",
-                {"status_code": 400, "detail": "Plan not found"},
+                "GetPlanId", {"status_code": 400, "detail": "no plan id"}
             )
-            raise HTTPException(status_code=404, detail="Plan not found")
-
-        # Use get_steps_by_plan to match the original implementation
-
-        team = await memory_store.get_team_by_id(team_id=plan.team_id)
-        agent_messages = await memory_store.get_agent_messages(plan_id=plan.plan_id)
-        m_plan = await memory_store.get_mplan(plan_id=plan.plan_id)
-        return {
-            "plan": plan,
-            "team": team if team else None,
-            "messages": agent_messages,
-            "m_plan": m_plan if m_plan else None,
-        }
-    else:
-        track_event_if_configured(
-            "GetPlanId", {"status_code": 400, "detail": "no plan id"}
-        )
-        raise HTTPException(status_code=400, detail="no plan id")
+            raise HTTPException(status_code=400, detail="no plan id")
+    except Exception as e:
+        logging.error(f"Error retrieving plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred")

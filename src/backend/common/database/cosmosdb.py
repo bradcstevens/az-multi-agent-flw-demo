@@ -293,7 +293,7 @@ class CosmosDBClient(DatabaseBase):
         teams = await self.query_items(query, parameters, TeamConfiguration)
         return teams[0] if teams else None
 
-    async def get_team_by_id(self, id: str) -> Optional[TeamConfiguration]:
+    async def get_team_by_id(self, team_id: str) -> Optional[TeamConfiguration]:
         """Retrieve a specific team configuration by its document id.
 
         Args:
@@ -302,9 +302,9 @@ class CosmosDBClient(DatabaseBase):
         Returns:
             TeamConfiguration object or None if not found
         """
-        query = "SELECT * FROM c WHERE c.id=@id AND c.data_type=@data_type"
+        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type"
         parameters = [
-            {"name": "@id", "value": id},
+            {"name": "@team_id", "value": team_id},
             {"name": "@data_type", "value": DataType.team_config},
         ]
         teams = await self.query_items(query, parameters, TeamConfiguration)
