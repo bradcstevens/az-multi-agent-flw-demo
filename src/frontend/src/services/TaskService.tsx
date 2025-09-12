@@ -144,14 +144,24 @@ export class TaskService {
    */
   static cleanTextToSpaces(text: string): string {
     if (!text) return "";
-    // Replace any non-alphanumeric character with a space
-    let cleanedText = text
-      .replace("Hr_Agent", "HR_Agent")
-      .trim()
-      .replace(/[^a-zA-Z0-9]/g, " ");
 
+    let cleanedText = text
+      .replace("Hr_Agent", "HR Agent")
+      .replace("Hr Agent", "HR Agent")
+      .trim();
+
+    // Convert camelCase and PascalCase to spaces
+    // This regex finds lowercase letter followed by uppercase letter
+    cleanedText = cleanedText.replace(/([a-z])([A-Z])/g, '$1 $2');
+    
+    // Replace any remaining non-alphanumeric characters with spaces
+    cleanedText = cleanedText.replace(/[^a-zA-Z0-9]/g, ' ');
+    
     // Clean up multiple spaces and trim
-    cleanedText = cleanedText.replace(/\s+/g, " ").trim();
+    cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+    
+    // Capitalize each word for better readability
+    cleanedText = cleanedText.replace(/\b\w/g, (char) => char.toUpperCase());
 
     return cleanedText;
   }
