@@ -6,13 +6,12 @@ Extends StandardMagenticManager to add approval gates before plan execution.
 import asyncio
 import re
 from typing import Any, List, Optional
-            # Create a progress ledger that indicates the request is satisfied (task complete)
-from semantic_kernel.agents.orchestration.magentic import (
-                ProgressLedger, ProgressLedgerItem)
+
 import v3.models.messages as messages
 from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
-    MagenticContext, ProgressLedger, StandardMagenticManager)
+    MagenticContext, ProgressLedger, ProgressLedgerItem,
+    StandardMagenticManager)
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import (
     ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT,
     ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT,
@@ -21,6 +20,8 @@ from semantic_kernel.contents import ChatMessageContent
 from v3.config.settings import (connection_config, current_user_id,
                                 orchestration_config)
 from v3.models.models import MPlan, MStep
+
+            # Create a progress ledger that indicates the request is satisfied (task complete)
 
 
 class HumanApprovalMagenticManager(StandardMagenticManager):
@@ -45,6 +46,11 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         """
 
         plan_append = """
+IMPORTANT: Never ask the user for information or clarification until all agents on the team have been asked first.
+
+EXAMPLE: If the user request involves product information, first ask all agents on the team to provide the information. 
+Do not ask the user unless all agents have been consulted and the information is still missing.
+
 Plan steps should always include a bullet point, followed by an agent name, followed by a description of the action
 to be taken. If a step involves multiple actions, separate them into distinct steps with an agent included in each step. If the step is taken by an agent that 
 is not part of the team, such as the MagenticManager, please always list the MagenticManager as the agent for that step. At any time, if more information is 
