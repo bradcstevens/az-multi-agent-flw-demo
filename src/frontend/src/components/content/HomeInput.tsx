@@ -126,19 +126,21 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     errorDetail = error?.response?.data?.detail;
                 }
 
-                // Handle RAI validation errors with better UX
+                  // Handle RAI validation errors - just show description as toast
                 if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
-                    setRAIError(errorDetail);
+                    const description = errorDetail.description || 
+                                     "Your request contains content that doesn't meet our safety guidelines. Please try rephrasing.";
+                    showToast(description, "error");
                 } else {
                     // Handle other errors with toast messages
                     const errorMessage = errorDetail?.description ||
                         errorDetail?.message ||
                         error?.response?.data?.message ||
                         error?.message ||
-                        "Something went wrong";
+                        "Something went wrong. Please try again.";
+                    
                     showToast(errorMessage, "error");
                 }
-
             } finally {
                 setInput("");
                 setSubmitting(false);
@@ -195,7 +197,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     </div>
 
                     {/* Show RAI error if present */}
-                    {raiError && (
+                    {/* {raiError && (
                         <RAIErrorCard
                             error={raiError}
                             onRetry={() => {
@@ -206,7 +208,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                             }}
                             onDismiss={() => setRAIError(null)}
                         />
-                    )}
+                    )} */}
 
                     <ChatInput
                         ref={textareaRef} // forwarding

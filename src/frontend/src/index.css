@@ -6,6 +6,25 @@ body, html, :root {
 }
 
 
+/* Hide raw JSON errors  */
+body > div[style*="position: fixed"]:contains('"error_type"'),
+body > div[style*="bottom: 0"]:contains('RAI_VALIDATION_FAILED'),
+pre:contains('"message":'),
+.error-raw,
+.json-error {
+  display: none !important;
+}
+
+/* Hide any pre-formatted JSON that might contain error messages */
+pre {
+  white-space: pre-wrap;
+}
+
+pre:has-text('error_type'),
+pre:has-text('RAI_VALIDATION_FAILED') {
+  display: none !important;
+}
+
 /* Global Custom Scrollbar */
 ::-webkit-scrollbar {
     overflow-y: auto; /* Ensure scrollable content */
