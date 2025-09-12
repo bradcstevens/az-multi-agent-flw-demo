@@ -193,6 +193,9 @@ export class PlanDataService {
     planData: ProcessedPlanData,
     is_final: boolean = false
   ): AgentMessageResponse {
+    if (!planData || !planData.plan) {
+      console.log("Invalid plan data provided to createAgentMessageResponse");
+    }
     return {
       is_final: is_final,
       plan_id: planData.plan.plan_id,

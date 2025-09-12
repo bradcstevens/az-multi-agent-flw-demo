@@ -474,7 +474,7 @@ class CosmosDBClient(DatabaseBase):
 
     async def get_mplan(self, plan_id: str) -> Optional[messages.MPlan]:
         """Retrieve a mplan configuration by mplan_id."""
-        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type ORDER BY c._ts ASC"
+        query = "SELECT * FROM c WHERE c.plan_id=@plan_id AND c.data_type=@data_type"
         parameters = [
             {"name": "@plan_id", "value": plan_id},
             {"name": "@data_type", "value": DataType.m_plan},

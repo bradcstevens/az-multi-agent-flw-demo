@@ -62,9 +62,12 @@ const PlanPage: React.FC = () => {
 
 
 
-    const processAgentMessage = useCallback((agentMessageData: AgentMessageData, is_final: boolean = false) => {
+    const processAgentMessage = useCallback((agentMessageData: AgentMessageData, planData: ProcessedPlanData, is_final: boolean = false) => {
 
         // Persist / forward to backend (fire-and-forget with logging)
+        console.log(planData)
+        console.log(is_final)
+        console.log(agentMessageData)
         const agentMessageResponse = PlanDataService.createAgentMessageResponse(agentMessageData, planData, is_final);
         void apiService.sendAgentMessage(agentMessageResponse)
             .then(saved => {
@@ -157,6 +160,7 @@ const PlanPage: React.FC = () => {
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.USER_CLARIFICATION_REQUEST, (clarificationMessage: any) => {
             console.log('📋 Clarification Message', clarificationMessage);
+            console.log('📋 Current plan data User clarification', planData);
             if (!clarificationMessage) {
                 console.warn('⚠️ clarification message missing data:', clarificationMessage);
                 return;
@@ -178,12 +182,12 @@ const PlanPage: React.FC = () => {
             setSubmittingChatDisableInput(false);
             scrollToBottom();
             // Persist the agent message
-            processAgentMessage(agentMessageData);
+            processAgentMessage(agentMessageData, planData);
 
         });
 
         return () => unsubscribe();
-    }, [scrollToBottom]);
+    }, [scrollToBottom, planData, processAgentMessage]);
     //WebsocketMessageType.AGENT_TOOL_MESSAGE
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_TOOL_MESSAGE, (toolMessage: any) => {
@@ -228,26 +232,27 @@ const PlanPage: React.FC = () => {
                 setPlanData({ ...planData });
             }
 
-            processAgentMessage(agentMessageData, is_final);
+            processAgentMessage(agentMessageData, planData, is_final);
 
         });
 
         return () => unsubscribe();
-    }, [scrollToBottom]);
+    }, [scrollToBottom, planData, processAgentMessage]);
 
     //WebsocketMessageType.AGENT_MESSAGE
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, (agentMessage: any) => {
             console.log('📋 Agent Message', agentMessage);
+            console.log('📋 Current plan data', planData);
             const agentMessageData = agentMessage.data as AgentMessageData;
             setAgentMessages(prev => [...prev, agentMessageData]);
             setShowProcessingPlanSpinner(true);
             scrollToBottom();
-            processAgentMessage(agentMessageData);
+            processAgentMessage(agentMessageData, planData);
         });
 
         return () => unsubscribe();
-    }, [scrollToBottom]); //onPlanReceived, scrollToBottom
+    }, [scrollToBottom, planData, processAgentMessage]); //onPlanReceived, scrollToBottom
 
     // Loading message rotation effect
     useEffect(() => {
