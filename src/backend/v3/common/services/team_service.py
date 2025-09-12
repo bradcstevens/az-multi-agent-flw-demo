@@ -313,8 +313,13 @@ class TeamService:
     def extract_models_from_agent(self, agent: Dict[str, Any]) -> set:
         """
         Extract all possible model references from a single agent configuration.
+         Skip proxy agents as they don't require deployment models.
         """
         models = set()
+
+         # Skip proxy agents - they don't need deployment models
+        if agent.get("name", "").lower() == "proxyagent":
+            return models
 
         if agent.get("deployment_name"):
             models.add(str(agent["deployment_name"]).lower())
