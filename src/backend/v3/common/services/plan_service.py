@@ -7,17 +7,23 @@ from common.database.database_factory import DatabaseFactory
 
 from v3.models.models import MPlan
 import v3.models.messages as messages
-from common.models.messages_kernel import AgentMessageData, AgentMessageType, AgentType, PlanStatus
+from common.models.messages_kernel import (
+    AgentMessageData,
+    AgentMessageType,
+    AgentType,
+    PlanStatus,
+)
 from v3.config.settings import orchestration_config
 from common.utils.event_utils import track_event_if_configured
 import uuid
 from semantic_kernel.kernel_pydantic import Field
 
-    
+
 logger = logging.getLogger(__name__)
+
+
 def build_agent_message_from_user_clarification(
-    human_feedback: messages.UserClarificationResponse,
-    user_id: str
+    human_feedback: messages.UserClarificationResponse, user_id: str
 ) -> AgentMessageData:
     """
     Convert a UserClarificationResponse (human feedback) into an AgentMessageData.
@@ -26,16 +32,17 @@ def build_agent_message_from_user_clarification(
     # e.g. HUMAN_AGENT = "Human_Agent",  -> value becomes ('Human_Agent',)
     # Consider fixing that enum (remove trailing commas) so .value is a string.
     return AgentMessageData(
-        plan_id = human_feedback.plan_id or "",
-        user_id = user_id,
-        m_plan_id = human_feedback.m_plan_id or None,
-        agent = AgentType.HUMAN.value,              # or simply "Human_Agent"
-        agent_type = AgentMessageType.HUMAN_AGENT,  # will serialize per current enum definition
-        content = human_feedback.answer or "",
-        raw_data = json.dumps(asdict(human_feedback)),
-        steps = [],          # intentionally empty
-        next_steps = []      # intentionally empty
+        plan_id=human_feedback.plan_id or "",
+        user_id=user_id,
+        m_plan_id=human_feedback.m_plan_id or None,
+        agent=AgentType.HUMAN.value,  # or simply "Human_Agent"
+        agent_type=AgentMessageType.HUMAN_AGENT,  # will serialize per current enum definition
+        content=human_feedback.answer or "",
+        raw_data=json.dumps(asdict(human_feedback)),
+        steps=[],  # intentionally empty
+        next_steps=[],  # intentionally empty
     )
+
 
 def build_agent_message_from_agent_message_response(
     agent_response: messages.AgentMessageResponse,
@@ -47,7 +54,6 @@ def build_agent_message_from_agent_message_response(
     """
     # Robust timestamp parsing (accepts seconds or ms or missing)
 
-
     # Raw data serialization
     raw = getattr(agent_response, "raw_data", None)
     try:
@@ -56,7 +62,13 @@ def build_agent_message_from_agent_message_response(
             try:
                 raw_str = json.dumps(asdict(agent_response))
             except Exception:
-                raw_str = json.dumps({k: getattr(agent_response, k) for k in dir(agent_response) if not k.startswith("_")})
+                raw_str = json.dumps(
+                    {
+                        k: getattr(agent_response, k)
+                        for k in dir(agent_response)
+                        if not k.startswith("_")
+                    }
+                )
         elif isinstance(raw, (dict, list)):
             raw_str = json.dumps(raw)
         else:
@@ -69,7 +81,11 @@ def build_agent_message_from_agent_message_response(
     next_steps = getattr(agent_response, "next_steps", []) or []
 
     # Agent name and type
-    agent_name = getattr(agent_response, "agent", "") or getattr(agent_response, "agent_name", "") or getattr(agent_response, "source", "")
+    agent_name = (
+        getattr(agent_response, "agent", "")
+        or getattr(agent_response, "agent_name", "")
+        or getattr(agent_response, "source", "")
+    )
     # Try to infer agent_type, fallback to AI_AGENT
     agent_type_raw = getattr(agent_response, "agent_type", None)
     if isinstance(agent_type_raw, AgentMessageType):
@@ -83,7 +99,11 @@ def build_agent_message_from_agent_message_response(
             agent_type = AgentMessageType.AI_AGENT
 
     # Content
-    content = getattr(agent_response, "content", "") or getattr(agent_response, "text", "") or ""
+    content = (
+        getattr(agent_response, "content", "")
+        or getattr(agent_response, "text", "")
+        or ""
+    )
 
     # plan_id / user_id fallback
     plan_id_val = getattr(agent_response, "plan_id", "") or ""
@@ -105,7 +125,9 @@ def build_agent_message_from_agent_message_response(
 class PlanService:
 
     @staticmethod
-    async def handle_plan_approval(human_feedback: messages.PlanApprovalResponse, user_id: str) ->  bool:
+    async def handle_plan_approval(
+        human_feedback: messages.PlanApprovalResponse, user_id: str
+    ) -> bool:
         """
         Process a PlanApprovalResponse coming from the client.
 
@@ -132,7 +154,7 @@ class PlanService:
                 if human_feedback.approved:
                     plan = await memory_store.get_plan(human_feedback.plan_id)
                     mplan.plan_id = human_feedback.plan_id
-                    mplan.team_id = plan.team_id # just to keep consistency 
+                    mplan.team_id = plan.team_id  # just to keep consistency
                     orchestration_config.plans[human_feedback.m_plan_id] = mplan
                     if plan:
                         plan.overall_status = PlanStatus.approved
@@ -149,15 +171,15 @@ class PlanService:
                     else:
                         print("Plan not found in memory store.")
                         return False
-                else: #reject plan
+                else:  # reject plan
                     track_event_if_configured(
-                            "PlanRejected",
-                            {
-                                "m_plan_id": human_feedback.m_plan_id,
-                                "plan_id": human_feedback.plan_id,
-                                "user_id": user_id,
-                            },
-                        )
+                        "PlanRejected",
+                        {
+                            "m_plan_id": human_feedback.m_plan_id,
+                            "plan_id": human_feedback.plan_id,
+                            "user_id": user_id,
+                        },
+                    )
                     await memory_store.delete_plan_by_plan_id(human_feedback.plan_id)
 
         except Exception as e:
@@ -166,7 +188,9 @@ class PlanService:
         return True
 
     @staticmethod
-    async def handle_agent_messages(agent_message: messages.AgentMessageResponse, user_id: str) -> bool:
+    async def handle_agent_messages(
+        agent_message: messages.AgentMessageResponse, user_id: str
+    ) -> bool:
         """
         Process an AgentMessage coming from the client.
 
@@ -181,7 +205,9 @@ class PlanService:
             ValueError on invalid state
         """
         try:
-            agent_msg = build_agent_message_from_agent_message_response(agent_message, user_id)
+            agent_msg = build_agent_message_from_agent_message_response(
+                agent_message, user_id
+            )
 
             # Persist if your database layer supports it.
             # Look for or implement something like: memory_store.add_agent_message(agent_msg)
@@ -189,12 +215,15 @@ class PlanService:
             await memory_store.add_agent_message(agent_msg)
             return True
         except Exception as e:
-            logger.exception("Failed to handle human clarification -> agent message: %s", e)
+            logger.exception(
+                "Failed to handle human clarification -> agent message: %s", e
+            )
             return False
 
-    
     @staticmethod
-    async def handle_human_clarification(human_feedback: messages.UserClarificationResponse, user_id: str) -> bool:
+    async def handle_human_clarification(
+        human_feedback: messages.UserClarificationResponse, user_id: str
+    ) -> bool:
         """
         Process a UserClarificationResponse coming from the client.
 
@@ -209,7 +238,9 @@ class PlanService:
             ValueError on invalid state
         """
         try:
-            agent_msg = build_agent_message_from_user_clarification(human_feedback, user_id)
+            agent_msg = build_agent_message_from_user_clarification(
+                human_feedback, user_id
+            )
 
             # Persist if your database layer supports it.
             # Look for or implement something like: memory_store.add_agent_message(agent_msg)
@@ -218,5 +249,7 @@ class PlanService:
 
             return True
         except Exception as e:
-            logger.exception("Failed to handle human clarification -> agent message: %s", e)
+            logger.exception(
+                "Failed to handle human clarification -> agent message: %s", e
+            )
             return False
