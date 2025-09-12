@@ -33,6 +33,24 @@ const getIconFromString = (iconString: string | React.ReactNode): React.ReactNod
     return iconMap[iconString] || iconMap['default'] || <Clipboard20Regular />;
 };
 
+const truncateDescription = (description: string, maxLength: number = 180): string => {
+    if (!description) return '';
+    
+    if (description.length <= maxLength) {
+        return description;
+    }
+    
+    // Find the last space before the limit to avoid cutting words
+    const truncated = description.substring(0, maxLength);
+    const lastSpaceIndex = truncated.lastIndexOf(' ');
+    
+    // If there's a space within the last 20 characters, cut there
+    // Otherwise, cut at the exact limit
+    const cutPoint = lastSpaceIndex > maxLength - 20 ? lastSpaceIndex : maxLength;
+    
+    return description.substring(0, cutPoint) + '...';
+};
+
 const HomeInput: React.FC<HomeInputProps> = ({
     selectedTeam,
 }) => {
@@ -152,16 +170,17 @@ const HomeInput: React.FC<HomeInputProps> = ({
                 return {
                     id: `team-task-${index}`,
                     title: task,
-                    description: task,
+                    description: truncateDescription(task),
                     icon: getIconFromString("📋")
                 };
             } else {
                 // Handle StartingTask objects
                 const startingTask = task as any; // Type assertion for now
+                const taskDescription = startingTask.prompt || startingTask.name || 'Task description';
                 return {
                     id: startingTask.id || `team-task-${index}`,
                     title: startingTask.name || startingTask.prompt || 'Task',
-                    description: startingTask.prompt || startingTask.name || 'Task description',
+                    description: truncateDescription(taskDescription),
                     icon: getIconFromString(startingTask.logo || "📋")
                 };
             }

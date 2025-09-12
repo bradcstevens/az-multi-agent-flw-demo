@@ -359,7 +359,7 @@ const renderPlanResponse = (
                             size="small"
                             className={styles.botBadge}
                         >
-                            BOT
+                            AI Agent
                         </Badge>
                     )}
                 </div>
