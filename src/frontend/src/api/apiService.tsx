@@ -183,43 +183,6 @@ export class APIService {
         return fetcher();
     }
 
-    /**
-     * Get a specific plan with its steps
-     * @param sessionId Session ID
-     * @param planId Plan ID
-     * @param useCache Whether to use cached data or force fresh fetch
-     * @returns Promise with the plan and its steps
-     */
-    async getPlanWithSteps(sessionId: string, planId: string, useCache = true): Promise<Plan> {
-        const cacheKey = `plan_${sessionId}_${planId}`;
-
-        if (useCache) {
-            const cachedPlan = this._cache.get<Plan>(cacheKey);
-            if (cachedPlan) return cachedPlan;
-        }
-
-        const fetcher = async () => {
-            const plans = await this.getPlans(sessionId, useCache);
-            const plan = plans.find(p => p.id === planId);
-
-            if (!plan) {
-                throw new Error(`Plan with ID ${planId} not found`);
-            }
-
-            if (useCache) {
-                this._cache.set(cacheKey, plan, 30000); // Cache for 30 seconds
-            }
-
-            return plan;
-        };
-
-        if (useCache) {
-            return this._requestTracker.trackRequest(cacheKey, fetcher);
-        }
-
-        return fetcher();
-    }
-
 
     /**
    * Approve a plan for execution 

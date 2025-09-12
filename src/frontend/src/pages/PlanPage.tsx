@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType } from "../models";
+import { ProcessedPlanData, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType, PlanStatus } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -317,9 +317,19 @@ const PlanPage: React.FC = () => {
                 let planResult: ProcessedPlanData | null = null;
                 console.log("Fetching plan with ID:", planId);
                 planResult = await PlanDataService.fetchPlanData(planId, useCache);
-
-
-
+                console.log("Plan data fetched:", planResult);
+                if (planResult?.plan?.overall_status === PlanStatus.IN_PROGRESS) {
+                    setShowApprovalButtons(true);
+                }
+                if (planResult?.plan?.overall_status !== PlanStatus.COMPLETED) {
+                    setContinueWithWebsocketFlow(true);
+                }
+                if (planResult?.messages) {
+                    setAgentMessages(planResult.messages);
+                }
+                if (planResult?.mplan) {
+                    setPlanApprovalRequest(planResult.mplan);
+                }
                 setPlanData(planResult);
                 return planResult;
             } catch (err) {
