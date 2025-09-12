@@ -358,7 +358,56 @@ async def process_request(
 async def plan_approval(
     human_feedback: messages.PlanApprovalResponse, request: Request
 ):
-    """Endpoint to receive plan approval or rejection from the user."""
+    """
+    Endpoint to receive plan approval or rejection from the user.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    requestBody:
+      description: Plan approval payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              m_plan_id:
+                type: string
+                description: The internal m_plan id for the plan (required)
+              approved:
+                type: boolean
+                description: Whether the plan is approved (true) or rejected (false)
+              feedback:
+                type: string
+                description: Optional feedback or comment from the user
+              plan_id:
+                type: string
+                description: Optional user-facing plan_id
+    responses:
+      200:
+        description: Approval recorded successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+      401:
+        description: Missing or invalid user information
+      404:
+        description: No active plan found for approval
+      500:
+        description: Internal server error
+    """
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
@@ -420,7 +469,51 @@ async def plan_approval(
 async def user_clarification(
     human_feedback: messages.UserClarificationResponse, request: Request
 ):
-    """Endpoint to receive plan approval or rejection from the user."""
+    """
+    Endpoint to receive user clarification responses for clarification requests sent by the system.
+
+    ---
+    tags:
+      - Plans
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    requestBody:
+      description: User clarification payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              request_id:
+                type: string
+                description: The clarification request id sent by the system (required)
+              answer:
+                type: string
+                description: The user's answer or clarification text
+              plan_id:
+                type: string
+                description: (Optional) Associated plan_id
+              m_plan_id:
+                type: string
+                description: (Optional) Internal m_plan id
+    responses:
+      200:
+        description: Clarification recorded successfully
+      400:
+        description: RAI check failed or invalid input
+      401:
+        description: Missing or invalid user information
+      404:
+        description: No active plan found for clarification
+      500:
+        description: Internal server error
+    """
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
@@ -493,7 +586,53 @@ async def user_clarification(
 async def agent_message_user(
     agent_message: messages.AgentMessageResponse, request: Request
 ):
-    """Endpoint to receive agent messages."""
+    """
+    Endpoint to receive messages from agents (agent -> user communication).
+
+    ---
+    tags:
+      - Agents
+    parameters:
+      - name: user_principal_id
+        in: header
+        type: string
+        required: true
+        description: User ID extracted from the authentication header
+    requestBody:
+      description: Agent message payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              plan_id:
+                type: string
+                description: ID of the plan this message relates to
+              agent:
+                type: string
+                description: Name or identifier of the agent sending the message
+              content:
+                type: string
+                description: The message content
+              agent_type:
+                type: string
+                description: Type of agent (AI/Human)
+              m_plan_id:
+                type: string
+                description: Optional internal m_plan id
+    responses:
+      200:
+        description: Message recorded successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+      401:
+        description: Missing or invalid user information
+    """
+
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
     if not user_id:
