@@ -247,13 +247,17 @@ const PlanPage: React.FC = () => {
     //WebsocketMessageType.AGENT_MESSAGE
     useEffect(() => {
         const unsubscribe = webSocketService.on(WebsocketMessageType.AGENT_MESSAGE, (agentMessage: any) => {
-            console.log('📋 Agent Message', agentMessage);
+            console.log('📋 Agent Message', agentMessage)
             console.log('📋 Current plan data', planData);
             const agentMessageData = agentMessage.data as AgentMessageData;
-            setAgentMessages(prev => [...prev, agentMessageData]);
-            setShowProcessingPlanSpinner(true);
-            scrollToBottom();
-            processAgentMessage(agentMessageData, planData);
+            if (agentMessageData) {
+                agentMessageData.content = PlanDataService.simplifyHumanClarification(agentMessageData?.content);
+                setAgentMessages(prev => [...prev, agentMessageData]);
+                setShowProcessingPlanSpinner(true);
+                scrollToBottom();
+                processAgentMessage(agentMessageData, planData);
+            }
+
         });
 
         return () => unsubscribe();
