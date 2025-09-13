@@ -123,6 +123,37 @@ export class PlanDataService {
     };
   }
   /**
+  * Extracts the actual text from a user_request object or string
+  * @param userRequest - Either a string or UserRequestObject
+  * @returns The extracted text string
+  */
+  static extractUserRequestText(userRequest: string | UserRequestObject): string {
+    if (typeof userRequest === 'string') {
+      return userRequest;
+    }
+
+    if (userRequest && typeof userRequest === 'object') {
+      // Look for text in the items array
+      if (Array.isArray(userRequest.items)) {
+        const textItem = userRequest.items.find(item => item.text);
+        if (textItem?.text) {
+          return textItem.text;
+        }
+      }
+
+      // Fallback: try to find any text content
+      if (userRequest.content_type === 'text' && 'text' in userRequest) {
+        return (userRequest as any).text || '';
+      }
+
+      // Last resort: stringify the object
+      return JSON.stringify(userRequest);
+    }
+
+    return '';
+  }
+
+  /**
    * Converts MPlanBE to MPlanData
    * @param mplanBE - MPlanBE from backend
    * @returns MPlanData or null if input is null/undefined
@@ -131,6 +162,9 @@ export class PlanDataService {
     if (!mplanBE) {
       return null;
     }
+
+    // Extract the actual user request text
+    const userRequestText = this.extractUserRequestText(mplanBE.user_request);
 
     // Convert MStepBE[] to the MPlanData steps format
     const steps = mplanBE.steps.map((stepBE: MStepBE, index: number) => ({
@@ -151,12 +185,12 @@ export class PlanDataService {
     return {
       id: mplanBE.id,
       status: mplanBE.overall_status.toString().toUpperCase(),
-      user_request: mplanBE.user_request,
+      user_request: userRequestText,
       team: mplanBE.team,
       facts: mplanBE.facts,
       steps: steps,
       context: {
-        task: mplanBE.user_request,
+        task: userRequestText,
         participant_descriptions: {} // Default empty object since it's not in MPlanBE
       },
       // Additional fields from m_plan

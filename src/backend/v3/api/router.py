@@ -1340,12 +1340,13 @@ async def get_plan_by_id(request: Request,  plan_id: Optional[str] = Query(None)
 
             team = await memory_store.get_team_by_id(team_id=plan.team_id)
             agent_messages = await memory_store.get_agent_messages(plan_id=plan.plan_id)
-
+            mplan = plan.m_plan if plan.m_plan else None
+            plan.m_plan = None  # remove m_plan from plan object for response
             return {
                 "plan": plan,
                 "team": team if team else None,
                 "messages": agent_messages,
-                "m_plan": plan.m_plan,
+                "m_plan": mplan,
             }
         else:
             track_event_if_configured(
