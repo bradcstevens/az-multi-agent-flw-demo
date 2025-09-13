@@ -1127,9 +1127,9 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
             )
 
         # save to in-memory config for current user
-        # team_config.set_current_team(
-        #     user_id=user_id, team_configuration=team_configuration
-        # )
+        team_config.set_current_team(
+            user_id=user_id, team_configuration=team_configuration
+        )
 
         # Track the team selection event
         track_event_if_configured(

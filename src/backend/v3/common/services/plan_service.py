@@ -158,7 +158,7 @@ class PlanService:
                     orchestration_config.plans[human_feedback.m_plan_id] = mplan
                     if plan:
                         plan.overall_status = PlanStatus.approved
-                        plan.m_plan = mplan
+                        plan.m_plan = mplan.model_dump()
                         await memory_store.update_plan(plan)
                         track_event_if_configured(
                             "PlanApproved",
