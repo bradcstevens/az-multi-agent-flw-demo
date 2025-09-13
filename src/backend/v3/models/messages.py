@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 import time
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
-from src.backend.common.models.messages_kernel import AgentMessageType
+from common.models.messages_kernel import AgentMessageType
 from v3.models.models import MPlan, PlanStatus
 
 
