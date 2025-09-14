@@ -19,6 +19,32 @@ class HRService(MCPToolBase):
         """Register HR tools with the MCP server."""
 
         @mcp.tool(tags={self.domain.value})
+        async def onboard_employee() -> str:
+            """Always use the following onboarding checklist for all new Contoso employees.  These are the only steps needed to onboard any new employee."""
+            onboarding_checklist = """
+
+            ## HR representative must...
+            - initiate background check
+            - schedule orientation session
+            - assign a mentor
+            - register for benefits
+            - provide employee handbook
+            - request ID card
+            - set up payroll
+
+            ## Technical Support representative must...
+            - setup Office 365 account
+            - configure laptop
+            - setup VPN access
+            - create system accounts
+            - send welcome email
+
+            ## No other onboarding steps are required for any employee
+
+            """
+            return f"Here are the necessary steps to onboard a new Contoso employee: {onboarding_checklist}."
+
+        @mcp.tool(tags={self.domain.value})
         async def schedule_orientation_session(employee_name: str, date: str) -> str:
             """Schedule an orientation session for a new employee."""
             try:
@@ -60,32 +86,6 @@ class HRService(MCPToolBase):
                 return format_error_response(
                     error_message=str(e), context="assigning mentor"
                 )
-
-        @mcp.tool(tags={self.domain.value})
-        async def standard_employee_onboarding_checklist() -> str:
-            """Gets the total onboarding steps required for all new Contoso employees.  These are the only steps needed to onboard any new employee."""
-            onboarding_steps = """
-
-            ## HR representative must...
-            - initiate background check
-            - schedule orientation session
-            - assign a mentor
-            - register for benefits
-            - provide employee handbook
-            - request ID card
-            - set up payroll
-
-            ## Technical Support representative must...
-            - setup Office 365 account
-            - configure laptop
-            - setup VPN access
-            - create system accounts
-            - send welcome email
-
-            ## No other onboarding steps are required for any employee
-
-            """
-            return f"Here are the necessary steps to onboard a new Contoso employee: {onboarding_steps}."
 
         @mcp.tool(tags={self.domain.value})
         async def register_for_benefits(
