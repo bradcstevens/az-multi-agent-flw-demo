@@ -47,7 +47,7 @@ const PlanPage: React.FC = () => {
     const [waitingForPlan, setWaitingForPlan] = useState<boolean>(true);
     const [showProcessingPlanSpinner, setShowProcessingPlanSpinner] = useState<boolean>(false);
     const [showApprovalButtons, setShowApprovalButtons] = useState<boolean>(true);
-    const [continueWithWebsocketFlow, setContinueWithWebsocketFlow] = useState<boolean>(true);
+    const [continueWithWebsocketFlow, setContinueWithWebsocketFlow] = useState<boolean>(false);
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState<boolean>(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
@@ -279,7 +279,7 @@ const PlanPage: React.FC = () => {
     // WebSocket connection with proper error handling and v3 backend compatibility
     useEffect(() => {
         if (planId && continueWithWebsocketFlow) {
-            console.log('🔌 Connecting WebSocket:', { planId });
+            console.log('🔌 Connecting WebSocket:', { planId, continueWithWebsocketFlow });
 
             const connectWebSocket = async () => {
                 try {
@@ -355,6 +355,7 @@ const PlanPage: React.FC = () => {
                     setShowApprovalButtons(true);
 
                 } else {
+                    setShowApprovalButtons(false);
                     setWaitingForPlan(false);
                 }
                 if (planResult?.plan?.overall_status !== PlanStatus.COMPLETED) {

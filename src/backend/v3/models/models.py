@@ -1,11 +1,11 @@
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
+
+from dataclasses import asdict, dataclass, field
 
 from pydantic import BaseModel, Field
-
-from common.models.messages_kernel import DataType
 
 
 class PlanStatus(str, Enum):
@@ -16,10 +16,12 @@ class PlanStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+
 class MStep(BaseModel):
     """model of a step in a plan"""
     agent: str = ""
     action: str = ""
+
 
 class MPlan(BaseModel):
     """model of a plan"""
@@ -32,3 +34,4 @@ class MPlan(BaseModel):
     team: List[str] = []
     facts: str = ""
     steps: List[MStep] = []
+    

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel
+
 from semantic_kernel.kernel_pydantic import Field, KernelBaseModel
 
 class DataType(str, Enum):
@@ -111,21 +111,7 @@ class UserCurrentTeam(BaseDataModel):
     user_id: str
     team_id: str
 
-class MStep(BaseModel):
-    """model of a step in a plan"""
-    agent: str = ""
-    action: str = ""
-class MPlan(BaseModel):
-    """model of a plan"""
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str = ""
-    team_id: str = ""
-    plan_id: str = ""
-    overall_status: PlanStatus = PlanStatus.created
-    user_request: str = ""
-    team: List[str] = []
-    facts: str = ""
-    steps: List[MStep] = []
+
 class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
@@ -136,7 +122,7 @@ class Plan(BaseDataModel):
     overall_status: PlanStatus = PlanStatus.in_progress
     approved: bool = False
     source: str = AgentType.PLANNER.value
-    m_plan: Optional[MPlan] = None
+    m_plan: Optional[Dict[str, Any]] = None
     summary: Optional[str] = None
     team_id: Optional[str] = None
     human_clarification_request: Optional[str] = None

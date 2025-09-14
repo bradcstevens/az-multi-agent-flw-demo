@@ -127,10 +127,50 @@ export interface MStepBE {
     /** Action to be performed */
     action: string;
 }
+/**
+ * Represents a user request item within the user_request object
+ */
+export interface UserRequestItem {
+    /** AI model identifier */
+    ai_model_id?: string | null;
+    /** Metadata */
+    metadata?: Record<string, any>;
+    /** Content type */
+    content_type?: string;
+    /** Text content */
+    text?: string;
+    /** Encoding */
+    encoding?: string | null;
+}
 
-export interface MPlanBE extends BaseModel {
-    /** The type of data model */
-    data_type: "m_plan";
+/**
+ * Represents the user_request object structure from the database
+ */
+export interface UserRequestObject {
+    /** AI model identifier */
+    ai_model_id?: string | null;
+    /** Metadata */
+    metadata?: Record<string, any>;
+    /** Content type */
+    content_type?: string;
+    /** Role */
+    role?: string;
+    /** Name */
+    name?: string | null;
+    /** Items array containing the actual request text */
+    items?: UserRequestItem[];
+    /** Encoding */
+    encoding?: string | null;
+    /** Finish reason */
+    finish_reason?: string | null;
+    /** Status */
+    status?: string | null;
+}
+
+export interface MPlanBE {
+
+    /** Unique identifier */
+    id: string;
     /** User identifier */
     user_id: string;
     /** Team identifier */
@@ -139,8 +179,8 @@ export interface MPlanBE extends BaseModel {
     plan_id: string;
     /** Overall status of the plan */
     overall_status: PlanStatus;
-    /** User's original request */
-    user_request: string;
+    /** User's original request - can be string or complex object */
+    user_request: string | UserRequestObject;
     /** List of team member names */
     team: string[];
     /** Facts or context for the plan */
