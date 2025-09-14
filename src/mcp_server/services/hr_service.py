@@ -62,7 +62,7 @@ class HRService(MCPToolBase):
                 )
 
         @mcp.tool(tags={self.domain.value})
-        async def employee_onboarding_steps() -> str:
+        async def standard_employee_onboarding_checklist() -> str:
             """Gets the total onboarding steps required for all new Contoso employees.  These are the only steps needed to onboard any new employee."""
             onboarding_steps = """
 
