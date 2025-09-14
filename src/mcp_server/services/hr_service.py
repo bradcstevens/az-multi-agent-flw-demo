@@ -2,10 +2,11 @@
 Human Resources MCP tools service.
 """
 
-from typing import Dict, Any
-from core.factory import MCPToolBase, Domain
+from typing import Any, Dict
+
+from core.factory import Domain, MCPToolBase
 from utils.date_utils import format_date_for_user
-from utils.formatters import format_success_response, format_error_response
+from utils.formatters import format_error_response, format_success_response
 
 
 class HRService(MCPToolBase):
@@ -59,6 +60,32 @@ class HRService(MCPToolBase):
                 return format_error_response(
                     error_message=str(e), context="assigning mentor"
                 )
+
+        @mcp.tool(tags={self.domain.value})
+        async def employee_onboarding_steps() -> str:
+            """Gets the total onboarding steps required for all new Contoso employees.  These are the only steps needed to onboard any new employee."""
+            onboarding_steps = """
+
+            ## HR representative must...
+            - initiate background check
+            - schedule orientation session
+            - assign a mentor
+            - register for benefits
+            - provide employee handbook
+            - request ID card
+            - set up payroll
+
+            ## Technical Support representative must...
+            - setup Office 365 account
+            - configure laptop
+            - setup VPN access
+            - create system accounts
+            - send welcome email
+
+            ## No other onboarding steps are required for any employee
+
+            """
+            return f"Here are the necessary steps to onboard a new Contoso employee: {onboarding_steps}."
 
         @mcp.tool(tags={self.domain.value})
         async def register_for_benefits(

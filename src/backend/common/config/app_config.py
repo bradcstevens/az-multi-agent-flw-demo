@@ -33,9 +33,9 @@ class AppConfig:
             "APPLICATIONINSIGHTS_CONNECTION_STRING"
         )
         self.APP_ENV = self._get_required("APP_ENV", "prod")
-        self.AZURE_AI_MODEL_DEPLOYMENT_NAME = self._get_required(
-            "AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o"
-        )
+        # self.AZURE_AI_MODEL_DEPLOYMENT_NAME = self._get_required(
+        #     "AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o"
+        # )
 
         self.AZURE_COGNITIVE_SERVICES = self._get_optional(
             "AZURE_COGNITIVE_SERVICES", "https://cognitiveservices.azure.com/.default"

@@ -40,7 +40,7 @@ class FoundryAgentTemplate(AzureAgentBase):
         self._bing_connection = None
         self.logger = logging.getLogger(__name__)
         # input validation
-        if self.model_deployment_name in any(["o3", "o4-mini"]):
+        if self.model_deployment_name in ["o3", "o4-mini"]:
             raise ValueError("The current version of Foundry agents do not support reasoning models.")
 
     # async def _make_bing_tool(self) -> Optional[BingGroundingTool]:
