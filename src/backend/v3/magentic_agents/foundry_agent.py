@@ -1,5 +1,6 @@
 """ Agent template for building foundry agents with Azure AI Search, Bing, and MCP plugins. """
 
+import asyncio
 import logging
 from typing import List, Optional
 
@@ -39,7 +40,7 @@ class FoundryAgentTemplate(AzureAgentBase):
         self._bing_connection = None
         self.logger = logging.getLogger(__name__)
         # input validation
-        if self.model_deployment_name is any(["o3", "o4-mini"]):
+        if self.model_deployment_name in any(["o3", "o4-mini"]):
             raise ValueError("The current version of Foundry agents do not support reasoning models.")
 
     # async def _make_bing_tool(self) -> Optional[BingGroundingTool]:
@@ -76,9 +77,11 @@ class FoundryAgentTemplate(AzureAgentBase):
             return search_tool
 
         except Exception as ex:
-            self.logger.error(f"Azure AI Search tool creation failed: {ex}   Connection name: " /
-                              f"{self.search.connection_name}   Index name: {self.search.index_name}" /
-                              " Make sure the connection exists in Azure AI Foundry portal")
+            self.logger.error(
+                "Azure AI Search tool creation failed: %s | Connection name: %s | Index name: %s | "
+                "Make sure the connection exists in Azure AI Foundry portal",
+                ex, self.search.connection_name, self.search.index_name
+            )
             return None
 
     async def _collect_tools_and_resources(self) -> tuple[List, dict]:
@@ -143,8 +146,39 @@ class FoundryAgentTemplate(AzureAgentBase):
             self.logger.error("Failed to create AzureAIAgent: %s", ex)
             raise
 
+        # After self._agent creation in _after_open:
+        # Diagnostics
+        try:
+            tool_names = [t.get("function", {}).get("name") for t in (definition.tools or []) if isinstance(t, dict)]
+            self.logger.info(
+                "Foundry agent '%s' initialized. Azure tools: %s | MCP plugin: %s",
+                self.agent_name,
+                tool_names,
+                getattr(self.mcp_plugin, 'name', None)
+            )
+            if not tool_names and not plugins:
+                self.logger.warning(
+                    "Foundry agent '%s' has no Azure tool definitions and no MCP plugin. "
+                    "Subsequent tool calls may fail.", self.agent_name
+                )
+        except Exception as diag_ex:
+            self.logger.warning("Diagnostics collection failed: %s", diag_ex)
+
         self.logger.info("%s initialized with %d tools and %d plugins", self.agent_name, len(tools), len(plugins))
 
+    async def fetch_run_details(self, thread_id: str, run_id: str):
+        """Fetch and log run details after a failure."""
+        try:
+            run = await self.client.agents.runs.get(thread=thread_id, run=run_id)
+            self.logger.error(
+                "Run failure details | status=%s | id=%s | last_error=%s | usage=%s",
+                getattr(run, 'status', None),
+                run_id,
+                getattr(run, 'last_error', None),
+                getattr(run, 'usage', None),
+            )
+        except Exception as ex:
+            self.logger.error("Could not fetch run details: %s", ex)
 
 async def create_foundry_agent(agent_name:str,
                                agent_description:str, 

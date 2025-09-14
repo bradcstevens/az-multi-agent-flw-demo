@@ -21,7 +21,7 @@ from v3.config.settings import (connection_config, current_user_id,
                                 orchestration_config)
 from v3.models.models import MPlan, MStep
 
-            # Create a progress ledger that indicates the request is satisfied (task complete)
+# Create a progress ledger that indicates the request is satisfied (task complete)
 
 
 class HumanApprovalMagenticManager(StandardMagenticManager):
