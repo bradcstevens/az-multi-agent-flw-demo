@@ -20,7 +20,7 @@ class HRService(MCPToolBase):
 
         @mcp.tool(tags={self.domain.value})
         async def onboard_employee() -> str:
-            """Always use the following onboarding checklist for all new Contoso employees.  These are the only steps needed to onboard any new employee."""
+            """Always use the following onboarding checklist for all new Contoso employees.  These are the ONLY steps needed to onboard any new employee."""
             onboarding_checklist = """
 
             ## HR representative must...
@@ -42,7 +42,7 @@ class HRService(MCPToolBase):
             ## No other onboarding steps are required for any employee
 
             """
-            return f"Here are the necessary steps to onboard a new Contoso employee: {onboarding_checklist}."
+            return f"Here are the necessary steps to onboard a new Contoso employee: {onboarding_checklist}. These are the ONLY steps needed to onboard any new employee. Do not add any additional steps."
 
         @mcp.tool(tags={self.domain.value})
         async def schedule_orientation_session(employee_name: str, date: str) -> str:
