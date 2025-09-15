@@ -73,9 +73,9 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             padding: "8px",
             borderRadius: "var(--borderRadiusLarge)",
             backgroundColor: "var(--colorNeutralBackground1)",
-            border: `1px solid ${isFocused
-              ? "var(--colorNeutralStroke1Pressed)"
-              : "var(--colorNeutralStroke1)"}`,
+            // border: `1px solid ${isFocused
+            //   ? "var(--colorNeutralStroke1Pressed)"
+            //   : "var(--colorNeutralStroke1)"}`,
             transition: "border-color 0.2s ease-in-out",
             position: "relative",
             boxSizing: "border-box",

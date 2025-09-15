@@ -23,16 +23,17 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
     return (
         <div
             style={{
-                position: 'sticky',
+                // position: 'sticky',
                 bottom: 0,
-                backgroundColor: 'var(--colorNeutralBackground1)',
+                // backgroundColor: 'var(--colorNeutralBackground1)',
                 // borderTop: '1px solid var(--colorNeutralStroke2)',
                 padding: '16px 24px',
                 maxWidth: '800px',
                 margin: '0 auto',
+                marginBottom: '40px',
                 width: '100%',
                 boxSizing: 'border-box',
-                zIndex: 10,
+                zIndex: 10
             }}
         >
             <ChatInput
@@ -49,7 +50,7 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
                     fontSize: '16px',
                     borderRadius: '8px',
                     // border: '1px solid var(--colorNeutralStroke1)',
-                    backgroundColor: 'var(--colorNeutralBackground1)',
+                    // backgroundColor: 'var(--colorNeutralBackground1)',
                     width: '100%',
                     boxSizing: 'border-box',
                 }}

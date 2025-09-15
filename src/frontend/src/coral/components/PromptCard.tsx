@@ -8,7 +8,7 @@ type PromptCardProps = {
   description: string;
   icon?: React.ReactNode;
   onClick?: () => void;
-  disabled?: boolean; // ✅ New prop for disabling the card
+  disabled?: boolean; 
 };
 
 const PromptCard: React.FC<PromptCardProps> = ({
@@ -16,11 +16,11 @@ const PromptCard: React.FC<PromptCardProps> = ({
   description,
   icon,
   onClick,
-  disabled = false, // 🔧 Default is false (enabled)
+  disabled = false,
 }) => {
   return (
     <Card
-      onClick={!disabled ? onClick : undefined} // 🚫 Block click if disabled
+      onClick={!disabled ? onClick : undefined} 
       style={{
         flex: "1",
         display: "flex",
@@ -33,20 +33,22 @@ const PromptCard: React.FC<PromptCardProps> = ({
         borderRadius: "8px",
         cursor: disabled ? "not-allowed" : "pointer",
         boxShadow: "none",
-        opacity: disabled ? 0.4 : 1, // 🧼 Matches Fluent disabled visual
+        opacity: disabled ? 0.4 : 1, // 
         transition: "background-color 0.2s ease-in-out",
       }}
       // 🧠 Only apply hover if not disabled
       onMouseOver={(e) => {
         if (!disabled) {
           e.currentTarget.style.backgroundColor =
-            "var(--colorNeutralBackground4Hover)";
+            "var(--colorNeutralBackground3Hover)";
+            e.currentTarget.style.border = "1px solid var(--colorNeutralStroke1)"; // subtle shadow on hover
         }
       }}
       onMouseOut={(e) => {
         if (!disabled) {
           e.currentTarget.style.backgroundColor =
             "var(--colorNeutralBackground3)";
+            e.currentTarget.style.border = "1px solid var(--colorNeutralStroke1)";
         }
       }}
     >

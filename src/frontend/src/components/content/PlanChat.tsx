@@ -92,7 +92,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
-      backgroundColor: 'var(--colorNeutralBackground1)'
+
     }}>
       {/* Messages Container */}
       <InlineToaster />
@@ -132,6 +132,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         OnChatSubmit={OnChatSubmit}
         waitingForPlan={waitingForPlan}
         loading={false} />
+        
     </div>
   );
 };

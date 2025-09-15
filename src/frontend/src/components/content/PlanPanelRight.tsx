@@ -187,7 +187,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
           fontWeight: 600,
           color: 'var(--colorNeutralForeground1)'
         }}>
-          Agents
+          Agent Team
         </Body1>
 
         {agents.length === 0 ? (
@@ -250,7 +250,8 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      backgroundColor: 'var(--colorNeutralBackground1)'
+      borderLeft: '1px solid var(--colorNeutralStroke1)',
+      // backgroundColor: 'var(--colorNeutralBackground1)'
     }}>
       {/* Plan section on top */}
       {renderPlanSection()}
