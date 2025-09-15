@@ -13,7 +13,7 @@ class ProductService(MCPToolBase):
     """Product tools for employee onboarding and management."""
 
     def __init__(self):
-        super().__init__(Domain.HR)
+        super().__init__(Domain.PRODUCT)
 
     def register_tools(self, mcp) -> None:
         """Register Product tools with the MCP server."""

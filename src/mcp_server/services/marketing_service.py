@@ -13,7 +13,7 @@ class MarketingService(MCPToolBase):
     """Marketing tools for employee onboarding and management."""
 
     def __init__(self):
-        super().__init__(Domain.HR)
+        super().__init__(Domain.MARKETING)
 
     def register_tools(self, mcp) -> None:
         """Register Marketing tools with the MCP server."""

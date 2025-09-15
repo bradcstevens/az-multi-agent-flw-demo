@@ -32,7 +32,9 @@ factory.register_service(HRService())
 factory.register_service(TechSupportService())
 factory.register_service(MarketingService())
 factory.register_service(ProductService())
-factory.register_service(GeneralService())
+
+# General service has tests for llm to mcp connectivity
+#factory.register_service(GeneralService())
 
 # Register DataToolService with the dataset path
 #factory.register_service(DataToolService(dataset_path="datasets"))
