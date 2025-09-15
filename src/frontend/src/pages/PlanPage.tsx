@@ -262,6 +262,45 @@ const PlanPage: React.FC = () => {
 
         return () => unsubscribe();
     }, [scrollToBottom, planData, processAgentMessage]); //onPlanReceived, scrollToBottom
+    // Create loadPlanData function with useCallback to memoize it
+    const loadPlanData = useCallback(
+        async (useCache = true): Promise<ProcessedPlanData | null> => {
+            if (!planId) return null;
+
+            setLoading(true);
+            try {
+
+                let planResult: ProcessedPlanData | null = null;
+                console.log("Fetching plan with ID:", planId);
+                planResult = await PlanDataService.fetchPlanData(planId, useCache);
+                console.log("Plan data fetched:", planResult);
+                if (planResult?.plan?.overall_status === PlanStatus.IN_PROGRESS) {
+                    setShowApprovalButtons(true);
+
+                } else {
+                    setShowApprovalButtons(false);
+                    setWaitingForPlan(false);
+                }
+                if (planResult?.plan?.overall_status !== PlanStatus.COMPLETED) {
+                    setContinueWithWebsocketFlow(true);
+                }
+                if (planResult?.messages) {
+                    setAgentMessages(planResult.messages);
+                }
+                if (planResult?.mplan) {
+                    setPlanApprovalRequest(planResult.mplan);
+                }
+                setPlanData(planResult);
+                return planResult;
+            } catch (err) {
+                console.log("Failed to load plan data:", err);
+                return null;
+            } finally {
+                setLoading(false);
+            }
+        },
+        [planId, navigate]
+    );
 
     // Loading message rotation effect
     useEffect(() => {
@@ -337,47 +376,7 @@ const PlanPage: React.FC = () => {
                 webSocketService.disconnect();
             };
         }
-    }, [planId, loading]);
-
-    // Create loadPlanData function with useCallback to memoize it
-    const loadPlanData = useCallback(
-        async (useCache = true): Promise<ProcessedPlanData | null> => {
-            if (!planId) return null;
-
-            setLoading(true);
-            try {
-
-                let planResult: ProcessedPlanData | null = null;
-                console.log("Fetching plan with ID:", planId);
-                planResult = await PlanDataService.fetchPlanData(planId, useCache);
-                console.log("Plan data fetched:", planResult);
-                if (planResult?.plan?.overall_status === PlanStatus.IN_PROGRESS) {
-                    setShowApprovalButtons(true);
-
-                } else {
-                    setShowApprovalButtons(false);
-                    setWaitingForPlan(false);
-                }
-                if (planResult?.plan?.overall_status !== PlanStatus.COMPLETED) {
-                    setContinueWithWebsocketFlow(true);
-                }
-                if (planResult?.messages) {
-                    setAgentMessages(planResult.messages);
-                }
-                if (planResult?.mplan) {
-                    setPlanApprovalRequest(planResult.mplan);
-                }
-                setPlanData(planResult);
-                return planResult;
-            } catch (err) {
-                console.log("Failed to load plan data:", err);
-                return null;
-            } finally {
-                setLoading(false);
-            }
-        },
-        [planId, navigate]
-    );
+    }, [planId, loading, continueWithWebsocketFlow, loadPlanData, planData]);
 
 
     // Handle plan approval
