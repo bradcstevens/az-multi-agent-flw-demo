@@ -229,9 +229,9 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
                 </ReactMarkdown>
 
                 {/* Action buttons for bot messages */}
-                {!isHuman && (
-                  <div className={styles.actionContainer}>
-                    <Button
+                {/* {!isHuman && (
+                  <div className={styles.actionContainer}> */}
+                    {/* <Button
                       onClick={() =>
                         msg.content &&
                         navigator.clipboard.writeText(msg.content)
@@ -241,17 +241,17 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
                       size="small"
                       icon={<Copy />}
                       className={styles.copyButton}
-                    />
+                    /> */}
                     
-                    <Tag
+                    {/* <Tag
                       appearance="filled"
                       size="extra-small"
                       className={styles.sampleTag}
                     >
                       Sample data for demonstration purposes only.
-                    </Tag>
-                  </div>
-                )}
+                    </Tag> */}
+                  {/* </div>
+                )} */}
               </div>
             </div>
           </div>
