@@ -28,7 +28,7 @@ class WebSocketService {
         let userId = getUserId();
         const hasApiSegment = /\/api(\/|$)/i.test(base);
         const socketPath = hasApiSegment ? '/v3/socket' : '/api/v3/socket';
-        const url = `${base}${socketPath}${processId ? `/${processId}` : `/${planId}`}&user_id=${userId || ''}`;
+        const url = `${base}${socketPath}${processId ? `/${processId}` : `/${planId}`}?user_id=${userId || ''}`;
         console.log("Constructed WebSocket URL:", url);
         return url;
     }
