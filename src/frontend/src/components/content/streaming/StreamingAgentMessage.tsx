@@ -243,13 +243,13 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
                       className={styles.copyButton}
                     />
                     
-                    <Tag
+                    {/* <Tag
                       appearance="filled"
                       size="extra-small"
                       className={styles.sampleTag}
                     >
                       Sample data for demonstration purposes only.
-                    </Tag>
+                    </Tag> */}
                   </div>
                 )}
               </div>
