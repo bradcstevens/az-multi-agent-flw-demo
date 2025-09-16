@@ -576,9 +576,9 @@ const PlanPage: React.FC = () => {
                             <ContentToolbar
                                 panelTitle="Multi-Agent Planner"
                             >
-                                <PanelRightToggles>
+                                {/* <PanelRightToggles>
                                     <TaskListSquareLtr />
-                                </PanelRightToggles>
+                                </PanelRightToggles> */}
                             </ContentToolbar>
 
                             <PlanChat

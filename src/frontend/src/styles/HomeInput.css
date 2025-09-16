@@ -88,81 +88,12 @@
 }
 
 .home-input-quick-tasks {
-  display: flex;
-  gap: 12px;
-  flex-wrap: nowrap;
-  justify-content: space-between;
-  overflow-x: auto;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr 1fr !important;
+  gap: 8px;
 }
 
 
-.home-input-quick-tasks .fui-Card {
-  flex: 1 1 0 !important;
-  min-width: 160px !important;
-  max-width: 200px !important;
-  min-height: 120px !important;
-  padding: 16px !important;
-  box-sizing: border-box !important;
-  border-radius: 12px;
-  border: 1px solid var(--colorNeutralStroke1Rest) !important;
-  background: var(--colorNeutralBackground1) !important;
-}
-
-.home-input-quick-tasks .fui-Card > div > div > div:first-child {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  gap: 8px !important;
-}
-
-
-.home-input-quick-tasks .fui-Card > div > div > div:first-child > div:first-child {
-  font-size: 32px !important;
-  color: var(--colorNeutralForeground2) !important;
-  order: -1 !important;
-  margin-bottom: 8px !important;
-  align-self: flex-start !important;
-}
-
-/* Title styling */
-.home-input-quick-tasks .fui-Card .fui-Body1Strong {
-  color: var(--colorNeutralForeground1) !important;
-  font-family: var(--fontFamilyBase) !important;
-  font-size: 14px !important;
-  font-style: normal !important;
-  font-weight: var(--fontWeightSemibold) !important;
-  line-height: var(--lineHeightBase300) !important;
-  order: 0 !important;
-}
-
-
-.home-input-quick-tasks .fui-Card .fui-Body1 {
-  font-size: 14px !important;
-  line-height: var(--lineHeightBase200) !important;
-  color: var(--colorNeutralForeground2) !important;
-  font-family: var(--fontFamilyBase) !important;
-  margin-top: 4px !important;
-  order: 1 !important;
-}
-
-/* Card hover state */
-.home-input-quick-tasks .fui-Card:hover {
-  background-color: var(--colorNeutralBackground1Hover) !important;
-  border-color: var(--colorNeutralStroke1Hover) !important;
-}
-
-/* Card pressed state */
-.home-input-quick-tasks .fui-Card:active {
-  background-color: var(--colorNeutralBackground1Pressed) !important;
-}
-
-/* Disabled state */
-.home-input-quick-tasks .fui-Card[disabled] {
-  background-color: var(--colorNeutralBackgroundDisabled) !important;
-  border-color: var(--colorNeutralStrokeDisabled) !important;
-  cursor: not-allowed !important;
-  opacity: var(--opacityDisabled) !important;
-}
 
 /* Responsive design for smaller screens */
 @media (max-width: 768px) {
