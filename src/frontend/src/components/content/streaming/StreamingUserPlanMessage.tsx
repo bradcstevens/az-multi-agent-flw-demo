@@ -43,7 +43,7 @@ const renderUserPlanMessage = (planApprovalRequest: MPlanData | null,
             }}>
                 <div style={{
                     backgroundColor: 'var(--colorBrandBackground)',
-                    color: 'var(--colorNeutralForegroundInverted)',
+                    color: 'white',
                     padding: '12px 16px',
                     borderRadius: '8px',
                     fontSize: '14px',

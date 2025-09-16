@@ -6,9 +6,14 @@ import rehypePrism from "rehype-prism";
 import { Body1, Button, Tag, makeStyles, tokens } from "@fluentui/react-components";
 import { TaskService } from "@/services";
 import { Copy } from "@/coral/imports/bundleicons";
-import { PersonRegular, Code20Regular } from "@fluentui/react-icons";
-import { TeamService } from "@/services/TeamService";
-import { iconMap } from "@/models/homeInput";
+import { PersonRegular } from "@fluentui/react-icons";
+import { getAgentIcon, getAgentDisplayName } from '@/utils/agentIconUtils';
+
+interface StreamingAgentMessageProps {
+  agentMessages: AgentMessageData[];
+  planData?: any;
+  planApprovalRequest?: any;
+}
 
 const useStyles = makeStyles({
   container: {
@@ -76,7 +81,8 @@ const useStyles = makeStyles({
     backgroundColor: 'var(--colorNeutralBackground2)',
     color: 'var(--colorNeutralForeground1)',
     maxWidth: '100%',
-    alignSelf: 'flex-start'
+    alignSelf: 'flex-start',
+
   },
  
   clarificationBubble: {
@@ -90,13 +96,15 @@ const useStyles = makeStyles({
     maxWidth: '100%',
     alignSelf: 'flex-start'
   },
-  actionContainer: {
+
+   actionContainer: {
     display: 'flex',
     alignItems: 'center',
     marginTop: '12px',
     paddingTop: '8px',
     borderTop: '1px solid var(--colorNeutralStroke2)'
   },
+  
   copyButton: {
     height: '28px',
     width: '28px'
@@ -106,31 +114,6 @@ const useStyles = makeStyles({
     opacity: 0.7
   }
 });
-
-// Function to get agent icon from team configuration
-const getAgentIconFromTeam = (agentName: string): React.ReactNode => {
-  const storedTeam = TeamService.getStoredTeam();
-  
-  if (!storedTeam?.agents) {
-    return <Code20Regular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />;
-  }
-
-  const cleanAgentName = TaskService.cleanTextToSpaces(agentName);
-  
-  const agent = storedTeam.agents.find(a => 
-    TaskService.cleanTextToSpaces(a.name).toLowerCase().includes(cleanAgentName.toLowerCase()) ||
-    a.type.toLowerCase().includes(cleanAgentName.toLowerCase()) ||
-    a.input_key.toLowerCase().includes(cleanAgentName.toLowerCase())
-  );
-
-  if (agent?.icon && iconMap[agent.icon]) {
-    return React.cloneElement(iconMap[agent.icon] as React.ReactElement, {
-      style: { fontSize: '16px', color: 'var(--colorNeutralForeground2)' }
-    });
-  }
-
-  return <Code20Regular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />;
-};
 
 // Check if message is a clarification request
 const isClarificationMessage = (content: string): boolean => {
@@ -148,7 +131,11 @@ const isClarificationMessage = (content: string): boolean => {
   return clarificationKeywords.some(keyword => lowerContent.includes(keyword));
 };
 
-const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
+const renderAgentMessages = (
+  agentMessages: AgentMessageData[], 
+  planData?: any, 
+  planApprovalRequest?: any
+) => {
   const styles = useStyles();
   
   if (!agentMessages?.length) return null;
@@ -176,7 +163,7 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
               {isHuman ? (
                 <PersonRegular style={{ fontSize: '16px', color: 'white' }} />
               ) : (
-                getAgentIconFromTeam(msg.agent)
+                getAgentIcon(msg.agent, planData, planApprovalRequest)
               )}
             </div>
 
@@ -186,7 +173,7 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
               {!isHuman && (
                 <div className={styles.agentHeader}>
                   <Body1 className={styles.agentName}>
-                    {TaskService.cleanTextToSpaces(msg.agent)}
+                    {getAgentDisplayName(msg.agent)}
                   </Body1>
                   <Tag
                     appearance="brand"
@@ -227,31 +214,6 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
                 >
                   {TaskService.cleanHRAgent(msg.content) || ""}
                 </ReactMarkdown>
-
-                {/* Action buttons for bot messages */}
-                {/* {!isHuman && (
-                  <div className={styles.actionContainer}> */}
-                    {/* <Button
-                      onClick={() =>
-                        msg.content &&
-                        navigator.clipboard.writeText(msg.content)
-                      }
-                      title="Copy Response"
-                      appearance="subtle"
-                      size="small"
-                      icon={<Copy />}
-                      className={styles.copyButton}
-                    /> */}
-                    
-                    {/* <Tag
-                      appearance="filled"
-                      size="extra-small"
-                      className={styles.sampleTag}
-                    >
-                      Sample data for demonstration purposes only.
-                    </Tag> */}
-                  {/* </div>
-                )} */}
               </div>
             </div>
           </div>

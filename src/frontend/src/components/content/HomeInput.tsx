@@ -40,16 +40,19 @@ const truncateDescription = (description: string, maxLength: number = 180): stri
         return description;
     }
     
-    // Find the last space before the limit to avoid cutting words
+
     const truncated = description.substring(0, maxLength);
     const lastSpaceIndex = truncated.lastIndexOf(' ');
     
-    // If there's a space within the last 20 characters, cut there
-    // Otherwise, cut at the exact limit
     const cutPoint = lastSpaceIndex > maxLength - 20 ? lastSpaceIndex : maxLength;
     
     return description.substring(0, cutPoint) + '...';
 };
+
+// Extended QuickTask interface to store both truncated and full descriptions
+interface ExtendedQuickTask extends QuickTask {
+    fullDescription: string; // Store the full, untruncated description
+}
 
 const HomeInput: React.FC<HomeInputProps> = ({
     selectedTeam,
@@ -148,13 +151,12 @@ const HomeInput: React.FC<HomeInputProps> = ({
         }
     };
 
-    const handleQuickTaskClick = (task: QuickTask) => {
-        setInput(task.description);
+    const handleQuickTaskClick = (task: ExtendedQuickTask) => {
+        setInput(task.fullDescription);
         setRAIError(null); // Clear any RAI errors when selecting a quick task
         if (textareaRef.current) {
             textareaRef.current.focus();
         }
-
     };
 
     useEffect(() => {
@@ -164,8 +166,8 @@ const HomeInput: React.FC<HomeInputProps> = ({
         }
     }, [input]);
 
-    // Convert team starting_tasks to QuickTask format
-    const tasksToDisplay: QuickTask[] = selectedTeam && selectedTeam.starting_tasks ?
+    // Convert team starting_tasks to ExtendedQuickTask format
+    const tasksToDisplay: ExtendedQuickTask[] = selectedTeam && selectedTeam.starting_tasks ?
         selectedTeam.starting_tasks.map((task, index) => {
             // Handle both string tasks and StartingTask objects
             if (typeof task === 'string') {
@@ -173,6 +175,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     id: `team-task-${index}`,
                     title: task,
                     description: truncateDescription(task),
+                    fullDescription: task, // Store the full description
                     icon: getIconFromString("📋")
                 };
             } else {
@@ -183,6 +186,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     id: startingTask.id || `team-task-${index}`,
                     title: startingTask.name || startingTask.prompt || 'Task',
                     description: truncateDescription(taskDescription),
+                    fullDescription: taskDescription, // Store the full description
                     icon: getIconFromString(startingTask.logo || "📋")
                 };
             }
