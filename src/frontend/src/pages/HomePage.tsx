@@ -83,7 +83,7 @@ const HomePage: React.FC = () => {
         };
 
         initTeam();
-    }, [setIsLoadingTeam, showToast, navigate, setReloadLeftList]);
+    }, []);
 
     /**
     * Handle new task creation from the "New task" button

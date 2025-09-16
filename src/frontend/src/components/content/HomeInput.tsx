@@ -35,17 +35,17 @@ const getIconFromString = (iconString: string | React.ReactNode): React.ReactNod
 
 const truncateDescription = (description: string, maxLength: number = 180): string => {
     if (!description) return '';
-    
+
     if (description.length <= maxLength) {
         return description;
     }
-    
+
 
     const truncated = description.substring(0, maxLength);
     const lastSpaceIndex = truncated.lastIndexOf(' ');
-    
+
     const cutPoint = lastSpaceIndex > maxLength - 20 ? lastSpaceIndex : maxLength;
-    
+
     return description.substring(0, cutPoint) + '...';
 };
 
@@ -57,8 +57,8 @@ interface ExtendedQuickTask extends QuickTask {
 const HomeInput: React.FC<HomeInputProps> = ({
     selectedTeam,
 }) => {
-    const [submitting, setSubmitting] = useState(false);
-    const [input, setInput] = useState("");
+    const [submitting, setSubmitting] = useState<boolean>(false);
+    const [input, setInput] = useState<string>("");
     const [raiError, setRAIError] = useState<RAIErrorData | null>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -129,10 +129,10 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     errorDetail = error?.response?.data?.detail;
                 }
 
-                  // Handle RAI validation errors - just show description as toast
+                // Handle RAI validation errors - just show description as toast
                 if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
-                    const description = errorDetail.description || 
-                                     "Your request contains content that doesn't meet our safety guidelines. Please try rephrasing.";
+                    const description = errorDetail.description ||
+                        "Your request contains content that doesn't meet our safety guidelines. Please try rephrasing.";
                     showToast(description, "error");
                 } else {
                     // Handle other errors with toast messages
@@ -141,7 +141,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                         error?.response?.data?.message ||
                         error?.message ||
                         "Something went wrong. Please try again.";
-                    
+
                     showToast(errorMessage, "error");
                 }
             } finally {
@@ -242,18 +242,18 @@ const HomeInput: React.FC<HomeInputProps> = ({
 
                                 <div className="home-input-quick-tasks">
                                     <div>
-                                    {tasksToDisplay.map((task) => (
-                                        <PromptCard
-                                            key={task.id}
-                                            title={task.title}
-                                            icon={task.icon}
-                                            description={task.description}
-                                            onClick={() => handleQuickTaskClick(task)}
-                                            disabled={submitting}
+                                        {tasksToDisplay.map((task) => (
+                                            <PromptCard
+                                                key={task.id}
+                                                title={task.title}
+                                                icon={task.icon}
+                                                description={task.description}
+                                                onClick={() => handleQuickTaskClick(task)}
+                                                disabled={submitting}
 
-                                        />
-                                    ))}
-                                </div>
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
                             </>
                         )}
