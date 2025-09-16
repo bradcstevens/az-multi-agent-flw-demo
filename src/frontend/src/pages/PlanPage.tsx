@@ -62,10 +62,10 @@ const PlanPage: React.FC = () => {
 
 
 
-    const processAgentMessage = useCallback((agentMessageData: AgentMessageData, planData: ProcessedPlanData, is_final: boolean = false) => {
+    const processAgentMessage = useCallback((agentMessageData: AgentMessageData, planData: ProcessedPlanData, is_final: boolean = false, streaming_message: string = '') => {
 
         // Persist / forward to backend (fire-and-forget with logging)
-        const agentMessageResponse = PlanDataService.createAgentMessageResponse(agentMessageData, planData, is_final);
+        const agentMessageResponse = PlanDataService.createAgentMessageResponse(agentMessageData, planData, is_final, streaming_message);
         console.log('📤 Persisting agent message:', agentMessageResponse);
         void apiService.sendAgentMessage(agentMessageResponse)
             .then(saved => {
@@ -82,9 +82,44 @@ const PlanPage: React.FC = () => {
     }, []);
 
     const resetPlanVariables = useCallback(() => {
-
-
-    }, []);
+        setInput("");
+        setPlanData(null);
+        setLoading(true);
+        setSubmittingChatDisableInput(true);
+        setErrorLoading(false);
+        setClarificationMessage(null);
+        setProcessingApproval(false);
+        setPlanApprovalRequest(null);
+        setReloadLeftList(true);
+        setWaitingForPlan(true);
+        setShowProcessingPlanSpinner(false);
+        setShowApprovalButtons(true);
+        setContinueWithWebsocketFlow(false);
+        setWsConnected(false);
+        setStreamingMessages([]);
+        setStreamingMessageBuffer("");
+        setShowBufferingText(false);
+        setAgentMessages([]);
+    }, [
+        setInput,
+        setPlanData,
+        setLoading,
+        setSubmittingChatDisableInput,
+        setErrorLoading,
+        setClarificationMessage,
+        setProcessingApproval,
+        setPlanApprovalRequest,
+        setReloadLeftList,
+        setWaitingForPlan,
+        setShowProcessingPlanSpinner,
+        setShowApprovalButtons,
+        setContinueWithWebsocketFlow,
+        setWsConnected,
+        setStreamingMessages,
+        setStreamingMessageBuffer,
+        setShowBufferingText,
+        setAgentMessages
+    ]);
 
     // Auto-scroll helper
     const scrollToBottom = useCallback(() => {
@@ -146,6 +181,7 @@ const PlanPage: React.FC = () => {
             //console.log('📋 Streaming Message', streamingMessage);
             // if is final true clear buffer and add final message to agent messages
             const line = PlanDataService.simplifyHumanClarification(streamingMessage.data.content);
+            setShowBufferingText(true);
             setStreamingMessageBuffer(prev => prev + line);
             //scrollToBottom();
 
@@ -175,7 +211,7 @@ const PlanPage: React.FC = () => {
             console.log('✅ Parsed clarification message:', agentMessageData);
             setClarificationMessage(clarificationMessage.data as ParsedUserClarification | null);
             setAgentMessages(prev => [...prev, agentMessageData]);
-            setStreamingMessageBuffer("");
+            setShowBufferingText(false);
             setShowProcessingPlanSpinner(false);
             setSubmittingChatDisableInput(false);
             scrollToBottom();
@@ -221,7 +257,8 @@ const PlanPage: React.FC = () => {
             console.log('✅ Parsed final result message:', agentMessageData);
             // we ignore the terminated message 
             if (finalMessage?.data?.status === PlanStatus.COMPLETED) {
-                setStreamingMessageBuffer("");
+
+                setShowBufferingText(true);
                 setShowProcessingPlanSpinner(false);
                 setAgentMessages(prev => [...prev, agentMessageData]);
                 scrollToBottom();
@@ -232,14 +269,14 @@ const PlanPage: React.FC = () => {
                     setPlanData({ ...planData });
                 }
 
-                processAgentMessage(agentMessageData, planData, is_final);
+                processAgentMessage(agentMessageData, planData, is_final, streamingMessageBuffer);
             }
 
 
         });
 
         return () => unsubscribe();
-    }, [scrollToBottom, planData, processAgentMessage]);
+    }, [scrollToBottom, planData, processAgentMessage, streamingMessageBuffer]);
 
     //WebsocketMessageType.AGENT_MESSAGE
     useEffect(() => {
@@ -340,7 +377,7 @@ const PlanPage: React.FC = () => {
     const loadPlanData = useCallback(
         async (useCache = true): Promise<ProcessedPlanData | null> => {
             if (!planId) return null;
-
+            resetPlanVariables();
             setLoading(true);
             try {
 
@@ -364,6 +401,10 @@ const PlanPage: React.FC = () => {
                 if (planResult?.mplan) {
                     setPlanApprovalRequest(planResult.mplan);
                 }
+                if (planResult?.streaming_message && planResult.streaming_message.trim() !== "") {
+                    setStreamingMessageBuffer(planResult.streaming_message);
+                    setShowBufferingText(true);
+                }
                 setPlanData(planResult);
                 return planResult;
             } catch (err) {
@@ -373,7 +414,7 @@ const PlanPage: React.FC = () => {
                 setLoading(false);
             }
         },
-        [planId, navigate]
+        [planId, navigate, resetPlanVariables]
     );
 
 
@@ -595,6 +636,7 @@ const PlanPage: React.FC = () => {
                                 waitingForPlan={waitingForPlan}
                                 messagesContainerRef={messagesContainerRef}
                                 streamingMessageBuffer={streamingMessageBuffer}
+                                showBufferingText={showBufferingText}
                                 agentMessages={agentMessages}
                                 showProcessingPlanSpinner={showProcessingPlanSpinner}
                                 showApprovalButtons={showApprovalButtons}

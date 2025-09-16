@@ -146,6 +146,7 @@ class AgentMessageResponse:
     agent_type: AgentMessageType
     is_final: bool = False
     raw_data: str = None
+    streaming_message: str = None
 
 
 class WebsocketMessageType(str, Enum):
