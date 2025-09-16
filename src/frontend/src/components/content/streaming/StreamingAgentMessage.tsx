@@ -73,8 +73,10 @@ const useStyles = makeStyles({
   },
   humanBubble: {
     backgroundColor: 'var(--colorBrandBackground)',
-    color: 'var(--colorNeutralForegroundInverted)',
+    color: 'white !important', // Force white text in both light and dark modes
     maxWidth: '80%',
+    padding: '12px 16px',
+    lineHeight: '1.5',
     alignSelf: 'flex-end'
   },
   botBubble: {
@@ -88,7 +90,7 @@ const useStyles = makeStyles({
   clarificationBubble: {
     backgroundColor: 'var(--colorNeutralBackground2)',
     color: 'var(--colorNeutralForeground1)',
-    padding: '6px 8px', // Reduced from 12px 16px
+    padding: '6px 8px', 
     borderRadius: '8px',
     fontSize: '14px',
     lineHeight: '1.5',

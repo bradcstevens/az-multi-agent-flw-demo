@@ -321,7 +321,15 @@ export const getAgentDisplayName = (agentName: string): string => {
     cleanName = cleanName.replace(/\s*agent\s*$/gi, '').trim();
     
     // Convert to proper case
+    cleanName = cleanName
+        .replace(/\bHRHelper\b/gi, 'HR Helper')
+        .replace(/\bHR([A-Z])/g, 'HR $1')        // Add space after HR before capital letter
+        .replace(/\bIT([A-Z])/g, 'IT $1')        // Add space after IT before capital letter
+        .replace(/\bAPI([A-Z])/g, 'API $1');     // Add space after API before capital letter
+
+    // Convert to proper case
     cleanName = cleanName.replace(/\b\w/g, l => l.toUpperCase());
+    
     
     // Handle special cases for better readability
     cleanName = cleanName
