@@ -103,7 +103,7 @@ based on available quota you can deploy application otherwise, you can request f
 </details>
  
 <details>
-<summary><b>DeploymentModelNotSupported/ ServiceModelDeprecated/ InvalidResourceProperties</b></summary>
+<summary><b>DeploymentModelNotSupported/ ServiceModelDeprecated/ InvalidResourceProperties/ SpecialFeatureOrQuotaIdRequired</b></summary>
  
  -  The updated model may not be supported in the selected region. Please verify its availability in the [Azure AI Foundry models](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions) document.
  
