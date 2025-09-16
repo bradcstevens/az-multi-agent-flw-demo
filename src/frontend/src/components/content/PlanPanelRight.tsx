@@ -3,12 +3,10 @@ import {
   Body1,
 } from "@fluentui/react-components";
 import {
-  PersonRegular,
   ArrowTurnDownRightRegular,
 } from "@fluentui/react-icons";
 import { MPlanData, PlanDetailsProps } from "../../models";
-import { TaskService } from "../../services/TaskService";
-import { AgentTypeUtils, AgentType } from "../../models/enums";
+import { getAgentIcon, getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils'; 
 import ContentNotFound from "../NotFound/ContentNotFound";
 
 
@@ -18,121 +16,82 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   planApprovalRequest
 }) => {
 
-  // Helper function to get clean agent display name
-  const getAgentDisplayName = (agentName: string): string => {
-    if (!agentName) return 'Assistant';
-
-    let cleanName = TaskService.cleanTextToSpaces(agentName);
-    if (cleanName.toLowerCase().includes('agent')) {
-      cleanName = cleanName.replace(/agent/gi, '').trim();
-    }
-    return cleanName.replace(/\b\w/g, l => l.toUpperCase()) || 'Assistant';
-  };
-
-  // Helper function to get agent icon based on name and type
-  const getAgentIcon = (agentName: string) => {
-    // Try to determine agent type from name
-    const cleanName = agentName.toLowerCase();
-    let agentType: AgentType;
-
-    if (cleanName.includes('coder')) {
-      agentType = AgentType.CODER;
-    } else if (cleanName.includes('executor')) {
-      agentType = AgentType.EXECUTOR;
-    } else if (cleanName.includes('filesurfer')) {
-      agentType = AgentType.FILE_SURFER;
-    } else if (cleanName.includes('websurfer')) {
-      agentType = AgentType.WEB_SURFER;
-    } else if (cleanName.includes('hr')) {
-      agentType = AgentType.HR;
-    } else if (cleanName.includes('marketing')) {
-      agentType = AgentType.MARKETING;
-    } else if (cleanName.includes('procurement')) {
-      agentType = AgentType.PROCUREMENT;
-    } else if (cleanName.includes('proxy')) {
-      agentType = AgentType.GENERIC;
-    } else {
-      agentType = AgentType.GENERIC;
-    }
-
-    // Get the icon name from the utility
-    const iconName = AgentTypeUtils.getAgentIcon(agentType);
-
-    // Return the appropriate icon component or fallback to PersonRegular
-    return <PersonRegular style={{
-      color: 'var(--colorPaletteBlueForeground2)',
-      fontSize: '16px'
-    }} />;
-  };
-
   if (!planData && !loading) {
     return <ContentNotFound subtitle="The requested page could not be found." />;
   }
 
   if (!planApprovalRequest) {
-    return null;
+    return (
+      <div style={{
+        width: '280px',
+        height: '100vh',
+        padding: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderLeft: '1px solid var(--colorNeutralStroke1)',
+        color: 'var(--colorNeutralForeground3)',
+        fontSize: '14px',
+        fontStyle: 'italic'
+      }}>
+        No plan available
+      </div>
+    );
   }
 
-  // Parse plan steps - items ending with colons are headings, others are substeps
-  const parsePlanSteps = () => {
-    if (!planApprovalRequest.steps || planApprovalRequest.steps.length === 0) return [];
+  // Extract plan steps from the planApprovalRequest
+  const extractPlanSteps = () => {
+    if (!planApprovalRequest.steps || planApprovalRequest.steps.length === 0) {
+      return [];
+    }
 
-    const result: Array<{ type: 'heading' | 'substep'; text: string }> = [];
-
-    planApprovalRequest.steps.forEach(step => {
-      const action = step.cleanAction || step.action || '';
-      const trimmedAction = action.trim();
-
-      if (trimmedAction) {
-        // Check if the step ends with a colon
-        if (trimmedAction.endsWith(':')) {
-          // This is a heading
-          result.push({ type: 'heading', text: trimmedAction });
-        } else {
-          // This is a substep
-          result.push({ type: 'substep', text: trimmedAction });
-        }
-      }
-    });
-
-    return result;
+    return planApprovalRequest.steps.map((step, index) => {
+      const action = step.action || step.cleanAction || '';
+      const isHeading = action.trim().endsWith(':');
+      
+      return {
+        text: action.trim(),
+        isHeading,
+        key: `${index}-${action.substring(0, 20)}`
+      };
+    }).filter(step => step.text.length > 0);
   };
 
-  // Render Plan Section with scrolling
+  // Render Plan Section
   const renderPlanSection = () => {
-    const parsedSteps = parsePlanSteps();
+    const planSteps = extractPlanSteps();
 
     return (
       <div style={{
+        marginBottom: '24px',
         paddingBottom: '20px',
-        marginBottom: '20px',
-        borderBottom: '1px solid var(--colorNeutralStroke2)',
-        maxHeight: '50vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
+        borderBottom: '1px solid var(--colorNeutralStroke1)'
       }}>
         <Body1 style={{
           marginBottom: '16px',
-          flexShrink: 0,
           fontSize: '14px',
           fontWeight: 600,
           color: 'var(--colorNeutralForeground1)'
         }}>
-          Plan
+          Plan Overview
         </Body1>
 
-        {/* Scrollable Plan Steps */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          paddingRight: '8px'
-        }}>
+        {planSteps.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            color: 'var(--colorNeutralForeground3)',
+            fontSize: '14px',
+            fontStyle: 'italic',
+            padding: '20px'
+          }}>
+            Plan is being generated...
+          </div>
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {parsedSteps.map((step, index) => (
-              <div key={index}>
-                {step.type === 'heading' ? (
-                  // Heading - no arrow, just the text
+            {planSteps.map((step, index) => (
+              <div key={step.key} style={{ display: 'flex', flexDirection: 'column' }}>
+                {step.isHeading ? (
+                  // Heading - larger text, bold
                   <Body1 style={{
                     fontSize: '14px',
                     fontWeight: 600,
@@ -167,7 +126,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
               </div>
             ))}
           </div>
-        </div>
+        )}
       </div>
     );
   };
@@ -220,7 +179,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
                   justifyContent: 'center',
                   flexShrink: 0
                 }}>
-                  {getAgentIcon(agentName)}
+                  {getAgentIcon(agentName, planData, planApprovalRequest)}
                 </div>
 
                 {/* Agent Info - just name */}
@@ -230,7 +189,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
                     fontSize: '14px',
                     color: 'var(--colorNeutralForeground1)'
                   }}>
-                    {getAgentDisplayName(agentName)} Agent
+                    {getAgentDisplayNameWithSuffix(agentName)}
                   </Body1>
                 </div>
               </div>

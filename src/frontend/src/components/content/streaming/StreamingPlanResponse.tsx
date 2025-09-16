@@ -11,36 +11,7 @@ import {
     CheckmarkCircle20Regular 
 } from "@fluentui/react-icons";
 import React, { useState } from 'react';
-import { TeamService } from "@/services/TeamService";
-import { TaskService } from "@/services";
-import { iconMap } from "@/models/homeInput";
-import { Desktop20Regular } from "@fluentui/react-icons";
-
-// Function to get agent icon from team configuration
-const getAgentIconFromTeam = (agentName: string): React.ReactNode => {
-  const storedTeam = TeamService.getStoredTeam();
-  
-  if (!storedTeam?.agents) {
-    return <Desktop20Regular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />;
-  }
-
-  const cleanAgentName = TaskService.cleanTextToSpaces(agentName);
-  
-  const agent = storedTeam.agents.find(a => 
-    TaskService.cleanTextToSpaces(a.name).toLowerCase().includes(cleanAgentName.toLowerCase()) ||
-    a.type.toLowerCase().includes(cleanAgentName.toLowerCase()) ||
-    a.input_key.toLowerCase().includes(cleanAgentName.toLowerCase())
-  );
-
-  if (agent?.icon && iconMap[agent.icon]) {
-    return React.cloneElement(iconMap[agent.icon] as React.ReactElement, {
-      style: { fontSize: '16px', color: 'var(--colorNeutralForeground2)' }
-    });
-  }
-
-  // Use Desktop icon for AI agents instead of Person icon
-  return <Desktop20Regular style={{ fontSize: '16px', color: 'var(--colorNeutralForeground2)' }} />;
-};
+import { getAgentIcon, getAgentDisplayName } from '@/utils/agentIconUtils';
 
 // Updated styles to match consistent spacing and remove brand colors from bot elements
 const useStyles = makeStyles({
@@ -84,17 +55,6 @@ const useStyles = makeStyles({
         color: 'var(--colorNeutralForeground1)',
         lineHeight: '20px'
     },
-    // botBadge: {
-    //     fontSize: '11px',
-    //     fontWeight: '600',
-    //     textTransform: 'uppercase',
-    //     letterSpacing: '0.5px',
-    //     backgroundColor: 'var(--colorNeutralBackground3)',
-    //     color: 'var(--colorNeutralForeground1)',
-    //     border: '1px solid var(--colorNeutralStroke2)',
-    //     padding: '2px 8px',
-    //     borderRadius: '4px'
-    // },
     messageContainer: {
         backgroundColor: 'var(--colorNeutralBackground2)',
         padding: '12px 16px',
@@ -169,7 +129,9 @@ const useStyles = makeStyles({
         minWidth: '24px',
         height: '24px',
         borderRadius: '50%',
-       color: 'var(--colorNeutralForeground1)',
+        backgroundColor: 'var(--colorNeutralBackground3)',
+        border: '1px solid var(--colorNeutralStroke2)',
+        color: 'var(--colorNeutralForeground1)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -207,15 +169,15 @@ const useStyles = makeStyles({
     }
 });
 
-// Function to get agent name from backend data
-const getAgentDisplayName = (planApprovalRequest: MPlanData | null): string => {
+// Function to get agent name from backend data using the centralized utility
+const getAgentDisplayNameFromPlan = (planApprovalRequest: MPlanData | null): string => {
     if (planApprovalRequest?.steps?.length) {
         const firstAgent = planApprovalRequest.steps.find(step => step.agent)?.agent;
         if (firstAgent) {
-            return firstAgent.replace(/Agent$/, '').replace(/([A-Z])/g, ' $1').trim();
+            return getAgentDisplayName(firstAgent);
         }
     }
-    return 'Assistant';
+    return getAgentDisplayName('Planning Agent');
 };
 
 // Dynamically extract content from whatever fields contain data
@@ -328,7 +290,7 @@ const renderPlanResponse = (
     
     if (!planApprovalRequest) return null;
 
-    const agentName = getAgentDisplayName(planApprovalRequest);
+    const agentName = getAgentDisplayNameFromPlan(planApprovalRequest);
     const { factsContent, planSteps } = extractDynamicContent(planApprovalRequest);
     const factsPreview = getFactsPreview(factsContent);
 
@@ -346,7 +308,7 @@ const renderPlanResponse = (
                     <div className={styles.hiddenAvatar}></div>
                 ) : (
                     <div className={styles.agentAvatar}>
-                        {getAgentIconFromTeam(agentName)}
+                        {getAgentIcon(agentName, null, planApprovalRequest)}
                     </div>
                 )}
                 <div className={styles.agentInfo}>
@@ -355,9 +317,7 @@ const renderPlanResponse = (
                     </Text>
                     {!isCreatingPlan && (
                         <Tag 
-                            appearance="brand" 
-                            // size="small"
-                            // className={styles.botBadge}
+                            appearance="brand"
                         >
                             AI Agent
                         </Tag>
@@ -373,7 +333,7 @@ const renderPlanResponse = (
                         <div className={styles.factsHeader}>
                             <div className={styles.factsHeaderLeft}>
                                 <CheckmarkCircle20Regular style={{
-                                    color: 'var(--colorNeutralForeground1)',
+                                    color: 'var(--colorPaletteGreenForeground1)',
                                     fontSize: '20px',
                                     width: '20px',
                                     height: '20px',
