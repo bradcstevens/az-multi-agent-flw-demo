@@ -3,7 +3,7 @@ import {
     Button, 
     Text,  
     Body1, 
-    Badge,
+    Tag,
     makeStyles,
     tokens
 } from "@fluentui/react-components";
@@ -84,17 +84,17 @@ const useStyles = makeStyles({
         color: 'var(--colorNeutralForeground1)',
         lineHeight: '20px'
     },
-    botBadge: {
-        fontSize: '11px',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        backgroundColor: 'var(--colorNeutralBackground3)',
-        color: 'var(--colorNeutralForeground1)',
-        border: '1px solid var(--colorNeutralStroke2)',
-        padding: '2px 8px',
-        borderRadius: '4px'
-    },
+    // botBadge: {
+    //     fontSize: '11px',
+    //     fontWeight: '600',
+    //     textTransform: 'uppercase',
+    //     letterSpacing: '0.5px',
+    //     backgroundColor: 'var(--colorNeutralBackground3)',
+    //     color: 'var(--colorNeutralForeground1)',
+    //     border: '1px solid var(--colorNeutralStroke2)',
+    //     padding: '2px 8px',
+    //     borderRadius: '4px'
+    // },
     messageContainer: {
         backgroundColor: 'var(--colorNeutralBackground2)',
         padding: '12px 16px',
@@ -354,13 +354,13 @@ const renderPlanResponse = (
                         {agentName}
                     </Text>
                     {!isCreatingPlan && (
-                        <Badge 
-                            appearance="filled" 
-                            size="small"
-                            className={styles.botBadge}
+                        <Tag 
+                            appearance="brand" 
+                            // size="small"
+                            // className={styles.botBadge}
                         >
                             AI Agent
-                        </Badge>
+                        </Tag>
                     )}
                 </div>
             </div>

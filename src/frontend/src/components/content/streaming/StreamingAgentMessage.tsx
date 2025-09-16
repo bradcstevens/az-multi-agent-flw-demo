@@ -59,17 +59,6 @@ const useStyles = makeStyles({
     color: 'var(--colorNeutralForeground1)',
     lineHeight: '20px'
   },
-  botBadge: {
-    fontSize: '11px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    backgroundColor: 'var(--colorNeutralBackground3)',
-    color: 'var(--colorNeutralForeground1)',
-    border: '1px solid var(--colorNeutralStroke2)',
-    padding: '2px 8px',
-    borderRadius: '4px'
-  },
   messageBubble: {
     padding: '12px 16px',
     borderRadius: '8px',
@@ -200,10 +189,7 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
                     {TaskService.cleanTextToSpaces(msg.agent)}
                   </Body1>
                   <Tag
-                    size="extra-small"
-                    shape="rounded"
-                    appearance="filled"
-                    className={styles.botBadge}
+                    appearance="brand"
                   >
                     AI Agent
                   </Tag>
@@ -243,9 +229,9 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
                 </ReactMarkdown>
 
                 {/* Action buttons for bot messages */}
-                {!isHuman && (
-                  <div className={styles.actionContainer}>
-                    <Button
+                {/* {!isHuman && (
+                  <div className={styles.actionContainer}> */}
+                    {/* <Button
                       onClick={() =>
                         msg.content &&
                         navigator.clipboard.writeText(msg.content)
@@ -255,17 +241,17 @@ const renderAgentMessages = (agentMessages: AgentMessageData[]) => {
                       size="small"
                       icon={<Copy />}
                       className={styles.copyButton}
-                    />
+                    /> */}
                     
-                    <Tag
+                    {/* <Tag
                       appearance="filled"
                       size="extra-small"
                       className={styles.sampleTag}
                     >
                       Sample data for demonstration purposes only.
-                    </Tag>
-                  </div>
-                )}
+                    </Tag> */}
+                  {/* </div>
+                )} */}
               </div>
             </div>
           </div>

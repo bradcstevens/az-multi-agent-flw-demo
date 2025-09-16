@@ -51,23 +51,13 @@ app_v3 = APIRouter(
 
 
 @app_v3.websocket("/socket/{process_id}")
-async def start_comms(websocket: WebSocket, process_id: str):
+async def start_comms(websocket: WebSocket, process_id: str, user_id: str = Query(None)):
     """Web-Socket endpoint for real-time process status updates."""
 
     # Always accept the WebSocket connection first
     await websocket.accept()
 
-    user_id = None
-    try:
-        # WebSocket headers are different, try to get user info
-        headers = dict(websocket.headers)
-        authenticated_user = get_authenticated_user_details(request_headers=headers)
-        user_id = authenticated_user.get("user_principal_id")
-        if not user_id:
-            user_id = "00000000-0000-0000-0000-000000000000"
-    except Exception as e:
-        logging.warning(f"Could not extract user from WebSocket headers: {e}")
-        user_id = "00000000-0000-0000-0000-000000000000"
+    user_id = user_id or "00000000-0000-0000-0000-000000000000"
 
     current_user_id.set(user_id)
 
