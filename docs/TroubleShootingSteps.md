@@ -546,7 +546,7 @@ If the server was deleted, either restore it (if possible) or update references 
 
 </details>
 
-<details><summary><b>BadRequest - DatabaseAccount cosmos-multiagenthkzp5 is in a failed provisioning state because the previous attempt to create it was not successful</b></summary>
+<details><summary><b>BadRequest - DatabaseAccount is in a failed provisioning state because the previous attempt to create it was not successful</b></summary>
 
 - This error occurs when a user attempts to redeploy a resource that previously failed to provision.
 
