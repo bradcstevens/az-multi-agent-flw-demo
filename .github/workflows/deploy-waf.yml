@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - psl-wafpipelinefix
   schedule:
     - cron: "0 11,23 * * *" # Runs at 11:00 AM and 11:00 PM GMT
 
@@ -117,6 +118,7 @@ jobs:
               enableMonitoring=true \
               enablePrivateNetworking=true \
               enableScalability=true \
+              createdBy="Pipeline" \
               
 
       - name: Send Notification on Failure
