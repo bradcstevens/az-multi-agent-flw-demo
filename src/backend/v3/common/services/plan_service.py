@@ -215,6 +215,7 @@ class PlanService:
             await memory_store.add_agent_message(agent_msg)
             if agent_message.is_final:
                 plan = await memory_store.get_plan(agent_msg.plan_id)
+                plan.streaming_message = agent_message.streaming_message
                 plan.overall_status = PlanStatus.completed
                 await memory_store.update_plan(plan)
             return True

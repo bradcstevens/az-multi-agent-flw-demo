@@ -125,6 +125,7 @@ class Plan(BaseDataModel):
     m_plan: Optional[Dict[str, Any]] = None
     summary: Optional[str] = None
     team_id: Optional[str] = None
+    streaming_message: Optional[str] = None
     human_clarification_request: Optional[str] = None
     human_clarification_response: Optional[str] = None
 

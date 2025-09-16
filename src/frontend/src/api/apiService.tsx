@@ -166,7 +166,8 @@ export class APIService {
                 plan: data.plan as Plan,
                 messages: data.messages as AgentMessageBE[],
                 m_plan: data.m_plan as MPlanBE | null,
-                team: data.team as TeamConfigurationBE | null
+                team: data.team as TeamConfigurationBE | null,
+                streaming_message: data.streaming_message as string | null
             } as PlanFromAPI;
             if (useCache) {
                 this._cache.set(cacheKey, results, 30000); // Cache for 30 seconds
