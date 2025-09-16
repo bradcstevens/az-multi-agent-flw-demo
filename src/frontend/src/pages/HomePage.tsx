@@ -32,7 +32,6 @@ const HomePage: React.FC = () => {
 
             try {
                 console.log('Initializing team from backend...');
-                //setReloadLeftList(true);
                 // Call the backend init_team endpoint (takes ~20 seconds)
                 const initResponse = await TeamService.initializeTeam();
 
@@ -105,7 +104,7 @@ const HomePage: React.FC = () => {
                 // TODO REFRACTOR THIS CODE 
                 setIsLoadingTeam(true);
                 const initResponse = await TeamService.initializeTeam(true);
-                //setReloadLeftList(true)
+                setReloadLeftList(true)
                 if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
                     console.log('Team initialization completed:', initResponse.data?.team_id);
 
