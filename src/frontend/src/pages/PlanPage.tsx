@@ -65,9 +65,6 @@ const PlanPage: React.FC = () => {
     const processAgentMessage = useCallback((agentMessageData: AgentMessageData, planData: ProcessedPlanData, is_final: boolean = false) => {
 
         // Persist / forward to backend (fire-and-forget with logging)
-        console.log(planData)
-        console.log(is_final)
-        console.log(agentMessageData)
         const agentMessageResponse = PlanDataService.createAgentMessageResponse(agentMessageData, planData, is_final);
         console.log('📤 Persisting agent message:', agentMessageResponse);
         void apiService.sendAgentMessage(agentMessageResponse)

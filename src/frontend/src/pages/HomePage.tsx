@@ -1,14 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Button,
     Spinner
 } from '@fluentui/react-components';
-import {
-    Add20Regular,
-    ErrorCircle20Regular,
-    Sparkle20Filled
-} from '@fluentui/react-icons';
 import '../styles/PlanPage.css';
 import CoralShellColumn from '../coral/components/Layout/CoralShellColumn';
 import CoralShellRow from '../coral/components/Layout/CoralShellRow';
@@ -17,7 +11,6 @@ import HomeInput from '@/components/content/HomeInput';
 import { NewTaskService } from '../services/NewTaskService';
 import PlanPanelLeft from '@/components/content/PlanPanelLeft';
 import ContentToolbar from '@/coral/components/Content/ContentToolbar';
-import { TaskService } from '../services/TaskService';
 import { TeamConfig } from '../models/Team';
 import { TeamService } from '../services/TeamService';
 import InlineToaster, { useInlineToaster } from "../components/toast/InlineToaster";
@@ -30,8 +23,8 @@ const HomePage: React.FC = () => {
     const navigate = useNavigate();
     const { showToast, dismissToast } = useInlineToaster();
     const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
-    const [isLoadingTeam, setIsLoadingTeam] = useState(true);
-
+    const [isLoadingTeam, setIsLoadingTeam] = useState<boolean>(true);
+    const [reloadLeftList, setReloadLeftList] = useState<boolean>(true);
 
     useEffect(() => {
         const initTeam = async () => {
@@ -39,7 +32,7 @@ const HomePage: React.FC = () => {
 
             try {
                 console.log('Initializing team from backend...');
-
+                setReloadLeftList(true);
                 // Call the backend init_team endpoint (takes ~20 seconds)
                 const initResponse = await TeamService.initializeTeam();
 
@@ -91,7 +84,7 @@ const HomePage: React.FC = () => {
         };
 
         initTeam();
-    }, []);
+    }, [setIsLoadingTeam, showToast, navigate, setReloadLeftList]);
 
     /**
     * Handle new task creation from the "New task" button
@@ -112,6 +105,7 @@ const HomePage: React.FC = () => {
                 // TODO REFRACTOR THIS CODE 
                 setIsLoadingTeam(true);
                 const initResponse = await TeamService.initializeTeam(true);
+                setReloadLeftList(true)
                 if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
                     console.log('Team initialization completed:', initResponse.data?.team_id);
 
@@ -152,7 +146,7 @@ const HomePage: React.FC = () => {
                 "info"
             );
         }
-    }, [showToast]);
+    }, [showToast, setReloadLeftList]);
 
 
     /**
@@ -187,6 +181,7 @@ const HomePage: React.FC = () => {
             <CoralShellColumn>
                 <CoralShellRow>
                     <PlanPanelLeft
+                        reloadTasks={reloadLeftList}
                         onNewTaskButton={handleNewTaskButton}
                         onTeamSelect={handleTeamSelect}
                         onTeamUpload={handleTeamUpload}

@@ -35,19 +35,19 @@ const getIconFromString = (iconString: string | React.ReactNode): React.ReactNod
 
 const truncateDescription = (description: string, maxLength: number = 180): string => {
     if (!description) return '';
-    
+
     if (description.length <= maxLength) {
         return description;
     }
-    
+
     // Find the last space before the limit to avoid cutting words
     const truncated = description.substring(0, maxLength);
     const lastSpaceIndex = truncated.lastIndexOf(' ');
-    
+
     // If there's a space within the last 20 characters, cut there
     // Otherwise, cut at the exact limit
     const cutPoint = lastSpaceIndex > maxLength - 20 ? lastSpaceIndex : maxLength;
-    
+
     return description.substring(0, cutPoint) + '...';
 };
 
@@ -126,10 +126,10 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     errorDetail = error?.response?.data?.detail;
                 }
 
-                  // Handle RAI validation errors - just show description as toast
+                // Handle RAI validation errors - just show description as toast
                 if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
-                    const description = errorDetail.description || 
-                                     "Your request contains content that doesn't meet our safety guidelines. Please try rephrasing.";
+                    const description = errorDetail.description ||
+                        "Your request contains content that doesn't meet our safety guidelines. Please try rephrasing.";
                     showToast(description, "error");
                 } else {
                     // Handle other errors with toast messages
@@ -138,7 +138,7 @@ const HomeInput: React.FC<HomeInputProps> = ({
                         error?.response?.data?.message ||
                         error?.message ||
                         "Something went wrong. Please try again.";
-                    
+
                     showToast(errorMessage, "error");
                 }
             } finally {
@@ -195,20 +195,6 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     <div className="home-input-title-wrapper">
                         <Title2>How can I help?</Title2>
                     </div>
-
-                    {/* Show RAI error if present */}
-                    {/* {raiError && (
-                        <RAIErrorCard
-                            error={raiError}
-                            onRetry={() => {
-                                setRAIError(null);
-                                if (textareaRef.current) {
-                                    textareaRef.current.focus();
-                                }
-                            }}
-                            onDismiss={() => setRAIError(null)}
-                        />
-                    )} */}
 
                     <ChatInput
                         ref={textareaRef} // forwarding
