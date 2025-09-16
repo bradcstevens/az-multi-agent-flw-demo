@@ -98,15 +98,17 @@ const HomePage: React.FC = () => {
      */
     const handleTeamSelect = useCallback(async (team: TeamConfig | null) => {
         setSelectedTeam(team);
+        setReloadLeftList(true);
+        console.log('handleTeamSelect called with team:', true);
         if (team) {
 
             try {
                 // TODO REFRACTOR THIS CODE 
                 setIsLoadingTeam(true);
                 const initResponse = await TeamService.initializeTeam(true);
-                setReloadLeftList(true)
+
                 if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
-                    console.log('Team initialization completed:', initResponse.data?.team_id);
+                    console.log('handleTeamSelect:', initResponse.data?.team_id);
 
                     // Now fetch the actual team details using the team_id
                     const teams = await TeamService.getUserTeams();
@@ -115,9 +117,9 @@ const HomePage: React.FC = () => {
                     if (initializedTeam) {
                         setSelectedTeam(initializedTeam);
                         TeamService.storageTeam(initializedTeam);
-
-                        console.log('Team loaded successfully:', initializedTeam.name);
-                        console.log('Team agents:', initializedTeam.agents?.length || 0);
+                        setReloadLeftList(true)
+                        console.log('Team loaded successfully handleTeamSelect:', initializedTeam.name);
+                        console.log('Team agents handleTeamSelect:', initializedTeam.agents?.length || 0);
 
                         showToast(
                             `${initializedTeam.name} team initialized successfully with ${initializedTeam.agents?.length || 0} agents`,

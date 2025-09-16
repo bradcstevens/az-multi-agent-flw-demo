@@ -274,6 +274,12 @@ async def process_request(
         team_id = None
         if user_current_team:
             team_id = user_current_team.team_id
+        team = await memory_store.get_team_by_id(team_id=team_id)
+        if not team:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Team configuration '{team_id}' not found or access denied",
+            )
         plan = Plan(
             id=plan_id,
             plan_id=plan_id,
