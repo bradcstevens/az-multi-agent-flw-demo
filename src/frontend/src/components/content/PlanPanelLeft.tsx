@@ -2,9 +2,6 @@ import PanelLeft from "@/coral/components/Panels/PanelLeft";
 import PanelLeftToolbar from "@/coral/components/Panels/PanelLeftToolbar";
 import {
   Body1Strong,
-  Button,
-  Subtitle1,
-  Subtitle2,
   Toast,
   ToastBody,
   ToastTitle,
@@ -12,7 +9,6 @@ import {
   useToastController,
 } from "@fluentui/react-components";
 import {
-  Add20Regular,
   ChatAdd20Regular,
   ErrorCircle20Regular,
 } from "@fluentui/react-icons";
@@ -22,7 +18,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Plan, PlanPanelLefProps, Task, UserInfo } from "@/models";
 import { apiService } from "@/api";
 import { TaskService } from "@/services";
-import MsftColor from "@/coral/imports/MsftColor";
 import ContosoLogo from "../../coral/imports/ContosoLogo";
 import "../../styles/PlanPanelLeft.css";
 import PanelFooter from "@/coral/components/Panels/PanelFooter";
@@ -60,9 +55,10 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
   const loadPlansData = useCallback(async (forceRefresh = false) => {
     try {
+      console.log("Loading plans, forceRefresh:", forceRefresh);
       setPlansLoading(true);
       setPlansError(null);
-      const plansData = await apiService.getPlans(undefined, !forceRefresh);
+      const plansData = await apiService.getPlans(undefined, forceRefresh);
       setPlans(plansData);
     } catch (error) {
       console.log("Failed to load plans:", error);
@@ -74,12 +70,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
     }
   }, []);
 
-  useEffect(() => {
-    if (reloadTasks) {
-      loadPlansData();
-      restReload?.();
-    }
-  }, [reloadTasks, loadPlansData, restReload]);
+
   // Fetch plans
 
 
@@ -131,6 +122,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   const handleTeamSelect = useCallback(
     (team: TeamConfig | null) => {
       // Use parent's team select handler if provided, otherwise use local state
+      loadPlansData();
       if (onTeamSelect) {
         onTeamSelect(team);
       } else {
@@ -160,7 +152,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         }
       }
     },
-    [onTeamSelect, dispatchToast]
+    [onTeamSelect, dispatchToast, loadPlansData]
   );
 
   return (
