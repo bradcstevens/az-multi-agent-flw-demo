@@ -546,6 +546,15 @@ If the server was deleted, either restore it (if possible) or update references 
 
 </details>
 
+<details><summary><b>BadRequest - DatabaseAccount cosmos-multiagenthkzp5 is in a failed provisioning state because the previous attempt to create it was not successful</b></summary>
+
+- This error occurs when a user attempts to redeploy a resource that previously failed to provision.
+
+- To resolve the issue, delete the failed deployment first, then start a new deployment.
+
+- For guidance on deleting a resource from a Resource Group, refer to the following link: [Delete an Azure Cosmos DB account](https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/manage-with-powershell#delete-account:~:text=%3A%24enableMultiMaster-,Delete%20an%20Azure%20Cosmos%20DB%20account,-This%20command%20deletes)
+
+</details>
 
 
 💡 Note: If you encounter any other issues, you can refer to the [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) documentation.
