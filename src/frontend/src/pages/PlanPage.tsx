@@ -65,9 +65,6 @@ const PlanPage: React.FC = () => {
     const processAgentMessage = useCallback((agentMessageData: AgentMessageData, planData: ProcessedPlanData, is_final: boolean = false) => {
 
         // Persist / forward to backend (fire-and-forget with logging)
-        console.log(planData)
-        console.log(is_final)
-        console.log(agentMessageData)
         const agentMessageResponse = PlanDataService.createAgentMessageResponse(agentMessageData, planData, is_final);
         console.log('📤 Persisting agent message:', agentMessageResponse);
         void apiService.sendAgentMessage(agentMessageResponse)
@@ -262,45 +259,6 @@ const PlanPage: React.FC = () => {
 
         return () => unsubscribe();
     }, [scrollToBottom, planData, processAgentMessage]); //onPlanReceived, scrollToBottom
-    // Create loadPlanData function with useCallback to memoize it
-    const loadPlanData = useCallback(
-        async (useCache = true): Promise<ProcessedPlanData | null> => {
-            if (!planId) return null;
-
-            setLoading(true);
-            try {
-
-                let planResult: ProcessedPlanData | null = null;
-                console.log("Fetching plan with ID:", planId);
-                planResult = await PlanDataService.fetchPlanData(planId, useCache);
-                console.log("Plan data fetched:", planResult);
-                if (planResult?.plan?.overall_status === PlanStatus.IN_PROGRESS) {
-                    setShowApprovalButtons(true);
-
-                } else {
-                    setShowApprovalButtons(false);
-                    setWaitingForPlan(false);
-                }
-                if (planResult?.plan?.overall_status !== PlanStatus.COMPLETED) {
-                    setContinueWithWebsocketFlow(true);
-                }
-                if (planResult?.messages) {
-                    setAgentMessages(planResult.messages);
-                }
-                if (planResult?.mplan) {
-                    setPlanApprovalRequest(planResult.mplan);
-                }
-                setPlanData(planResult);
-                return planResult;
-            } catch (err) {
-                console.log("Failed to load plan data:", err);
-                return null;
-            } finally {
-                setLoading(false);
-            }
-        },
-        [planId, navigate]
-    );
 
     // Loading message rotation effect
     useEffect(() => {
@@ -376,7 +334,47 @@ const PlanPage: React.FC = () => {
                 webSocketService.disconnect();
             };
         }
-    }, [planId, loading, continueWithWebsocketFlow, loadPlanData, planData]);
+    }, [planId, loading, continueWithWebsocketFlow]);
+
+    // Create loadPlanData function with useCallback to memoize it
+    const loadPlanData = useCallback(
+        async (useCache = true): Promise<ProcessedPlanData | null> => {
+            if (!planId) return null;
+
+            setLoading(true);
+            try {
+
+                let planResult: ProcessedPlanData | null = null;
+                console.log("Fetching plan with ID:", planId);
+                planResult = await PlanDataService.fetchPlanData(planId, useCache);
+                console.log("Plan data fetched:", planResult);
+                if (planResult?.plan?.overall_status === PlanStatus.IN_PROGRESS) {
+                    setShowApprovalButtons(true);
+
+                } else {
+                    setShowApprovalButtons(false);
+                    setWaitingForPlan(false);
+                }
+                if (planResult?.plan?.overall_status !== PlanStatus.COMPLETED) {
+                    setContinueWithWebsocketFlow(true);
+                }
+                if (planResult?.messages) {
+                    setAgentMessages(planResult.messages);
+                }
+                if (planResult?.mplan) {
+                    setPlanApprovalRequest(planResult.mplan);
+                }
+                setPlanData(planResult);
+                return planResult;
+            } catch (err) {
+                console.log("Failed to load plan data:", err);
+                return null;
+            } finally {
+                setLoading(false);
+            }
+        },
+        [planId, navigate]
+    );
 
 
     // Handle plan approval
