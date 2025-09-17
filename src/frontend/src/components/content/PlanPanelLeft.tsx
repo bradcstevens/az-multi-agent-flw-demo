@@ -79,6 +79,13 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
     setUserInfo(getUserInfoGlobal());
   }, [loadPlansData, setUserInfo]);
 
+
+  useEffect(() => {
+    console.log("Reload tasks changed:", reloadTasks);
+    if (reloadTasks) {
+      loadPlansData();
+    }
+  }, [loadPlansData, setUserInfo, reloadTasks]);
   useEffect(() => {
     if (plans) {
       const { inProgress, completed } =
@@ -215,7 +222,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
             {/* User Card */}
             <PanelUserCard
-              name={userInfo ? userInfo.user_first_last_name : "Guest"}
+              name={userInfo?.user_first_last_name || "Guest"}
               // alias={userInfo ? userInfo.user_email : ""}
               size={32}
             />

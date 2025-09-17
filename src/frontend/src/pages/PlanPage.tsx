@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Spinner, Text } from "@fluentui/react-components";
 import { PlanDataService } from "../services/PlanDataService";
-import { ProcessedPlanData, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType, PlanStatus, FinalMessage } from "../models";
+import { ProcessedPlanData, WebsocketMessageType, MPlanData, AgentMessageData, AgentMessageType, ParsedUserClarification, AgentType, PlanStatus, FinalMessage, TeamConfig } from "../models";
 import PlanChat from "../components/content/PlanChat";
 import PlanPanelRight from "../components/content/PlanPanelRight";
 import PlanPanelLeft from "../components/content/PlanPanelLeft";
@@ -48,6 +48,7 @@ const PlanPage: React.FC = () => {
     const [showProcessingPlanSpinner, setShowProcessingPlanSpinner] = useState<boolean>(false);
     const [showApprovalButtons, setShowApprovalButtons] = useState<boolean>(true);
     const [continueWithWebsocketFlow, setContinueWithWebsocketFlow] = useState<boolean>(false);
+    const [selectedTeam, setSelectedTeam] = useState<TeamConfig | null>(null);
     // WebSocket connection state
     const [wsConnected, setWsConnected] = useState<boolean>(false);
     const [streamingMessages, setStreamingMessages] = useState<StreamingPlanUpdate[]>([]);
@@ -261,6 +262,7 @@ const PlanPage: React.FC = () => {
                 setShowBufferingText(true);
                 setShowProcessingPlanSpinner(false);
                 setAgentMessages(prev => [...prev, agentMessageData]);
+                setSelectedTeam(planData?.team || null);
                 scrollToBottom();
                 // Persist the agent message
                 const is_final = true;
@@ -270,13 +272,19 @@ const PlanPage: React.FC = () => {
                 }
 
                 processAgentMessage(agentMessageData, planData, is_final, streamingMessageBuffer);
+
+                setTimeout(() => {
+                    console.log('✅ Plan completed, refreshing left list');
+                    setReloadLeftList(true);
+                }, 1000);
+
             }
 
 
         });
 
         return () => unsubscribe();
-    }, [scrollToBottom, planData, processAgentMessage, streamingMessageBuffer]);
+    }, [scrollToBottom, planData, processAgentMessage, streamingMessageBuffer, setSelectedTeam, setReloadLeftList]);
 
     //WebsocketMessageType.AGENT_MESSAGE
     useEffect(() => {
@@ -591,7 +599,7 @@ const PlanPage: React.FC = () => {
                     onTeamSelect={() => { }}
                     onTeamUpload={async () => { }}
                     isHomePage={false}
-                    selectedTeam={null}
+                    selectedTeam={selectedTeam}
                 />
 
                 <Content>
