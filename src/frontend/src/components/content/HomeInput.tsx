@@ -114,36 +114,19 @@ const HomeInput: React.FC<HomeInputProps> = ({
                     dismissToast(id);
                 }
             } catch (error: any) {
+                console.log("Error creating plan:", error);
+                let errorMessage = "Unable to create plan. Please try again.";
                 dismissToast(id);
                 // Check if this is an RAI validation error
-                let errorDetail = null;
                 try {
-                    // Try to parse the error detail if it's a string
-                    if (typeof error?.response?.data?.detail === 'string') {
-                        errorDetail = JSON.parse(error.response.data.detail);
-                    } else {
-                        errorDetail = error?.response?.data?.detail;
-                    }
+                    // errorDetail = JSON.parse(error);
+                    errorMessage = error?.message || errorMessage;
                 } catch (parseError) {
-                    // If parsing fails, use the original error
-                    errorDetail = error?.response?.data?.detail;
+                    console.error("Error parsing error detail:", parseError);
                 }
 
-                // Handle RAI validation errors - just show description as toast
-                if (errorDetail?.error_type === 'RAI_VALIDATION_FAILED') {
-                    const description = errorDetail.description ||
-                        "Your request contains content that doesn't meet our safety guidelines. Please try rephrasing.";
-                    showToast(description, "error");
-                } else {
-                    // Handle other errors with toast messages
-                    const errorMessage = errorDetail?.description ||
-                        errorDetail?.message ||
-                        error?.response?.data?.message ||
-                        error?.message ||
-                        "Something went wrong. Please try again.";
 
-                    showToast(errorMessage, "error");
-                }
+                showToast(errorMessage, "error");
             } finally {
                 setInput("");
                 setSubmitting(false);

@@ -235,18 +235,7 @@ async def process_request(
         )
         raise HTTPException(
             status_code=400,
-            detail={
-                "error_type": "RAI_VALIDATION_FAILED",
-                "message": "Content Safety Check Failed",
-                "description": "Your request contains content that doesn't meet our safety guidelines. Please modify your request to ensure it's appropriate and try again.",
-                "suggestions": [
-                    "Remove any potentially harmful, inappropriate, or unsafe content",
-                    "Use more professional and constructive language",
-                    "Focus on legitimate business or educational objectives",
-                    "Ensure your request complies with content policies",
-                ],
-                "user_action": "Please revise your request and try again",
-            },
+            detail="Request contains content that doesn't meet our safety guidelines, try again.",
         )
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
@@ -256,7 +245,7 @@ async def process_request(
         track_event_if_configured(
             "UserIdNotFound", {"status_code": 400, "detail": "no user"}
         )
-        raise HTTPException(status_code=400, detail="no user")
+        raise HTTPException(status_code=400, detail="no user found")
 
     # if not input_task.team_id:
     #     track_event_if_configured(
