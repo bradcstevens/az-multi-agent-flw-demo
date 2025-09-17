@@ -893,16 +893,30 @@ export class PlanDataService {
     }
 
     // Capture the inside of UserClarificationResponse(...)
-    const outerMatch = line.match(/Human clarification:\s*UserClarificationResponse\((.*?)\)/s);
+    const outerMatch = line.match(/Human clarification:\s*UserClarificationResponse\((.*)\)$/s);
     if (!outerMatch) return line;
 
     const inner = outerMatch[1];
 
-    // Find answer= '...' | "..."
-    const answerMatch = inner.match(/answer=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/);
-    if (!answerMatch) return line;
+    // Find answer= '...' | "..." - Updated regex to handle the full content properly
+    const answerMatch = inner.match(/answer='([^']*(?:''[^']*)*)'/);
+    if (!answerMatch) {
+      // Try double quotes if single quotes don't work
+      const doubleQuoteMatch = inner.match(/answer="([^"]*(?:""[^"]*)*)"/);
+      if (!doubleQuoteMatch) return line;
 
-    let answer = answerMatch[1] ?? answerMatch[2] ?? '';
+      let answer = doubleQuoteMatch[1];
+      answer = answer
+        .replace(/\\n/g, '\n')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+        .trim();
+
+      return `Human clarification: ${answer}`;
+    }
+
+    let answer = answerMatch[1];
     // Unescape common sequences
     answer = answer
       .replace(/\\n/g, '\n')
