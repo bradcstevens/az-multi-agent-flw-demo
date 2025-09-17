@@ -673,14 +673,12 @@ module virtualNetwork 'br/public:avm/res/network/virtual-network:0.7.0' = if (en
       {
         name: 'backend'
         addressPrefix: '10.0.0.0/27'
-        //defaultOutboundAccess: false TODO: check this configuration for a more restricted outbound access
         networkSecurityGroupResourceId: networkSecurityGroupBackend!.outputs.resourceId
       }
       {
         name: 'administration'
         addressPrefix: '10.0.0.32/27'
         networkSecurityGroupResourceId: networkSecurityGroupAdministration!.outputs.resourceId
-        //defaultOutboundAccess: false TODO: check this configuration for a more restricted outbound access
         //natGatewayResourceId: natGateway.outputs.resourceId
       }
       {
@@ -1314,7 +1312,6 @@ var cosmosDbResourceName = 'cosmos-${solutionSuffix}'
 var cosmosDbDatabaseName = 'macae'
 var cosmosDbDatabaseMemoryContainerName = 'memory'
 
-//TODO: update to latest version of AVM module
 module cosmosDb 'br/public:avm/res/document-db/database-account:0.15.0' = {
   name: take('avm.res.document-db.database-account.${cosmosDbResourceName}', 64)
   params: {
@@ -1530,24 +1527,6 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
         name: 'backend'
         //image: '${backendContainerRegistryHostname}/${backendContainerImageName}:${backendContainerImageTag}'
         image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-        //TODO: configure probes for container app
-        // probes: [
-        //   {
-        //     httpGet: {
-        //       httpHeaders: [
-        //         {
-        //           name: 'Custom-Header'
-        //           value: 'Awesome'
-        //         }
-        //       ]
-        //       path: '/health'
-        //       port: 8080
-        //     }
-        //     initialDelaySeconds: 3
-        //     periodSeconds: 3
-        //     type: 'Liveness'
-        //   }
-        // ]
         resources: {
           cpu: '2.0'
           memory: '4.0Gi'
@@ -1746,24 +1725,6 @@ module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = {
         name: 'mcp'
         //image: '${backendContainerRegistryHostname}/${backendContainerImageName}:${backendContainerImageTag}'
         image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-        //TODO: configure probes for container app
-        // probes: [
-        //   {
-        //     httpGet: {
-        //       httpHeaders: [
-        //         {
-        //           name: 'Custom-Header'
-        //           value: 'Awesome'
-        //         }
-        //       ]
-        //       path: '/health'
-        //       port: 8080
-        //     }
-        //     initialDelaySeconds: 3
-        //     periodSeconds: 3
-        //     type: 'Liveness'
-        //   }
-        // ]
         resources: {
           cpu: '2.0'
           memory: '4.0Gi'

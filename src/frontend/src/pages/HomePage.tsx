@@ -103,7 +103,6 @@ const HomePage: React.FC = () => {
         if (team) {
 
             try {
-                // TODO REFRACTOR THIS CODE 
                 setIsLoadingTeam(true);
                 const initResponse = await TeamService.initializeTeam(true);
 
@@ -198,7 +197,6 @@ const HomePage: React.FC = () => {
                                 selectedTeam={selectedTeam}
                             />
                         ) : (
-                            // TODO MOVE THIS STYLE TO CSS 
                             <div style={{
                                 display: 'flex',
                                 justifyContent: 'center',
