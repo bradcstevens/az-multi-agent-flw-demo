@@ -417,6 +417,8 @@ const PlanPage: React.FC = () => {
                 return planResult;
             } catch (err) {
                 console.log("Failed to load plan data:", err);
+                setErrorLoading(true);
+                setPlanData(null);
                 return null;
             } finally {
                 setLoading(false);
@@ -572,6 +574,15 @@ const PlanPage: React.FC = () => {
         return (
             <CoralShellColumn>
                 <CoralShellRow>
+                    <PlanPanelLeft
+                        reloadTasks={reloadLeftList}
+                        onNewTaskButton={handleNewTaskButton}
+                        restReload={resetReload}
+                        onTeamSelect={() => { }}
+                        onTeamUpload={async () => { }}
+                        isHomePage={false}
+                        selectedTeam={selectedTeam}
+                    />
                     <Content>
                         <div style={{
                             textAlign: "center",
