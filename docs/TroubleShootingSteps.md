@@ -556,6 +556,30 @@ If the server was deleted, either restore it (if possible) or update references 
 
 </details>
 
+<details>
+
+<summary><b>SpecialFeatureOrQuotaIdRequired</b></summary>
+
+This error occurs when your subscription does not have access to certain Azure OpenAI models.  
+
+**Example error message:**  
+`SpecialFeatureOrQuotaIdRequired: The current subscription does not have access to this model 'Format:OpenAI,Name:o3,Version:2025-04-16'.`  
+
+**Resolution:**  
+To gain access, submit a request using the official form:  
+👉 [Azure OpenAI Model Access Request](https://customervoice.microsoft.com/Pages/ResponsePage.aspx?id=v4j5cvGGr0GRqy180BHbR7en2Ais5pxKtso_Pz4b1_xUQ1VGQUEzRlBIMVU2UFlHSFpSNkpOR0paRSQlQCN0PWcu)  
+
+You’ll need to use this form if you require access to the following restricted models:  
+- gpt-5  
+- o3  
+- o3-pro  
+- deep research  
+- reasoning summary  
+- gpt-image-1  
+
+Once your request is approved, redeploy your resource.
+
+</details>
 
 💡 Note: If you encounter any other issues, you can refer to the [Common Deployment Errors](https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/common-deployment-errors) documentation.
 If the problem persists, you can also raise an bug in our [MACAE Github Issues](https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/issues) for further support.
