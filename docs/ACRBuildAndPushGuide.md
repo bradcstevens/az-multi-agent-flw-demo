@@ -6,24 +6,44 @@ This guide provides step-by-step instructions to build and push Docker images fo
 Before starting, ensure you have:
 - An active [Azure Subscription](https://portal.azure.com/)
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) installed and logged in
-- [Docker](https://docs.docker.com/get-docker/) installed and running
+- [Docker Desktop](https://docs.docker.com/get-docker/) installed and running
 - Access to your Azure Container Registry (ACR)
+- To create an Azure Container Registry (ACR), you can refer to the following guides:
+
+    - [Create Container Registry using Azure CLI](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-get-started-azure-cli)
+
+    - [Create Container Registry using Azure Portal](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-get-started-portal?tabs=azure-cli)
+
+    - [Create Container Registry using PowerShell](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-get-started-powershell)
+
+    - [Create Container Registry using ARM Template](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-get-started-geo-replication-template)
+
+    - [Create Container Registry using Bicep](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-get-started-bicep?tabs=CLI)
 
 ---
-
-## 🚀 Build and Push Images
 
 Login to ACR :
 ``` bash
 az acr login --name $ACR_NAME
 ```
-Command Build and Push Images to Backend : 
+
+## 🚀 Build and Push Images
+
+**Backend :** 
  
  ```bash 
- az acr login --name <containerregname>
-docker build --no-cache -f docker/Frontend.Dockerfile -t <acrloginserver>/<repo>:<tagname> .
+az acr login --name <containerregname>
+docker build --no-cache -f docker/Backend.Dockerfile -t <acrloginserver>/<repo>:<tagname> .
 docker push <acrloginserver>/<repo>:<tagname>
  ```
+
+**WebApp :**
+
+```bash
+az acr login --name <containerregname>
+docker build --no-cache -f docker/Frontend.Dockerfile -t <acrloginserver>/<repo>:<tagname> .
+docker push <acrloginserver>/<repo>:<tagname>
+```
 
 ## ✅ Verification
 
