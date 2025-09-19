@@ -235,11 +235,11 @@ class CosmosDBClient(DatabaseBase):
         return await self.query_items(query, parameters, Plan)
 
 
-    async def get_all_plans_by_team_id_status(self, team_id: str, status: str) -> List[Plan]:
+    async def get_all_plans_by_team_id_status(self, user_id: str,team_id: str, status: str) -> List[Plan]:
         """Retrieve all plans for a specific team."""
         query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id and c.overall_status=@status ORDER BY c._ts DESC"
         parameters = [
-            {"name": "@user_id", "value": self.user_id},
+            {"name": "@user_id", "value": user_id},
             {"name": "@team_id", "value": team_id},
             {"name": "@data_type", "value": DataType.plan},
             {"name": "@status", "value": status},

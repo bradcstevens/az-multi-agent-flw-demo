@@ -1214,7 +1214,7 @@ async def get_plans(request: Request):
         return []
 
     all_plans = await memory_store.get_all_plans_by_team_id_status(
-        team_id=current_team.team_id, status=PlanStatus.completed
+        user_id=user_id, team_id=current_team.team_id, status=PlanStatus.completed
     )
 
     return all_plans

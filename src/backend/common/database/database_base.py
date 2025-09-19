@@ -93,7 +93,7 @@ class DatabaseBase(ABC):
 
     @abstractmethod
     async def get_all_plans_by_team_id_status(
-        self, team_id: str, status: str
+        self, user_id:str, team_id: str, status: str
     ) -> List[Plan]:
         """Retrieve all plans for a specific team."""
         pass
