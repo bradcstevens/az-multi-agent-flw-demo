@@ -13,7 +13,7 @@ from semantic_kernel.agents.orchestration.magentic import (
     MagenticContext, ProgressLedger, ProgressLedgerItem,
     StandardMagenticManager)
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import (
-    ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT,
+    ORCHESTRATOR_FINAL_ANSWER_PROMPT, ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT,
     ORCHESTRATOR_TASK_LEDGER_PLAN_UPDATE_PROMPT)
 from semantic_kernel.contents import ChatMessageContent
 from v3.config.settings import (connection_config, current_user_id,
@@ -61,9 +61,15 @@ Here is an example of a well-structured plan:
 
 """
 
+        final_append = """
+The final answer should not include any offers of further conversation or assistance.  The application will not all further interaction with the user.
+The final answer should be a complete and final response to the user's original request.
+"""
+
         # kwargs["task_ledger_facts_prompt"] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + facts_append
         kwargs['task_ledger_plan_prompt'] = ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT + plan_append
         kwargs['task_ledger_plan_update_prompt'] = ORCHESTRATOR_TASK_LEDGER_PLAN_UPDATE_PROMPT + plan_append
+        kwargs['final_answer_prompt'] = ORCHESTRATOR_FINAL_ANSWER_PROMPT + final_append
 
         super().__init__(*args, **kwargs)
 
