@@ -3,6 +3,7 @@
 
 import asyncio
 import contextvars
+import logging
 import os
 import uuid
 from contextvars import ContextVar
@@ -18,12 +19,12 @@ from semantic_kernel.connectors.ai.open_ai import (
     AzureChatCompletion, OpenAIChatPromptExecutionSettings)
 from semantic_kernel.contents import (ChatMessageContent,
                                       StreamingChatMessageContent)
-from v3.models.messages import WebsocketMessageType
 from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
 from v3.config.settings import (config, connection_config, current_user_id,
                                 orchestration_config)
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
+from v3.models.messages import WebsocketMessageType
 from v3.orchestration.human_approval_manager import \
     HumanApprovalMagenticManager
 
@@ -33,8 +34,13 @@ current_user_id: ContextVar[Optional[str]] = contextvars.ContextVar("current_use
 class OrchestrationManager:
     """Manager for handling orchestration logic."""
 
+    # Class-scoped logger (always available to classmethods)
+    logger = logging.getLogger(f"{__name__}.OrchestrationManager")
+
     def __init__(self):
         self.user_id: Optional[str] = None
+        # Optional alias (helps with autocomplete)
+        self.logger = self.__class__.logger
 
     @classmethod
     async def init_orchestration(cls, agents: List, user_id: str = None)-> MagenticOrchestration:
@@ -83,7 +89,7 @@ class OrchestrationManager:
         return callback
     
     @classmethod
-    async def get_current_or_new_orchestration(self, user_id: str, team_config: TeamConfiguration, team_switched: bool) -> MagenticOrchestration: # add team_switched: bool parameter
+    async def get_current_or_new_orchestration(cls, user_id: str, team_config: TeamConfiguration, team_switched: bool) -> MagenticOrchestration: # add team_switched: bool parameter
         """get existing orchestration instance."""
         current_orchestration = orchestration_config.get_current_orchestration(user_id)
         if current_orchestration is None or team_switched: # add check for team_switched flag
@@ -93,10 +99,10 @@ class OrchestrationManager:
                         try:
                             await agent.close()
                         except Exception as e:
-                            print(f"Error closing agent: {e}")
+                            cls.logger.error("Error closing agent: %s", e)
             factory = MagenticAgentFactory()
             agents = await factory.get_agents(team_config_input=team_config)
-            orchestration_config.orchestrations[user_id] = await self.init_orchestration(agents, user_id)
+            orchestration_config.orchestrations[user_id] = await cls.init_orchestration(agents, user_id)
         return orchestration_config.get_current_orchestration(user_id)
 
     async def run_orchestration(self, user_id, input_task) -> None:
@@ -114,9 +120,9 @@ class OrchestrationManager:
         try:
             if hasattr(magentic_orchestration, '_manager') and hasattr(magentic_orchestration._manager, 'current_user_id'):
                 magentic_orchestration._manager.current_user_id = user_id
-                print(f"🔍 DEBUG: Set user_id on manager = {user_id}")
+                self.logger.debug(f"DEBUG: Set user_id on manager = {user_id}")
         except Exception as e:
-            print(f"Error setting user_id on manager: {e}")
+            self.logger.error(f"Error setting user_id on manager: {e}")
         
         runtime = InProcessRuntime()
         runtime.start()
@@ -129,10 +135,10 @@ class OrchestrationManager:
             )
 
             try:
-                print("\nAgent responses:")
+                self.logger.info("\nAgent responses:")
                 value = await orchestration_result.get()
-                print(f"\nFinal result:\n{value}")
-                print("=" * 50)
+                self.logger.info(f"\nFinal result:\n{value}")
+                self.logger.info("=" * 50)
 
                 # Send final result via WebSocket
                 await connection_config.send_status_update_async({
@@ -143,16 +149,16 @@ class OrchestrationManager:
                         "timestamp": asyncio.get_event_loop().time()
                     }
                 }, user_id, message_type=WebsocketMessageType.FINAL_RESULT_MESSAGE)
-                print(f"Final result sent via WebSocket to user {user_id}")
+                self.logger.info(f"Final result sent via WebSocket to user {user_id}")
             except Exception as e:
-                print(f"Error: {e}")
-                print(f"Error type: {type(e).__name__}")
+                self.logger.info(f"Error: {e}")
+                self.logger.info(f"Error type: {type(e).__name__}")
                 if hasattr(e, '__dict__'):
-                    print(f"Error attributes: {e.__dict__}")
-                print("=" * 50)
+                    self.logger.info(f"Error attributes: {e.__dict__}")
+                self.logger.info("=" * 50)
 
         except Exception as e:
-            print(f"Unexpected error: {e}")
+            self.logger.error(f"Unexpected error: {e}")
         finally:
             await runtime.stop_when_idle()
             current_user_id.reset(token)
