@@ -4,10 +4,7 @@ Tests Bing search, RAG, MCP tools, and Code Interpreter capabilities.
 """
 # pylint: disable=E0401, E0611, C0413
 
-import asyncio
-import os
 import sys
-import time
 from pathlib import Path
 
 import pytest

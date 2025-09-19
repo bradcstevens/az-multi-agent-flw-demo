@@ -4,32 +4,34 @@ Extends StandardMagenticManager to add approval gates before plan execution.
 """
 
 import asyncio
+import logging
 import re
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import v3.models.messages as messages
-from semantic_kernel.agents import Agent
 from semantic_kernel.agents.orchestration.magentic import (
     MagenticContext, ProgressLedger, ProgressLedgerItem,
     StandardMagenticManager)
 from semantic_kernel.agents.orchestration.prompts._magentic_prompts import (
-    ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT,
-    ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT,
+    ORCHESTRATOR_FINAL_ANSWER_PROMPT, ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT,
     ORCHESTRATOR_TASK_LEDGER_PLAN_UPDATE_PROMPT)
 from semantic_kernel.contents import ChatMessageContent
 from v3.config.settings import (connection_config, current_user_id,
                                 orchestration_config)
 from v3.models.models import MPlan, MStep
+from v3.orchestration.helper.plan_to_mplan_converter import \
+    PlanToMPlanConverter
 
-# Create a progress ledger that indicates the request is satisfied (task complete)
+# Using a module level logger to avoid pydantic issues around inherited fields
+logger = logging.getLogger(__name__)
 
-
+# Create a progress ledger that indicates the request is satisfied (task completed)
 class HumanApprovalMagenticManager(StandardMagenticManager):
     """
     Extended Magentic manager that requires human approval before executing plan steps.
     Provides interactive approval for each step in the orchestration plan.
     """
-    
+
     # Define Pydantic fields to avoid validation errors
     approval_enabled: bool = True
     magentic_plan: Optional[MPlan] = None
@@ -37,13 +39,6 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
 
     def __init__(self, *args, **kwargs):
         # Remove any custom kwargs before passing to parent
-
-        # Use object.__setattr__ to bypass Pydantic validation
-        # object.__setattr__(self, 'current_user_id', None)
-
-        facts_append = """
-
-        """
 
         plan_append = """
 IMPORTANT: Never ask the user for information or clarification until all agents on the team have been asked first.
@@ -66,10 +61,16 @@ Here is an example of a well-structured plan:
 
 """
 
+        final_append = """
+The final answer should not include any offers of further conversation or assistance.  The application will not all further interaction with the user.
+The final answer should be a complete and final response to the user's original request.
+"""
+
         # kwargs["task_ledger_facts_prompt"] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + facts_append
         kwargs['task_ledger_plan_prompt'] = ORCHESTRATOR_TASK_LEDGER_PLAN_PROMPT + plan_append
         kwargs['task_ledger_plan_update_prompt'] = ORCHESTRATOR_TASK_LEDGER_PLAN_UPDATE_PROMPT + plan_append
-        
+        kwargs['final_answer_prompt'] = ORCHESTRATOR_FINAL_ANSWER_PROMPT + final_append
+
         super().__init__(*args, **kwargs)
 
     async def plan(self, magentic_context: MagenticContext) -> Any:
@@ -82,15 +83,16 @@ Here is an example of a well-structured plan:
             task_text = task_text.content
         elif not isinstance(task_text, str):
             task_text = str(task_text)
-        
-        print(f"\n Human-in-the-Loop Magentic Manager Creating Plan:")
-        print(f"   Task: {task_text}")
-        print("-" * 60)
-        
+
+        logger.info("\n Human-in-the-Loop Magentic Manager Creating Plan:")
+        logger.info("   Task: %s", task_text)
+        logger.info("-" * 60)
+
         # First, let the parent create the actual plan
-        print(" Creating execution plan...")
+        logger.info(" Creating execution plan...")
         plan = await super().plan(magentic_context)
-        print(f" Plan created: {plan}")
+        logger.info(" Plan created: %s",plan)
+
         self.magentic_plan = self.plan_to_obj( magentic_context, self.task_ledger)
 
         self.magentic_plan.user_id = current_user_id.get()
@@ -107,7 +109,7 @@ Here is an example of a well-structured plan:
         try:
             orchestration_config.plans[self.magentic_plan.id] = self.magentic_plan 
         except Exception as e:
-            print(f"Error processing plan approval: {e}")
+            logger.error("Error processing plan approval: %s", e)
 
 
         # Send the approval request to the user's WebSocket
@@ -116,31 +118,31 @@ Here is an example of a well-structured plan:
             message=approval_message,
             user_id=current_user_id.get(),
             message_type=messages.WebsocketMessageType.PLAN_APPROVAL_REQUEST)
-        
+
         # Wait for user approval
         approval_response = await self._wait_for_user_approval(approval_message.plan.id)
-        
+
         if approval_response and approval_response.approved:
-            print("Plan approved - proceeding with execution...")
+            logger.info("Plan approved - proceeding with execution...")
             return plan
         else:
-            print("Plan execution cancelled by user")
+            logger.debug("Plan execution cancelled by user")
             await connection_config.send_status_update_async({
                 "type": messages.WebsocketMessageType.PLAN_APPROVAL_RESPONSE, 
                 "data": approval_response
             }, user_id=current_user_id.get(), message_type=messages.WebsocketMessageType.PLAN_APPROVAL_RESPONSE)
             raise Exception("Plan execution cancelled by user") 
-            
+
     async def replan(self,magentic_context: MagenticContext) -> Any:
         """ 
         Override to add websocket messages for replanning events. 
         """
 
-        print(f"\nHuman-in-the-Loop Magentic Manager replanned:")
+        logger.info("\nHuman-in-the-Loop Magentic Manager replanned:")
         replan = await super().replan(magentic_context=magentic_context)
-        print("Replanned: %s", replan)
+        logger.info("Replanned: %s", replan)
         return replan
-    
+
     async def create_progress_ledger(self, magentic_context: MagenticContext) -> ProgressLedger:
         """ Check for max rounds exceeded and send final message if so. """
         if magentic_context.round_count >= orchestration_config.max_rounds:
@@ -150,12 +152,12 @@ Here is an example of a well-structured plan:
                 status="terminated",
                 summary=f"Stopped after {magentic_context.round_count} rounds (max: {orchestration_config.max_rounds})"
             )
-            
+
             await connection_config.send_status_update_async(
                 message= final_message,
                 user_id=current_user_id.get(),
                 message_type=messages.WebsocketMessageType.FINAL_RESULT_MESSAGE)
-            
+
             return ProgressLedger(
                 is_request_satisfied=ProgressLedgerItem(reason="Maximum rounds exceeded", answer=True),
                 is_in_loop=ProgressLedgerItem(reason="Terminating", answer=False),
@@ -163,12 +165,13 @@ Here is an example of a well-structured plan:
                 next_speaker=ProgressLedgerItem(reason="Task complete", answer=""),
                 instruction_or_question=ProgressLedgerItem(reason="Task complete", answer="Process terminated due to maximum rounds exceeded")
             )
-        
+
         return await super().create_progress_ledger(magentic_context)
-    
-    async def _wait_for_user_approval(self, m_plan_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: # plan_id will not be optional in future
+
+    # plan_id will not be optional in future
+    async def _wait_for_user_approval(self, m_plan_id: Optional[str] = None) -> Optional[messages.PlanApprovalResponse]: 
         """Wait for user approval response."""
-        
+
         # To do: implement timeout and error handling
         if m_plan_id not in orchestration_config.approvals:
             orchestration_config.approvals[m_plan_id] = None
@@ -180,85 +183,72 @@ Here is an example of a well-structured plan:
         """
         Override to ensure final answer is prepared after all steps are executed.
         """
-        print("\n Magentic Manager - Preparing final answer...")
+        logger.info("\n Magentic Manager - Preparing final answer...")
 
         return await super().prepare_final_answer(magentic_context)
-
-    
-    async def _get_plan_approval_with_details(self, task: str, participant_descriptions: dict, plan: Any) -> bool:
-        while True:
-            approval = input("\ Approve this execution plan? [y/n/details]: ").strip().lower()
-            
-            if approval in ['y', 'yes']:
-                print(" Plan approved by user")
-                return True
-            elif approval in ['n', 'no']:
-                print(" Plan rejected by user")
-                return False
-            # elif approval in ['d', 'details']:
-            #     self._show_detailed_plan_info(task, participant_descriptions, plan)
-            else:
-                print("Please enter 'y' for yes, 'n' for no, or 'details' for more info")
     
 
     def plan_to_obj(self, magentic_context, ledger) -> MPlan:
         """ Convert the generated plan from the ledger into a structured MPlan object. """
-        
-        return_plan: MPlan = MPlan()
 
-        # get the request text from the ledger
-        if hasattr(magentic_context, 'task'):
-            return_plan.user_request = magentic_context.task
+        return_plan: MPlan = PlanToMPlanConverter.convert(plan_text=ledger.plan.content,facts=ledger.facts.content, team=list(magentic_context.participant_descriptions.keys()), task=magentic_context.task)
 
-        return_plan.team = list(magentic_context.participant_descriptions.keys())
-        
-        # Get the facts content from the ledger
-        if hasattr(ledger, 'facts') and ledger.facts.content:
-            return_plan.facts = ledger.facts.content
+        # # get the request text from the ledger
+        # if hasattr(magentic_context, 'task'):
+        #     return_plan.user_request = magentic_context.task
 
-        # Get the plan / steps content from the ledger
-        # Split the description into lines and clean them
-        lines = [line.strip() for line in ledger.plan.content.strip().split('\n') if line.strip()]
-        
-        found_agent = None
-        prefix = None
-        
-        for line in lines:
-            # match lines that look like bullet points
-            if re.match(r'^[-•*]\s+', line):
-                # Remove the bullet point marker
-                line = re.sub(r'^[-•*]\s+', '', line).strip()
-            
-            # Look for agent names in the line
-            
-            for agent_name in return_plan.team:
-                # Check if agent name appears in the line (case insensitive)
-                if agent_name.lower() in line.lower():
-                    found_agent = agent_name
-                    line = line.split(agent_name, 1)
-                    line = line[1].strip() if len(line) > 1 else ""
-                    line = line.replace('*', '').strip()
-                    break
-            
-            if not found_agent:
-                # If no agent found, assign to ProxyAgent if available
-                found_agent = "MagenticAgent"
-            # If line indicates a following list of actions (e.g. "Assign **EnhancedResearchAgent** 
-            # to gather authoritative data on:") save and prefix to the steps
-            if line.endswith(':'):
-                line = line.replace(':', '').strip()
-                prefix = line + " "
+        # return_plan.team = list(magentic_context.participant_descriptions.keys())
 
-            # Don't create a step if action is blank 
-            if line.strip() != "":
-                if prefix:
-                    line = prefix + line
-                # Create the step object
-                step = MStep(agent=found_agent, action=line)
+        # # Get the facts content from the ledger
+        # if hasattr(ledger, 'facts') and ledger.facts.content:
+        #     return_plan.facts = ledger.facts.content
 
-                # add the step to the plan
-                return_plan.steps.append(step) # pylint: disable=E1101
+        # # Get the plan / steps content from the ledger
+        # # Split the description into lines and clean them
+        # lines = [line.strip() for line in ledger.plan.content.strip().split('\n') if line.strip()]
+
+        # found_agent = None
+        # prefix = None
+
+        # for line in lines:
+        #     found_agent = None
+        #     prefix = None
+        #     # log the line for troubleshooting
+        #     logger.debug("Processing plan line: %s", line)
+
+        #     # match only lines that have bullet points
+        #     if re.match(r'^[-•*]\s+', line):
+        #         # Remove the bullet point marker
+        #         line = re.sub(r'^[-•*]\s+', '', line).strip()
+
+        #         # Look for agent names in the line
+
+        #         for agent_name in return_plan.team:
+        #             # Check if agent name appears in the line (case insensitive)
+        #             if agent_name.lower() in line[:20].lower():
+        #                 found_agent = agent_name
+        #                 line = line.split(agent_name, 1)
+        #                 line = line[1].strip() if len(line) > 1 else ""
+        #                 line = line.replace('*', '').strip()
+        #                 break
+
+        #         if not found_agent:
+        #             # If no agent found, assign to ProxyAgent if available
+        #             found_agent = "MagenticAgent"
+        #         # If line indicates a following list of actions (e.g. "Assign **EnhancedResearchAgent**
+        #         # to gather authoritative data on:") save and prefix to the steps
+        #         # if line.endswith(':'):
+        #         #     line = line.replace(':', '').strip()
+        #         #     prefix = line + " "
+
+        #         # Don't create a step if action is blank
+        #         if line.strip() != "":
+        #             if prefix:
+        #                 line = prefix + line
+        #             # Create the step object
+        #             step = MStep(agent=found_agent, action=line)
+
+        #             # add the step to the plan
+        #             return_plan.steps.append(step) # pylint: disable=E1101
 
         return return_plan
-
-
