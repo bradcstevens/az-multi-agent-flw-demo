@@ -117,6 +117,7 @@ jobs:
               enableMonitoring=true \
               enablePrivateNetworking=true \
               enableScalability=true \
+              createdBy="Pipeline" \
               
 
       - name: Send Notification on Failure
