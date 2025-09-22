@@ -62,8 +62,7 @@ Here is an example of a well-structured plan:
 """
 
         final_append = """
-The final answer should not include any offers of further conversation or assistance.  The application will not all further interaction with the user.
-The final answer should be a complete and final response to the user's original request.
+ DO NOT EVER OFFER TO HELP FURTHER IN THE FINAL ANSWER! Just provide the final answer and end with a polite closing.
 """
 
         # kwargs["task_ledger_facts_prompt"] = ORCHESTRATOR_TASK_LEDGER_FACTS_PROMPT + facts_append
