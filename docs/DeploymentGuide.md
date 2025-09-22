@@ -61,6 +61,23 @@ By default, the `azd up` command uses the [`main.parameters.json`](../infra/main
 
 For **production deployments**, the repository also provides [`main.waf.parameters.json`](../infra/main.waf.parameters.json), which applies a [Well-Architected Framework (WAF) aligned](https://learn.microsoft.com/en-us/azure/well-architected/) configuration. This option enables additional Azure best practices for reliability, security, cost optimization, operational excellence, and performance efficiency, such as:
 
+  **Prerequisite** — Enable the Microsoft.Compute/EncryptionAtHost feature for every subscription (and region, if required) where you plan to deploy VMs or VM scale sets with `encryptionAtHost: true`. Repeat the registration steps below for each target subscription (and for each region when applicable). This step is required for **WAF-aligned** (production) deployments.
+
+  Steps to enable the feature:
+  1. Set the target subscription:
+     Run: <code>az account set --subscription "&lt;YourSubscriptionId&gt;"</code>
+  2. Register the feature (one time per subscription):
+     Run: <code>az feature register --name EncryptionAtHost --namespace Microsoft.Compute</code>
+  3. Wait until registration completes and shows "Registered":
+     Run: <code>az feature show --name EncryptionAtHost --namespace Microsoft.Compute --query properties.state -o tsv</code>
+  4. Refresh the provider (if required):
+     Run: <code>az provider register --namespace Microsoft.Compute</code>
+  5. Re-run the deployment after registration is complete.
+
+  Note: Feature registration can take several minutes. Ensure the feature is registered before attempting deployments that require encryptionAtHost.
+
+  Reference: Azure Host Encryption — https://learn.microsoft.com/azure/virtual-machines/disks-enable-host-based-encryption-portal?tabs=azure-cli
+
   - Enhanced network security (e.g., Network protection with private endpoints)
   - Stricter access controls and managed identities
   - Logging, monitoring, and diagnostics enabled by default
