@@ -3,11 +3,12 @@ name: Build Docker and Optional Push
 on:
   push:
     branches:
-      - main
-      - dev
-      - dev-v3
-      - demo
-      - hotfix
+      # - main
+      # - dev
+      # - dev-v3
+      - macae-v2
+      # - demo
+      # - hotfix
   pull_request:
     types:
       - opened
@@ -15,11 +16,12 @@ on:
       - reopened
       - synchronize
     branches:
-      - main
-      - dev
-      - dev-v3
-      - demo
-      - hotfix
+      # - main
+      # - dev
+      # - dev-v3
+      - macae-v2
+      # - demo
+      # - hotfix
   workflow_dispatch:
 
 jobs:
@@ -34,7 +36,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Log in to Azure Container Registry
-        if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'dev-v3'|| github.ref_name == 'demo' || github.ref_name == 'hotfix' }}
+        if: ${{ github.ref_name == 'macae-v2' }}
         uses: azure/docker-login@v2
         with:
           login-server: ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}
@@ -53,16 +55,9 @@ jobs:
       - name: Determine Tag Name Based on Branch
         id: determine_tag
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "TAG=latest_v3" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-            echo "TAG=dev_v3" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/dev-v3" ]]; then
-            echo "TAG=dev_v3" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/demo" ]]; then
-            echo "TAG=demo" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/hotfix" ]]; then
-            echo "TAG=hotfix" >> $GITHUB_ENV
+ 
+          if [[ "${{ github.ref }}" == "refs/heads/macae-v2" ]]; then
+            echo "TAG=latest" >> $GITHUB_ENV
           else
             echo "TAG=pullrequest-ignore" >> $GITHUB_ENV
           fi
@@ -94,12 +89,3 @@ jobs:
             ${{ steps.registry.outputs.ext_registry }}/macaefrontend:${{ env.TAG }}
             ${{ steps.registry.outputs.ext_registry }}/macaefrontend:${{ env.HISTORICAL_TAG }}
       
-      - name: Build and optionally push MCP Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./src/mcp_server
-          file: ./src/mcp_server/Dockerfile
-          push: ${{ env.TAG != 'pullrequest-ignore' }}
-          tags: |
-            ${{ steps.registry.outputs.ext_registry }}/macaemcp:${{ env.TAG }}
-            ${{ steps.registry.outputs.ext_registry }}/macaemcp:${{ env.HISTORICAL_TAG }}
