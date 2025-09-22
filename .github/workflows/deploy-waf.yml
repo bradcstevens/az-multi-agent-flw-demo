@@ -1,4 +1,4 @@
-name: Validate WAF Deployment
+name: Validate WAF Deployment v3
 
 on:
   push:

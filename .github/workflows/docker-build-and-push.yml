@@ -1,12 +1,11 @@
-name: Build Docker and Optional Push
+name: Build Docker and Optional Push v3
 
 on:
   push:
     branches:
       - main
-      - dev
       - dev-v3
-      - demo
+      - demo-v3
       - hotfix
   pull_request:
     types:
@@ -16,9 +15,8 @@ on:
       - synchronize
     branches:
       - main
-      - dev
       - dev-v3
-      - demo
+      - demo-v3
       - hotfix
   workflow_dispatch:
 
@@ -34,7 +32,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Log in to Azure Container Registry
-        if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'dev-v3'|| github.ref_name == 'demo' || github.ref_name == 'hotfix' }}
+        if: ${{ github.ref_name == 'main' || github.ref_name == 'dev-v3'|| github.ref_name == 'demo-v3' || github.ref_name == 'hotfix' }}
         uses: azure/docker-login@v2
         with:
           login-server: ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}
@@ -55,12 +53,10 @@ jobs:
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "TAG=latest_v3" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-            echo "TAG=dev_v3" >> $GITHUB_ENV
           elif [[ "${{ github.ref }}" == "refs/heads/dev-v3" ]]; then
             echo "TAG=dev_v3" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/demo" ]]; then
-            echo "TAG=demo" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == "refs/heads/demo-v3" ]]; then
+            echo "TAG=demo_v3" >> $GITHUB_ENV
           elif [[ "${{ github.ref }}" == "refs/heads/hotfix" ]]; then
             echo "TAG=hotfix" >> $GITHUB_ENV
           else
