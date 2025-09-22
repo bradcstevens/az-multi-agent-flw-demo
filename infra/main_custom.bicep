@@ -133,31 +133,31 @@ param virtualMachineAdminPassword string = newGuid()
 // These parameters are changed for testing - please reset as part of publication
 
 @description('Optional. The Container Registry hostname where the docker images for the backend are located.')
-param backendContainerRegistryHostname string = 'macaev3tst1acr.azurecr.io'
+param backendContainerRegistryHostname string = 'biabcontainerreg.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the backend.')
-param backendContainerImageName string = 'macae-backend'
+param backendContainerImageName string = 'macaebackend'
 
 @description('Optional. The Container Image Tag to deploy on the backend.')
-param backendContainerImageTag string = 'v3tst1'
+param backendContainerImageTag string = 'latest_v3'
 
 @description('Optional. The Container Registry hostname where the docker images for the frontend are located.')
-param frontendContainerRegistryHostname string = 'macaev3tst1acr.azurecr.io'
+param frontendContainerRegistryHostname string = 'biabcontainerreg.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the frontend.')
-param frontendContainerImageName string = 'macae-frontend'
+param frontendContainerImageName string = 'macaefrontend'
 
 @description('Optional. The Container Image Tag to deploy on the frontend.')
-param frontendContainerImageTag string = 'v3tst1'
+param frontendContainerImageTag string = 'latest_v3'
 
 @description('Optional. The Container Registry hostname where the docker images for the MCP are located.')
-param MCPContainerRegistryHostname string = 'macaev3tst1acr.azurecr.io'
+param MCPContainerRegistryHostname string = 'biabcontainerreg.azurecr.io'
 
 @description('Optional. The Container Image Name to deploy on the MCP.')
-param MCPContainerImageName string = 'mcp_server'
+param MCPContainerImageName string = 'macaemcp'
 
 @description('Optional. The Container Image Tag to deploy on the MCP.')
-param MCPContainerImageTag string = 'v3tst1'
+param MCPContainerImageTag string = 'latest_v3'
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
@@ -284,7 +284,7 @@ module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0
     features: { enableLogAccessUsingOnlyResourcePermissions: true }
     diagnosticSettings: [{ useThisWorkspace: true }]
     // WAF aligned configuration for Redundancy
-    dailyQuotaGb: enableRedundancy ? 10 : null //WAF recommendation: 10 GB per day is a good starting point for most workloads
+    dailyQuotaGb: enableRedundancy ? 150 : null //WAF recommendation: 150 GB per day is a good starting point for most workloads
     replication: enableRedundancy
       ? {
           enabled: true
@@ -725,6 +725,7 @@ module bastionHost 'br/public:avm/res/network/bastion-host:0.7.0' = if (enablePr
     enableTelemetry: enableTelemetry
     tags: tags
     virtualNetworkResourceId: virtualNetwork!.?outputs.?resourceId
+    availabilityZones:[]
     publicIPAddressObject: {
       name: 'pip-bas${solutionSuffix}'
       diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
@@ -849,6 +850,26 @@ module windowsVmDataCollectionRules 'br/public:avm/res/insights/data-collection-
             name: 'perfCounterDataSource60'
           }
         ]
+        windowsEventLogs: [
+          {
+            name: 'SecurityAuditEvents'
+            streams: [
+              'Microsoft-WindowsEvent'
+            ]
+            eventLogName: 'Security'
+            eventTypes: [
+              {
+                eventType: 'Audit Success'
+              }
+              {
+                eventType: 'Audit Failure'
+              }
+            ]
+            xPathQueries: [
+              'Security!*[System[(EventID=4624 or EventID=4625)]]'
+            ]
+          }
+        ]
       }
       destinations: {
         logAnalytics: [
@@ -906,7 +927,7 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.17.0' = if (e
     bypassPlatformSafetyChecksOnUserSchedule: true
     maintenanceConfigurationResourceId: maintenanceConfiguration!.outputs.resourceId
     enableAutomaticUpdates: true
-    encryptionAtHost: false
+    encryptionAtHost: true
     availabilityZone: virtualMachineAvailabilityZone
     proximityPlacementGroupResourceId: proximityPlacementGroup!.outputs.resourceId
     imageReference: {
@@ -1504,7 +1525,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
     // WAF aligned configuration for Scalability
     scaleSettings: {
       maxReplicas: enableScalability ? 3 : 1
-      minReplicas: enableScalability ? 2 : 1
+      minReplicas: enableScalability ? 1 : 1
       rules: [
         {
           name: 'http-scaler'
@@ -1702,7 +1723,7 @@ module containerAppMcp 'br/public:avm/res/app/container-app:0.18.1' = {
     // WAF aligned configuration for Scalability
     scaleSettings: {
       maxReplicas: enableScalability ? 3 : 1
-      minReplicas: enableScalability ? 2 : 1
+      minReplicas: enableScalability ? 1 : 1
       rules: [
         {
           name: 'http-scaler'
@@ -1845,6 +1866,7 @@ module webSite 'modules/web-sites.bicep' = {
     vnetImagePullEnabled: enablePrivateNetworking ? true : false
     virtualNetworkSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.subnetResourceIds[4] : null
     publicNetworkAccess: 'Enabled' // Always enabling the public network access for Web App
+    e2eEncryptionEnabled: true
   }
 }
 
