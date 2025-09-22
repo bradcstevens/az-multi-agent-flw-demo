@@ -61,6 +61,23 @@ By default, the `azd up` command uses the [`main.parameters.json`](../infra/main
 
 For **production deployments**, the repository also provides [`main.waf.parameters.json`](../infra/main.waf.parameters.json), which applies a [Well-Architected Framework (WAF) aligned](https://learn.microsoft.com/en-us/azure/well-architected/) configuration. This option enables additional Azure best practices for reliability, security, cost optimization, operational excellence, and performance efficiency, such as:
 
+  **Prerequisite** — Enable the Microsoft.Compute/EncryptionAtHost feature for every subscription (and region, if required) where you plan to deploy VMs or VM scale sets with `encryptionAtHost: true`. Repeat the registration steps below for each target subscription (and for each region when applicable). This step is required for **WAF-aligned** (production) deployments.
+
+  Steps to enable the feature:
+  1. Set the target subscription:
+     Run: <code>az account set --subscription "&lt;YourSubscriptionId&gt;"</code>
+  2. Register the feature (one time per subscription):
+     Run: <code>az feature register --name EncryptionAtHost --namespace Microsoft.Compute</code>
+  3. Wait until registration completes and shows "Registered":
+     Run: <code>az feature show --name EncryptionAtHost --namespace Microsoft.Compute --query properties.state -o tsv</code>
+  4. Refresh the provider (if required):
+     Run: <code>az provider register --namespace Microsoft.Compute</code>
+  5. Re-run the deployment after registration is complete.
+
+  Note: Feature registration can take several minutes. Ensure the feature is registered before attempting deployments that require encryptionAtHost.
+
+  Reference: Azure Host Encryption — https://learn.microsoft.com/azure/virtual-machines/disks-enable-host-based-encryption-portal?tabs=azure-cli
+
   - Enhanced network security (e.g., Network protection with private endpoints)
   - Stricter access controls and managed identities
   - Logging, monitoring, and diagnostics enabled by default
@@ -239,11 +256,47 @@ Once you've opened the project in [Codespaces](#github-codespaces), [Dev Contain
    - This deployment will take _4-6 minutes_ to provision the resources in your account and set up the solution with sample data.
    - If you encounter an error or timeout during deployment, changing the location may help, as there could be availability constraints for the resources.
 
-5. Once the deployment has completed successfully, open the [Azure Portal](https://portal.azure.com/), go to the deployed resource group, find the App Service, and get the app URL from `Default domain`.
+5. After deployment completes, you can upload Team Configurations using command printed in the terminal. The command will look like one of the following. Run the appropriate command for your shell from the project root:
 
-6. When Deployment is complete, follow steps in [Set Up Authentication in Azure App Service](../docs/azure_app_service_auth_setup.md) to add app authentication to your web app running on Azure App Service
+  - **For Bash (Linux/macOS/WSL):**
+    ```bash
+    bash infra/scripts/upload_team_config.sh
+    ```
 
-7. If you are done trying out the application, you can delete the resources by running `azd down`.
+  - **For PowerShell (Windows):**
+    ```powershell
+    infra\scripts\Upload-Team-Config.ps1
+    ```
+
+6. After deployment completes, you can index Sample Data into Search Service using command printed in the terminal. The command will look like one of the following. Run the appropriate command for your shell from the project root:
+
+  - **For Bash (Linux/macOS/WSL):**
+    ```bash
+    bash infra/scripts/process_sample_data.sh
+    ```
+
+  - **For PowerShell (Windows):**
+    ```powershell
+    infra\scripts\Process-Sample-Data.ps1
+    ```
+
+7. To upload team configurations and index sample data in one step. Run the appropriate command for your shell from the project root:
+
+  - **For Bash (Linux/macOS/WSL):**
+    ```bash
+    bash infra/scripts/team_config_and_data.sh
+    ```
+
+  - **For PowerShell (Windows):**
+    ```powershell
+    infra\scripts\Team-Config-And-Data.ps1
+    ```
+
+8. Once the deployment has completed successfully, open the [Azure Portal](https://portal.azure.com/), go to the deployed resource group, find the App Service, and get the app URL from `Default domain`.
+
+9. When Deployment is complete, follow steps in [Set Up Authentication in Azure App Service](../docs/azure_app_service_auth_setup.md) to add app authentication to your web app running on Azure App Service
+
+10. If you are done trying out the application, you can delete the resources by running `azd down`.
 
 
 ### 🛠️ Troubleshooting
@@ -418,6 +471,14 @@ or Run
 
 11. Open a browser and navigate to `http://localhost:3000`
 12. To see swagger API documentation, you can navigate to `http://localhost:8000/docs`
+
+## Deploy Your local changes
+To Deploy your local changes rename the below files.
+   1. Rename `azure.yaml` to `azure_custom2.yaml` and `azure_custom.yaml` to `azure.yaml`.
+   2. Go to `infra` directory
+        - Remove `main.bicep` to `main_custom2.bicep` and `main_custom.bicep` to `main.bicep`.
+Continue with the [deploying steps](#deploying-with-azd).
+
 
 ## Debugging the solution locally
 

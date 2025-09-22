@@ -14,11 +14,13 @@ RUN npm ci --silent
 # Copy source files
 COPY . ./
 
+RUN rm -rf node_modules && npm ci && npm rebuild esbuild --force
+
 # Build the React app
 RUN npm run build
 
 # Stage 2: Python build environment with UV
-FROM mcr.microsoft.com/devcontainers/python:3.11-bullseye AS python-builder
+FROM python:3.11-slim-bullseye AS python-builder
 
 # Copy UV from official image
 COPY --from=ghcr.io/astral-sh/uv:0.6.3 /uv /uvx /bin/

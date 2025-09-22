@@ -18,7 +18,6 @@ import {
 } from "@fluentui/react-components";
 
 const TaskList: React.FC<TaskListProps> = ({
-  inProgressTasks,
   completedTasks,
   onTaskSelect,
   loading,
@@ -49,9 +48,9 @@ const TaskList: React.FC<TaskListProps> = ({
           {task.date && task.status == "completed" && (
             <Caption1 className="task-list-task-date">{task.date}</Caption1>
           )}
-          {task.status == "inprogress" && (
+          {/* {task.status == "inprogress" && (
             <Caption1 className="task-list-task-date">{`${task?.completed_steps} of ${task?.total_steps} completed`}</Caption1>
-          )}
+          )} */}
         </div>
         <Menu>
           <MenuTrigger>
@@ -82,26 +81,17 @@ const TaskList: React.FC<TaskListProps> = ({
       <Accordion defaultOpenItems="1" collapsible>
         <AccordionItem value="1">
           <AccordionHeader expandIconPosition="end">
-            In progress
+            Completed
           </AccordionHeader>
           <AccordionPanel>
             {loading
               ? Array.from({ length: 5 }, (_, i) =>
-                  renderSkeleton(`in-progress-${i}`)
-                )
-              : inProgressTasks.map(renderTaskItem)}
-          </AccordionPanel>
-        </AccordionItem>
-        <AccordionItem value="2">
-          <AccordionHeader expandIconPosition="end">Completed</AccordionHeader>
-          <AccordionPanel>
-            {loading
-              ? Array.from({ length: 5 }, (_, i) =>
-                  renderSkeleton(`completed-${i}`)
-                )
+                renderSkeleton(`completed-${i}`)
+              )
               : completedTasks.map(renderTaskItem)}
           </AccordionPanel>
         </AccordionItem>
+
       </Accordion>
     </div>
   );

@@ -97,7 +97,7 @@ export function getUserInfoGlobal() {
     }
 
     if (!USER_INFO) {
-        console.info('User info not yet configured');
+        // console.info('User info not yet configured');
         return null;
     }
 
@@ -120,14 +120,17 @@ export function getUserId(): string {
  */
 export function headerBuilder(headers?: Record<string, string>): Record<string, string> {
     let userId = getUserId();
+    //console.log('headerBuilder: Using user ID:', userId);
     let defaultHeaders = {
         "x-ms-client-principal-id": String(userId) || "",  // Custom header
     };
+    //console.log('headerBuilder: Created headers:', defaultHeaders);
     return {
         ...defaultHeaders,
         ...(headers ? headers : {})
     };
 }
+
 export const toBoolean = (value: any): boolean => {
     if (typeof value !== 'string') {
         return false;
@@ -143,5 +146,5 @@ export default {
     setEnvData,
     config,
     USER_ID,
-    API_URL
+    API_URL,
 };
