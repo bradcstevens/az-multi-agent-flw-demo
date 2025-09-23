@@ -2062,7 +2062,7 @@ module keyvault 'br/public:avm/res/key-vault/vault:0.12.1' = {
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
     diagnosticSettings: enableMonitoring 
-      ? [{ workspaceResourceId: logAnalyticsWorkspace!.outputs.resourceId }] 
+      ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] 
       : []
     // WAF aligned configuration for Private Networking
     privateEndpoints: enablePrivateNetworking
