@@ -1962,7 +1962,8 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
     managedIdentities: {
       systemAssigned: true
     }
-    publicNetworkAccess: enablePrivateNetworking  ? 'Disabled' : 'Enabled'
+    // publicNetworkAccess: enablePrivateNetworking  ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: 'Enabled'
     networkRuleSet: {
       bypass: 'AzureServices'
     }
@@ -1992,23 +1993,24 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
         principalType: 'ServicePrincipal'
       }
     ]
-    privateEndpoints: enablePrivateNetworking 
-      ? [
-          {
-            name: 'pep-search-${solutionSuffix}'
-            customNetworkInterfaceName: 'nic-search-${solutionSuffix}'
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                {
-                  privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.search]!.outputs.resourceId
-                }
-              ]
-            }
-            subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
-            service: 'searchService'
-          }
-        ]
-      : []
+    privateEndpoints:[]
+    // privateEndpoints: enablePrivateNetworking 
+    //   ? [
+    //       {
+    //         name: 'pep-search-${solutionSuffix}'
+    //         customNetworkInterfaceName: 'nic-search-${solutionSuffix}'
+    //         privateDnsZoneGroup: {
+    //           privateDnsZoneGroupConfigs: [
+    //             {
+    //               privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.search]!.outputs.resourceId
+    //             }
+    //           ]
+    //         }
+    //         subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
+    //         service: 'searchService'
+    //       }
+    //     ]
+    //   : []
   }
 }
 
