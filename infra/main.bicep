@@ -1921,6 +1921,9 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
     managedIdentities: {
       systemAssigned: true
     }
+
+    // Enabled the Public access because other services are not able to connect with search search AVM module when public access is disabled
+
     // publicNetworkAccess: enablePrivateNetworking  ? 'Disabled' : 'Enabled'
     publicNetworkAccess: 'Enabled'
     networkRuleSet: {
@@ -1952,6 +1955,9 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
         principalType: 'ServicePrincipal'
       }
     ]
+
+    //Removing the Private endpoints as we are facing the issue with connecting to search service while comminicating with agents
+
     privateEndpoints:[]
     // privateEndpoints: enablePrivateNetworking 
     //   ? [
