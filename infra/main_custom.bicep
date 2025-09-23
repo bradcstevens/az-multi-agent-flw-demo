@@ -1962,7 +1962,11 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
     managedIdentities: {
       systemAssigned: true
     }
-    publicNetworkAccess: enablePrivateNetworking  ? 'Disabled' : 'Enabled'
+
+    // Enabled the Public access because other services are not able to connect with search search AVM module when public access is disabled
+
+    // publicNetworkAccess: enablePrivateNetworking  ? 'Disabled' : 'Enabled'
+    publicNetworkAccess: 'Enabled'
     networkRuleSet: {
       bypass: 'AzureServices'
     }
@@ -1992,23 +1996,27 @@ module searchService 'br/public:avm/res/search/search-service:0.11.1' = {
         principalType: 'ServicePrincipal'
       }
     ]
-    privateEndpoints: enablePrivateNetworking 
-      ? [
-          {
-            name: 'pep-search-${solutionSuffix}'
-            customNetworkInterfaceName: 'nic-search-${solutionSuffix}'
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                {
-                  privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.search]!.outputs.resourceId
-                }
-              ]
-            }
-            subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
-            service: 'searchService'
-          }
-        ]
-      : []
+    privateEndpoints:[]
+
+    // Removing the Private endpoints as we are facing the issue with connecting to search service while comminicating with agents
+
+    // privateEndpoints: enablePrivateNetworking 
+    //   ? [
+    //       {
+    //         name: 'pep-search-${solutionSuffix}'
+    //         customNetworkInterfaceName: 'nic-search-${solutionSuffix}'
+    //         privateDnsZoneGroup: {
+    //           privateDnsZoneGroupConfigs: [
+    //             {
+    //               privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.search]!.outputs.resourceId
+    //             }
+    //           ]
+    //         }
+    //         subnetResourceId: virtualNetwork!.outputs.subnetResourceIds[0]
+    //         service: 'searchService'
+    //       }
+    //     ]
+    //   : []
   }
 }
 
