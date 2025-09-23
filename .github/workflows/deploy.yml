@@ -1,4 +1,4 @@
-name: Validate Deployment
+name: Validate Deployment v3
 
 on:
   workflow_run:
@@ -7,8 +7,8 @@ on:
       - completed
     branches:
       - main
+      - dev-v3
       - hotfix
-      - dev
   schedule:
     - cron: "0 11,23 * * *" # Runs at 11:00 AM and 11:00 PM GMT
   workflow_dispatch: #Allow manual triggering
@@ -116,14 +116,17 @@ jobs:
         id: deploy
         run: |
           if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
-            IMAGE_TAG="latest"
-          elif [[ "${{ env.BRANCH_NAME }}" == "dev" ]]; then
-            IMAGE_TAG="dev"
+            IMAGE_TAG="latest_v3"
+          elif [[ "${{ env.BRANCH_NAME }}" == "dev-v3" ]]; then
+            IMAGE_TAG="dev_v3"
           elif [[ "${{ env.BRANCH_NAME }}" == "hotfix" ]]; then
             IMAGE_TAG="hotfix"
           else
             IMAGE_TAG="latest"
           fi
+
+          # Generate current timestamp in desired format: YYYY-MM-DDTHH:MM:SS.SSSSSSSZ
+            current_date=$(date -u +"%Y-%m-%dT%H:%M:%S.%7NZ")
 
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
@@ -139,6 +142,7 @@ jobs:
               azureAiServiceLocation='${{ env.AZURE_LOCATION }}' \
               gptModelCapacity=150 \
               createdBy="Pipeline" \
+              tags="{'SecurityControl':'Ignore','Purpose':'Deploying and Cleaning Up Resources for Validation','CreatedDate':'$current_date'}" \
             --output json
 
       - name: Extract Web App and API App URLs
