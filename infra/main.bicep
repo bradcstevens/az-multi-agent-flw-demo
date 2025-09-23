@@ -223,8 +223,8 @@ var allTags = union(
   },
   tags
 )
-@description('Optional created by user name')
-param createdBy string = empty(deployer().userPrincipalName) ? '' : split(deployer().userPrincipalName, '@')[0] 
+@description('Tag, Created by user name')
+param createdBy string = contains(deployer(), 'userPrincipalName')? split(deployer().userPrincipalName, '@')[0]: deployer().objectId
 
 resource resourceGroupTags 'Microsoft.Resources/tags@2021-04-01' = {
   name: 'default'
@@ -1559,11 +1559,11 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_AI_SUBSCRIPTION_ID'
-            value: subscription().subscriptionId
+            value: aiFoundryAiServicesSubscriptionId
           }
           {
             name: 'AZURE_AI_RESOURCE_GROUP'
-            value: resourceGroup().name
+            value: aiFoundryAiServicesResourceGroupName
           }
           {
             name: 'AZURE_AI_PROJECT_NAME'
