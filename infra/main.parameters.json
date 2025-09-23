@@ -24,10 +24,13 @@
       "value": "${AZURE_ENV_MODEL_CAPACITY}"
     },
     "backendContainerImageTag": {
-      "value": "${AZURE_ENV_IMAGE_TAG=latest}"
+      "value": "${AZURE_ENV_IMAGE_TAG=latest_v3}"
     },
     "frontendContainerImageTag": {
-      "value": "${AZURE_ENV_IMAGE_TAG=latest}"
+      "value": "${AZURE_ENV_IMAGE_TAG=latest_v3}"
+    },
+    "MCPContainerImageTag": {
+      "value": "${AZURE_ENV_IMAGE_TAG=latest_v3}"
     },
     "enableTelemetry": {
       "value": "${AZURE_ENV_ENABLE_TELEMETRY}"

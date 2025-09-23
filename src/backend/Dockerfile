@@ -1,5 +1,5 @@
 # Base Python image
-FROM mcr.microsoft.com/devcontainers/python:3.11-bullseye AS base
+FROM python:3.11-slim-bullseye AS base
 WORKDIR /app
 
 FROM base AS builder
@@ -14,10 +14,13 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project --no-dev
+#RUN uv sync --frozen --no-install-project --no-dev
 
 # Backend app setup
 COPY . /app  
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
+#RUN uv sync --frozen --no-dev
+
 
 FROM base
 

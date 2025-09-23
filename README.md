@@ -29,11 +29,6 @@ The solution leverages Azure OpenAI Service, Azure Container Apps, Azure Cosmos 
 |![image](./docs/images/readme/agent_flow.png)|
 |---|
 
-### How to customize
-If you'd like to customize the solution accelerator, here are some common areas to start:
-
-[Custom scenario](./docs/CustomizeSolution.md)
-
 <br/>
 
 ### Additional resources
