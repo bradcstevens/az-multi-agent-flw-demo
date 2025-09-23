@@ -1591,11 +1591,11 @@ module containerApp 'br/public:avm/res/app/container-app:0.18.1' = {
           }
           {
             name: 'AZURE_AI_SUBSCRIPTION_ID'
-            value: subscription().subscriptionId
+            value: aiFoundryAiServicesSubscriptionId
           }
           {
             name: 'AZURE_AI_RESOURCE_GROUP'
-            value: resourceGroup().name
+            value: aiFoundryAiServicesResourceGroupName
           }
           {
             name: 'AZURE_AI_PROJECT_NAME'
