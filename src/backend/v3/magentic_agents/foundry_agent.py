@@ -2,11 +2,11 @@
 
 import asyncio
 import logging
-from typing import List, Optional
+from typing import Awaitable, List, Optional
 
 from azure.ai.agents.models import (AzureAISearchTool, BingGroundingTool,
                                     CodeInterpreterToolDefinition)
-from semantic_kernel.agents import AzureAIAgent  # pylint: disable=E0611
+from semantic_kernel.agents import Agent, AzureAIAgent  # pylint: disable=E0611
 from v3.magentic_agents.common.lifecycle import AzureAgentBase
 from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
 
@@ -43,6 +43,7 @@ class FoundryAgentTemplate(AzureAgentBase):
         if self.model_deployment_name in ["o3", "o4-mini"]:
             raise ValueError("The current version of Foundry agents do not support reasoning models.")
 
+    # Uncomment to enable bing grounding capabilities (requires Bing connection in Foundry and uncommenting other code)
     # async def _make_bing_tool(self) -> Optional[BingGroundingTool]:
     #     """Create Bing search tool for web search."""
     #     if not all([self.client, self.bing.connection_name]):
@@ -119,19 +120,24 @@ class FoundryAgentTemplate(AzureAgentBase):
         return tools, tool_resources
 
     async def _after_open(self) -> None:
+        """Initialize the AzureAIAgent with the collected tools and MCP plugin."""
 
-        # Collect all tools
-        tools, tool_resources = await self._collect_tools_and_resources()
+        # Try to get existing agent definition from Foundry
+        definition = await self._get_azure_ai_agent_definition(self.agent_name)
+        # If not found in Foundry, create a new one
+        if definition is None:
+            # Collect all tools
+            tools, tool_resources = await self._collect_tools_and_resources()
 
-        # Create agent definition with all tools
-        definition = await self.client.agents.create_agent(
-            model=self.model_deployment_name,
-            name=self.agent_name,
-            description=self.agent_description,
-            instructions=self.agent_instructions,
-            tools=tools,
-            tool_resources=tool_resources
-        )
+            # Create agent definition with all tools
+            definition = await self.client.agents.create_agent(
+                model=self.model_deployment_name,
+                name=self.agent_name,
+                description=self.agent_description,
+                instructions=self.agent_instructions,
+                tools=tools,
+                tool_resources=tool_resources
+            )
 
         # Add MCP plugins if available
         plugins = [self.mcp_plugin] if self.mcp_plugin else []
@@ -146,25 +152,25 @@ class FoundryAgentTemplate(AzureAgentBase):
             self.logger.error("Failed to create AzureAIAgent: %s", ex)
             raise
 
-        # After self._agent creation in _after_open:
-        # Diagnostics
-        try:
-            tool_names = [t.get("function", {}).get("name") for t in (definition.tools or []) if isinstance(t, dict)]
-            self.logger.info(
-                "Foundry agent '%s' initialized. Azure tools: %s | MCP plugin: %s",
-                self.agent_name,
-                tool_names,
-                getattr(self.mcp_plugin, 'name', None)
-            )
-            if not tool_names and not plugins:
-                self.logger.warning(
-                    "Foundry agent '%s' has no Azure tool definitions and no MCP plugin. "
-                    "Subsequent tool calls may fail.", self.agent_name
-                )
-        except Exception as diag_ex:
-            self.logger.warning("Diagnostics collection failed: %s", diag_ex)
+        # # After self._agent creation in _after_open:
+        # # Diagnostics
+        # try:
+        #     tool_names = [t.get("function", {}).get("name") for t in (definition.tools or []) if isinstance(t, dict)]
+        #     self.logger.info(
+        #         "Foundry agent '%s' initialized. Azure tools: %s | MCP plugin: %s",
+        #         self.agent_name,
+        #         tool_names,
+        #         getattr(self.mcp_plugin, 'name', None)
+        #     )
+        #     if not tool_names and not plugins:
+        #         self.logger.warning(
+        #             "Foundry agent '%s' has no Azure tool definitions and no MCP plugin. "
+        #             "Subsequent tool calls may fail.", self.agent_name
+        #         )
+        # except Exception as diag_ex:
+        #     self.logger.warning("Diagnostics collection failed: %s", diag_ex)
 
-        self.logger.info("%s initialized with %d tools and %d plugins", self.agent_name, len(tools), len(plugins))
+        # self.logger.info("%s initialized with %d tools and %d plugins", self.agent_name, len(tools), len(plugins))
 
     async def fetch_run_details(self, thread_id: str, run_id: str):
         """Fetch and log run details after a failure."""
@@ -179,6 +185,42 @@ class FoundryAgentTemplate(AzureAgentBase):
             )
         except Exception as ex:
             self.logger.error("Could not fetch run details: %s", ex)
+
+    async def _get_azure_ai_agent_definition(self, agent_name: str)-> Awaitable[Agent | None]:
+        """
+        Gets an Azure AI Agent with the specified name and instructions using AIProjectClient if it is already created.
+        """
+        # # First try to get an existing agent with this name as assistant_id
+        try:
+            agent_id = None
+            agent_list = self.client.agents.list_agents()
+            async for agent in agent_list:
+                if agent.name == agent_name:
+                    agent_id = agent.id
+                    break
+            # If the agent already exists, we can use it directly
+            # Get the existing agent definition
+            if agent_id is not None:
+                logging.info(f"Agent with ID {agent_id} exists.")
+
+                existing_definition = await self.client.agents.get_agent(agent_id)
+
+                return existing_definition
+            else:
+                return None
+        except Exception as e:
+            # The Azure AI Projects SDK throws an exception when the agent doesn't exist
+            # (not returning None), so we catch it and proceed to create a new agent
+            if "ResourceNotFound" in str(e) or "404" in str(e):
+                logging.info(
+                    f"Agent with ID {agent_name} not found. Will create a new one."
+                )
+            else:
+                # Log unexpected errors but still try to create a new agent
+                logging.warning(
+                    f"Unexpected error while retrieving agent {agent_name}: {str(e)}. Attempting to create new agent."
+                )
+
 
 async def create_foundry_agent(agent_name:str,
                                agent_description:str, 
