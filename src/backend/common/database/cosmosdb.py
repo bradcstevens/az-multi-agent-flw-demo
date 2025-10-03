@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Type
 import v3.models.messages as messages
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos.aio._database import DatabaseProxy
-from common.models.messages_kernel import AgentMessage, Plan, Step, TeamConfiguration
 
 from ..models.messages_kernel import (
     AgentMessage,
