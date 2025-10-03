@@ -34,7 +34,7 @@ async def check_deployments():
         # Check what we're looking for
         required_models = ["gpt-4o", "o3", "gpt-4", "gpt-35-turbo"]
 
-        print(f"\n🔍 Checking required models:")
+        print(f"\n🔍 Checking required models: {required_models}")
         for model in required_models:
             if model.lower() in available_models:
                 print(f"✅ {model} is available")

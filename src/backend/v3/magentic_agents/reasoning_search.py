@@ -29,7 +29,6 @@ class ReasoningSearch:
             return False
 
         try:
-            credential = SyncDefaultAzureCredential()
 
             self.search_client = SearchClient(
                 endpoint=self.search_config.endpoint,

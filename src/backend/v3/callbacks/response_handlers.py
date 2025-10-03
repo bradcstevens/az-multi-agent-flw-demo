@@ -24,8 +24,6 @@ def agent_response_callback(message: ChatMessageContent, user_id: str = None) ->
 
     # Get agent name to determine handling
     agent_name = message.name or "Unknown Agent"
-    # Get message type
-    content_type = getattr(message, "content_type", "text")
 
     role = getattr(message, "role", "unknown")
 

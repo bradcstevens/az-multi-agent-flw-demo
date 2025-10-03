@@ -505,8 +505,8 @@ async def user_clarification(
         )
     # Set the approval in the orchestration config
     if user_id and human_feedback.request_id:
-        ### validate rai
-        if human_feedback.answer != None or human_feedback.answer != "":
+        # validate rai
+        if human_feedback.answer is not None or human_feedback.answer != "":
             if not await rai_success(human_feedback.answer):
                 track_event_if_configured(
                     "RAI failed",
@@ -1220,9 +1220,9 @@ async def get_plans(request: Request):
         )
         raise HTTPException(status_code=400, detail="no user")
 
-    #### <To do: Francia> Replace the following with code to get plan run history from the database
+    # <To do: Francia> Replace the following with code to get plan run history from the database
 
-    # # Initialize memory context
+    # Initialize memory context
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
 
     current_team = await memory_store.get_current_team(user_id=user_id)
@@ -1308,9 +1308,9 @@ async def get_plan_by_id(
         )
         raise HTTPException(status_code=400, detail="no user")
 
-    #### <To do: Francia> Replace the following with code to get plan run history from the database
+    # <To do: Francia> Replace the following with code to get plan run history from the database
 
-    # # Initialize memory context
+    # Initialize memory context
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
     try:
         if plan_id:

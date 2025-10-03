@@ -2,7 +2,6 @@
 """Orchestration manager to handle the orchestration logic."""
 
 import asyncio
-import contextvars
 import logging
 import uuid
 from contextvars import ContextVar
@@ -34,7 +33,7 @@ from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
 from v3.models.messages import WebsocketMessageType
 from v3.orchestration.human_approval_manager import HumanApprovalMagenticManager
 
-# Context variable to hold the current user ID
+#Context variable to hold the current user ID
 current_user_id: ContextVar[Optional[str]] = contextvars.ContextVar(
     "current_user_id", default=None
 )

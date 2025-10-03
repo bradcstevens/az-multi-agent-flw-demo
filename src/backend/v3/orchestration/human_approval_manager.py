@@ -46,12 +46,11 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         plan_append = """
 IMPORTANT: Never ask the user for information or clarification until all agents on the team have been asked first.
 
-EXAMPLE: If the user request involves product information, first ask all agents on the team to provide the information. 
+EXAMPLE: If the user request involves product information, first ask all agents on the team to provide the information.
 Do not ask the user unless all agents have been consulted and the information is still missing.
 
 Plan steps should always include a bullet point, followed by an agent name, followed by a description of the action
-to be taken. If a step involves multiple actions, separate them into distinct steps with an agent included in each step. If the step is taken by an agent that 
-is not part of the team, such as the MagenticManager, please always list the MagenticManager as the agent for that step. At any time, if more information is 
+to be taken. If a step involves multiple actions, separate them into distinct steps with an agent included in each step. If the step is taken by an agent that is not part of the team, such as the MagenticManager, please always list the MagenticManager as the agent for that step. At any time, if more information is 
 needed from the user, use the ProxyAgent to request this information.
 
 Here is an example of a well-structured plan:

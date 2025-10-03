@@ -203,20 +203,14 @@ async def websocket_endpoint(websocket: WebSocket):
 async def execute_plan_step(plan_id: str, step_id: str):
     # Send initial update
     await send_step_update(plan_id, step_id, "in_progress", "Starting step execution...")
-    
     # Simulate some work
     await asyncio.sleep(2)
-    
     # Send agent thinking message
     await send_agent_message(plan_id, "Data Analyst", "Analyzing the requirements...", "thinking")
-    
     await asyncio.sleep(1)
-    
     # Send agent action message
     await send_agent_message(plan_id, "Data Analyst", "Processing data and generating insights...", "action")
-    
     await asyncio.sleep(3)
-    
     # Send completion update
     await send_step_update(plan_id, step_id, "completed", "Step completed successfully!")
 """
