@@ -4,7 +4,6 @@ Based on Semantic Kernel text search patterns.
 """
 
 from azure.core.credentials import AzureKeyCredential
-from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
 from azure.search.documents import SearchClient
 from semantic_kernel import Kernel
 from semantic_kernel.functions import kernel_function
