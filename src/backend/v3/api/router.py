@@ -806,7 +806,6 @@ async def upload_team_config(
             {
                 "status": "success",
                 "team_id": team_id,
-                "team_id": team_config.team_id,
                 "user_id": user_id,
                 "agents_count": len(team_config.agents),
                 "tasks_count": len(team_config.starting_tasks),
