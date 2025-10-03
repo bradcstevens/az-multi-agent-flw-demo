@@ -25,7 +25,6 @@ from v3.callbacks.response_handlers import (
     streaming_agent_response_callback,
 )
 from v3.config.settings import (
-    config,
     connection_config,
     current_user_id,
     orchestration_config,
