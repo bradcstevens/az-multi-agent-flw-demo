@@ -5,7 +5,6 @@ import aiohttp
 
 from common.config.app_config import config
 
-
 class BaseAPIService:
     """Minimal async HTTP API service.
 
