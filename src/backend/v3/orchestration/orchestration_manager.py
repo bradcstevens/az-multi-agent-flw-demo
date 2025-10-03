@@ -26,7 +26,6 @@ from v3.callbacks.response_handlers import (
 )
 from v3.config.settings import (
     connection_config,
-    current_user_id,
     orchestration_config,
 )
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
