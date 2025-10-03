@@ -7,20 +7,34 @@ from typing import Optional
 
 import v3.models.messages as messages
 from auth.auth_utils import get_authenticated_user_details
-from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
-from common.models.messages_kernel import (InputTask, Plan, PlanStatus,
-                                           PlanWithSteps, TeamSelectionRequest)
+from common.models.messages_kernel import (
+    InputTask,
+    Plan,
+    PlanStatus,
+    TeamSelectionRequest,
+)
 from common.utils.event_utils import track_event_if_configured
-from common.utils.utils_date import format_dates_in_messages
 from common.utils.utils_kernel import rai_success, rai_validate_team_config
-from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
-                     Request, UploadFile, WebSocket, WebSocketDisconnect)
-from semantic_kernel.agents.runtime import InProcessRuntime
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from v3.common.services.plan_service import PlanService
 from v3.common.services.team_service import TeamService
-from v3.config.settings import (connection_config, current_user_id,
-                                orchestration_config, team_config)
+from v3.config.settings import (
+    connection_config,
+    current_user_id,
+    orchestration_config,
+    team_config,
+)
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
 router = APIRouter()
@@ -33,7 +47,9 @@ app_v3 = APIRouter(
 
 
 @app_v3.websocket("/socket/{process_id}")
-async def start_comms(websocket: WebSocket, process_id: str, user_id: str = Query(None)):
+async def start_comms(
+    websocket: WebSocket, process_id: str, user_id: str = Query(None)
+):
     """Web-Socket endpoint for real-time process status updates."""
 
     # Always accept the WebSocket connection first
@@ -1222,7 +1238,10 @@ async def get_plans(request: Request):
 
 # Get plans is called in the initial side rendering of the frontend
 @app_v3.get("/plan")
-async def get_plan_by_id(request: Request,  plan_id: Optional[str] = Query(None),):
+async def get_plan_by_id(
+    request: Request,
+    plan_id: Optional[str] = Query(None),
+):
     """
     Retrieve plans for the current user.
 

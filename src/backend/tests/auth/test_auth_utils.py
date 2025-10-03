@@ -1,6 +1,6 @@
-from unittest.mock import patch, Mock
 import base64
 import json
+from unittest.mock import Mock, patch
 
 from auth.auth_utils import get_authenticated_user_details, get_tenantid
 

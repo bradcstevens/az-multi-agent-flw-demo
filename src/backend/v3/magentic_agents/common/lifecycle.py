@@ -1,6 +1,4 @@
-import os
 from contextlib import AsyncExitStack
-from dataclasses import dataclass
 from typing import Any
 
 from azure.ai.projects.aio import AIProjectClient
@@ -18,7 +16,7 @@ class MCPEnabledBase:
 
     def __init__(self, mcp: MCPConfig | None = None) -> None:
         self._stack: AsyncExitStack | None = None
-        self.mcp_cfg: MCPConfig | None = mcp 
+        self.mcp_cfg: MCPConfig | None = mcp
         self.mcp_plugin: MCPStreamableHttpPlugin | None = None
         self._agent: Any | None = None  # delegate target
 
@@ -34,7 +32,7 @@ class MCPEnabledBase:
         if self._stack is None:
             return
         try:
-            #self.cred.close()
+            # self.cred.close()
             await self._stack.aclose()
         finally:
             self._stack = None
@@ -76,12 +74,12 @@ class MCPEnabledBase:
     async def _enter_mcp_if_configured(self) -> None:
         if not self.mcp_cfg:
             return
-        #headers = self._build_mcp_headers()
+        # headers = self._build_mcp_headers()
         plugin = MCPStreamableHttpPlugin(
             name=self.mcp_cfg.name,
             description=self.mcp_cfg.description,
             url=self.mcp_cfg.url,
-            #headers=headers,
+            # headers=headers,
         )
         # Enter MCP async context via the stack to ensure correct LIFO cleanup
         if self._stack is None:

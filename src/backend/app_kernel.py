@@ -1,23 +1,21 @@
 # app_kernel.py
-import asyncio
 import logging
-import os
-# Azure monitoring
-import re
-import uuid
-from typing import Dict, List, Optional
 
 from azure.monitor.opentelemetry import configure_azure_monitor
 from common.config.app_config import config
 from common.models.messages_kernel import UserLanguage
+
 # FastAPI imports
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+
 # Local imports
 from middleware.health_check import HealthCheckMiddleware
 from v3.api.router import app_v3
+
+# Azure monitoring
+
 # Semantic Kernel imports
-from v3.orchestration.orchestration_manager import OrchestrationManager
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
 connection_string = config.APPLICATIONINSIGHTS_CONNECTION_STRING
@@ -104,4 +102,11 @@ async def user_browser_language_endpoint(user_language: UserLanguage, request: R
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app_kernel:app", host="127.0.0.1", port=8000, reload=True, log_level="info", access_log=False)
+    uvicorn.run(
+        "app_kernel:app",
+        host="127.0.0.1",
+        port=8000,
+        reload=True,
+        log_level="info",
+        access_log=False,
+    )
