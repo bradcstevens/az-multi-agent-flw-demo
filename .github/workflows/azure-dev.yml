@@ -15,9 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     name: template validation
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: microsoft/template-validation-action@Latest
+       # Step 1: Checkout the code from your repository 
+      - name: Checkout code 
+        uses: actions/checkout@v4 
+      # Step 2: Validate the Azure template using microsoft/template-validation-action 
+      - name: Validate Azure Template 
+        uses: microsoft/template-validation-action@Latest
+        with: 
+          validateAzd: true
+          useDevContainer: false
         id: validation
         env:
           AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -26,6 +32,6 @@ jobs:
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      # Step 3: Print the result of the validation 
       - name: print result
         run: cat ${{ steps.validation.outputs.resultFile }}
