@@ -7,7 +7,7 @@ import pytest
 
 # Now import from the v3 package
 from src.backend.v3.magentic_agents.foundry_agent import FoundryAgentTemplate
-from src.backend.v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
+from src.backend.v3.magentic_agents.models.agent_models import (MCPConfig,
                                                     SearchConfig)
 
 

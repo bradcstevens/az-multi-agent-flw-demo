@@ -5,7 +5,7 @@ from azure.ai.projects.aio import AIProjectClient
 from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 from semantic_kernel.connectors.mcp import MCPStreamableHttpPlugin
-from v3.magentic_agents.models.agent_models import MCPConfig
+from src.backend.v3.magentic_agents.models.agent_models import MCPConfig
 
 
 class MCPEnabledBase:
