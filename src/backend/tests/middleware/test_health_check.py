@@ -1,7 +1,7 @@
 from asyncio import sleep
 
 from fastapi import FastAPI
-from middleware.health_check import HealthCheckMiddleware, HealthCheckResult
+from src.backend.middleware.health_check import HealthCheckMiddleware, HealthCheckResult
 from starlette.testclient import TestClient
 
 

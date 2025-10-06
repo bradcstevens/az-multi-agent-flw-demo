@@ -4,7 +4,7 @@ Tests for utility functions.
 
 import pytest
 from datetime import datetime
-from utils.date_utils import (
+from src.mcp_server.utils.date_utils import (
     format_date_for_user,
     get_current_timestamp,
     format_timestamp_for_display,
