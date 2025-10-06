@@ -120,7 +120,7 @@ class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
     data_type: Literal[DataType.plan] = Field(DataType.plan, Literal=True)
-    plan_id: str
+    plan_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
     initial_goal: str
     overall_status: PlanStatus = PlanStatus.in_progress
@@ -276,3 +276,21 @@ class AgentMessageData(BaseDataModel):
     raw_data: str
     steps: List[Any] = Field(default_factory=list)
     next_steps: List[Any] = Field(default_factory=list)
+
+
+class ActionRequest(BaseDataModel):
+    """Message sent to an agent to perform an action."""
+
+    step_id: str
+    plan_id: str
+    action: str
+    agent: AgentType
+
+
+class HumanFeedback(BaseDataModel):
+    """Message containing human feedback on a step."""
+
+    step_id: str
+    plan_id: str
+    approved: bool
+    human_feedback: Optional[str] = None
