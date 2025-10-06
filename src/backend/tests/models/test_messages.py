@@ -1,18 +1,18 @@
 # File: test_message.py
 
 import uuid
-
-from src.backend.common.models.messages_kernel import ActionRequest, AgentMessage
-from src.backend.common.models.messages_kernel import AgentType as BAgentType  # map to your enum
-from src.backend.common.models.messages_kernel import (
+from models.messages import (
     DataType,
-    HumanFeedback,
-    HumanFeedbackStatus,
-    Plan,
+    AgentType as BAgentType,   # map to your enum
+    StepStatus,
     PlanStatus,
+    HumanFeedbackStatus,
     PlanWithSteps,
     Step,
-    StepStatus,
+    Plan,
+    AgentMessage,
+    ActionRequest,
+    HumanFeedback,
 )
 
 
@@ -20,7 +20,7 @@ def test_enum_values():
     """Test enumeration values for consistency."""
     assert DataType.session == "session"
     assert DataType.plan == "plan"
-    assert BAgentType.HUMAN == "Human_Agent"  # was human_agent / "HumanAgent"
+    assert BAgentType.HUMAN == "Human_Agent"   # was human_agent / "HumanAgent"
     assert StepStatus.completed == "completed"
     assert PlanStatus.in_progress == "in_progress"
     assert HumanFeedbackStatus.requested == "requested"
