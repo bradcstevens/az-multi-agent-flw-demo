@@ -2,9 +2,9 @@
 
 import uuid
 
-from models.messages import ActionRequest, AgentMessage
-from models.messages import AgentType as BAgentType  # map to your enum
-from models.messages import (
+from src.backend.common.models.messages_kernel import ActionRequest, AgentMessage
+from src.backend.common.models.messages_kernel import AgentType as BAgentType  # map to your enum
+from src.backend.common.models.messages_kernel import (
     DataType,
     HumanFeedback,
     HumanFeedbackStatus,
