@@ -3,11 +3,19 @@ Integration tests for FoundryAgentTemplate functionality.
 Tests Bing search, RAG, MCP tools, and Code Interpreter capabilities.
 """
 # pylint: disable=E0401, E0611, C0413
+
+import sys
+from pathlib import Path
+
 import pytest
 
+# Add the backend path to sys.path so we can import v3 modules
+backend_path = Path(__file__).parent.parent.parent / "backend"
+sys.path.insert(0, str(backend_path))
+
 # Now import from the v3 package
-from src.backend.v3.magentic_agents.foundry_agent import FoundryAgentTemplate
-from src.backend.v3.magentic_agents.models.agent_models import (MCPConfig,
+from v3.magentic_agents.foundry_agent import FoundryAgentTemplate
+from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
                                                     SearchConfig)
 
 
