@@ -3,8 +3,8 @@ Tests for HR service.
 """
 
 import pytest
-from src.mcp_server.services.hr_service import HRService
-from src.mcp_server.core.factory import Domain
+from services.hr_service import HRService
+from core.factory import Domain
 
 
 class TestHRService:
