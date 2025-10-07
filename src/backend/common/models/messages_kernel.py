@@ -87,7 +87,7 @@ class BaseDataModel(KernelBaseModel):
 class AgentMessage(BaseDataModel):
     """Base class for messages sent between agents."""
 
-    data_type: Literal[DataType.agent_message] = Field(DataType.agent_message, Literal=True)
+    data_type: Literal[DataType.agent_message] = Field(DataType.agent_message)
     plan_id: str
     content: str
     source: str
@@ -98,7 +98,7 @@ class AgentMessage(BaseDataModel):
 class Session(BaseDataModel):
     """Represents a user session."""
 
-    data_type: Literal[DataType.session] = Field(DataType.session, Literal=True)
+    data_type: Literal[DataType.session] = Field(DataType.session)
     user_id: str
     current_status: str
     message_to_user: Optional[str] = None
@@ -107,7 +107,7 @@ class Session(BaseDataModel):
 class UserCurrentTeam(BaseDataModel):
     """Represents the current team of a user."""
 
-    data_type: Literal[DataType.user_current_team] = Field(DataType.user_current_team, Literal=True)
+    data_type: Literal[DataType.user_current_team] = Field(DataType.user_current_team)
     user_id: str
     team_id: str
 
@@ -115,8 +115,8 @@ class UserCurrentTeam(BaseDataModel):
 class Plan(BaseDataModel):
     """Represents a plan containing multiple steps."""
 
-    data_type: Literal[DataType.plan] = Field(DataType.plan, Literal=True)
-    plan_id: str
+    data_type: Literal[DataType.plan] = Field(DataType.plan)
+    plan_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
     initial_goal: str
     overall_status: PlanStatus = PlanStatus.in_progress
@@ -133,7 +133,7 @@ class Plan(BaseDataModel):
 class Step(BaseDataModel):
     """Represents an individual step (task) within a plan."""
 
-    data_type: Literal[DataType.step] = Field(DataType.step, Literal=True)
+    data_type: Literal[DataType.step] = Field(DataType.step)
     plan_id: str
     user_id: str
     action: str
@@ -184,7 +184,7 @@ class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""
 
     team_id: str
-    data_type: Literal[DataType.team_config] = Field(DataType.team_config, Literal=True)
+    data_type: Literal[DataType.team_config] = Field(DataType.team_config)
     session_id: str  # Partition key
     name: str
     status: str
@@ -260,9 +260,27 @@ class AgentMessageType(str, Enum):
     AI_AGENT = "AI_Agent",
 
 
+class ActionRequest(BaseDataModel):
+    """Represents an action request for a specific step."""
+
+    step_id: str
+    plan_id: str
+    action: str
+    agent: AgentType
+
+
+class HumanFeedback(BaseDataModel):
+    """Represents human feedback for a specific step."""
+
+    step_id: str
+    plan_id: str
+    approved: bool
+    human_feedback: str
+
+
 class AgentMessageData (BaseDataModel):
 
-    data_type: Literal[DataType.m_plan_message] = Field(DataType.m_plan_message, Literal=True)
+    data_type: Literal[DataType.m_plan_message] = Field(DataType.m_plan_message)
     plan_id: str
     user_id: str
     agent: str
