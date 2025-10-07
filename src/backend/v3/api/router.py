@@ -1,5 +1,4 @@
 import asyncio
-import contextvars
 import json
 import logging
 import uuid
@@ -19,8 +18,8 @@ from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
 from semantic_kernel.agents.runtime import InProcessRuntime
 from v3.common.services.plan_service import PlanService
 from v3.common.services.team_service import TeamService
-from v3.config.settings import (connection_config, current_user_id,
-                                orchestration_config, team_config)
+from v3.config.settings import (connection_config, orchestration_config, 
+                                team_config)
 from v3.orchestration.orchestration_manager import OrchestrationManager
 
 router = APIRouter()
@@ -40,8 +39,6 @@ async def start_comms(websocket: WebSocket, process_id: str, user_id: str = Quer
     await websocket.accept()
 
     user_id = user_id or "00000000-0000-0000-0000-000000000000"
-
-    current_user_id.set(user_id)
 
     # Add to the connection manager for backend updates
     connection_config.add_connection(
@@ -74,7 +71,7 @@ async def start_comms(websocket: WebSocket, process_id: str, user_id: str = Quer
         logging.error(f"Error in WebSocket connection: {str(e)}")
     finally:
         # Always clean up the connection
-        await connection_config.close_connection(user_id)
+        await connection_config.close_connection(process_id=process_id)
 
 
 @app_v3.get("/init_team")
@@ -288,18 +285,14 @@ async def process_request(
         raise HTTPException(status_code=500, detail="Failed to create plan")
 
     try:
-        current_user_id.set(user_id)  # Set context
-        current_context = contextvars.copy_context()  # Capture context
         # background_tasks.add_task(
         #     lambda: current_context.run(lambda:OrchestrationManager().run_orchestration, user_id, input_task)
         # )
 
-        async def run_with_context():
-            return await current_context.run(
-                OrchestrationManager().run_orchestration, user_id, input_task
-            )
+        async def run_orchestration_task():
+          await OrchestrationManager().run_orchestration(user_id, input_task)
 
-        background_tasks.add_task(run_with_context)
+        background_tasks.add_task(run_orchestration_task)
 
         return {
             "status": "Request started successfully",
