@@ -50,6 +50,17 @@ jobs:
             echo "Test files found, running tests."
             echo "skip_tests=false" >> $GITHUB_ENV
           fi
+          
+      - name: Run tests with coverage
+        if: env.skip_tests == 'false'
+        run: |
+          pytest --cov=. --cov-report=term-missing --cov-report=xml \
+            --ignore=tests/e2e-test/tests \
+            --ignore=src/backend/tests/test_app.py \
+            --ignore=src/tests/agents/test_foundry_integration.py \
+            --ignore=src/tests/mcp_server/test_factory.py \
+            --ignore=src/tests/mcp_server/test_hr_service.py
+
       - name: Run tests with coverage
         if: env.skip_tests == 'false'
         run: |
