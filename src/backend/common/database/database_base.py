@@ -193,7 +193,3 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def get_agent_messages(self, plan_id: str) -> Optional[AgentMessageData]:
         """Retrieve an agent message by message_id."""
-
-    @abstractmethod
-    async def get_agent_messages(self, plan_id: str) -> Optional[AgentMessageData]:
-        """Retrieve an agent message by message_id."""
