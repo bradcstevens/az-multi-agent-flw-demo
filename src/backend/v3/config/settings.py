@@ -4,7 +4,6 @@ Handles Azure OpenAI, MCP, and environment setup.
 """
 
 import asyncio
-import contextvars
 import json
 import logging
 from typing import Dict, Optional
@@ -18,11 +17,6 @@ from semantic_kernel.connectors.ai.open_ai import (
 from v3.models.messages import WebsocketMessageType, MPlan
 
 logger = logging.getLogger(__name__)
-
-# Create a context variable to track current user
-current_user_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
-    "current_user_id", default=None
-)
 
 
 class AzureConfig:
@@ -177,13 +171,10 @@ class ConnectionConfig:
     async def send_status_update_async(
         self,
         message: any,
-        user_id: Optional[str] = None,
+        user_id: str,
         message_type: WebsocketMessageType = WebsocketMessageType.SYSTEM_MESSAGE,
     ):
         """Send a status update to a specific client."""
-        # If no process_id provided, get from context
-        if user_id is None:
-            user_id = current_user_id.get()
 
         if not user_id:
             logger.warning("No user_id available for WebSocket message")

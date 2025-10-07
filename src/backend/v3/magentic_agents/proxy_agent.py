@@ -21,8 +21,7 @@ from semantic_kernel.exceptions.agent_exceptions import \
 from typing_extensions import override
 from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
-from v3.config.settings import (connection_config, current_user_id,
-                                orchestration_config)
+from v3.config.settings import connection_config, orchestration_config
 from v3.models.messages import (UserClarificationRequest,
                                 UserClarificationResponse, WebsocketMessageType)
 
@@ -94,11 +93,11 @@ class ProxyAgent(Agent):
     """Simple proxy agent that prompts for human clarification."""
 
     # Declare as Pydantic field
-    user_id: Optional[str] = Field(default=None, description="User ID for WebSocket messaging")
+    user_id: str = Field(default=None, description="User ID for WebSocket messaging")
     
-    def __init__(self, user_id: str = None, **kwargs):
-        # Get user_id from parameter or context, fallback to empty string
-        effective_user_id = user_id or current_user_id.get() or ""
+    def __init__(self, user_id: str, **kwargs):
+        # Get user_id from parameter, fallback to empty string
+        effective_user_id = user_id or ""
         super().__init__(
             name="ProxyAgent",
             description="Call this agent when you need to clarify requests by asking the human user for more information. Ask it for more details about any unclear requirements, missing information, or if you need the user to elaborate on any aspect of the task.",
@@ -119,7 +118,7 @@ class ProxyAgent(Agent):
     async def _trigger_response_callbacks(self, message_content: ChatMessageContent):
         """Manually trigger the same response callbacks used by other agents."""
                 # Get current user_id dynamically instead of using stored value
-        current_user = current_user_id.get() or self.user_id or ""
+        current_user = self.user_id or ""
 
         # Trigger the standard agent response callback
         agent_response_callback(message_content, current_user)
@@ -127,7 +126,7 @@ class ProxyAgent(Agent):
     async def _trigger_streaming_callbacks(self, content: str, is_final: bool = False):
         """Manually trigger streaming callbacks for real-time updates."""
         # Get current user_id dynamically instead of using stored value
-        current_user = current_user_id.get() or self.user_id or ""
+        current_user = self.user_id or ""
         streaming_message = StreamingChatMessageContent(
             role=AuthorRole.ASSISTANT,
             content=content,
@@ -158,7 +157,7 @@ class ProxyAgent(Agent):
         await connection_config.send_status_update_async({
             "type": WebsocketMessageType.USER_CLARIFICATION_REQUEST,
             "data": clarification_message
-        }, user_id=current_user_id.get(), message_type=WebsocketMessageType.USER_CLARIFICATION_REQUEST)
+        }, user_id=self.user_id, message_type=WebsocketMessageType.USER_CLARIFICATION_REQUEST)
 
         # Get human input
         human_response = await self._wait_for_user_clarification(clarification_message.request_id)
@@ -206,7 +205,7 @@ class ProxyAgent(Agent):
         await connection_config.send_status_update_async({
             "type": WebsocketMessageType.USER_CLARIFICATION_REQUEST, 
             "data": clarification_message
-        }, user_id=current_user_id.get(), message_type=WebsocketMessageType.USER_CLARIFICATION_REQUEST)
+        }, user_id=self.user_id, message_type=WebsocketMessageType.USER_CLARIFICATION_REQUEST)
 
         # Get human input - replace with websocket call when available
         human_response = await self._wait_for_user_clarification(clarification_message.request_id)

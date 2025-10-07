@@ -10,7 +10,7 @@ import time
 
 from semantic_kernel.contents import (ChatMessageContent,
                                       StreamingChatMessageContent)
-from v3.config.settings import connection_config, current_user_id
+from v3.config.settings import connection_config
 from v3.models.messages import (AgentMessage, AgentMessageStreaming,
                                 AgentToolCall, AgentToolMessage, WebsocketMessageType)
 
