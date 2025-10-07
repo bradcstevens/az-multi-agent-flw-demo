@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - dev-v3
       - demo
       - hotfix
   pull_request:
@@ -17,6 +18,7 @@ on:
       - main
       - main
       - dev
+      - dev-v3
       - demo
       - hotfix
 
