@@ -1,4 +1,4 @@
-from middleware.health_check import (
+from src.backend.middleware.health_check import (
     HealthCheckMiddleware,
     HealthCheckResult,
 )
