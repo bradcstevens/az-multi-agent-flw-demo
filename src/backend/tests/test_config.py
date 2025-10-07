@@ -36,7 +36,6 @@ with patch.dict(os.environ, MOCK_ENV_VARS, clear=False):
     # New codebase: config lives in app_config/config_kernel
     from src.backend.common.config.app_config import config as app_config
 
-
 # Provide thin wrappers so the old test names still work
 def GetRequiredConfig(name: str, default=None):
     return app_config._get_required(name, default)
