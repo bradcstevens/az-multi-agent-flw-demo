@@ -143,7 +143,7 @@ jobs:
               gptModelCapacity=1 \
               createdBy="Pipeline" \
               tags="{'SecurityControl':'Ignore','Purpose':'Deploying and Cleaning Up Resources for Validation','CreatedDate':'$current_date'}" \
-            --output json
+            --output none || { echo "Deployment failed"; exit 1; }
 
       - name: Extract Web App and API App URLs
         id: get_output
