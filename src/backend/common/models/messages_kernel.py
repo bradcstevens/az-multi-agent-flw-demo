@@ -276,21 +276,3 @@ class AgentMessageData(BaseDataModel):
     raw_data: str
     steps: List[Any] = Field(default_factory=list)
     next_steps: List[Any] = Field(default_factory=list)
-
-
-class ActionRequest(BaseDataModel):
-    """Message sent to an agent to perform an action."""
-
-    step_id: str
-    plan_id: str
-    action: str
-    agent: AgentType
-
-
-class HumanFeedback(BaseDataModel):
-    """Message containing human feedback on a step."""
-
-    step_id: str
-    plan_id: str
-    approved: bool
-    human_feedback: Optional[str] = None
