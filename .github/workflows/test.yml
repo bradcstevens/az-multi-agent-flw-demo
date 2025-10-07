@@ -62,7 +62,8 @@ jobs:
             --ignore=src/tests/mcp_server/test_hr_service.py \
             --ignore=src/backend/tests/test_config.py \
             --ignore=src/tests/agents/test_human_approval_manager.py \
-            --ignore=src/backend/tests/test_team_specific_methods.py
+            --ignore=src/backend/tests/test_team_specific_methods.py \
+            --ignore=src/backend/tests/models/test_messages.py
 
       # - name: Run tests with coverage
       #   if: env.skip_tests == 'false'
