@@ -6,7 +6,6 @@ on:
       - main
       - dev
       - demo
-      - dev-v3
       - hotfix
   pull_request:
     types:
@@ -18,7 +17,6 @@ on:
       - main
       - main
       - dev
-      - dev-v3
       - demo
       - hotfix
 
