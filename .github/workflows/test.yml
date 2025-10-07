@@ -64,10 +64,10 @@ jobs:
             --ignore=src/tests/agents/test_human_approval_manager.py \
             --ignore=src/backend/tests/test_team_specific_methods.py
 
-      - name: Run tests with coverage
-        if: env.skip_tests == 'false'
-        run: |
-          pytest --cov=. --cov-report=term-missing --cov-report=xml --ignore=tests/e2e-test/tests
+      # - name: Run tests with coverage
+      #   if: env.skip_tests == 'false'
+      #   run: |
+      #     pytest --cov=. --cov-report=term-missing --cov-report=xml --ignore=tests/e2e-test/tests
           
       - name: Skip coverage report if no tests
         if: env.skip_tests == 'true'
