@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 class WebSocketManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
-        self.plan_subscriptions: Dict[str, Set[str]] = (
-            {}
-        )  # plan_id -> set of connection_ids
+        self.plan_subscriptions: Dict[str, Set[str]] = {}  # plan_id -> set of connection_ids
 
     async def connect(self, websocket: WebSocket, connection_id: str):
         await websocket.accept()
