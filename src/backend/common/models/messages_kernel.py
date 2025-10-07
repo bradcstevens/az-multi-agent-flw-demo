@@ -271,5 +271,4 @@ class AgentMessageData (BaseDataModel):
     content: str
     raw_data: str
     steps: List[Any] = Field(default_factory=list)       
-    next_steps: List[Any] = Field(default_factory=list)  
-    
+    next_steps: List[Any] = Field(default_factory=list) 
