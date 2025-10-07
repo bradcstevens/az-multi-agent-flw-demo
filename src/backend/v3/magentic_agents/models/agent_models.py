@@ -3,7 +3,7 @@
 import os
 from dataclasses import dataclass
 
-from src.backend.common.config.app_config import config
+from common.config.app_config import config
 
 
 @dataclass(slots=True)
