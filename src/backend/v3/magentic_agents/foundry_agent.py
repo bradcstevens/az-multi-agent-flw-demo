@@ -7,8 +7,8 @@ from typing import Awaitable, List, Optional
 from azure.ai.agents.models import (AzureAISearchTool, BingGroundingTool,
                                     CodeInterpreterToolDefinition)
 from semantic_kernel.agents import Agent, AzureAIAgent  # pylint: disable=E0611
-from src.backend.v3.magentic_agents.common.lifecycle import AzureAgentBase
-from src.backend.v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
+from v3.magentic_agents.common.lifecycle import AzureAgentBase
+from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
 
 # from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
 #                                                     SearchConfig)
