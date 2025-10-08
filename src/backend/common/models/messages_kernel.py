@@ -274,3 +274,5 @@ class AgentMessageData(BaseDataModel):
     agent_type: AgentMessageType = AgentMessageType.AI_AGENT
     content: str
     raw_data: str
+    steps: List[Any] = Field(default_factory=list)       
+    next_steps: List[Any] = Field(default_factory=list) 
