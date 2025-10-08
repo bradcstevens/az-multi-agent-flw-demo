@@ -1,10 +1,8 @@
 # Copyright (c) Microsoft. All rights reserved.
 """Orchestration manager to handle the orchestration logic."""
 import asyncio
-import contextvars
 import logging
 import uuid
-from contextvars import ContextVar
 from typing import List, Optional
 
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
@@ -15,26 +13,15 @@ from semantic_kernel.agents.runtime import InProcessRuntime
 
 # Create custom execution settings to fix schema issues
 from semantic_kernel.connectors.ai.open_ai import (
-    AzureChatCompletion,
-    OpenAIChatPromptExecutionSettings,
-)
-from semantic_kernel.contents import ChatMessageContent, StreamingChatMessageContent
-from v3.callbacks.response_handlers import (
-    agent_response_callback,
-    streaming_agent_response_callback,
-)
-from v3.config.settings import (
-    connection_config,
-    orchestration_config,
-)
+    AzureChatCompletion, OpenAIChatPromptExecutionSettings)
+from semantic_kernel.contents import (ChatMessageContent,
+                                      StreamingChatMessageContent)
+from v3.callbacks.response_handlers import (agent_response_callback,
+                                            streaming_agent_response_callback)
+from v3.config.settings import connection_config, orchestration_config
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
 from v3.models.messages import WebsocketMessageType
 from v3.orchestration.human_approval_manager import HumanApprovalMagenticManager
-
-# Context variable to hold the current user ID
-current_user_id: ContextVar[Optional[str]] = contextvars.ContextVar(
-    "current_user_id", default=None
-)
 
 
 class OrchestrationManager:
@@ -69,6 +56,7 @@ class OrchestrationManager:
         magentic_orchestration = MagenticOrchestration(
             members=agents,
             manager=HumanApprovalMagenticManager(
+                user_id=user_id,
                 chat_completion_service=AzureChatCompletion(
                     deployment_name=config.AZURE_OPENAI_DEPLOYMENT_NAME,
                     endpoint=config.AZURE_OPENAI_ENDPOINT,
@@ -122,7 +110,7 @@ class OrchestrationManager:
                         except Exception as e:
                             cls.logger.error("Error closing agent: %s", e)
             factory = MagenticAgentFactory()
-            agents = await factory.get_agents(team_config_input=team_config)
+            agents = await factory.get_agents(user_id=user_id, team_config_input=team_config)
             orchestration_config.orchestrations[user_id] = await cls.init_orchestration(
                 agents, user_id
             )
@@ -130,7 +118,6 @@ class OrchestrationManager:
 
     async def run_orchestration(self, user_id, input_task) -> None:
         """Run the orchestration with user input loop."""
-        token = current_user_id.set(user_id)
 
         job_id = str(uuid.uuid4())
         orchestration_config.approvals[job_id] = None
@@ -190,4 +177,3 @@ class OrchestrationManager:
             self.logger.error(f"Unexpected error: {e}")
         finally:
             await runtime.stop_when_idle()
-            current_user_id.reset(token)

@@ -8,7 +8,6 @@ from typing import List, Union
 
 from common.config.app_config import config
 from common.models.messages_kernel import TeamConfiguration
-from v3.config.settings import current_user_id
 from v3.magentic_agents.foundry_agent import FoundryAgentTemplate
 from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
 
@@ -40,13 +39,12 @@ class MagenticAgentFactory:
     #         data = json.load(f)
     #     return json.loads(json.dumps(data), object_hook=lambda d: SimpleNamespace(**d))
 
-    async def create_agent_from_config(
-        self, agent_obj: SimpleNamespace
-    ) -> Union[FoundryAgentTemplate, ReasoningAgentTemplate, ProxyAgent]:
+    async def create_agent_from_config(self, user_id: str, agent_obj: SimpleNamespace) -> Union[FoundryAgentTemplate, ReasoningAgentTemplate, ProxyAgent]:
         """
         Create an agent from configuration object.
 
         Args:
+            user_id: User ID
             agent_obj: Agent object from parsed JSON (SimpleNamespace)
             team_model: Model name to determine which template to use
 
@@ -62,7 +60,6 @@ class MagenticAgentFactory:
 
         if not deployment_name and agent_obj.name.lower() == "proxyagent":
             self.logger.info("Creating ProxyAgent")
-            user_id = current_user_id.get()
             return ProxyAgent(user_id=user_id)
 
         # Validate supported models
@@ -133,11 +130,12 @@ class MagenticAgentFactory:
         )
         return agent
 
-    async def get_agents(self, team_config_input: TeamConfiguration) -> List:
+    async def get_agents(self, user_id: str, team_config_input: TeamConfiguration) -> List:
         """
         Create and return a team of agents from JSON configuration.
 
         Args:
+            user_id: User ID
             team_config_input: team configuration object from cosmos db
 
         Returns:
@@ -151,11 +149,9 @@ class MagenticAgentFactory:
 
             for i, agent_cfg in enumerate(team_config_input.agents, 1):
                 try:
-                    self.logger.info(
-                        f"Creating agent {i}/{len(team_config_input.agents)}: {agent_cfg.name}"
-                    )
+                    self.logger.info(f"Creating agent {i}/{len(team_config_input.agents)}: {agent_cfg.name}")
 
-                    agent = await self.create_agent_from_config(agent_cfg)
+                    agent = await self.create_agent_from_config(user_id, agent_cfg)
                     initalized_agents.append(agent)
                     self._agent_list.append(agent)  # Keep track for cleanup
 

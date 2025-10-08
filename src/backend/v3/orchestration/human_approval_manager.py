@@ -20,9 +20,10 @@ from semantic_kernel.agents.orchestration.prompts._magentic_prompts import (
     ORCHESTRATOR_TASK_LEDGER_PLAN_UPDATE_PROMPT,
 )
 from semantic_kernel.contents import ChatMessageContent
-from v3.config.settings import connection_config, current_user_id, orchestration_config
+from v3.config.settings import connection_config, orchestration_config
 from v3.models.models import MPlan
-from v3.orchestration.helper.plan_to_mplan_converter import PlanToMPlanConverter
+from v3.orchestration.helper.plan_to_mplan_converter import \
+    PlanToMPlanConverter
 
 # Using a module level logger to avoid pydantic issues around inherited fields
 logger = logging.getLogger(__name__)
@@ -38,9 +39,17 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
     # Define Pydantic fields to avoid validation errors
     approval_enabled: bool = True
     magentic_plan: Optional[MPlan] = None
-    current_user_id: Optional[str] = None
+    current_user_id: str
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, user_id: str, *args, **kwargs):
+        """
+        Initialize the HumanApprovalMagenticManager.
+        Args:
+            user_id: ID of the user to associate with this orchestration instance.
+            *args: Additional positional arguments for the parent StandardMagenticManager.
+            **kwargs: Additional keyword arguments for the parent StandardMagenticManager.
+        """
+
         # Remove any custom kwargs before passing to parent
 
         plan_append = """
@@ -76,6 +85,8 @@ Here is an example of a well-structured plan:
         )
         kwargs["final_answer_prompt"] = ORCHESTRATOR_FINAL_ANSWER_PROMPT + final_append
 
+        kwargs['current_user_id'] = user_id
+
         super().__init__(*args, **kwargs)
 
     async def plan(self, magentic_context: MagenticContext) -> Any:
@@ -100,7 +111,7 @@ Here is an example of a well-structured plan:
 
         self.magentic_plan = self.plan_to_obj(magentic_context, self.task_ledger)
 
-        self.magentic_plan.user_id = current_user_id.get()
+        self.magentic_plan.user_id = self.current_user_id
 
         # Request approval from the user before executing the plan
         approval_message = messages.PlanApprovalRequest(
@@ -124,7 +135,7 @@ Here is an example of a well-structured plan:
         # The user_id will be automatically retrieved from context
         await connection_config.send_status_update_async(
             message=approval_message,
-            user_id=current_user_id.get(),
+            user_id=self.current_user_id,
             message_type=messages.WebsocketMessageType.PLAN_APPROVAL_REQUEST,
         )
 
@@ -141,7 +152,7 @@ Here is an example of a well-structured plan:
                     "type": messages.WebsocketMessageType.PLAN_APPROVAL_RESPONSE,
                     "data": approval_response,
                 },
-                user_id=current_user_id.get(),
+                user_id=self.current_user_id,
                 message_type=messages.WebsocketMessageType.PLAN_APPROVAL_RESPONSE,
             )
             raise Exception("Plan execution cancelled by user")
@@ -170,7 +181,7 @@ Here is an example of a well-structured plan:
 
             await connection_config.send_status_update_async(
                 message=final_message,
-                user_id=current_user_id.get(),
+                user_id=self.current_user_id,
                 message_type=messages.WebsocketMessageType.FINAL_RESULT_MESSAGE,
             )
 
