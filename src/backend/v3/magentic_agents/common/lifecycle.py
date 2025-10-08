@@ -6,6 +6,7 @@ from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 from semantic_kernel.connectors.mcp import MCPStreamableHttpPlugin
 from v3.magentic_agents.models.agent_models import MCPConfig
+from v3.config.agent_registry import agent_registry
 
 
 class MCPEnabledBase:
@@ -118,5 +119,32 @@ class AzureAgentBase(MCPEnabledBase):
         return self
 
     async def close(self) -> None:
-        await self.creds.close()
+        """
+        Close the agent and clean up Azure AI Foundry resources.
+        This method deletes the agent from Azure AI Foundry and closes credentials.
+        """
+
+        try:
+            # Delete agent from Azure AI Foundry if we have the necessary information
+            if hasattr(self, '_agent') and self._agent and hasattr(self._agent, 'definition'):
+                agent_id = getattr(self._agent.definition, 'id', None)
+
+                if agent_id and self.client:
+                    try:
+                        await self.client.agents.delete_agent(agent_id)
+                    except Exception:
+                        pass
+            # Unregister from agent registry
+            try:
+                agent_registry.unregister_agent(self)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        # Always close credentials and parent resources
+        try:
+            if hasattr(self, 'creds') and self.creds:
+                await self.creds.close()
+        except Exception:
+            pass
         await super().close()

@@ -1,6 +1,9 @@
 # app_kernel.py
 import logging
 
+from contextlib import asynccontextmanager
+
+
 from azure.monitor.opentelemetry import configure_azure_monitor
 from common.config.app_config import config
 from common.models.messages_kernel import UserLanguage
@@ -16,6 +19,32 @@ from v3.api.router import app_v3
 # Azure monitoring
 
 # Semantic Kernel imports
+from v3.config.agent_registry import agent_registry
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage FastAPI application lifecycle - startup and shutdown."""
+    logger = logging.getLogger(__name__)
+
+    # Startup
+    logger.info("🚀 Starting MACAE application...")
+    yield
+
+    # Shutdown
+    logger.info("🛑 Shutting down MACAE application...")
+    try:
+        # Clean up all agents from Azure AI Foundry when container stops
+        await agent_registry.cleanup_all_agents()
+        logger.info("✅ Agent cleanup completed successfully")
+
+    except ImportError as ie:
+        logger.error(f"❌ Could not import agent_registry: {ie}")
+    except Exception as e:
+        logger.error(f"❌ Error during shutdown cleanup: {e}")
+
+    logger.info("👋 MACAE application shutdown complete")
+
 
 # Check if the Application Insights Instrumentation Key is set in the environment variables
 connection_string = config.APPLICATIONINSIGHTS_CONNECTION_STRING
@@ -46,7 +75,7 @@ logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").setLevel(
 )
 
 # Initialize the FastAPI app
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 frontend_url = config.FRONTEND_SITE_NAME
 
