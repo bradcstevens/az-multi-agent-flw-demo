@@ -30,7 +30,7 @@ from v3.common.services.plan_service import PlanService
 from v3.common.services.team_service import TeamService
 from v3.config.settings import (
     connection_config,
-    orchestration_config, 
+    orchestration_config,
     team_config,
 )
 from v3.orchestration.orchestration_manager import OrchestrationManager
@@ -305,7 +305,7 @@ async def process_request(
         # )
 
         async def run_orchestration_task():
-          await OrchestrationManager().run_orchestration(user_id, input_task)
+            await OrchestrationManager().run_orchestration(user_id, input_task)
 
         background_tasks.add_task(run_orchestration_task)
 

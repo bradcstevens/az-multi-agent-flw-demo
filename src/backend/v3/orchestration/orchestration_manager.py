@@ -18,10 +18,11 @@ from semantic_kernel.contents import (ChatMessageContent,
                                       StreamingChatMessageContent)
 from v3.callbacks.response_handlers import (agent_response_callback,
                                             streaming_agent_response_callback)
-from v3.config.settings import config, connection_config, orchestration_config
+from v3.config.settings import connection_config, orchestration_config
 from v3.magentic_agents.magentic_agent_factory import MagenticAgentFactory
 from v3.models.messages import WebsocketMessageType
 from v3.orchestration.human_approval_manager import HumanApprovalMagenticManager
+
 
 class OrchestrationManager:
     """Manager for handling orchestration logic."""

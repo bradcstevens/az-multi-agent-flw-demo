@@ -6,7 +6,7 @@ Handles Azure OpenAI, MCP, and environment setup.
 import asyncio
 import json
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 from common.config.app_config import config
 from common.models.messages_kernel import TeamConfiguration
