@@ -258,8 +258,8 @@ class UserLanguage(KernelBaseModel):
 
 
 class AgentMessageType(str, Enum):
-    HUMAN_AGENT = ("Human_Agent",)
-    AI_AGENT = ("AI_Agent",)
+    HUMAN_AGENT = "Human_Agent",
+    AI_AGENT = "AI_Agent",
 
 
 class AgentMessageData(BaseDataModel):
