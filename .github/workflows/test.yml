@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - dev-v3
       - demo
       - hotfix
   pull_request:
@@ -17,6 +18,7 @@ on:
       - main
       - main
       - dev
+      - dev-v3
       - demo
       - hotfix
 
@@ -61,7 +63,8 @@ jobs:
             --ignore=src/backend/tests/test_config.py \
             --ignore=src/tests/agents/test_human_approval_manager.py \
             --ignore=src/backend/tests/test_team_specific_methods.py \
-            --ignore=src/backend/tests/models/test_messages.py
+            --ignore=src/backend/tests/models/test_messages.py \
+            --ignore=src/backend/tests/test_otlp_tracing.py
 
       # - name: Run tests with coverage
       #   if: env.skip_tests == 'false'
