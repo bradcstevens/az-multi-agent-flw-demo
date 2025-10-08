@@ -10,6 +10,8 @@ from semantic_kernel.agents import Agent, AzureAIAgent  # pylint: disable=E0611
 from v3.magentic_agents.common.lifecycle import AzureAgentBase
 from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
 
+from v3.config.agent_registry import agent_registry
+
 # from v3.magentic_agents.models.agent_models import (BingConfig, MCPConfig,
 #                                                     SearchConfig)
 
@@ -124,6 +126,15 @@ class FoundryAgentTemplate(AzureAgentBase):
 
         # Try to get existing agent definition from Foundry
         definition = await self._get_azure_ai_agent_definition(self.agent_name)
+        
+        # Check if existing definition uses the same connection name
+        if definition is not None:
+            connection_compatible = await self._check_connection_compatibility(definition)
+            if not connection_compatible:
+                await self.client.agents.delete_agent(definition.id)
+                self.logger.info(f"Existing agent '{self.agent_name}' uses different connection. Creating new agent definition.")
+                definition = None
+        
         # If not found in Foundry, create a new one
         if definition is None:
             # Collect all tools
@@ -151,6 +162,13 @@ class FoundryAgentTemplate(AzureAgentBase):
         except Exception as ex:
             self.logger.error("Failed to create AzureAIAgent: %s", ex)
             raise
+
+        # Register agent with global registry for tracking and cleanup
+        try:
+            agent_registry.register_agent(self)
+            self.logger.info(f"📝 Registered agent '{self.agent_name}' with global registry")
+        except Exception as registry_error:
+            self.logger.warning(f"⚠️ Failed to register agent '{self.agent_name}' with registry: {registry_error}")
 
         # # After self._agent creation in _after_open:
         # # Diagnostics
@@ -185,6 +203,63 @@ class FoundryAgentTemplate(AzureAgentBase):
             )
         except Exception as ex:
             self.logger.error("Could not fetch run details: %s", ex)
+
+    async def _check_connection_compatibility(self, existing_definition) -> bool:
+        """
+        Check if the existing agent definition uses the same connection name as the current configuration.
+        
+        Args:
+            existing_definition: The existing agent definition from Azure AI Foundry
+            
+        Returns:
+            bool: True if connections are compatible, False otherwise
+        """
+        try:
+            # Check if we have search configuration to compare
+            if not self.search or not self.search.connection_name:
+                self.logger.info("No search configuration to compare")
+                return True
+            
+            # Get tool resources from existing definition
+            if not hasattr(existing_definition, 'tool_resources') or not existing_definition.tool_resources:
+                self.logger.info("Existing definition has no tool resources")
+                return not self.search.connection_name  # Compatible if we also don't need search
+            
+            # Check Azure AI Search tool resources
+            azure_ai_search_resources = existing_definition.tool_resources.get('azure_ai_search', {})
+            if not azure_ai_search_resources:
+                self.logger.info("Existing definition has no Azure AI Search resources")
+                return not self.search.connection_name  # Compatible if we also don't need search
+            
+            # Get connection ID from existing definition
+            indexes = azure_ai_search_resources.get('indexes')[0]
+            existing_connection_id = indexes.get('index_connection_id')
+            if not existing_connection_id:
+                self.logger.info("Existing definition has no connection ID")
+                return False
+            
+            # Get the current connection to compare
+            try:
+                current_connection = await self.client.connections.get(name=self.search.connection_name)
+                current_connection_id = current_connection.id
+                
+                # Compare connection IDs
+                is_compatible = existing_connection_id == current_connection_id
+                
+                if is_compatible:
+                    self.logger.info(f"Connection compatible: existing connection ID {existing_connection_id} matches current connection")
+                else:
+                    self.logger.info(f"Connection mismatch: existing connection ID {existing_connection_id} != current connection ID {current_connection_id}")
+                
+                return is_compatible
+                
+            except Exception as conn_ex:
+                self.logger.error(f"Failed to get current connection '{self.search.connection_name}': {conn_ex}")
+                return False
+            
+        except Exception as ex:
+            self.logger.error(f"Error checking connection compatibility: {ex}")
+            return False
 
     async def _get_azure_ai_agent_definition(self, agent_name: str)-> Awaitable[Agent | None]:
         """

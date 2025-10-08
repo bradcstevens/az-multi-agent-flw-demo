@@ -7,6 +7,8 @@ from typing import Any, Dict
 from semantic_kernel.agents.azure_ai.azure_ai_agent import AzureAIAgent
 from v3.magentic_agents.foundry_agent import FoundryAgentTemplate
 
+from v3.config.agent_registry import agent_registry
+
 logging.basicConfig(level=logging.INFO)
 
 # Cache for agent instances by session
@@ -45,6 +47,12 @@ async def create_RAI_agent() -> FoundryAgentTemplate:
     )
 
     await agent.open()
+
+    try:
+        agent_registry.register_agent(agent)
+        
+    except Exception as registry_error:
+        logging.warning(f"Failed to register agent '{agent.agent_name}' with registry: {registry_error}")
     return agent
 
 async def _get_agent_response(agent: FoundryAgentTemplate, query: str) -> str:

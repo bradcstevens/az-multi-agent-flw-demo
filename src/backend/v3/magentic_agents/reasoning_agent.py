@@ -10,6 +10,7 @@ from semantic_kernel.connectors.azure_ai_search import AzureAISearchCollection
 from v3.magentic_agents.common.lifecycle import MCPEnabledBase
 from v3.magentic_agents.models.agent_models import MCPConfig, SearchConfig
 from v3.magentic_agents.reasoning_search import ReasoningSearch
+from v3.config.agent_registry import agent_registry
 
 
 class ReasoningAgentTemplate(MCPEnabledBase):
@@ -73,6 +74,13 @@ class ReasoningAgentTemplate(MCPEnabledBase):
             description=self.agent_description,
             instructions=self.agent_instructions,
         )
+
+        # Register agent with global registry for tracking and cleanup
+        try:
+            agent_registry.register_agent(self)
+            self.logger.info(f"📝 Registered agent '{self.agent_name}' with global registry")
+        except Exception as registry_error:
+            self.logger.warning(f"⚠️ Failed to register agent '{self.agent_name}' with registry: {registry_error}")
 
     async def invoke(self, message: str):
         """Invoke the agent with a message."""
