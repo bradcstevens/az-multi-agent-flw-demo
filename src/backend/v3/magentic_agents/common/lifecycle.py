@@ -123,30 +123,28 @@ class AzureAgentBase(MCPEnabledBase):
         Close the agent and clean up Azure AI Foundry resources.
         This method deletes the agent from Azure AI Foundry and closes credentials.
         """
-     
+
         try:
             # Delete agent from Azure AI Foundry if we have the necessary information
             if hasattr(self, '_agent') and self._agent and hasattr(self._agent, 'definition'):
                 agent_id = getattr(self._agent.definition, 'id', None)
-                agent_name = getattr(self, 'agent_name', 'Unknown')
-                
+
                 if agent_id and self.client:
                     try:
                         await self.client.agents.delete_agent(agent_id)
-                    except Exception as delete_error:
+                    except Exception:
                         pass
             # Unregister from agent registry
             try:
                 agent_registry.unregister_agent(self)
-            except Exception as registry_error:
+            except Exception:
                 pass
-        except Exception as cleanup_error:
+        except Exception:
             pass
         # Always close credentials and parent resources
         try:
             if hasattr(self, 'creds') and self.creds:
                 await self.creds.close()
-        except Exception as creds_error:
-            pass   
+        except Exception:
+            pass
         await super().close()
-

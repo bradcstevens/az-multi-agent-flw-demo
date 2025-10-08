@@ -51,7 +51,7 @@ async def create_RAI_agent() -> FoundryAgentTemplate:
 
     try:
         agent_registry.register_agent(agent)
-        
+
     except Exception as registry_error:
         logging.warning(f"Failed to register agent '{agent.agent_name}' with registry: {registry_error}")
     return agent
