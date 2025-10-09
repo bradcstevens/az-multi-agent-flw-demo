@@ -18,7 +18,8 @@ import {
   Radio,
   RadioGroup,
   Tab,
-  TabList
+  TabList,
+  Tooltip
 } from '@fluentui/react-components';
 import {
   ChevronUpDown16Regular,
@@ -61,7 +62,14 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [uploadedTeam, setUploadedTeam] = useState<TeamConfig | null>(null);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
-
+  // Helper function to check if a team is a default team
+  const isDefaultTeam = (team: TeamConfig): boolean => {
+    const defaultTeamIds = ['team-1', 'team-2', 'team-3'];
+    const defaultTeamNames = ['Human Resources Team', 'Product Marketing Team', 'Retail Customer Success Team'];
+    
+    return defaultTeamIds.includes(team.team_id) || 
+           defaultTeamNames.includes(team.name);
+  };
   const loadTeams = async () => {
     setLoading(true);
     setError(null);
@@ -113,7 +121,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
       // For existing teams, do the normal selection process
       const result = await TeamService.selectTeam(tempSelectedTeam.team_id);
-
+      
       if (result.success) {
         console.log('Team selected:', result.data);
         onTeamSelect?.(tempSelectedTeam);
@@ -171,7 +179,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
     try {
       const success = await TeamService.deleteTeam(teamToDelete.team_id);
-
+      
       if (success) {
         setDeleteConfirmOpen(false);
         setTeamToDelete(null);
@@ -193,7 +201,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
       }
     } catch (err: any) {
       let errorMessage = 'Failed to delete team configuration. Please try again.';
-
+      
       if (err.response?.status === 404) {
         errorMessage = 'Team not found. It may have already been deleted.';
       } else if (err.response?.status === 403) {
@@ -261,11 +269,11 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
         if (result.team) {
           // Set success message with team name
           setUploadSuccessMessage(`${result.team.name} was uploaded`);
-
+          
           setTeams(currentTeams => [result.team!, ...currentTeams]);
           setUploadedTeam(result.team);
           setTempSelectedTeam(result.team);
-
+          
           setTimeout(() => {
             setUploadSuccessMessage(null);
           }, 15000);
@@ -313,7 +321,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
     event.stopPropagation();
 
     event.currentTarget.classList.remove(styles.dropZoneHover);
-
+    
     const files = event.dataTransfer.files;
     if (files.length === 0) return;
 
@@ -362,11 +370,11 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
         if (result.team) {
           // Set success message with team name
           setUploadSuccessMessage(`${result.team.name} was uploaded and selected`);
-
+          
           setTeams(currentTeams => [result.team!, ...currentTeams]);
           setUploadedTeam(result.team);
           setTempSelectedTeam(result.team);
-
+          
           // Clear success message after 15 seconds if user doesn't act
           setTimeout(() => {
             setUploadSuccessMessage(null);
@@ -399,7 +407,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
   const renderTeamCard = (team: TeamConfig, index?: number) => {
     const isSelected = tempSelectedTeam?.team_id === team.team_id;
-
+    const isDefault = isDefaultTeam(team);
     return (
       <div
         key={team.team_id || `team-${index}`}
@@ -452,13 +460,32 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
         </div>
 
         {/* Three-dot Menu Button */}
-        <Button
-          icon={<MoreHorizontal20Regular />}
-          appearance="subtle"
-          size="small"
-          onClick={(e) => handleDeleteTeam(team, e)}
-          className={styles.moreButton}
-        />
+        {isDefault ? (
+          <Tooltip
+            content="Default teams cannot be deleted."
+            relationship="label"
+            positioning="above-start"
+            withArrow
+            mountNode={document.querySelector('[role="dialog"]') || undefined}
+          >
+            <Button
+              icon={<MoreHorizontal20Regular />}
+              appearance="subtle"
+              size="small"
+              disabled={true}
+              className={`${styles.moreButton} ${styles.moreButtonDisabled || ''}`}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </Tooltip>
+        ) : (
+          <Button
+            icon={<MoreHorizontal20Regular />}
+            appearance="subtle"
+            size="small"
+            onClick={(e) => handleDeleteTeam(team, e)}
+            className={styles.moreButton}
+          />
+        )}
       </div>
     );
   };
