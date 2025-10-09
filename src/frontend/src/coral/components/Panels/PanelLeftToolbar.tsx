@@ -7,7 +7,7 @@ interface PanelLeftToolbarProps {
   panelIcon?: ReactNode;
   panelTitle?: string | null;
   linkTo?: string;
-  onTitleClick?: () => void; // Custom click handler for protected navigation
+  onTitleClick?: () => void;
   children?: ReactNode;
 }
 
