@@ -121,7 +121,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
       // For existing teams, do the normal selection process
       const result = await TeamService.selectTeam(tempSelectedTeam.team_id);
-      
+
       if (result.success) {
         console.log('Team selected:', result.data);
         onTeamSelect?.(tempSelectedTeam);
@@ -179,7 +179,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
 
     try {
       const success = await TeamService.deleteTeam(teamToDelete.team_id);
-      
+
       if (success) {
         setDeleteConfirmOpen(false);
         setTeamToDelete(null);
@@ -201,7 +201,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
       }
     } catch (err: any) {
       let errorMessage = 'Failed to delete team configuration. Please try again.';
-      
+
       if (err.response?.status === 404) {
         errorMessage = 'Team not found. It may have already been deleted.';
       } else if (err.response?.status === 403) {
@@ -269,11 +269,11 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
         if (result.team) {
           // Set success message with team name
           setUploadSuccessMessage(`${result.team.name} was uploaded`);
-          
+
           setTeams(currentTeams => [result.team!, ...currentTeams]);
           setUploadedTeam(result.team);
           setTempSelectedTeam(result.team);
-          
+
           setTimeout(() => {
             setUploadSuccessMessage(null);
           }, 15000);
@@ -321,7 +321,7 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
     event.stopPropagation();
 
     event.currentTarget.classList.remove(styles.dropZoneHover);
-    
+
     const files = event.dataTransfer.files;
     if (files.length === 0) return;
 
@@ -370,11 +370,11 @@ const TeamSelector: React.FC<TeamSelectorProps> = ({
         if (result.team) {
           // Set success message with team name
           setUploadSuccessMessage(`${result.team.name} was uploaded and selected`);
-          
+
           setTeams(currentTeams => [result.team!, ...currentTeams]);
           setUploadedTeam(result.team);
           setTempSelectedTeam(result.team);
-          
+
           // Clear success message after 15 seconds if user doesn't act
           setTimeout(() => {
             setUploadSuccessMessage(null);
