@@ -792,7 +792,7 @@ export class PlanDataService {
       if (!source) return null;
 
       // question=( "...") OR ('...')
-      const questionRegex = /question=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')/;
+      const questionRegex = /question=(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/;
       const qMatch = source.match(questionRegex);
       if (!qMatch) return null;
 
