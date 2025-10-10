@@ -60,17 +60,29 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
       console.log("Loading plans, forceRefresh:", forceRefresh);
       setPlansLoading(true);
       setPlansError(null);
-      const plansData = await apiService.getPlans(undefined, forceRefresh);
+      const plansData = await apiService.getPlans(undefined, !forceRefresh); // Invert forceRefresh for useCache
       setPlans(plansData);
+      
+      // Reset the reload flag after successful load
+      if (forceRefresh && restReload) {
+        console.log("Plans loaded successfully, resetting reload flag");
+        restReload();
+      }
     } catch (error) {
       console.log("Failed to load plans:", error);
       setPlansError(
         error instanceof Error ? error : new Error("Failed to load plans")
       );
+      
+      // Reset the reload flag even on error to prevent infinite loops
+      if (forceRefresh && restReload) {
+        console.log("Plans load failed, resetting reload flag");
+        restReload();
+      }
     } finally {
       setPlansLoading(false);
     }
-  }, []);
+  }, [restReload]);
 
 
   // Fetch plans
@@ -85,7 +97,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   useEffect(() => {
     console.log("Reload tasks changed:", reloadTasks);
     if (reloadTasks) {
-      loadPlansData();
+      loadPlansData(true); // Force refresh when reloadTasks is true
     }
   }, [loadPlansData, setUserInfo, reloadTasks]);
   useEffect(() => {
