@@ -383,7 +383,7 @@ export class PlanDataService {
 
       const facts =
         body
-          .match(/facts="([^"]*(?:\\.[^"]*)*)"/)?.[1]
+          .match(/facts="((?:[^"\\]|\\.)*)"/)?.[1]
           ?.replace(/\\n/g, '\n')
           .replace(/\\"/g, '"') || '';
 
