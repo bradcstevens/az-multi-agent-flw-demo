@@ -144,7 +144,6 @@ const PlanPage: React.FC = () => {
                 if (is_final) {
                     // Single refresh with a delay to ensure backend processing is complete
                     setTimeout(() => {
-                        console.log('✅ Final message persisted, forcing task list refresh');
                         setReloadLeftList(true);
                     }, 1000);
                 }
@@ -155,7 +154,6 @@ const PlanPage: React.FC = () => {
                 // The local plan data has been updated, so the UI should reflect that
                 if (is_final) {
                     setTimeout(() => {
-                        console.log('⚠️ Final message persistence failed, but still forcing task list refresh');
                         setReloadLeftList(true);
                     }, 1000);
                 }

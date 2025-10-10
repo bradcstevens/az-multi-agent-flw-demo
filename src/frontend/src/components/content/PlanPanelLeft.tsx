@@ -65,7 +65,6 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
       
       // Reset the reload flag after successful load
       if (forceRefresh && restReload) {
-        console.log("Plans loaded successfully, resetting reload flag");
         restReload();
       }
     } catch (error) {
@@ -76,7 +75,6 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
       
       // Reset the reload flag even on error to prevent infinite loops
       if (forceRefresh && restReload) {
-        console.log("Plans load failed, resetting reload flag");
         restReload();
       }
     } finally {
