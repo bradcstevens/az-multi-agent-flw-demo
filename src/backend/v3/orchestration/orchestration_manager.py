@@ -53,7 +53,6 @@ class OrchestrationManager:
         )
 
         credential = config.get_azure_credential(client_id=config.AZURE_CLIENT_ID)
-        # credential = SyncDefaultAzureCredential()
 
         def get_token():
             token = credential.get_token("https://cognitiveservices.azure.com/.default")
