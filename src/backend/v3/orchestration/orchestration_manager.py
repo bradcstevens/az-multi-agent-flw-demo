@@ -5,7 +5,6 @@ import logging
 import uuid
 from typing import List, Optional
 
-from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
 from common.config.app_config import config
 from common.models.messages_kernel import TeamConfiguration
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
