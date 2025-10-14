@@ -120,9 +120,7 @@ class AppConfig:
             Credential object: Either DefaultAzureCredential or ManagedIdentityCredential.
         """
         if self.APP_ENV == "dev":
-            return (
-                DefaultAzureCredential()
-            )  # CodeQL [SM05139] Okay use of DefaultAzureCredential as it is only used in development
+            return DefaultAzureCredential()  # CodeQL [SM05139]: DefaultAzureCredential is safe here
         else:
             return ManagedIdentityCredential(client_id=client_id)
 

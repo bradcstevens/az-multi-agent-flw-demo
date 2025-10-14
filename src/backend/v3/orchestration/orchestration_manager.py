@@ -5,7 +5,6 @@ import logging
 import uuid
 from typing import List, Optional
 
-from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
 from common.config.app_config import config
 from common.models.messages_kernel import TeamConfiguration
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
@@ -46,7 +45,7 @@ class OrchestrationManager:
             max_tokens=4000, temperature=0.1
         )
 
-        credential = SyncDefaultAzureCredential()
+        credential = config.get_azure_credential(client_id=config.AZURE_CLIENT_ID)
 
         def get_token():
             token = credential.get_token("https://cognitiveservices.azure.com/.default")
