@@ -120,7 +120,10 @@ class OrchestrationManager:
         """Run the orchestration with user input loop."""
 
         job_id = str(uuid.uuid4())
-        orchestration_config.approvals[job_id] = None
+        #orchestration_config.approvals[job_id] = None
+
+        # Use the new event-driven method to set approval as pending
+        orchestration_config.set_approval_pending(job_id)
 
         magentic_orchestration = orchestration_config.get_current_orchestration(user_id)
 

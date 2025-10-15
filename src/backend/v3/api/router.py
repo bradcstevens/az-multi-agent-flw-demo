@@ -396,8 +396,11 @@ async def plan_approval(
                 orchestration_config
                 and human_feedback.m_plan_id in orchestration_config.approvals
             ):
-                orchestration_config.approvals[human_feedback.m_plan_id] = (
-                    human_feedback.approved
+                # orchestration_config.approvals[human_feedback.m_plan_id] = (
+                #     human_feedback.approved
+                # )
+                orchestration_config.set_approval_result(
+                    human_feedback.m_plan_id, human_feedback.approved
                 )
                 # orchestration_config.plans[human_feedback.m_plan_id][
                 #     "plan_id"
@@ -528,10 +531,13 @@ async def user_clarification(
             orchestration_config
             and human_feedback.request_id in orchestration_config.clarifications
         ):
-            orchestration_config.clarifications[human_feedback.request_id] = (
-                human_feedback.answer
+            # orchestration_config.clarifications[human_feedback.request_id] = (
+            #     human_feedback.answer
+            # )
+            # Use the new event-driven method to set clarification result
+            orchestration_config.set_clarification_result(
+                human_feedback.request_id, human_feedback.answer
             )
-
             try:
                 result = await PlanService.handle_human_clarification(
                     human_feedback, user_id
