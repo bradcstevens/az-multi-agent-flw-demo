@@ -86,17 +86,17 @@ class OrchestrationConfig:
             20  # Maximum number of replanning rounds 20 needed to accommodate complex tasks
         )
 
-         # Event-driven notification system for approvals and clarifications
+        # Event-driven notification system for approvals and clarifications
         self._approval_events: Dict[str, asyncio.Event] = {}
         self._clarification_events: Dict[str, asyncio.Event] = {}
-        
+
         # Default timeout for waiting operations (5 minutes)
         self.default_timeout: float = 300.0
 
     def get_current_orchestration(self, user_id: str) -> MagenticOrchestration:
         """get existing orchestration instance."""
         return self.orchestrations.get(user_id, None)
-    
+
     def set_approval_pending(self, plan_id: str) -> None:
         """Set an approval as pending and create an event for it."""
         self.approvals[plan_id] = None
@@ -115,31 +115,31 @@ class OrchestrationConfig:
     async def wait_for_approval(self, plan_id: str, timeout: Optional[float] = None) -> bool:
         """
         Wait for an approval decision with timeout.
-        
+
         Args:
             plan_id: The plan ID to wait for
             timeout: Timeout in seconds (defaults to default_timeout)
-            
+
         Returns:
             The approval decision (True/False)
-            
+
         Raises:
             asyncio.TimeoutError: If timeout is exceeded
             KeyError: If plan_id is not found in approvals
         """
         if timeout is None:
             timeout = self.default_timeout
-            
+
         if plan_id not in self.approvals:
             raise KeyError(f"Plan ID {plan_id} not found in approvals")
-            
+
         if self.approvals[plan_id] is not None:
             # Already has a result
             return self.approvals[plan_id]
-            
+
         if plan_id not in self._approval_events:
             self._approval_events[plan_id] = asyncio.Event()
-            
+
         try:
             await asyncio.wait_for(self._approval_events[plan_id].wait(), timeout=timeout)
             return self.approvals[plan_id]
@@ -161,7 +161,7 @@ class OrchestrationConfig:
             # cleaning up successful approvals
             if plan_id in self.approvals and self.approvals[plan_id] is None:
                 self.cleanup_approval(plan_id)
-            
+
     def set_clarification_pending(self, request_id: str) -> None:
         """Set a clarification as pending and create an event for it."""
         self.clarifications[request_id] = None
@@ -180,31 +180,31 @@ class OrchestrationConfig:
     async def wait_for_clarification(self, request_id: str, timeout: Optional[float] = None) -> str:
         """
         Wait for a clarification response with timeout.
-        
+
         Args:
             request_id: The request ID to wait for
             timeout: Timeout in seconds (defaults to default_timeout)
-            
+
         Returns:
             The clarification response
-            
+
         Raises:
             asyncio.TimeoutError: If timeout is exceeded
             KeyError: If request_id is not found in clarifications
         """
         if timeout is None:
             timeout = self.default_timeout
-            
+
         if request_id not in self.clarifications:
             raise KeyError(f"Request ID {request_id} not found in clarifications")
-            
+
         if self.clarifications[request_id] is not None:
             # Already has a result
             return self.clarifications[request_id]
-            
+
         if request_id not in self._clarification_events:
             self._clarification_events[request_id] = asyncio.Event()
-            
+
         try:
             await asyncio.wait_for(self._clarification_events[request_id].wait(), timeout=timeout)
             return self.clarifications[request_id]

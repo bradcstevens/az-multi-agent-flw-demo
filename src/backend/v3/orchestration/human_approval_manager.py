@@ -5,7 +5,6 @@ Extends StandardMagenticManager to add approval gates before plan execution.
 
 import asyncio
 import logging
-import time
 from typing import Any, Optional
 
 import v3.models.messages as messages
@@ -219,29 +218,29 @@ Here is an example of a well-structured plan:
         # )
         """
         Wait for user approval response using event-driven pattern with timeout handling.
-        
+
         Args:
             m_plan_id: The plan ID to wait for approval
-            
+
         Returns:
             PlanApprovalResponse: Approval result with approved status and plan ID
-            
+
         Raises:
             asyncio.TimeoutError: If timeout is exceeded (300 seconds default)
         """
         logger.info(f"Waiting for user approval for plan: {m_plan_id}")
-        
+
         if not m_plan_id:
             logger.error("No plan ID provided for approval")
             return messages.PlanApprovalResponse(approved=False, m_plan_id=m_plan_id)
-        
+
         # Initialize approval as pending using the new event-driven method
         orchestration_config.set_approval_pending(m_plan_id)
-        
+
         try:
             # Wait for approval with timeout using the new event-driven method
             approved = await orchestration_config.wait_for_approval(m_plan_id)
-            
+
             logger.info(f"Approval received for plan {m_plan_id}: {approved}")
             return messages.PlanApprovalResponse(
                 approved=approved, m_plan_id=m_plan_id
@@ -249,7 +248,7 @@ Here is an example of a well-structured plan:
         except asyncio.TimeoutError:
             # Enhanced timeout handling - notify user via WebSocket and cleanup
             logger.debug(f"Approval timeout for plan {m_plan_id} - notifying user and terminating process")
-            
+
             # Create timeout notification message
             timeout_message = messages.TimeoutNotification(
                 timeout_type="approval",
@@ -258,7 +257,7 @@ Here is an example of a well-structured plan:
                 timestamp=asyncio.get_event_loop().time(),
                 timeout_duration=orchestration_config.default_timeout
             )
-            
+
             # Send timeout notification to user via WebSocket
             try:
                 await connection_config.send_status_update_async(
@@ -269,25 +268,25 @@ Here is an example of a well-structured plan:
                 logger.info(f"Timeout notification sent to user {self.current_user_id} for plan {m_plan_id}")
             except Exception as e:
                 logger.error(f"Failed to send timeout notification: {e}")
-            
+
             # Clean up this specific request
             orchestration_config.cleanup_approval(m_plan_id)
-            
+
             # Return None to indicate silent termination
             # The timeout naturally stops this specific wait operation without affecting other tasks
             return None
-            
+
         except KeyError as e:
             # Silent error handling for invalid plan IDs
             logger.debug(f"Plan ID not found: {e} - terminating process silently")
             return None
-            
+
         except asyncio.CancelledError:
             # Handle task cancellation gracefully
             logger.debug(f"Approval request {m_plan_id} was cancelled")
             orchestration_config.cleanup_approval(m_plan_id)
             return None
-            
+
         except Exception as e:
             # Silent error handling for unexpected errors
             logger.debug(f"Unexpected error waiting for approval: {e} - terminating process silently")
@@ -296,8 +295,7 @@ Here is an example of a well-structured plan:
         finally:
             # Ensure cleanup happens for any incomplete requests
             # This provides an additional safety net for resource cleanup
-            if (m_plan_id in orchestration_config.approvals and 
-                orchestration_config.approvals[m_plan_id] is None):
+            if (m_plan_id in orchestration_config.approvals and orchestration_config.approvals[m_plan_id] is None):
                 logger.debug(f"Final cleanup for pending approval plan {m_plan_id}")
                 orchestration_config.cleanup_approval(m_plan_id)
 
