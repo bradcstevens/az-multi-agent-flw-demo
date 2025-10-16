@@ -206,16 +206,6 @@ Here is an example of a well-structured plan:
     async def _wait_for_user_approval(
         self, m_plan_id: Optional[str] = None
     ) -> Optional[messages.PlanApprovalResponse]:
-        # """Wait for user approval response."""
-
-        # # To do: implement timeout and error handling
-        # if m_plan_id not in orchestration_config.approvals:
-        #     orchestration_config.approvals[m_plan_id] = None
-        # while orchestration_config.approvals[m_plan_id] is None:
-        #     await asyncio.sleep(0.2)
-        # return messages.PlanApprovalResponse(
-        #     approved=orchestration_config.approvals[m_plan_id], m_plan_id=m_plan_id
-        # )
         """
         Wait for user approval response using event-driven pattern with timeout handling.
 

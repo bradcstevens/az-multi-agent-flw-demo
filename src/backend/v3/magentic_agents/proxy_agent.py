@@ -270,17 +270,6 @@ class ProxyAgent(Agent):
     async def _wait_for_user_clarification(
         self, request_id: str
     ) -> Optional[UserClarificationResponse]:
-        # """Wait for user clarification response."""
-        # # To do: implement timeout and error handling
-        # if request_id not in orchestration_config.clarifications:
-        #     orchestration_config.clarifications[request_id] = None
-        # while orchestration_config.clarifications[request_id] is None:
-        #     await asyncio.sleep(0.2)
-        # return UserClarificationResponse(
-        #     request_id=request_id,
-        #     answer=orchestration_config.clarifications[request_id],
-        # )
-
         """
         Wait for user clarification response using event-driven pattern with timeout handling.
 
