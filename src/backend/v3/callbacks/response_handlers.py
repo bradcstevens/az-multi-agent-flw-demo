@@ -33,7 +33,6 @@ def clean_citations(text: str) -> str:
     text = re.sub(r'\(source:[^)]*\)', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\[source:[^\]]*\]', '', text, flags=re.IGNORECASE)
 
-
     return text
 
 def agent_response_callback(message: ChatMessageContent, user_id: str = None) -> None:
