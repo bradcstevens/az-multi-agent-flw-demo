@@ -98,7 +98,7 @@ async def streaming_agent_response_callback(
             try:
                 message = AgentMessageStreaming(
                     agent_name=streaming_message.name or "Unknown Agent",
-                    content=clean_citations(streaming_message.content) or "",
+                    content=clean_citations(streaming_message.content),
                     is_final=is_final,
                 )
                 await connection_config.send_status_update_async(
