@@ -35,6 +35,7 @@ def clean_citations(text: str) -> str:
 
     return text
 
+
 def agent_response_callback(message: ChatMessageContent, user_id: str = None) -> None:
     """Observer function to print detailed information about streaming messages."""
     # import sys
