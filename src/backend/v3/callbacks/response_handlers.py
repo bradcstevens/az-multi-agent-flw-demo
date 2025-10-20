@@ -6,7 +6,7 @@ Provides detailed monitoring and response handling for different agent types.
 import asyncio
 import logging
 import time
-
+import re
 from semantic_kernel.contents import ChatMessageContent, StreamingChatMessageContent
 from v3.config.settings import connection_config
 from v3.models.messages import (
@@ -16,6 +16,24 @@ from v3.models.messages import (
     AgentToolMessage,
     WebsocketMessageType,
 )
+
+
+def clean_citations(text: str) -> str:
+    """Remove citation markers from agent responses while preserving formatting."""
+    if not text:
+        return text
+
+    # Remove citation patterns like [9:0|source], [9:1|source], etc.
+    text = re.sub(r'\[\d+:\d+\|source\]', '', text)
+
+    # Remove other common citation pattern
+    text = re.sub(r'\[\s*source\s*\]', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\[\d+\]', '', text)
+    text = re.sub(r'【[^】]*】', '', text)  # Unicode brackets
+    text = re.sub(r'\(source:[^)]*\)', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\[source:[^\]]*\]', '', text, flags=re.IGNORECASE)
+
+    return text
 
 
 def agent_response_callback(message: ChatMessageContent, user_id: str = None) -> None:
@@ -55,7 +73,7 @@ def agent_response_callback(message: ChatMessageContent, user_id: str = None) ->
                 final_message = AgentMessage(
                     agent_name=agent_name,
                     timestamp=time.time() or "",
-                    content=message.content or "",
+                    content=clean_citations(message.content) or "",
                 )
 
                 asyncio.create_task(
@@ -80,7 +98,7 @@ async def streaming_agent_response_callback(
             try:
                 message = AgentMessageStreaming(
                     agent_name=streaming_message.name or "Unknown Agent",
-                    content=streaming_message.content,
+                    content=clean_citations(streaming_message.content),
                     is_final=is_final,
                 )
                 await connection_config.send_status_update_async(

@@ -5,7 +5,6 @@ import logging
 import uuid
 from typing import List, Optional
 
-from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
 from common.config.app_config import config
 from common.models.messages_kernel import TeamConfiguration
 from semantic_kernel.agents.orchestration.magentic import MagenticOrchestration
@@ -46,7 +45,7 @@ class OrchestrationManager:
             max_tokens=4000, temperature=0.1
         )
 
-        credential = SyncDefaultAzureCredential()
+        credential = config.get_azure_credential(client_id=config.AZURE_CLIENT_ID)
 
         def get_token():
             token = credential.get_token("https://cognitiveservices.azure.com/.default")
@@ -120,7 +119,9 @@ class OrchestrationManager:
         """Run the orchestration with user input loop."""
 
         job_id = str(uuid.uuid4())
-        orchestration_config.approvals[job_id] = None
+
+        # Use the new event-driven method to set approval as pending
+        orchestration_config.set_approval_pending(job_id)
 
         magentic_orchestration = orchestration_config.get_current_orchestration(user_id)
 
