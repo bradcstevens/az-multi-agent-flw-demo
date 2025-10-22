@@ -153,6 +153,7 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def get_current_team(self, user_id: str) -> Optional[UserCurrentTeam]:
         """Retrieve the current team for a user."""
+        pass
 
     @abstractmethod
     async def delete_current_team(self, user_id: str) -> Optional[UserCurrentTeam]:
