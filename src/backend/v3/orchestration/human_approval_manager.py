@@ -53,15 +53,7 @@ class HumanApprovalMagenticManager(StandardMagenticManager):
         # Remove any custom kwargs before passing to parent
 
         plan_append = """
- 
-CRITICAL DOMAIN CHECK: Examine team agents first - if request doesn't match team domain, reject immediately:
-- CustomerDataAgent/OrderDataAgent = RETAIL team (reject HR/employee requests)
-- HRHelperAgent = HR team (reject non-HR requests)  
-- ProductAgent/MarketingAgent = MARKETING team (reject non-marketing requests)
-
-- **ProxyAgent** to politely inform the user that this request does not match this team’s domain and should be redirected to the appropriate team. No clarifications or follow-up questions should be asked.
-
- 
+  
 IMPORTANT: Never ask the user for information or clarification until all agents on the team have been asked first.
  
 EXAMPLE: If the user request involves product information, first ask all agents on the team to provide the information.
