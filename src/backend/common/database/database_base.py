@@ -208,7 +208,7 @@ class DatabaseBase(ABC):
     async def add_mplan(self, mplan: messages.MPlan) -> None:
         """Add a team configuration to the database."""
         pass
-    
+
     @abstractmethod
     async def update_mplan(self, mplan: messages.MPlan) -> None:
         """Update a team configuration in the database."""
