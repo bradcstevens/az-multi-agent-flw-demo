@@ -299,7 +299,6 @@ Once you've opened the project in [Codespaces](#github-codespaces), [Dev Contain
 
 10. If you are done trying out the application, you can delete the resources by running `azd down`.
 
-
 ### 🛠️ Troubleshooting
  If you encounter any issues during the deployment process, please refer [troubleshooting](../docs/TroubleShootingSteps.md) document for detailed steps and solutions.
 
@@ -510,3 +509,7 @@ To debug the python server in the frontend directory (frontend_server.py) and re
       "jinja": true
     }
 ```
+## Next Steps
+Now that you've completed your deployment, you can start using the solution. 
+
+To help you get started, here are some [Sample Questions](./SampleQuestions.md) you can follow to try it out.
