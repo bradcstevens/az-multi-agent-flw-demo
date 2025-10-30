@@ -171,6 +171,38 @@ jobs:
           echo "MACAE_URL_API=https://${MACAE_URL_API}" >> $GITHUB_OUTPUT
           echo "CONTAINER_APP=${CONTAINER_APP_NAME}" >> $GITHUB_OUTPUT
 
+      - name: Run Post deployment scripts
+        run: |
+          set -e
+          az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+
+          echo "Running post-deployment script..."
+          
+          # Extract required resource names from the deployment
+          STORAGE_ACCOUNT=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.Storage/storageAccounts" --query "[0].name" -o tsv)
+          AI_SEARCH=$(az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --resource-type "Microsoft.Search/searchServices" --query "[0].name" -o tsv)
+          
+          echo "Found Storage Account: $STORAGE_ACCOUNT"
+          echo "Found AI Search Service: $AI_SEARCH"
+          echo "Backend URL: ${{ steps.get_backend_url.outputs.MACAE_URL_API }}"
+          
+          # Run upload team config script with parameters
+          bash infra/scripts/upload_team_config.sh \
+            "${{ steps.get_backend_url.outputs.MACAE_URL_API }}" \
+            "data/agent_teams" \
+            "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          
+          # Run process sample data script with parameters
+          bash infra/scripts/process_sample_data.sh \
+            "$STORAGE_ACCOUNT" \
+            "documents" \
+            "$AI_SEARCH" \
+            "sample-dataset-index" \
+            "${{ env.RESOURCE_GROUP_NAME }}" \
+            "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+
+          echo "=== Post-Deployment Script Completed Successfully ==="
+
       - name: Set Deployment Status
         id: deployment_status
         if: always()
