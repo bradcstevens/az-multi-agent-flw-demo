@@ -159,9 +159,10 @@ jobs:
       - name: Get Container App Backend URL
         id: get_backend_url
         run: |
+          # Get specifically the backend container app (not the MCP container app)
           CONTAINER_APP_NAME=$(az containerapp list \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --query "[0].name" -o tsv)
+            --query "[?starts_with(name, 'ca-') && !contains(name, 'mcp')].name" -o tsv)
 
           MACAE_URL_API=$(az containerapp show \
             --name "$CONTAINER_APP_NAME" \
