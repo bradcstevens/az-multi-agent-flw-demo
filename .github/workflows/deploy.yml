@@ -136,7 +136,7 @@ jobs:
               location="${{ env.AZURE_LOCATION }}" \
               gptModelDeploymentType="GlobalStandard" \
               gptModelName="gpt-4.1-mini" \
-              gptModelVersion="2024-08-06" \
+              gptModelVersion="2025-04-14" \
               backendContainerImageTag="${IMAGE_TAG}" \
               frontendContainerImageTag="${IMAGE_TAG}" \
               azureAiServiceLocation='${{ env.AZURE_LOCATION }}' \
