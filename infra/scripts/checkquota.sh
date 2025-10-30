@@ -33,6 +33,7 @@ echo "✅ Azure subscription set successfully."
 declare -A MIN_CAPACITY=(
     ["OpenAI.GlobalStandard.o4-mini"]=50
     ["OpenAI.GlobalStandard.gpt4.1"]=150
+    ["OpenAI.GlobalStandard.gpt4.1-mini"]=50
 )
 
 VALID_REGION=""
