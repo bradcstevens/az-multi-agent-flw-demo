@@ -75,15 +75,8 @@ else
     az account set --subscription "$currentSubscriptionId"
 fi
 
-# Only get user principal ID if we have azSubscriptionId (indicating authentication is needed)
-if [ -n "$azSubscriptionId" ]; then
-    echo "Getting user principal ID for authentication..."
-    userPrincipalId=$(az ad signed-in-user show --query id -o tsv)
-    echo "Using authenticated mode with user ID: $userPrincipalId"
-else
-    echo "No subscription ID provided - using development mode (no authentication)"
-    userPrincipalId=""
-fi
+userPrincipalId=$(az ad signed-in-user show --query id -o tsv)
+echo "User Principal ID: $userPrincipalId"
 
 # Determine the correct Python command
 if command -v python && python --version &> /dev/null; then
@@ -120,11 +113,7 @@ pip install --quiet -r infra/scripts/requirements.txt
 echo "Requirements installed"
 
 echo "Running the python script to upload team configuration"
-if [ -n "$userPrincipalId" ]; then
-    $PYTHON_CMD infra/scripts/upload_team_config.py "$backendUrl" "$directoryPath" "$userPrincipalId"
-else
-    $PYTHON_CMD infra/scripts/upload_team_config.py "$backendUrl" "$directoryPath"
-fi
+$PYTHON_CMD infra/scripts/upload_team_config.py "$backendUrl" "$directoryPath" "$userPrincipalId"
 if [ $? -ne 0 ]; then
     echo "Error: Team configuration upload failed."
     exit 1

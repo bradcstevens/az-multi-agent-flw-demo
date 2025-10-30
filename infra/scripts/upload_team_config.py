@@ -16,9 +16,9 @@ def check_team_exists(backend_url, team_id, user_principal_id):
         exists: bool
     """
     check_endpoint = backend_url.rstrip('/') + f'/api/v3/team_configs/{team_id}'
-    headers = {}
-    if user_principal_id is not None:
-        headers['x-ms-client-principal-id'] = user_principal_id
+    headers = {
+        'x-ms-client-principal-id': user_principal_id
+    }
     
     try:
         response = requests.get(check_endpoint, headers=headers)
@@ -39,18 +39,12 @@ if len(sys.argv) < 2:
 
 backend_url = sys.argv[1]
 directory_path = sys.argv[2]
-user_principal_id = sys.argv[3] if len(sys.argv) > 3 else None
+user_principal_id = sys.argv[3] if len(sys.argv) > 3 else "00000000-0000-0000-0000-000000000000"
 
 # Convert to absolute path if provided as relative
 directory_path = os.path.abspath(directory_path)
 print(f"Scanning directory: {directory_path}")
 
-# Determine if we should use authentication headers
-use_auth_headers = user_principal_id is not None
-if use_auth_headers:
-    print(f"Using authentication with user ID: {user_principal_id}")
-else:
-    print("No authentication - backend will use development mode")
 
 files_to_process = [
     ("hr.json", "00000000-0000-0000-0000-000000000001"),
@@ -84,9 +78,9 @@ for filename, team_id in files_to_process:
                 files = {
                     'file': (filename, file_data, 'application/json')
                 }
-                headers = {}
-                if use_auth_headers:
-                    headers['x-ms-client-principal-id'] = user_principal_id
+                headers = {
+                    'x-ms-client-principal-id': user_principal_id
+                }
                 
                 params = {
                     'team_id': team_id
