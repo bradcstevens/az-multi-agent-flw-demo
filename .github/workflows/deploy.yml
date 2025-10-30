@@ -181,6 +181,17 @@ jobs:
             echo "SUCCESS=false" >> $GITHUB_OUTPUT
           fi
 
+  e2e-test:
+    needs: deploy
+    if: needs.deploy.outputs.DEPLOYMENT_SUCCESS == 'true'
+    uses: ./.github/workflows/test-automation.yml
+    with:
+      MACAE_WEB_URL: ${{ needs.deploy.outputs.WEBAPP_URL }}
+      MACAE_URL_API: ${{ needs.deploy.outputs.MACAE_URL_API }}
+      MACAE_RG: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
+      MACAE_CONTAINER_APP: ${{ needs.deploy.outputs.CONTAINER_APP }}
+    secrets: inherit
+    
   cleanup-deployment:
     if: always() && needs.deploy.outputs.RESOURCE_GROUP_NAME != ''
     needs: [deploy]
