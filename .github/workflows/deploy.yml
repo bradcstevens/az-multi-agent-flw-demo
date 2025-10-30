@@ -195,7 +195,7 @@ jobs:
           # Run process sample data script with parameters
           bash infra/scripts/process_sample_data.sh \
             "$STORAGE_ACCOUNT" \
-            "documents" \
+            "sample-dataset" \
             "$AI_SEARCH" \
             "sample-dataset-index" \
             "${{ env.RESOURCE_GROUP_NAME }}" \
