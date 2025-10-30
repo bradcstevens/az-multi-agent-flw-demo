@@ -191,10 +191,10 @@ jobs:
       MACAE_RG: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
       MACAE_CONTAINER_APP: ${{ needs.deploy.outputs.CONTAINER_APP }}
     secrets: inherit
-    
+
   cleanup-deployment:
     if: always() && needs.deploy.outputs.RESOURCE_GROUP_NAME != ''
-    needs: [deploy]
+    needs: [deploy, e2e-test]
     runs-on: ubuntu-latest
     env:
       RESOURCE_GROUP_NAME: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
