@@ -179,11 +179,11 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$EMAIL_BODY" || echo "Failed to send notification"
 
-      - name: Stop Container App
-        if: always()
-        uses: azure/cli@v2
-        with:
-          azcliversion: "latest"
-          inlineScript: |
-            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/stop?api-version=2025-01-01"
-            az logout
+      # - name: Stop Container App
+      #   if: always()
+      #   uses: azure/cli@v2
+      #   with:
+      #     azcliversion: "latest"
+      #     inlineScript: |
+      #       az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/stop?api-version=2025-01-01"
+      #       az logout

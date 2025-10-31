@@ -76,7 +76,6 @@ else
 fi
 
 userPrincipalId=$(az ad signed-in-user show --query id -o tsv)
-echo "User Principal ID: $userPrincipalId"
 
 # Determine the correct Python command
 if command -v python && python --version &> /dev/null; then

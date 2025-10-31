@@ -10,7 +10,7 @@ def check_team_exists(backend_url, team_id, user_principal_id):
     Args:
         backend_url: The backend endpoint URL
         team_id: The team ID to check
-        user_principal_id: User principal ID for authentication (None if no auth)
+        user_principal_id: User principal ID for authentication
         
     Returns:
         exists: bool
@@ -45,7 +45,6 @@ print("User principal from py : " + user_principal_id)
 # Convert to absolute path if provided as relative
 directory_path = os.path.abspath(directory_path)
 print(f"Scanning directory: {directory_path}")
-
 
 files_to_process = [
     ("hr.json", "00000000-0000-0000-0000-000000000001"),
@@ -82,7 +81,7 @@ for filename, team_id in files_to_process:
                 headers = {
                     'x-ms-client-principal-id': user_principal_id
                 }
-                
+    
                 params = {
                     'team_id': team_id
                 }
