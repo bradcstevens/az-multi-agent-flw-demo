@@ -150,40 +150,40 @@ jobs:
             exit 1
           fi
 
-      # - name: Send Notification
-      #   if: always()
-      #   run: |
-      #     RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-      #     REPORT_URL=${{ steps.upload_report.outputs.artifact-url }}
-      #     IS_SUCCESS=${{ steps.test_result.outputs.IS_SUCCESS }}
+      - name: Send Notification
+        if: always()
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          REPORT_URL=${{ steps.upload_report.outputs.artifact-url }}
+          IS_SUCCESS=${{ steps.test_result.outputs.IS_SUCCESS }}
 
-      #     if [ "$IS_SUCCESS" = "true" ]; then
-      #             EMAIL_BODY=$(cat <<EOF
-      #             {
-      #               "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has completed successfully.</p><p><strong>Run URL:</strong> <a href=\\"${RUN_URL}\\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\\"${REPORT_URL}\\">${REPORT_URL}</a></p><p>Best regards,<br>Your Automation Team</p>",
-      #               "subject": "${{ env.accelerator_name }} Test Automation - Success"
-      #             }
-      #     EOF
-      #       )
-      #     else
-      #             EMAIL_BODY=$(cat <<EOF
-      #             {
-      #               "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Run URL:</strong> <a href=\\"${RUN_URL}\\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\\"${REPORT_URL}\\">${REPORT_URL}</a></p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>",
-      #               "subject": "${{ env.accelerator_name }} Test Automation - Failure"
-      #             }
-      #     EOF
-      #       )
-      #     fi
+          if [ "$IS_SUCCESS" = "true" ]; then
+                  EMAIL_BODY=$(cat <<EOF
+                  {
+                    "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has completed successfully.</p><p><strong>Run URL:</strong> <a href=\\"${RUN_URL}\\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\\"${REPORT_URL}\\">${REPORT_URL}</a></p><p>Best regards,<br>Your Automation Team</p>",
+                    "subject": "${{ env.accelerator_name }} Test Automation - Success"
+                  }
+          EOF
+            )
+          else
+                  EMAIL_BODY=$(cat <<EOF
+                  {
+                    "body": "<p>Dear Team,</p><p>We would like to inform you that the ${{ env.accelerator_name }} Test Automation process has encountered an issue and has failed to complete successfully.</p><p><strong>Run URL:</strong> <a href=\\"${RUN_URL}\\">${RUN_URL}</a><br></p><p><strong>Test Report:</strong> <a href=\\"${REPORT_URL}\\">${REPORT_URL}</a></p><p>Please investigate the matter at your earliest convenience.</p><p>Best regards,<br>Your Automation Team</p>",
+                    "subject": "${{ env.accelerator_name }} Test Automation - Failure"
+                  }
+          EOF
+            )
+          fi
 
-      #     curl -X POST "${{ secrets.EMAILNOTIFICATION_LOGICAPP_URL_TA }}" \
-      #       -H "Content-Type: application/json" \
-      #       -d "$EMAIL_BODY" || echo "Failed to send notification"
+          curl -X POST "${{ secrets.EMAILNOTIFICATION_LOGICAPP_URL_TA }}" \
+            -H "Content-Type: application/json" \
+            -d "$EMAIL_BODY" || echo "Failed to send notification"
 
-      # - name: Stop Container App
-      #   if: always()
-      #   uses: azure/cli@v2
-      #   with:
-      #     azcliversion: "latest"
-      #     inlineScript: |
-      #       az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/stop?api-version=2025-01-01"
-      #       az logout
+      - name: Stop Container App
+        if: always()
+        uses: azure/cli@v2
+        with:
+          azcliversion: "latest"
+          inlineScript: |
+            az rest -m post -u "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.MACAE_RG }}/providers/Microsoft.App/containerApps/${{ env.MACAE_CONTAINER_APP }}/stop?api-version=2025-01-01"
+            az logout
