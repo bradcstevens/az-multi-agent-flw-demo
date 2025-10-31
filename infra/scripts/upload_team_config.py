@@ -40,7 +40,6 @@ if len(sys.argv) < 2:
 backend_url = sys.argv[1]
 directory_path = sys.argv[2]
 user_principal_id = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3].strip() != "" else "00000000-0000-0000-0000-000000000000"
-print("User principal from py : " + user_principal_id)
 
 # Convert to absolute path if provided as relative
 directory_path = os.path.abspath(directory_path)
