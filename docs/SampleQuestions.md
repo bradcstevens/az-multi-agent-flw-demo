@@ -13,7 +13,7 @@ The Retail Scenario allows users to explore and retrieve information. Key tasks 
 
 _Sample operation:_
 - Task: From the Quick Tasks, select **"Satisfaction Plan"** and submit it.
-  > _Observe: Analyze the satisfaction of Emily Thompson with Contoso is generated. If needed, provide a plan to increase satisfaction._
+  > _Observe: Analyze the satisfaction of Emily Thompson with Contoso is generated._
 - Task: Click **"Approve Task Plan"** Button
   > _Observe: It goes into "Thinking Process", "Processing your plan" and "coordinating with AI Agents"._ 
 
