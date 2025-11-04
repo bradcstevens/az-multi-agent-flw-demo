@@ -54,7 +54,7 @@ _Sample operation:_
 - Task: Switch to the **"Human Resources Team"** from the top left section and click **"Continue"**
 - Task: From the Quick Tasks, select **"Onboard New Employee"** and submit it.
   
-  > _Observe: If it asks for additional clarification (Human in the loop) Please provide this information irrepective of what specific information is asked. This will prevent agent for asking for multiple clarifications_
+  > _Observe: If it asks for additional clarification (Human in the loop) Please provide this information irrespective of what specific information is asked. This will prevent agent for asking for multiple clarifications_
 
   ```sh
   department: hr, role: manager, start date: 11/23/2025, orientation date: 11/25/2025, location: onsite, email: js@contoso.com, mentor: Jim Shorts, benefits package:   standard, ID Card: yes, salary: 70000, Laptop : Dell 14 Plus
