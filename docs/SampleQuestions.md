@@ -37,7 +37,7 @@ The Product Marketing Scenario allows users to explore and retrieve information 
 _Sample operation:_
 - Task: Switch to **"Product Marketing Team"** from the top left section and click **"Continue"** button.
 - Task: From the Quick Tasks, select **"Draft a press release"** and submit it.
-  > _Observe: It will trigger the "Generating Plan Action" and Give the Proposed Plan with 4 or more Steps_
+  > _Observe: It will trigger the "Generating Plan Action" and give the Proposed Plan with 4 or more Steps_
 - Task: Click on **"Approve Task Plan"** Button
   > _Observe: It goes into "Thinking Process" and observe a spinner "Processing your plan and coordinating with AI Agents" _
   > Review the output.
