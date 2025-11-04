@@ -1,5 +1,5 @@
 
-# Sample Questions
+# Sample Workflow
 
 To help you get started, here are some **Sample Prompts** you can ask in the app:
 
