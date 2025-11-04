@@ -11,7 +11,7 @@ By default, three teams are available after running the post-deployment scripts:
 - HR
 - Marketing
   
-![GenerateDraft](images/samplequestion_1.png)
+![Application](images/samplequestion_1.png)
 
 ### **Retail Scenario**
 If you select the Retail team, follow the prompts below.
