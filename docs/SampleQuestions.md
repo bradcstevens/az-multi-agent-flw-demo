@@ -42,12 +42,12 @@ _Sample operation:_
   > _Observe: It goes into "Thinking Process" and observe a spinner "Processing your plan and coordinating with AI Agents" _
   > Review the output.
 
-### **HR Onboaring Scenario**
+### **HR Onboarding Scenario**
 If you select the HR team, follow the prompts below.
 
 >**Agents Used:** HR Helper, Technical support , Proxy 
 
-The HR Onboaring Scenario allows users to explore and retrieve information related to OnBoarding the Employee. Key tasks include:
+The HR Onboarding Scenario allows users to explore and retrieve information related to OnBoarding the Employee. Key tasks include:
 
 _Sample operation:_
 
