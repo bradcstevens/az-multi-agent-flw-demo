@@ -185,19 +185,6 @@ Consider the following settings during your deployment to modify specific settin
 
 When you start the deployment, most parameters will have **default values**, but you can update the following settings [here](../docs/CustomizingAzdParameters.md):
 
-| **Setting**                    | **Description**                                                                      | **Default value** |
-| ------------------------------ | ------------------------------------------------------------------------------------ | ----------------- |
-| **Environment Name**           | Used as a prefix for all resource names to ensure uniqueness across environments.    | macae             |
-| **Azure Region**               | Location of the Azure resources. Controls where the infrastructure will be deployed. | swedencentral     |
-| **OpenAI Deployment Location** | Specifies the region for OpenAI resource deployment.                                 | swedencentral     |
-| **Model Deployment Type**      | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).      | GlobalStandard    |
-| **GPT Model Name**             | Specifies the name of the GPT model to be deployed.                                 | gpt-4o            |
-| **GPT Model Version**          | Version of the GPT model to be used for deployment.                                 | 2024-08-06        |
-| **GPT Model Capacity**          | Sets the GPT model capacity.                                 | 150        |
-| **Image Tag**                  | Docker image tag used for container deployments.                                    | latest            |
-| **Enable Telemetry**           | Enables telemetry for monitoring and diagnostics.                                    | true              |
-| **Existing Log Analytics Workspace**        | To reuse an existing Log Analytics Workspace ID instead of creating a new one.              | *(none)*          |
-| **Existing Azure AI Foundry Project**        | To reuse an existing Azure AI Foundry Project ID instead of creating a new one.              | *(none)*          |
 
 </details>
 
@@ -298,7 +285,6 @@ Once you've opened the project in [Codespaces](#github-codespaces), [Dev Contain
 9. When Deployment is complete, follow steps in [Set Up Authentication in Azure App Service](../docs/azure_app_service_auth_setup.md) to add app authentication to your web app running on Azure App Service
 
 10. If you are done trying out the application, you can delete the resources by running `azd down`.
-
 
 ### 🛠️ Troubleshooting
  If you encounter any issues during the deployment process, please refer [troubleshooting](../docs/TroubleShootingSteps.md) document for detailed steps and solutions.
@@ -510,3 +496,7 @@ To debug the python server in the frontend directory (frontend_server.py) and re
       "jinja": true
     }
 ```
+## Next Steps
+Now that you've completed your deployment, you can start using the solution. 
+
+To help you get started, here are some [Sample Questions](./SampleQuestions.md) you can follow to try it out.
