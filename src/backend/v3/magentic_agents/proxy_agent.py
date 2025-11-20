@@ -291,7 +291,7 @@ class ProxyAgent(Agent):
             # Wait for clarification with timeout using the new event-driven method
             answer = await orchestration_config.wait_for_clarification(request_id)
 
-            logger.info(f"Clarification received for: {request_id}")
+            logger.info(f"Clarification received for {request_id} : {answer}")
             return UserClarificationResponse(
                 request_id=request_id,
                 answer=answer,

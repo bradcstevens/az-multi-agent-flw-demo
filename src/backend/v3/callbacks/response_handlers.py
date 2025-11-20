@@ -53,6 +53,7 @@ def agent_response_callback(message: ChatMessageContent, user_id: str = None) ->
     if user_id:
         try:
             if message.items and message.items[0].content_type == "function_call":
+                logger.info(f" Message content_type: {message.items[0].content_type}")
                 logger.info(f"🔧 Tool calls detected from agent: {agent_name}")
                 final_message = AgentToolMessage(agent_name=agent_name)
                 for item in message.items:
@@ -74,9 +75,10 @@ def agent_response_callback(message: ChatMessageContent, user_id: str = None) ->
                         message_type=WebsocketMessageType.AGENT_TOOL_MESSAGE,
                     )
                 )
-                logging.info(f"📤 Tool message sent via WebSocket for user: {user_id}")
+                logging.info(f"Function call: {final_message}")
             elif message.items and message.items[0].content_type == "function_result":
                 # Log function results for debugging
+                logger.info(f" Message content_type: {message.items[0].content_type}")
                 logger.info(f"📥 Function result received from agent: {agent_name}")
                 for item in message.items:
                     if item.content_type == "function_result":
@@ -85,6 +87,7 @@ def agent_response_callback(message: ChatMessageContent, user_id: str = None) ->
                 # skip returning these results for now - agent will return in a later message
                 pass
             else:
+                logger.info(f" Message content_type: {message.items[0].content_type}")
                 logger.info(f"💬 Text message from agent: {agent_name}")
                 final_message = AgentMessage(
                     agent_name=agent_name,

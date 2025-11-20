@@ -77,7 +77,7 @@ class MCPEnabledBase:
 
     async def _enter_mcp_if_configured(self) -> None:
         if not self.mcp_cfg:
-            logger.debug("No MCP configuration provided")
+            logger.error("No MCP configuration provided")
             return
         # headers = self._build_mcp_headers()
         plugin = MCPStreamableHttpPlugin(
