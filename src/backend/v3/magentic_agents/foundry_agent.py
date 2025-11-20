@@ -171,7 +171,7 @@ class FoundryAgentTemplate(AzureAgentBase):
 
         # Add MCP plugins if available
         plugins = [self.mcp_plugin] if self.mcp_plugin else []
-        
+
         if self.mcp_plugin:
             self.logger.info(f"🔧 Adding MCP plugin to agent: {self.agent_name}")
             self.logger.debug(f"MCP plugin name: {getattr(self.mcp_plugin, 'name', 'Unknown')}")

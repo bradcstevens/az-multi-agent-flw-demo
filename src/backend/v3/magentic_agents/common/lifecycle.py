@@ -89,7 +89,7 @@ class MCPEnabledBase:
         # Enter MCP async context via the stack to ensure correct LIFO cleanup
         if self._stack is None:
             self._stack = AsyncExitStack()
-        
+
         try:
             self.mcp_plugin = await self._stack.enter_async_context(plugin)
             logger.info(f"✅ MCP plugin '{self.mcp_cfg.name}' successfully initialized")

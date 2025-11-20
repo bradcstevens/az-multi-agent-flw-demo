@@ -44,7 +44,7 @@ def agent_response_callback(message: ChatMessageContent, user_id: str = None) ->
 
     # Get agent name to determine handling
     agent_name = message.name or "Unknown Agent"
-    
+
     logger.info(f"🤖 Agent Response from '{agent_name}' for user: {user_id}")
 
     role = getattr(message, "role", "unknown")
@@ -60,7 +60,7 @@ def agent_response_callback(message: ChatMessageContent, user_id: str = None) ->
                         tool_name = item.name or "unknown_tool"
                         tool_args = item.arguments or {}
                         logger.info(f"🛠️ Tool call: {tool_name} with args: {str(tool_args)[:200]}...")
-                        
+
                         tool_call = AgentToolCall(
                             tool_name=tool_name,
                             arguments=tool_args,
