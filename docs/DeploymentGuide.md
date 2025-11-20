@@ -245,7 +245,7 @@ azd init -t microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/
 
 > **💡 Why is this needed?** Azure resources maintain state information tied to your environment. Reusing an old environment can cause naming conflicts, permission issues, and deployment failures.
 
-#### Deployment the solution
+#### Deploy the solution
 1. Login to Azure:
 
    ```shell
