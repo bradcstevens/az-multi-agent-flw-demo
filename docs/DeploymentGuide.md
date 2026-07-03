@@ -322,66 +322,8 @@ azd up
 
 **Expected Duration:** 9-10 minutes for default configuration
 
-> **Note — Automatic container image build & push:** After the Bicep templates finish provisioning, `azd` runs an automatic **postprovision** hook that:
->
-> 1. Builds the `backend`, `frontend` and `mcp` container images from `src/backend`, `src/App` and `src/mcp_server`.
-> 2. Pushes them to the Azure Container Registry (ACR) that was just provisioned in your resource group.
-> 3. Updates the two Container Apps and the frontend Web App to run the freshly pushed images.
->
-> Add another 4-8 minutes for this step. See [Container image build behavior](#42a-container-image-build-behavior-optional) below to change how the images are built or to skip the step.
 
-### 4.2.a Container image build behavior (optional)
-
-The postprovision hook is driven by environment variables you can set on the `azd` environment **before** running `azd up`.
-
-| `azd env set` key | Values | Default | Purpose |
-|-------------------|--------|---------|---------|
-| `AZURE_ENV_BUILD_MODE` | `remote` \| `local` | `remote` | `remote` builds each image with `az acr build` (an ACR Task — no local Docker required). `local` runs `docker build` + `docker push` from your machine. |
-| `AZURE_ENV_IMAGE_TAG` | any tag | `latest` | Tag applied to every image pushed to the ACR. |
-| `AZURE_ENV_SKIP_IMAGE_BUILD` | `true` \| unset | unset | When `true`, the postprovision hook is skipped entirely. Use this if you plan to push images yourself. |
-
-**Examples**
-
-```shell
-# Default: remote ACR build, tag "latest" (no local Docker needed)
-azd up
-
-# Local Docker build with a custom tag
-azd env set AZURE_ENV_BUILD_MODE local
-azd env set AZURE_ENV_IMAGE_TAG   dev
-azd up
-
-# Skip the automatic build step (I'll push my own images later)
-azd env set AZURE_ENV_SKIP_IMAGE_BUILD true
-azd up
-```
-
-**Prerequisites**
-
-- `remote` mode requires only the Azure CLI (`az`) that comes with the deployment environments listed in Step 2.
-- `local` mode additionally requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) to be running on the machine where `azd up` is executed.
-
-**Running the script manually**
-
-You can also invoke the same script directly, for example after a code change:
-
-```powershell
-# PowerShell (Windows)
-infra\scripts\Build-And-Push-Images.ps1                    # remote build, tag "latest"
-infra\scripts\Build-And-Push-Images.ps1 -BuildMode local   # local Docker build
-infra\scripts\Build-And-Push-Images.ps1 -ImageTag v1.2.0   # custom tag
-```
-
-```bash
-# Bash (Linux / macOS / WSL)
-bash infra/scripts/build_and_push_images.sh                # remote build, tag "latest"
-AZURE_ENV_BUILD_MODE=local  bash infra/scripts/build_and_push_images.sh
-AZURE_ENV_IMAGE_TAG=v1.2.0  bash infra/scripts/build_and_push_images.sh
-```
-
-The script reads the ACR name, resource group and target Container App / Web App names from the current `azd` environment (`azd env get-values`), so it must be run from the project root after a successful `azd provision` / `azd up`.
-
-- **Upon successful completion**, you will see a success message indicating that all resources have been deployed, along with the application URL and next steps for uploading team configurations and sample data.
+- **Upon successful completion**, you will see a success message indicating that all resources have been deployed, along with the application URL and next steps for Build and push the backend/frontend/mcp_server container images to ACR, then point the container app and webapp at them and uploading team configurations and sample data.
 
 ![Deployment Success message](./images/Deployment_success_message.png)
 
@@ -399,9 +341,27 @@ After successful deployment:
 
 ## Step 5: Post-Deployment Configuration
 
-### 5.1 Run Post Deployment Script
+When `azd up` finishes, the `postdeploy` hook (defined in `azure.yaml`) prints the exact commands to run next. Complete the following steps, in order, from the project root before accessing the application.
 
-1. You can upload Team Configurations using command printed in the terminal. The command will look like one of the following. Run the appropriate command for your shell from the project root:
+### 5.1 Build and Push Container Images
+
+Build and push the backend, frontend, and mcp_server container images to ACR, then point the Container App and Web App at them. Run the command for your shell:
+
+  - **For Bash (Linux/macOS/WSL):**
+    ```bash
+    bash infra/scripts/build_and_push_images.sh
+    ```
+
+  - **For PowerShell (Windows):**
+    ```powershell
+    infra\scripts\Build-And-Push-Images.ps1
+    ```
+
+The script reads the ACR name, resource group and target Container App / Web App names from the current `azd` environment, so it must be run from the project root after a successful `azd up`. See [Step 4.2](#step-4-deploy-application) for build options (`remote` vs `local` mode and custom image tags).
+
+### 5.2 Upload Team Configurations and Index Sample Data
+
+1. Upload Team Configurations and index the sample data using the command printed in the terminal. Run the appropriate command for your shell from the project root:
 
   - **For Bash (Linux/macOS/WSL):**
     ```bash
@@ -418,25 +378,29 @@ After successful deployment:
 
 ![Usecase selection](./images/Usecase_selection.png)
 
+### 5.3 Access the Application
 
-### 5.2 Configure Authentication (Optional)
+Once both scripts complete, access your deployed frontend application at the URL printed by the `postdeploy` hook (`https://<webSiteDefaultHostname>`), or retrieve it from the Azure Portal as described in [Step 4.3](#43-get-application-url).
+
+
+### 5.4 Configure Authentication (Optional)
 
 1. Follow [App Authentication Configuration](./azure_app_service_auth_setup.md)
 2. Wait up to 10 minutes for authentication changes to take effect
 
-### 5.3 Verify Deployment
+### 5.5 Verify Deployment
 
 1. Access your application using the URL from Step 4.3
 2. Confirm the application loads successfully
 <!-- 3. Verify you can sign in with your authenticated account -->
 
-### 5.4 Test the Application
+### 5.6 Test the Application
 
 **Quick Test Steps:**
 
 1. **Access the application** using the URL from Step 4.3
 2. **Sign in** with your authenticated account
-3. **Select a use case** from the available scenarios you uploaded in Step 5.1
+3. **Select a use case** from the available scenarios you uploaded in Step 5.2
 4. **Ask a sample question** relevant to the selected use case
 5. **Verify the response** includes appropriate multi-agent collaboration
 6. **Check the logs** in Azure Portal to confirm backend processing

@@ -1,37 +1,10 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
 name: multi-agent-custom-automation-engine-solution-accelerator
-# metadata:
-#   template: multi-agent-custom-automation-engine-solution-accelerator@1.0
+metadata:
+  template: multi-agent-custom-automation-engine-solution-accelerator@1.0
 requiredVersions:
   azd: '>= 1.18.0 != 1.23.9'
 hooks:
-  postprovision:
-    windows:
-      run: |
-        # Build the backend, frontend and MCP images, push them to the ACR
-        # provisioned by this deployment and update the Container Apps /
-        # Web App to use the freshly built images.
-        #
-        # Set AZURE_ENV_SKIP_IMAGE_BUILD=true to skip this step.
-        # Set AZURE_ENV_BUILD_MODE=local to build with local Docker instead
-        # of the default remote 'az acr build'.
-        & "$PWD/infra/scripts/Build-And-Push-Images.ps1"
-      shell: pwsh
-      interactive: true
-      continueOnError: false
-    posix:
-      run: |
-        # Build the backend, frontend and MCP images, push them to the ACR
-        # provisioned by this deployment and update the Container Apps /
-        # Web App to use the freshly built images.
-        #
-        # Set AZURE_ENV_SKIP_IMAGE_BUILD=true to skip this step.
-        # Set AZURE_ENV_BUILD_MODE=local to build with local Docker instead
-        # of the default remote 'az acr build'.
-        bash "$PWD/infra/scripts/build_and_push_images.sh"
-      shell: sh
-      interactive: true
-      continueOnError: false
   postdeploy:
     windows:
       run: |
@@ -42,6 +15,11 @@ hooks:
           Write-Host "===============================================================" -ForegroundColor Yellow
           Write-Host " POST-DEPLOYMENT STEPS (Bash)" -ForegroundColor Green  
           Write-Host "===============================================================" -ForegroundColor Yellow
+          Write-Host ""
+
+          Write-Host " Build and push the backend/frontend/mcp_server container images to ACR, then point the container app and webapp at them:" -ForegroundColor White
+          Write-Host "  👉 Run the following command in Bash:" -ForegroundColor White
+          Write-Host "   bash infra/scripts/build_and_push_images.sh" -ForegroundColor Cyan
           Write-Host ""
 
           Write-Host " Upload Team Configurations and index sample data" -ForegroundColor White
@@ -58,6 +36,11 @@ hooks:
           Write-Host "===============================================================" -ForegroundColor Yellow
           Write-Host " POST-DEPLOYMENT STEP (PowerShell) " -ForegroundColor Green
           Write-Host "===============================================================" -ForegroundColor Yellow
+          Write-Host ""
+
+          Write-Host " Build and push the backend/frontend/mcp_server container images to ACR, then point the container app and webapp at them:" -ForegroundColor White
+          Write-Host "  👉 Run the following command in PowerShell:" -ForegroundColor White
+          Write-Host "   infra\scripts\Build-And-Push-Images.ps1" -ForegroundColor Cyan
           Write-Host ""
 
           Write-Host " Upload Team Configurations and index sample data" -ForegroundColor White
@@ -84,6 +67,10 @@ hooks:
         printf "${Yellow}===============================================================\n"
         printf "${Green} POST-DEPLOYMENT STEPS (Bash)\n"
         printf "${Yellow}===============================================================${NC}\n\n"
+
+        printf  "Build and push the backend/frontend/mcp_server container images to ACR, then point the container app and webapp at them:\n"
+        printf  "  👉 Run the following command in Bash:\n"
+        printf  "   ${Blue}bash infra/scripts/build_and_push_images.sh${NC}\n\n"
 
         printf  "Upload Team Configurations and index sample data:\n"
         printf  "  👉 Run the following command in Bash:\n"
