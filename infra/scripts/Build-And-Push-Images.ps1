@@ -234,3 +234,10 @@ if ($LASTEXITCODE -ne 0) { throw "Failed to restart Web App '$frontendApp'." }
 
 Write-Section 'Image build & push complete'
 Write-Host "All images built, pushed to '$acrEndpoint' with tag '$ImageTag', and services updated." -ForegroundColor Green
+
+Write-Section 'Next step: Upload Team Configurations and index sample data'
+Write-Host "Run the following command from the project root to upload the team" -ForegroundColor White
+Write-Host "configurations and index the sample data:" -ForegroundColor White
+Write-Host ""
+Write-Host "   infra\scripts\Selecting-Team-Config-And-Data.ps1" -ForegroundColor Cyan
+Write-Host ""
