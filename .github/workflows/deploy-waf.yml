@@ -134,7 +134,7 @@ jobs:
               location="${{ env.AZURE_LOCATION }}" \
               azureAiServiceLocation='${{ env.AZURE_LOCATION }}' \
               gptDeploymentCapacity=${{ env.GPT_MIN_CAPACITY }} \
-              gpt4_1ModelCapacity=${{ env.GPT41_MINI_MIN_CAPACITY }} \
+              gpt5_4ModelCapacity=${{ env.GPT41_MINI_MIN_CAPACITY }} \
               gptReasoningModelCapacity=${{ env.O4_MINI_MIN_CAPACITY }} \
               enableTelemetry=true \
               enableMonitoring=true \

@@ -16,11 +16,11 @@ By default this template will use the environment name as the prefix to prevent 
 | `AZURE_ENV_GPT_MODEL_VERSION`       | string | `2026-03-17`      | Version of the GPT model to be used for deployment.                                                |
 | `AZURE_ENV_GPT_DEPLOYMENT_NAME`     | string | (defaults to `AZURE_ENV_GPT_MODEL_NAME`) | Optional. Deployment (alias) name used in Azure OpenAI for the main GPT model. This is the value referenced as `deployment_name` in `data/agent_teams/*.json`. Override this if you want the deployment alias to differ from the underlying model name. |
 | `AZURE_ENV_GPT_MODEL_CAPACITY`       | int | `50`      | Sets the GPT model capacity.                                                |
-| `AZURE_ENV_MODEL_4_1_DEPLOYMENT_TYPE` | string | `GlobalStandard` | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).                     |
-| `AZURE_ENV_MODEL_4_1_NAME`          | string | `gpt-5.4`          | Specifies the underlying larger GPT model to be deployed.                                          |
-| `AZURE_ENV_MODEL_4_1_VERSION`       | string | `2026-03-05`      | Version of the larger GPT model to be used for deployment.                                         |
-| `AZURE_ENV_MODEL_4_1_DEPLOYMENT_NAME` | string | (defaults to `AZURE_ENV_MODEL_4_1_NAME`) | Optional. Deployment (alias) name used in Azure OpenAI for the larger GPT model. Override if the alias should differ from the underlying model name. |
-| `AZURE_ENV_MODEL_4_1_CAPACITY`       | int | `150`      | Sets the GPT model capacity.                                                |
+| `AZURE_ENV_MODEL_5_4_DEPLOYMENT_TYPE` | string | `GlobalStandard` | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).                     |
+| `AZURE_ENV_MODEL_5_4_NAME`          | string | `gpt-5.4`          | Specifies the underlying larger GPT model to be deployed.                                          |
+| `AZURE_ENV_MODEL_5_4_VERSION`       | string | `2026-03-05`      | Version of the larger GPT model to be used for deployment.                                         |
+| `AZURE_ENV_MODEL_5_4_DEPLOYMENT_NAME` | string | (defaults to `AZURE_ENV_MODEL_5_4_NAME`) | Optional. Deployment (alias) name used in Azure OpenAI for the larger GPT model. Override if the alias should differ from the underlying model name. |
+| `AZURE_ENV_MODEL_5_4_CAPACITY`       | int | `150`      | Sets the GPT model capacity.                                                |
 | `AZURE_ENV_REASONING_MODEL_DEPLOYMENT_TYPE` | string | `GlobalStandard` | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).                     |
 | `AZURE_ENV_REASONING_MODEL_NAME`          | string | `gpt-5.4-mini`          | Specifies the underlying reasoning GPT model to be deployed.                                       |
 | `AZURE_ENV_REASONING_MODEL_VERSION`       | string | `2026-03-17`      | Version of the reasoning GPT model to be used for deployment.                                      |
