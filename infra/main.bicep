@@ -1,4 +1,4 @@
-// // ========== main_custom.bicep ========== //
+// // ========== main.bicep ========== //
 targetScope = 'resourceGroup'
 
 metadata name = 'Multi-Agent Custom Automation Engine'

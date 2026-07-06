@@ -323,7 +323,7 @@ azd up
 **Expected Duration:** 9-10 minutes for default configuration
 
 
-- **Upon successful completion**, you will see a success message indicating that all resources have been deployed, along with the application URL and next steps for Build and push the backend/frontend/mcp_server container images to ACR, then point the container app and webapp at them and uploading team configurations and sample data.
+- **Upon successful completion**, you will see a success message indicating that all resources have been deployed, along with the application URL. The next steps are to build and push the backend, frontend, and mcp_server container images to ACR, point the container app and web app at them, and upload the team configurations and sample data.
 
 ![Deployment Success message](./images/Deployment_success_message.png)
 
@@ -344,6 +344,8 @@ After successful deployment:
 When `azd up` finishes, the `postdeploy` hook (defined in `azure.yaml`) prints the exact commands to run next. Complete the following steps, in order, from the project root before accessing the application.
 
 ### 5.1 Build and Push Container Images
+
+> **⚠️ Required step:** `azd up` provisions the infrastructure but deploys a temporary `hello-world` placeholder image to the backend and mcp_server Container Apps. Until you complete this step, those services are non-functional and the application will not work. The `postdeploy` hook only prints these commands — you must run them yourself.
 
 Build and push the backend, frontend, and mcp_server container images to ACR, then point the Container App and Web App at them. Run the command for your shell:
 
