@@ -57,13 +57,13 @@ param gptDeploymentName string = gptModelName
 
 @minLength(1)
 @description('Optional. Name of the underlying larger GPT model to deploy. Defaults to gpt-5.4 (2026-03-05 series).')
-param gpt4_1ModelName string = 'gpt-5.4'
+param gpt5_4ModelName string = 'gpt-5.4'
 
 @description('Optional. Version of the larger GPT model to deploy. Defaults to 2026-03-05 (gpt-5.4 release).')
-param gpt4_1ModelVersion string = '2026-03-05'
+param gpt5_4ModelVersion string = '2026-03-05'
 
-@description('Optional. Deployment (alias) name used in Azure OpenAI for the larger GPT model. Defaults to gpt4_1ModelName.')
-param gpt4_1DeploymentName string = gpt4_1ModelName
+@description('Optional. Deployment (alias) name used in Azure OpenAI for the larger GPT model. Defaults to gpt5_4ModelName.')
+param gpt5_4DeploymentName string = gpt5_4ModelName
 
 @minLength(1)
 @description('Optional. Name of the underlying GPT Reasoning model to deploy. Defaults to gpt-5.4-mini (reasoning-capable, 2026-03-17 series).')
@@ -89,7 +89,7 @@ param azureAiAgentAPIVersion string = '2025-01-01-preview'
   'GlobalStandard'
 ])
 @description('Optional. GPT model deployment type. Defaults to GlobalStandard.')
-param gpt4_1ModelDeploymentType string = 'GlobalStandard'
+param gpt5_4ModelDeploymentType string = 'GlobalStandard'
 
 @minLength(1)
 @allowed([
@@ -111,7 +111,7 @@ param gptReasoningModelDeploymentType string = 'GlobalStandard'
 param gptDeploymentCapacity int = 50
 
 @description('Optional. AI model deployment token capacity. Defaults to 150 for optimal performance.')
-param gpt4_1ModelCapacity int = 150
+param gpt5_4ModelCapacity int = 150
 
 @description('Optional. AI model deployment token capacity. Defaults to 50 for optimal performance.')
 param gptReasoningModelCapacity int = 50
@@ -789,14 +789,14 @@ var aiFoundryAiServicesModelDeployment = {
   }
   raiPolicyName: 'Microsoft.Default'
 }
-var aiFoundryAiServices4_1ModelDeployment = {
+var aiFoundryAiServices5_4ModelDeployment = {
   format: 'OpenAI'
-  deploymentName: gpt4_1DeploymentName
-  name: gpt4_1ModelName
-  version: gpt4_1ModelVersion
+  deploymentName: gpt5_4DeploymentName
+  name: gpt5_4ModelName
+  version: gpt5_4ModelVersion
   sku: {
-    name: gpt4_1ModelDeploymentType
-    capacity: gpt4_1ModelCapacity
+    name: gpt5_4ModelDeploymentType
+    capacity: gpt5_4ModelCapacity
   }
   raiPolicyName: 'Microsoft.Default'
 }
@@ -838,16 +838,16 @@ module existingAiFoundryAiServicesDeployments 'modules/ai-services-deployments.b
         }
       }
       {
-        name: aiFoundryAiServices4_1ModelDeployment.deploymentName
+        name: aiFoundryAiServices5_4ModelDeployment.deploymentName
         model: {
-          format: aiFoundryAiServices4_1ModelDeployment.format
-          name: aiFoundryAiServices4_1ModelDeployment.name
-          version: aiFoundryAiServices4_1ModelDeployment.version
+          format: aiFoundryAiServices5_4ModelDeployment.format
+          name: aiFoundryAiServices5_4ModelDeployment.name
+          version: aiFoundryAiServices5_4ModelDeployment.version
         }
-        raiPolicyName: aiFoundryAiServices4_1ModelDeployment.raiPolicyName
+        raiPolicyName: aiFoundryAiServices5_4ModelDeployment.raiPolicyName
         sku: {
-          name: aiFoundryAiServices4_1ModelDeployment.sku.name
-          capacity: aiFoundryAiServices4_1ModelDeployment.sku.capacity
+          name: aiFoundryAiServices5_4ModelDeployment.sku.name
+          capacity: aiFoundryAiServices5_4ModelDeployment.sku.capacity
         }
       }
       {
@@ -913,16 +913,16 @@ module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-service
         }
       }
       {
-        name: aiFoundryAiServices4_1ModelDeployment.deploymentName
+        name: aiFoundryAiServices5_4ModelDeployment.deploymentName
         model: {
-          format: aiFoundryAiServices4_1ModelDeployment.format
-          name: aiFoundryAiServices4_1ModelDeployment.name
-          version: aiFoundryAiServices4_1ModelDeployment.version
+          format: aiFoundryAiServices5_4ModelDeployment.format
+          name: aiFoundryAiServices5_4ModelDeployment.name
+          version: aiFoundryAiServices5_4ModelDeployment.version
         }
-        raiPolicyName: aiFoundryAiServices4_1ModelDeployment.raiPolicyName
+        raiPolicyName: aiFoundryAiServices5_4ModelDeployment.raiPolicyName
         sku: {
-          name: aiFoundryAiServices4_1ModelDeployment.sku.name
-          capacity: aiFoundryAiServices4_1ModelDeployment.sku.capacity
+          name: aiFoundryAiServices5_4ModelDeployment.sku.name
+          capacity: aiFoundryAiServices5_4ModelDeployment.sku.capacity
         }
       }
       {
@@ -1301,6 +1301,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.22.0' = {
         }
         env: [
           {
+            name: 'PORT'
+            value: '8000'
+          }
+          {
             name: 'COSMOSDB_ENDPOINT'
             value: 'https://${cosmosDbResourceName}.documents.azure.com:443/'
           }
@@ -1326,7 +1330,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.22.0' = {
           }
           {
             name: 'AZURE_OPENAI_RAI_DEPLOYMENT_NAME'
-            value: aiFoundryAiServices4_1ModelDeployment.deploymentName
+            value: aiFoundryAiServices5_4ModelDeployment.deploymentName
           }
           {
             name: 'AZURE_OPENAI_API_VERSION'
@@ -1414,7 +1418,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.22.0' = {
           }
           {
             name: 'SUPPORTED_MODELS'
-            value: '["${aiFoundryAiServicesModelDeployment.deploymentName}","${aiFoundryAiServices4_1ModelDeployment.deploymentName}","${aiFoundryAiServicesReasoningModelDeployment.deploymentName}"]'
+            value: '["${aiFoundryAiServicesModelDeployment.deploymentName}","${aiFoundryAiServices5_4ModelDeployment.deploymentName}","${aiFoundryAiServicesReasoningModelDeployment.deploymentName}"]'
           }
           {
             name: 'AZURE_STORAGE_BLOB_URL'
@@ -1627,7 +1631,7 @@ module webSite 'modules/web-sites.bicep' = {
           // Port 80 matches the hello-world placeholder image above.
           // The postprovision script updates this to 3000 (FRONTEND_WEBSITES_PORT)
           // when it swaps in the real frontend image.
-          WEBSITES_PORT: '3000'
+          WEBSITES_PORT: '80'
           WEBSITES_CONTAINER_START_TIME_LIMIT: '1800' // 30 minutes, adjust as needed
           BACKEND_API_URL: 'https://${containerApp.outputs.fqdn}'
           AUTH_ENABLED: 'false'
@@ -1892,7 +1896,7 @@ output COSMOSDB_CONTAINER string = cosmosDbDatabaseMemoryContainerName
 output AZURE_OPENAI_ENDPOINT string = 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/'
 output AZURE_OPENAI_MODEL_NAME string = aiFoundryAiServicesModelDeployment.name
 output AZURE_OPENAI_DEPLOYMENT_NAME string = aiFoundryAiServicesModelDeployment.deploymentName
-output AZURE_OPENAI_RAI_DEPLOYMENT_NAME string = aiFoundryAiServices4_1ModelDeployment.deploymentName
+output AZURE_OPENAI_RAI_DEPLOYMENT_NAME string = aiFoundryAiServices5_4ModelDeployment.deploymentName
 output AZURE_OPENAI_API_VERSION string = azureOpenaiAPIVersion
 // output APPLICATIONINSIGHTS_INSTRUMENTATION_KEY string = applicationInsights.outputs.instrumentationKey
 // output AZURE_AI_PROJECT_ENDPOINT string = aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
@@ -1916,7 +1920,7 @@ output AZURE_COGNITIVE_SERVICES string = 'https://cognitiveservices.azure.com/.d
 output REASONING_MODEL_NAME string = aiFoundryAiServicesReasoningModelDeployment.deploymentName
 output MCP_SERVER_NAME string = 'MacaeMcpServer'
 output MCP_SERVER_DESCRIPTION string = 'MCP server with greeting, HR, and planning tools'
-output SUPPORTED_MODELS string = '["${aiFoundryAiServicesModelDeployment.deploymentName}","${aiFoundryAiServices4_1ModelDeployment.deploymentName}","${aiFoundryAiServicesReasoningModelDeployment.deploymentName}"]'
+output SUPPORTED_MODELS string = '["${aiFoundryAiServicesModelDeployment.deploymentName}","${aiFoundryAiServices5_4ModelDeployment.deploymentName}","${aiFoundryAiServicesReasoningModelDeployment.deploymentName}"]'
 output BACKEND_URL string = 'https://${containerApp.outputs.fqdn}'
 output AZURE_AI_PROJECT_ENDPOINT string = aiFoundryAiProjectEndpoint
 output AZURE_AI_AGENT_ENDPOINT string = aiFoundryAiProjectEndpoint
