@@ -276,14 +276,6 @@ DO NOT EVER OFFER TO HELP FURTHER IN THE FINAL ANSWER! Just provide the final an
                     uncalled,
                 )
             if uncalled and within_budget:
-                logger.warning(
-                    "Premature satisfaction guard exhausted its round budget (%d) with "
-                    "agent(s) still marked uncalled: %s. Allowing termination to avoid an "
-                    "infinite loop (likely an author_name/participant-name mismatch).",
-                    guard_round_budget,
-                    uncalled,
-                )
-            if uncalled and within_budget:
                 next_agent = uncalled[0]
                 logger.info(
                     "Progress ledger marked satisfied but %d agent(s) have not responded yet: %s. "
