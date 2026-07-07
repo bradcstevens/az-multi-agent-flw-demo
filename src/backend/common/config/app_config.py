@@ -58,7 +58,7 @@ class AppConfig:
             "AZURE_OPENAI_API_VERSION", "2024-11-20"
         )
         self.AZURE_OPENAI_ENDPOINT = self._get_required("AZURE_OPENAI_ENDPOINT")
-        self.REASONING_MODEL_NAME = self._get_optional("REASONING_MODEL_NAME", "gpt-5.4-mini-reasoning")
+        self.REASONING_MODEL_NAME = self._get_optional("REASONING_MODEL_NAME", "gpt-5.4-mini")
         # self.AZURE_BING_CONNECTION_NAME = self._get_optional(
         #     "AZURE_BING_CONNECTION_NAME"
         # )

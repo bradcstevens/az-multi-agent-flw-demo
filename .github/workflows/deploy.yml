@@ -17,8 +17,7 @@ on:
     - cron: "0 11,23 * * *" # Runs at 11:00 AM and 11:00 PM GMT
   workflow_dispatch: #Allow manual triggering
 env:
-  GPT_5_4_MINI_MIN_CAPACITY: 50
-  GPT_REASONING_MIN_CAPACITY: 50
+  GPT_5_4_MINI_MIN_CAPACITY: 100
   GPT_5_4_MIN_CAPACITY: 150
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
 
@@ -48,7 +47,6 @@ jobs:
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           GPT_5_4_MINI_MIN_CAPACITY: ${{ env.GPT_5_4_MINI_MIN_CAPACITY }}
-          GPT_REASONING_MIN_CAPACITY: ${{ env.GPT_REASONING_MIN_CAPACITY }}
           GPT_5_4_MIN_CAPACITY: ${{ env.GPT_5_4_MIN_CAPACITY }}
           AZURE_REGIONS: ${{ vars.AZURE_REGIONS }}
         run: |
@@ -153,7 +151,7 @@ jobs:
               backendContainerImageTag="${IMAGE_TAG}" \
               frontendContainerImageTag="${IMAGE_TAG}" \
               azureAiServiceLocation='${{ env.AZURE_LOCATION }}' \
-              gptDeploymentCapacity=50 \
+              gptDeploymentCapacity=100 \
               createdBy="Pipeline" \
               tags="{'Purpose':'Deploying and Cleaning Up Resources for Validation','CreatedDate':'$current_date'}" \
             --output json

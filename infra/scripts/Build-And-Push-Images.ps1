@@ -152,6 +152,21 @@ foreach ($img in $images) {
     }
 }
 
+# --- WAF: temporarily relax ACR restrictions for build/push, restored in finally ---
+$deploymentType = & az group show --name $resourceGroup --query "tags.Type" -o tsv 2>$null
+
+if ($deploymentType -eq 'WAF') {
+    Write-Section 'WAF deployment detected - temporarily relaxing ACR restrictions'
+    & az acr update --name $acrName --resource-group $resourceGroup --allow-exports true --output none
+    if ($LASTEXITCODE -ne 0) { throw "Failed to enable ACR exports." }
+    & az acr update --name $acrName --resource-group $resourceGroup --public-network-enabled true --output none
+    if ($LASTEXITCODE -ne 0) { throw "Failed to enable ACR public network access." }
+    & az acr update --name $acrName --resource-group $resourceGroup --default-action Allow --output none
+    if ($LASTEXITCODE -ne 0) { throw "Failed to set ACR default action to Allow." }
+    Write-Host 'ACR restrictions temporarily relaxed.'
+}
+
+try {
 # --- Build & push -----------------------------------------------------------
 Write-Section "Building and pushing images ($BuildMode)"
 
@@ -241,3 +256,13 @@ Write-Host "configurations and index the sample data:" -ForegroundColor White
 Write-Host ""
 Write-Host "   infra\scripts\Selecting-Team-Config-And-Data.ps1" -ForegroundColor Cyan
 Write-Host ""
+}
+finally {
+    if ($deploymentType -eq 'WAF') {
+        Write-Section 'Restoring WAF ACR configuration'
+        & az acr update --name $acrName --resource-group $resourceGroup --default-action Deny --output none
+        & az acr update --name $acrName --resource-group $resourceGroup --public-network-enabled false --output none
+        & az acr update --name $acrName --resource-group $resourceGroup --allow-exports false --output none
+        Write-Host 'ACR configuration restored.'
+    }
+}

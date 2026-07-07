@@ -99,6 +99,29 @@ for ctx in "${IMAGE_CTXS[@]}"; do
     fi
 done
 
+# --- WAF: temporarily relax ACR restrictions for build/push, restored on exit ---
+DEPLOYMENT_TYPE="$(az group show --name "${RESOURCE_GROUP}" --query "tags.Type" -o tsv 2>/dev/null || true)"
+
+restore_acr_waf() {
+    if [ "${DEPLOYMENT_TYPE}" = "WAF" ]; then
+        echo ""
+        echo "Restoring WAF ACR configuration..."
+        az acr update --name "${ACR_NAME}" --resource-group "${RESOURCE_GROUP}" --default-action Deny --output none || true
+        az acr update --name "${ACR_NAME}" --resource-group "${RESOURCE_GROUP}" --public-network-enabled false --output none || true
+        az acr update --name "${ACR_NAME}" --resource-group "${RESOURCE_GROUP}" --allow-exports false --output none || true
+        echo "ACR configuration restored."
+    fi
+}
+
+if [ "${DEPLOYMENT_TYPE}" = "WAF" ]; then
+    section "WAF deployment detected - temporarily relaxing ACR restrictions"
+    trap restore_acr_waf EXIT
+    az acr update --name "${ACR_NAME}" --resource-group "${RESOURCE_GROUP}" --allow-exports true --output none
+    az acr update --name "${ACR_NAME}" --resource-group "${RESOURCE_GROUP}" --public-network-enabled true --output none
+    az acr update --name "${ACR_NAME}" --resource-group "${RESOURCE_GROUP}" --default-action Allow --output none
+    echo "ACR restrictions temporarily relaxed."
+fi
+
 section "Building and pushing images (${BUILD_MODE})"
 
 for i in "${!IMAGE_NAMES[@]}"; do

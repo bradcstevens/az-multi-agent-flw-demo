@@ -41,21 +41,6 @@
     "gpt5_4ModelCapacity": {
       "value": "${AZURE_ENV_MODEL_5_4_CAPACITY}"
     },
-    "gptReasoningModelDeploymentType": {
-      "value": "${AZURE_ENV_REASONING_MODEL_DEPLOYMENT_TYPE}"
-    },
-    "gptReasoningModelName": {
-      "value": "${AZURE_ENV_REASONING_MODEL_NAME}"
-    },
-    "gptReasoningModelVersion": {
-      "value": "${AZURE_ENV_REASONING_MODEL_VERSION}"
-    },
-    "gptReasoningDeploymentName": {
-      "value": "${AZURE_ENV_REASONING_DEPLOYMENT_NAME}"
-    },
-    "gptReasoningModelCapacity": {
-      "value": "${AZURE_ENV_REASONING_MODEL_CAPACITY}"
-    },
     "backendContainerImageTag": {
       "value": "${AZURE_ENV_IMAGE_TAG=latest_v4}"
     },

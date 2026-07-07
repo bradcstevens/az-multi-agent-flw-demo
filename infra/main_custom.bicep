@@ -65,18 +65,6 @@ param gpt5_4ModelVersion string = '2026-03-05'
 @description('Optional. Deployment (alias) name used in Azure OpenAI for the larger GPT model. Defaults to gpt5_4ModelName.')
 param gpt5_4DeploymentName string = gpt5_4ModelName
 
-@minLength(1)
-@description('Optional. Name of the underlying GPT Reasoning model to deploy. Defaults to gpt-5.4-mini (reasoning-capable, 2026-03-17 series).')
-param gptReasoningModelName string = 'gpt-5.4-mini'
-
-@description('Optional. Version of the GPT Reasoning model to deploy. Defaults to 2026-03-17 (gpt-5.4-mini release).')
-param gptReasoningModelVersion string = '2026-03-17'
-
-@description('Optional. Deployment (alias) name used in Azure OpenAI for the reasoning model. Must be unique from gptDeploymentName. Defaults to "{gptReasoningModelName}-reasoning" when it would otherwise collide with gptDeploymentName, otherwise gptReasoningModelName.')
-param gptReasoningDeploymentName string = gptReasoningModelName == gptModelName
-  ? '${gptReasoningModelName}-reasoning'
-  : gptReasoningModelName
-
 @description('Optional. Version of the Azure OpenAI service to deploy. Defaults to 2024-12-01-preview.')
 param azureOpenaiAPIVersion string = '2024-12-01-preview'
 
@@ -99,22 +87,11 @@ param gpt5_4ModelDeploymentType string = 'GlobalStandard'
 @description('Optional. GPT model deployment type. Defaults to GlobalStandard.')
 param deploymentType string = 'GlobalStandard'
 
-@minLength(1)
-@allowed([
-  'Standard'
-  'GlobalStandard'
-])
-@description('Optional. GPT model deployment type. Defaults to GlobalStandard.')
-param gptReasoningModelDeploymentType string = 'GlobalStandard'
-
 @description('Optional. AI model deployment token capacity. Defaults to 50 for optimal performance.')
-param gptDeploymentCapacity int = 50
+param gptDeploymentCapacity int = 100
 
 @description('Optional. AI model deployment token capacity. Defaults to 150 for optimal performance.')
 param gpt5_4ModelCapacity int = 150
-
-@description('Optional. AI model deployment token capacity. Defaults to 50 for optimal performance.')
-param gptReasoningModelCapacity int = 50
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags resourceInput<'Microsoft.Resources/resourceGroups@2025-04-01'>.tags = {}
@@ -799,17 +776,6 @@ var aiFoundryAiServices5_4ModelDeployment = {
   }
   raiPolicyName: 'Microsoft.Default'
 }
-var aiFoundryAiServicesReasoningModelDeployment = {
-  format: 'OpenAI'
-  deploymentName: gptReasoningDeploymentName
-  name: gptReasoningModelName
-  version: gptReasoningModelVersion
-  sku: {
-    name: gptReasoningModelDeploymentType
-    capacity: gptReasoningModelCapacity
-  }
-  raiPolicyName: 'Microsoft.Default'
-}
 var aiFoundryAiProjectDescription = 'AI Foundry Project'
 
 resource existingAiFoundryAiServices 'Microsoft.CognitiveServices/accounts@2025-12-01' existing = if (useExistingAiFoundryAiProject) {
@@ -847,19 +813,6 @@ module existingAiFoundryAiServicesDeployments 'modules/ai-services-deployments.b
         sku: {
           name: aiFoundryAiServices5_4ModelDeployment.sku.name
           capacity: aiFoundryAiServices5_4ModelDeployment.sku.capacity
-        }
-      }
-      {
-        name: aiFoundryAiServicesReasoningModelDeployment.deploymentName
-        model: {
-          format: aiFoundryAiServicesReasoningModelDeployment.format
-          name: aiFoundryAiServicesReasoningModelDeployment.name
-          version: aiFoundryAiServicesReasoningModelDeployment.version
-        }
-        raiPolicyName: aiFoundryAiServicesReasoningModelDeployment.raiPolicyName
-        sku: {
-          name: aiFoundryAiServicesReasoningModelDeployment.sku.name
-          capacity: aiFoundryAiServicesReasoningModelDeployment.sku.capacity
         }
       }
     ]
@@ -922,19 +875,6 @@ module aiFoundryAiServices 'br:mcr.microsoft.com/bicep/avm/res/cognitive-service
         sku: {
           name: aiFoundryAiServices5_4ModelDeployment.sku.name
           capacity: aiFoundryAiServices5_4ModelDeployment.sku.capacity
-        }
-      }
-      {
-        name: aiFoundryAiServicesReasoningModelDeployment.deploymentName
-        model: {
-          format: aiFoundryAiServicesReasoningModelDeployment.format
-          name: aiFoundryAiServicesReasoningModelDeployment.name
-          version: aiFoundryAiServicesReasoningModelDeployment.version
-        }
-        raiPolicyName: aiFoundryAiServicesReasoningModelDeployment.raiPolicyName
-        sku: {
-          name: aiFoundryAiServicesReasoningModelDeployment.sku.name
-          capacity: aiFoundryAiServicesReasoningModelDeployment.sku.capacity
         }
       }
     ]
@@ -1388,7 +1328,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.22.0' = {
           }
           {
             name: 'REASONING_MODEL_NAME'
-            value: aiFoundryAiServicesReasoningModelDeployment.deploymentName
+            value: aiFoundryAiServicesModelDeployment.deploymentName
           }
           {
             name: 'MCP_SERVER_ENDPOINT'
@@ -1412,7 +1352,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.22.0' = {
           }
           {
             name: 'SUPPORTED_MODELS'
-            value: '["${aiFoundryAiServicesModelDeployment.deploymentName}","${aiFoundryAiServices5_4ModelDeployment.deploymentName}","${aiFoundryAiServicesReasoningModelDeployment.deploymentName}"]'
+            value: '["${aiFoundryAiServicesModelDeployment.deploymentName}","${aiFoundryAiServices5_4ModelDeployment.deploymentName}"]'
           }
           {
             name: 'AZURE_STORAGE_BLOB_URL'
@@ -1905,10 +1845,10 @@ output AZURE_CLIENT_ID string = userAssignedIdentity!.outputs.clientId
 output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_AI_SEARCH_CONNECTION_NAME string = aiSearchConnectionName
 output AZURE_COGNITIVE_SERVICES string = 'https://cognitiveservices.azure.com/.default'
-output REASONING_MODEL_NAME string = aiFoundryAiServicesReasoningModelDeployment.deploymentName
+output REASONING_MODEL_NAME string = aiFoundryAiServicesModelDeployment.deploymentName
 output MCP_SERVER_NAME string = 'MacaeMcpServer'
 output MCP_SERVER_DESCRIPTION string = 'MCP server with greeting, HR, and planning tools'
-output SUPPORTED_MODELS string = '["${aiFoundryAiServicesModelDeployment.deploymentName}","${aiFoundryAiServices5_4ModelDeployment.deploymentName}","${aiFoundryAiServicesReasoningModelDeployment.deploymentName}"]'
+output SUPPORTED_MODELS string = '["${aiFoundryAiServicesModelDeployment.deploymentName}","${aiFoundryAiServices5_4ModelDeployment.deploymentName}"]'
 output BACKEND_URL string = 'https://${containerApp.outputs.fqdn}'
 output AZURE_AI_PROJECT_ENDPOINT string = aiFoundryAiProjectEndpoint
 output AZURE_AI_AGENT_ENDPOINT string = aiFoundryAiProjectEndpoint

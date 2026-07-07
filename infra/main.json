@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.44.1.10279",
-      "templateHash": "17459100270519587144"
+      "templateHash": "8449191466193195939"
     },
     "name": "Multi-Agent Custom Automation Engine",
     "description": "This module contains the resources required to deploy the [Multi-Agent Custom Automation Engine solution accelerator](https://github.com/microsoft/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator) for both Sandbox environments and WAF aligned environments.\n\n> **Note:** This module is not intended for broad, generic use, as it was designed by the Commercial Solution Areas CTO team, as a Microsoft Solution Accelerator. Feature requests and bug fix requests are welcome if they support the needs of this organization but may not be incorporated if they aim to make this module more generic than what it needs to be for its primary use case. This module will likely be updated to leverage AVM resource modules in the future. This may result in breaking changes in upcoming versions when these features are implemented.\n"
@@ -115,28 +115,6 @@
         "description": "Optional. Deployment (alias) name used in Azure OpenAI for the larger GPT model. Defaults to gpt5_4ModelName."
       }
     },
-    "gptReasoningModelName": {
-      "type": "string",
-      "defaultValue": "gpt-5.4-mini",
-      "minLength": 1,
-      "metadata": {
-        "description": "Optional. Name of the underlying GPT Reasoning model to deploy. Defaults to gpt-5.4-mini (reasoning-capable, 2026-03-17 series)."
-      }
-    },
-    "gptReasoningModelVersion": {
-      "type": "string",
-      "defaultValue": "2026-03-17",
-      "metadata": {
-        "description": "Optional. Version of the GPT Reasoning model to deploy. Defaults to 2026-03-17 (gpt-5.4-mini release)."
-      }
-    },
-    "gptReasoningDeploymentName": {
-      "type": "string",
-      "defaultValue": "[if(equals(parameters('gptReasoningModelName'), parameters('gptModelName')), format('{0}-reasoning', parameters('gptReasoningModelName')), parameters('gptReasoningModelName'))]",
-      "metadata": {
-        "description": "Optional. Deployment (alias) name used in Azure OpenAI for the reasoning model. Must be unique from gptDeploymentName. Defaults to \"{gptReasoningModelName}-reasoning\" when it would otherwise collide with gptDeploymentName, otherwise gptReasoningModelName."
-      }
-    },
     "azureOpenaiAPIVersion": {
       "type": "string",
       "defaultValue": "2024-12-01-preview",
@@ -175,21 +153,9 @@
         "description": "Optional. GPT model deployment type. Defaults to GlobalStandard."
       }
     },
-    "gptReasoningModelDeploymentType": {
-      "type": "string",
-      "defaultValue": "GlobalStandard",
-      "allowedValues": [
-        "Standard",
-        "GlobalStandard"
-      ],
-      "minLength": 1,
-      "metadata": {
-        "description": "Optional. GPT model deployment type. Defaults to GlobalStandard."
-      }
-    },
     "gptDeploymentCapacity": {
       "type": "int",
-      "defaultValue": 50,
+      "defaultValue": 100,
       "metadata": {
         "description": "Optional. AI model deployment token capacity. Defaults to 50 for optimal performance."
       }
@@ -199,13 +165,6 @@
       "defaultValue": 150,
       "metadata": {
         "description": "Optional. AI model deployment token capacity. Defaults to 150 for optimal performance."
-      }
-    },
-    "gptReasoningModelCapacity": {
-      "type": "int",
-      "defaultValue": 50,
-      "metadata": {
-        "description": "Optional. AI model deployment token capacity. Defaults to 50 for optimal performance."
       }
     },
     "tags": {
@@ -445,7 +404,8 @@
       "privatelink.services.ai.azure.com",
       "privatelink.documents.azure.com",
       "privatelink.blob.core.windows.net",
-      "privatelink.search.windows.net"
+      "privatelink.search.windows.net",
+      "privatelink.azurecr.io"
     ],
     "dnsZoneIndex": {
       "cognitiveServices": 0,
@@ -453,7 +413,8 @@
       "aiServices": 2,
       "cosmosDb": 3,
       "blob": 4,
-      "search": 5
+      "search": 5,
+      "containerRegistry": 6
     },
     "aiRelatedDnsZoneIndices": [
       "[variables('dnsZoneIndex').cognitiveServices]",
@@ -484,17 +445,6 @@
       "sku": {
         "name": "[parameters('gpt5_4ModelDeploymentType')]",
         "capacity": "[parameters('gpt5_4ModelCapacity')]"
-      },
-      "raiPolicyName": "Microsoft.Default"
-    },
-    "aiFoundryAiServicesReasoningModelDeployment": {
-      "format": "OpenAI",
-      "deploymentName": "[parameters('gptReasoningDeploymentName')]",
-      "name": "[parameters('gptReasoningModelName')]",
-      "version": "[parameters('gptReasoningModelVersion')]",
-      "sku": {
-        "name": "[parameters('gptReasoningModelDeploymentType')]",
-        "capacity": "[parameters('gptReasoningModelCapacity')]"
       },
       "raiPolicyName": "Microsoft.Default"
     },
@@ -24292,19 +24242,6 @@
                   "name": "[variables('aiFoundryAiServices5_4ModelDeployment').sku.name]",
                   "capacity": "[variables('aiFoundryAiServices5_4ModelDeployment').sku.capacity]"
                 }
-              },
-              {
-                "name": "[variables('aiFoundryAiServicesReasoningModelDeployment').deploymentName]",
-                "model": {
-                  "format": "[variables('aiFoundryAiServicesReasoningModelDeployment').format]",
-                  "name": "[variables('aiFoundryAiServicesReasoningModelDeployment').name]",
-                  "version": "[variables('aiFoundryAiServicesReasoningModelDeployment').version]"
-                },
-                "raiPolicyName": "[variables('aiFoundryAiServicesReasoningModelDeployment').raiPolicyName]",
-                "sku": {
-                  "name": "[variables('aiFoundryAiServicesReasoningModelDeployment').sku.name]",
-                  "capacity": "[variables('aiFoundryAiServicesReasoningModelDeployment').sku.capacity]"
-                }
               }
             ]
           },
@@ -24726,19 +24663,6 @@
                 "sku": {
                   "name": "[variables('aiFoundryAiServices5_4ModelDeployment').sku.name]",
                   "capacity": "[variables('aiFoundryAiServices5_4ModelDeployment').sku.capacity]"
-                }
-              },
-              {
-                "name": "[variables('aiFoundryAiServicesReasoningModelDeployment').deploymentName]",
-                "model": {
-                  "format": "[variables('aiFoundryAiServicesReasoningModelDeployment').format]",
-                  "name": "[variables('aiFoundryAiServicesReasoningModelDeployment').name]",
-                  "version": "[variables('aiFoundryAiServicesReasoningModelDeployment').version]"
-                },
-                "raiPolicyName": "[variables('aiFoundryAiServicesReasoningModelDeployment').raiPolicyName]",
-                "sku": {
-                  "name": "[variables('aiFoundryAiServicesReasoningModelDeployment').sku.name]",
-                  "capacity": "[variables('aiFoundryAiServicesReasoningModelDeployment').sku.capacity]"
                 }
               }
             ]
@@ -28000,9 +27924,9 @@
       },
       "dependsOn": [
         "aiFoundryAiServices",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').cognitiveServices)]",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').openAI)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').aiServices)]",
+        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').openAI)]",
+        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').cognitiveServices)]",
         "virtualNetwork"
       ]
     },
@@ -38447,15 +38371,11 @@
           "acrAdminUserEnabled": {
             "value": false
           },
-          "acrSku": {
-            "value": "Basic"
-          },
+          "acrSku": "[if(parameters('enablePrivateNetworking'), createObject('value', 'Premium'), createObject('value', 'Basic'))]",
           "azureADAuthenticationAsArmPolicyStatus": {
             "value": "enabled"
           },
-          "exportPolicyStatus": {
-            "value": "enabled"
-          },
+          "exportPolicyStatus": "[if(parameters('enablePrivateNetworking'), createObject('value', 'disabled'), createObject('value', 'enabled'))]",
           "location": {
             "value": "[parameters('location')]"
           },
@@ -38471,6 +38391,9 @@
           "networkRuleBypassOptions": {
             "value": "AzureServices"
           },
+          "publicNetworkAccess": "[if(parameters('enablePrivateNetworking'), createObject('value', 'Disabled'), createObject('value', 'Enabled'))]",
+          "networkRuleSetDefaultAction": "[if(parameters('enablePrivateNetworking'), createObject('value', 'Deny'), createObject('value', 'Allow'))]",
+          "privateEndpoints": "[if(parameters('enablePrivateNetworking'), createObject('value', createArray(createObject('name', format('pep-cr{0}', variables('solutionSuffix')), 'customNetworkInterfaceName', format('nic-cr{0}', variables('solutionSuffix')), 'privateDnsZoneGroup', createObject('privateDnsZoneGroupConfigs', createArray(createObject('privateDnsZoneResourceId', reference(format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').containerRegistry)).outputs.resourceId.value))), 'subnetResourceId', reference('virtualNetwork').outputs.backendSubnetResourceId.value))), createObject('value', createArray()))]",
           "roleAssignments": {
             "value": [
               {
@@ -42288,7 +42211,9 @@
         }
       },
       "dependsOn": [
-        "userAssignedIdentity"
+        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').containerRegistry)]",
+        "userAssignedIdentity",
+        "virtualNetwork"
       ]
     },
     "containerApp": {
@@ -42474,7 +42399,7 @@
                   },
                   {
                     "name": "REASONING_MODEL_NAME",
-                    "value": "[variables('aiFoundryAiServicesReasoningModelDeployment').deploymentName]"
+                    "value": "[variables('aiFoundryAiServicesModelDeployment').deploymentName]"
                   },
                   {
                     "name": "MCP_SERVER_ENDPOINT",
@@ -42498,7 +42423,7 @@
                   },
                   {
                     "name": "SUPPORTED_MODELS",
-                    "value": "[format('[\"{0}\",\"{1}\",\"{2}\"]', variables('aiFoundryAiServicesModelDeployment').deploymentName, variables('aiFoundryAiServices5_4ModelDeployment').deploymentName, variables('aiFoundryAiServicesReasoningModelDeployment').deploymentName)]"
+                    "value": "[format('[\"{0}\",\"{1}\"]', variables('aiFoundryAiServicesModelDeployment').deploymentName, variables('aiFoundryAiServices5_4ModelDeployment').deploymentName)]"
                   },
                   {
                     "name": "AZURE_STORAGE_BLOB_URL",
@@ -58950,7 +58875,7 @@
     },
     "REASONING_MODEL_NAME": {
       "type": "string",
-      "value": "[variables('aiFoundryAiServicesReasoningModelDeployment').deploymentName]"
+      "value": "[variables('aiFoundryAiServicesModelDeployment').deploymentName]"
     },
     "MCP_SERVER_NAME": {
       "type": "string",
@@ -58962,7 +58887,7 @@
     },
     "SUPPORTED_MODELS": {
       "type": "string",
-      "value": "[format('[\"{0}\",\"{1}\",\"{2}\"]', variables('aiFoundryAiServicesModelDeployment').deploymentName, variables('aiFoundryAiServices5_4ModelDeployment').deploymentName, variables('aiFoundryAiServicesReasoningModelDeployment').deploymentName)]"
+      "value": "[format('[\"{0}\",\"{1}\"]', variables('aiFoundryAiServicesModelDeployment').deploymentName, variables('aiFoundryAiServices5_4ModelDeployment').deploymentName)]"
     },
     "BACKEND_URL": {
       "type": "string",
