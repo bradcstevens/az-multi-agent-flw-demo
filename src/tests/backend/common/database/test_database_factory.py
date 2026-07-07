@@ -183,7 +183,6 @@ class TestDatabaseFactoryGetDatabase:
         mock_config.COSMOSDB_CONTAINER = "test_container"
         mock_config.get_azure_credentials.return_value = "mock_credentials"
         
-        instances = []
         with patch('backend.common.database.database_factory.CosmosDBClient') as mock_cosmos_class:
             def make_instance(**kwargs):
                 inst = Mock(spec=CosmosDBClient)
