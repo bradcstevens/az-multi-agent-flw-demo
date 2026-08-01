@@ -1,0 +1,46 @@
+# Operating systems
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Dependencies and virtual environments
+node_modules/
+.venv/
+venv/
+
+# Build and coverage output
+build/
+dist/
+out/
+target/
+coverage/
+htmlcov/
+
+# Language and tool caches
+__pycache__/
+*.py[cod]
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Temporary files
+.tmp/
+tmp/
+temp/
