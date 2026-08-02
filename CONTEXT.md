@@ -49,6 +49,13 @@ upstream `main`. Upstream fixes arrive by `git cherry-pick` from the `upstream` 
 **Two-phase test invocation** — `src/tests/backend/test_app.py` runs first in its own pytest
 process, then the rest of `src/tests/backend` runs with `--cov-append` and `--ignore` on that file.
 Required because the suite mutates `sys.modules` and the environment at import time. Preserve it.
+Encoded in `scripts/backend-tests.sh`.
+
+**Feedback loop** — a `(name, command)` row of the `## Feedback loops` table in `AGENTS.md`. Two
+today: **Backend lint** (`scripts/backend-lint.sh`) and **Backend tests**
+(`scripts/backend-tests.sh`). The table is the single source of truth: agents run these before
+committing and the runner re-runs them after each merge as the integration gate, so a missing or
+unrunnable table makes every merge red. See [ADR-005](docs/ADR/005-declare-feedback-loops-in-agents-md.md).
 
 ## Confirmed findings
 
