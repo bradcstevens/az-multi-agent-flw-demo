@@ -57,6 +57,14 @@ today: **Backend lint** (`scripts/backend-lint.sh`) and **Backend tests**
 committing and the runner re-runs them after each merge as the integration gate, so a missing or
 unrunnable table makes every merge red. See [ADR-005](docs/ADR/005-declare-feedback-loops-in-agents-md.md).
 
+**Runner state** — `.git-loopy/` at the repo root holds the runner's event log, run summaries and
+diagnostics. The runner appends `.git-loopy/` to `.gitignore` itself when the entry is missing, and
+never commits that edit — which dirties the base worktree and makes the integration publish
+(`git merge --no-ff`) refuse to overwrite `.gitignore`. The entry is therefore **tracked** in
+`.gitignore`, which keeps the runner's append a permanent no-op. Do not remove it. Its diagnostic
+log (`.git-loopy/logs/<iso>-<run_id>.log`) is the first place to look when the gate reports red —
+it distinguishes "gate could not run" and "publish failed" from an actually-failing loop.
+
 ## Confirmed findings
 
 ### The Workflow is *not* tagged with a team identifier at build time (confirmed 2026-08-01, issue #9)

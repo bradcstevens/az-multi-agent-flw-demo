@@ -39,3 +39,7 @@ Notes:
   runs to `src/tests/backend`.
 - Coverage and lint configuration live in the root `pyproject.toml` and `.flake8`. There
   is no `.coveragerc`.
+- A red integration gate is not always a red loop. The runner's diagnostic log,
+  `.git-loopy/logs/<iso>-<run_id>.log`, distinguishes "gate could not run" (no runnable
+  table) and "publish failed" (e.g. a dirty base worktree) from a loop that actually
+  failed. Read it before assuming the loops are broken.

@@ -498,3 +498,9 @@ temp/
 
 # Superseded build-requirements reference material
 .reference/
+
+# git-loopy runner state (event log, run summaries, diagnostics). The runner
+# appends this exact line to .gitignore itself when it is missing, which dirties
+# the base worktree and makes its publish merge refuse to overwrite the file.
+# Tracking the line here keeps that a permanent no-op.
+.git-loopy/
