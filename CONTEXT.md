@@ -1,0 +1,108 @@
+# CONTEXT.md
+
+Glossary and ubiquitous language for the **Circle K Frontline Store Assistant** — a fork of the
+Microsoft Multi-Agent Custom Automation Engine (MACAE) solution accelerator, pinned to upstream
+commit `c5a7a4d1f0bfb6930b4c7b7f6356f28e7e03c309` (see
+[ADR-004](docs/ADR/004-fork-macae-at-pinned-upstream-commit.md)).
+
+ADRs live in `docs/ADR/` — the directory upstream already uses, with its three-digit `NNN-`
+numbering continued rather than the four-digit example in `docs/agents/domain.md`.
+
+Use these terms in issue titles, commit messages, test names, and module names. Where a term has a
+concrete home in the code, the file is named.
+
+## Orchestration
+
+**Workflow** — the Magentic workflow object built by
+`OrchestrationManager.init_orchestration` (`src/backend/orchestration/orchestration_manager.py`). It
+holds the participant agents and the manager chat client. Built per user and cached; it is *not* a
+per-request object. At build time it is tagged with `_team_config` and `_manager_chat_client`, and
+nothing else.
+
+**Workflow cache** — `orchestration_config.orchestrations`, a process-local dictionary keyed by
+**user identifier alone**. Because it is process-local and in-memory, the application must run as a
+single replica.
+
+**Team tag** — the notional `_team_id` attribute on a Workflow, read in two places to decide whether
+the cached Workflow belongs to the currently selected team:
+`orchestration_manager.get_current_or_new_orchestration` and `api/router.py`.
+**It is never assigned.** See *Confirmed findings* below.
+
+**Full workflow rebuild** — the `needs_full_rebuild` branch of
+`get_current_or_new_orchestration`: closes every cached agent, then runs `AgentFactory.get_agents`
+and `init_orchestration` from scratch. This is the expensive path and, today, the *only* path.
+
+**Lightweight workflow reset** — the `needs_workflow_reset` branch: rebuilds only the workflow shell
+and reuses the existing agent pool. Currently unreachable in production.
+
+**Team configuration** — a `TeamConfiguration` (`src/backend/common/models/messages.py`): the set of
+agents, their models, and their prompts. `team_id` is a required non-optional `str`.
+
+**Plan review** — the approval gate the Magentic builder is configured with at Workflow build time.
+Upstream hardcodes it as a literal; the two-lane design makes it a per-request value.
+
+## Build and test
+
+**Pinned upstream commit** — `c5a7a4d1f0bfb6930b4c7b7f6356f28e7e03c309`. The build never tracks
+upstream `main`. Upstream fixes arrive by `git cherry-pick` from the `upstream` remote.
+
+**Two-phase test invocation** — `src/tests/backend/test_app.py` runs first in its own pytest
+process, then the rest of `src/tests/backend` runs with `--cov-append` and `--ignore` on that file.
+Required because the suite mutates `sys.modules` and the environment at import time. Preserve it.
+Encoded in `scripts/backend-tests.sh`.
+
+**Feedback loop** — a `(name, command)` row of the `## Feedback loops` table in `AGENTS.md`. Two
+today: **Backend lint** (`scripts/backend-lint.sh`) and **Backend tests**
+(`scripts/backend-tests.sh`). The table is the single source of truth: agents run these before
+committing and the runner re-runs them after each merge as the integration gate, so a missing or
+unrunnable table makes every merge red. See [ADR-005](docs/ADR/005-declare-feedback-loops-in-agents-md.md).
+
+**Runner state** — `.git-loopy/` at the repo root holds the runner's event log, run summaries and
+diagnostics. The runner appends `.git-loopy/` to `.gitignore` itself when the entry is missing, and
+never commits that edit — which dirties the base worktree and makes the integration publish
+(`git merge --no-ff`) refuse to overwrite `.gitignore`. The entry is therefore **tracked** in
+`.gitignore`, which keeps the runner's append a permanent no-op. Do not remove it. Its diagnostic
+log (`.git-loopy/logs/<iso>-<run_id>.log`) is the first place to look when the gate reports red —
+it distinguishes "gate could not run" and "publish failed" from an actually-failing loop.
+
+## Confirmed findings
+
+### The Workflow is *not* tagged with a team identifier at build time (confirmed 2026-08-01, issue #9)
+
+The comment at `orchestration_manager.py:236-238` claims "The team_id tag is set on every workflow we
+build/reset below". **That claim is false.** A static scan of `src/backend` finds:
+
+- **Assignments of `_team_id` on a Workflow: none.**
+- Reads of `_team_id` on a Workflow: two —
+  - `src/backend/orchestration/orchestration_manager.py:239` (`current_team_id`)
+  - `src/backend/api/router.py:380` (`cached_team_id`)
+
+`init_orchestration` assigns only `workflow._team_config` and `workflow._manager_chat_client`
+(`orchestration_manager.py:206-207`). The only place `_team_id` is ever set on a workflow object in
+the entire repository is `src/tests/backend/orchestration/test_orchestration_manager.py:441`, where
+a test hand-sets it on a mock.
+
+**Consequence — yes, every request currently performs a Full workflow rebuild.**
+`getattr(current, "_team_id", None)` always returns `None`, while `team_config.team_id` is a
+required non-empty `str`. So `team_changed` is `True` whenever a cached Workflow exists, and
+`needs_full_rebuild = current is None or team_switched or team_changed` is therefore **always**
+`True`. Two consequences follow:
+
+1. Every call closes and recreates all agents. There is no warm path, so the latency baseline for
+   the fast lane must be measured against a full agent-pool rebuild, not against a cache hit.
+2. `needs_workflow_reset` (`not needs_full_rebuild and workflow_terminated`) can never be `True` —
+   the Lightweight workflow reset branch is dead code in production.
+
+The same defect appears independently at `router.py:380`, where `team_mismatch` is always `True`, so
+`workflow_unusable` is always `True` on the request path too.
+
+Confirmed empirically with a throwaway probe: replaying the existing reuse test
+(`test_given_existing_workflow_when_no_switch_then_returns_it`) against a Workflow shaped as
+production builds it — i.e. with `_team_config` set and `_team_id` absent — takes the rebuild branch
+and calls `init_orchestration` exactly once, where the committed test (which hand-sets `_team_id`)
+returns the cached Workflow untouched.
+
+**Implication for the workflow-cache fix:** deleting line 441 of
+`test_orchestration_manager.py` converts that passing test into a regression test for the fix. Do
+that as part of the cache change, not before — it fails until `_team_id` is genuinely assigned at
+build time.
