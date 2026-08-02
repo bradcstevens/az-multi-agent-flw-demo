@@ -29,6 +29,7 @@ capability — and re-run its script rather than re-deriving the finding by hand
 | `docs/preflight/dataverse-admin-role.md` | `scripts/preflight/check-dataverse-admin-role.sh` |
 | `docs/preflight/dataverse-search.md` | `scripts/preflight/check-dataverse-search.sh --probe` |
 | `docs/preflight/copilot-studio-data-policy-and-egress.md` | `scripts/preflight/check-copilot-studio-dlp.sh` |
+| `docs/preflight/azure-subscription-rights-and-policy.md` | `scripts/preflight/check-azure-subscription.sh` |
 | `docs/preflight/deployed-environment.md` | `scripts/preflight/check-deployed-environment.sh` |
 
 Each check keeps its decision logic in a pure, importable Python module beside the shell entry
