@@ -75,6 +75,7 @@ resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-12-01' = 
   parent: aiServices
   name: projectName
   location: location
+  tags: tags
   kind: 'AIServices'
   identity: {
     type: identityType

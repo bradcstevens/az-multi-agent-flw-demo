@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.44.1.10279",
-      "templateHash": "11051305577029776274"
+      "version": "0.45.15.27210",
+      "templateHash": "9168948981387734524"
     },
     "name": "Multi-Agent Custom Automation Engine - Vanilla Bicep",
     "description": "Vanilla Bicep orchestrator for the Multi-Agent Custom Automation Engine accelerator. This deployment intentionally excludes WAF features such as private networking, scale-out, redundancy, bastion, and VM resources while keeping router-compatible outputs."
@@ -172,6 +172,39 @@
       "defaultValue": 5,
       "metadata": {
         "description": "Optional. gpt-image-1.5 deployment capacity (RPM). Defaults to 5 to support concurrent marketing-image generation across multiple sessions."
+      }
+    },
+    "embeddingModelName": {
+      "type": "string",
+      "defaultValue": "text-embedding-3-small",
+      "metadata": {
+        "description": "Optional. Name of the embedding model deployed for guardrail similarity checks."
+      }
+    },
+    "embeddingModelVersion": {
+      "type": "string",
+      "defaultValue": "1",
+      "metadata": {
+        "description": "Optional. Version of the embedding model deployment."
+      }
+    },
+    "embeddingModelDeploymentType": {
+      "type": "string",
+      "defaultValue": "GlobalStandard",
+      "allowedValues": [
+        "Standard",
+        "GlobalStandard"
+      ],
+      "metadata": {
+        "description": "Optional. Embedding model deployment type. Defaults to GlobalStandard."
+      }
+    },
+    "embeddingModelCapacity": {
+      "type": "int",
+      "defaultValue": 120,
+      "minValue": 1,
+      "metadata": {
+        "description": "Optional. Embedding model deployment capacity (TPM in thousands)."
       }
     },
     "azureOpenaiAPIVersion": {
@@ -386,6 +419,12 @@
         "version": "[parameters('gptImageModelVersion')]",
         "skuName": "[parameters('gptImageModelDeploymentType')]",
         "capacity": "[parameters('gptImageModelCapacity')]"
+      },
+      {
+        "name": "[parameters('embeddingModelName')]",
+        "version": "[parameters('embeddingModelVersion')]",
+        "skuName": "[parameters('embeddingModelDeploymentType')]",
+        "capacity": "[parameters('embeddingModelCapacity')]"
       }
     ],
     "supportedModels": [
@@ -452,8 +491,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "12095091241389333540"
+              "version": "0.45.15.27210",
+              "templateHash": "15421810482770561899"
             }
           },
           "parameters": {
@@ -573,8 +612,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "3199910078817503702"
+              "version": "0.45.15.27210",
+              "templateHash": "1396979465821863055"
             }
           },
           "parameters": {
@@ -737,8 +776,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "18283443262150133120"
+              "version": "0.45.15.27210",
+              "templateHash": "5391405737735698917"
             }
           },
           "parameters": {
@@ -835,6 +874,9 @@
           },
           "location": {
             "value": "[parameters('azureAiServiceLocation')]"
+          },
+          "tags": {
+            "value": "[variables('allTags')]"
           }
         },
         "template": {
@@ -843,8 +885,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "13273853593348360979"
+              "version": "0.45.15.27210",
+              "templateHash": "8547241330728186818"
             }
           },
           "parameters": {
@@ -965,6 +1007,7 @@
               "apiVersion": "2025-12-01",
               "name": "[format('{0}/{1}', parameters('name'), parameters('projectName'))]",
               "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
               "kind": "AIServices",
               "identity": {
                 "type": "[parameters('identityType')]"
@@ -1076,8 +1119,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "11426307275851055409"
+              "version": "0.45.15.27210",
+              "templateHash": "2061702784288856091"
             }
           },
           "parameters": {
@@ -1216,8 +1259,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "10180502016624897684"
+              "version": "0.45.15.27210",
+              "templateHash": "4595332855354691903"
             }
           },
           "parameters": {
@@ -1243,7 +1286,7 @@
             "modelName": {
               "type": "string",
               "metadata": {
-                "description": "Required. Model name (e.g., gpt-4o, text-embedding-ada-002)."
+                "description": "Required. Model name (e.g., gpt-5.4-mini, text-embedding-ada-002)."
               }
             },
             "modelVersion": {
@@ -1362,8 +1405,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "1497887351577571547"
+              "version": "0.45.15.27210",
+              "templateHash": "11721174189700074948"
             }
           },
           "parameters": {
@@ -1549,8 +1592,8 @@
                   "metadata": {
                     "_generator": {
                       "name": "bicep",
-                      "version": "0.44.1.10279",
-                      "templateHash": "10414963800025954513"
+                      "version": "0.45.15.27210",
+                      "templateHash": "17604355495933543187"
                     }
                   },
                   "parameters": {
@@ -1741,6 +1784,9 @@
           "tags": {
             "value": "[variables('allTags')]"
           },
+          "allowSharedKeyAccess": {
+            "value": false
+          },
           "containers": {
             "value": [
               {
@@ -1788,8 +1834,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "2631611108118541891"
+              "version": "0.45.15.27210",
+              "templateHash": "13346453627451399796"
             }
           },
           "parameters": {
@@ -2007,8 +2053,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "1776329168736674430"
+              "version": "0.45.15.27210",
+              "templateHash": "17272927369391163104"
             }
           },
           "parameters": {
@@ -2200,8 +2246,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "12583934720074784298"
+              "version": "0.45.15.27210",
+              "templateHash": "6852038563791820738"
             }
           },
           "parameters": {
@@ -2362,8 +2408,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "14126031085782385090"
+              "version": "0.45.15.27210",
+              "templateHash": "3215519417659672748"
             }
           },
           "parameters": {
@@ -2534,8 +2580,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "9689542388193984627"
+              "version": "0.45.15.27210",
+              "templateHash": "1926866919489596894"
             }
           },
           "parameters": {
@@ -2872,8 +2918,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "9640201944207164847"
+              "version": "0.45.15.27210",
+              "templateHash": "7673613183489184414"
             }
           },
           "parameters": {
@@ -3203,8 +3249,16 @@
                     "value": "[parameters('gptImageModelName')]"
                   },
                   {
+                    "name": "AZURE_OPENAI_IMAGE_QUALITY",
+                    "value": "high"
+                  },
+                  {
                     "name": "AZURE_STORAGE_BLOB_URL",
                     "value": "[reference(resourceId('Microsoft.Resources/deployments', take(format('module.storage-account.{0}', variables('solutionSuffix')), 64)), '2025-04-01').outputs.blobEndpoint.value]"
+                  },
+                  {
+                    "name": "AZURE_STORAGE_IMAGES_CONTAINER",
+                    "value": "[parameters('storageContainerNameGeneratedImages')]"
                   },
                   {
                     "name": "BACKEND_URL",
@@ -3222,8 +3276,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "9640201944207164847"
+              "version": "0.45.15.27210",
+              "templateHash": "7673613183489184414"
             }
           },
           "parameters": {
@@ -3459,8 +3513,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "9486671591976114621"
+              "version": "0.45.15.27210",
+              "templateHash": "17068291292905260801"
             }
           },
           "parameters": {
@@ -3619,7 +3673,6 @@
             "value": {
               "SCM_DO_BUILD_DURING_DEPLOYMENT": "true",
               "DOCKER_REGISTRY_SERVER_URL": "[format('https://{0}', if(variables('useExistingContainerRegistry'), format('{0}.azurecr.io', variables('existingContainerRegistryName')), reference(resourceId('Microsoft.Resources/deployments', take(format('module.container-registry.{0}', variables('solutionSuffix')), 64)), '2025-04-01').outputs.loginServer.value))]",
-              "WEBSITES_PORT": "3000",
               "WEBSITES_CONTAINER_START_TIME_LIMIT": "1800",
               "BACKEND_API_URL": "[format('https://{0}', reference(resourceId('Microsoft.Resources/deployments', take(format('module.backend-container-app.{0}', variables('solutionSuffix')), 64)), '2025-04-01').outputs.fqdn.value)]",
               "AUTH_ENABLED": "false",
@@ -3635,8 +3688,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "1320403547799686545"
+              "version": "0.45.15.27210",
+              "templateHash": "11238724503345433192"
             }
           },
           "parameters": {
@@ -3943,8 +3996,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "5361107554306540209"
+              "version": "0.45.15.27210",
+              "templateHash": "10709935439571354870"
             }
           },
           "parameters": {
@@ -4332,8 +4385,8 @@
                   "metadata": {
                     "_generator": {
                       "name": "bicep",
-                      "version": "0.44.1.10279",
-                      "templateHash": "3414629451173950961"
+                      "version": "0.45.15.27210",
+                      "templateHash": "6381374613030863702"
                     }
                   },
                   "parameters": {
@@ -4425,8 +4478,8 @@
                   "metadata": {
                     "_generator": {
                       "name": "bicep",
-                      "version": "0.44.1.10279",
-                      "templateHash": "3414629451173950961"
+                      "version": "0.45.15.27210",
+                      "templateHash": "6381374613030863702"
                     }
                   },
                   "parameters": {
@@ -4518,8 +4571,8 @@
                   "metadata": {
                     "_generator": {
                       "name": "bicep",
-                      "version": "0.44.1.10279",
-                      "templateHash": "3414629451173950961"
+                      "version": "0.45.15.27210",
+                      "templateHash": "6381374613030863702"
                     }
                   },
                   "parameters": {

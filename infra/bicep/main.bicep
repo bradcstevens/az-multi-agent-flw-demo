@@ -96,6 +96,23 @@ param gptImageModelDeploymentType string = 'GlobalStandard'
 @description('Optional. gpt-image-1.5 deployment capacity (RPM). Defaults to 5 to support concurrent marketing-image generation across multiple sessions.')
 param gptImageModelCapacity int = 5
 
+@description('Optional. Name of the embedding model deployed for guardrail similarity checks.')
+param embeddingModelName string = 'text-embedding-3-small'
+
+@description('Optional. Version of the embedding model deployment.')
+param embeddingModelVersion string = '1'
+
+@allowed([
+  'Standard'
+  'GlobalStandard'
+])
+@description('Optional. Embedding model deployment type. Defaults to GlobalStandard.')
+param embeddingModelDeploymentType string = 'GlobalStandard'
+
+@minValue(1)
+@description('Optional. Embedding model deployment capacity (TPM in thousands).')
+param embeddingModelCapacity int = 120
+
 @description('Optional. Azure OpenAI API version.')
 param azureOpenaiAPIVersion string = '2024-12-01-preview'
 
@@ -226,6 +243,12 @@ var modelDeployments = [
     skuName: gptImageModelDeploymentType
     capacity: gptImageModelCapacity
   }
+  {
+    name: embeddingModelName
+    version: embeddingModelVersion
+    skuName: embeddingModelDeploymentType
+    capacity: embeddingModelCapacity
+  }
 ]
 var supportedModels = [
   gptModelName
@@ -319,6 +342,7 @@ module ai_foundry_project './modules/ai/ai-foundry-project.bicep' = if (!useExis
     name: aiFoundryAiServicesResourceName
     projectName: aiFoundryAiProjectResourceName
     location: azureAiServiceLocation
+    tags: allTags
   }
 }
 
@@ -373,6 +397,7 @@ module storage_account './modules/data/storage-account.bicep' = {
     solutionName: solutionSuffix
     location: solutionLocation
     tags: allTags
+    allowSharedKeyAccess: false
     containers: [
       {
         name: storageContainerNameRetailCustomer

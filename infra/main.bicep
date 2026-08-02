@@ -119,6 +119,23 @@ param gptImageModelDeploymentType string = 'GlobalStandard'
 @description('Optional. gpt-image-1.5 deployment capacity (RPM). Defaults to 5 to support concurrent marketing-image generation across multiple sessions.')
 param gptImageModelCapacity int = 5
 
+@description('Optional. Name of the embedding model deployed for guardrail similarity checks.')
+param embeddingModelName string = 'text-embedding-3-small'
+
+@description('Optional. Version of the embedding model deployment.')
+param embeddingModelVersion string = '1'
+
+@allowed([
+  'Standard'
+  'GlobalStandard'
+])
+@description('Optional. Embedding model deployment type. Defaults to GlobalStandard.')
+param embeddingModelDeploymentType string = 'GlobalStandard'
+
+@minValue(1)
+@description('Optional. Embedding model deployment capacity (TPM in thousands).')
+param embeddingModelCapacity int = 120
+
 @description('Optional. Version of the Azure OpenAI service to deploy. Defaults to 2024-12-01-preview.')
 param azureOpenaiAPIVersion string = '2024-12-01-preview'
 
@@ -314,6 +331,10 @@ module bicepDeployment './bicep/main.bicep' = if (isBicep) {
     gptImageModelVersion: gptImageModelVersion
     gptImageModelDeploymentType: gptImageModelDeploymentType
     gptImageModelCapacity: gptImageModelCapacity
+    embeddingModelName: embeddingModelName
+    embeddingModelVersion: embeddingModelVersion
+    embeddingModelDeploymentType: embeddingModelDeploymentType
+    embeddingModelCapacity: embeddingModelCapacity
     azureOpenaiAPIVersion: azureOpenaiAPIVersion
     backendContainerRegistryHostname: backendContainerRegistryHostname
     backendContainerImageName: backendContainerImageName

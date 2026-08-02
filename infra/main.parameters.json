@@ -50,6 +50,18 @@
     "gptImageModelCapacity": {
       "value": "${AZURE_ENV_IMAGE_MODEL_CAPACITY}"
     },
+    "embeddingModelName": {
+      "value": "${AZURE_ENV_EMBEDDING_MODEL_NAME=text-embedding-3-small}"
+    },
+    "embeddingModelVersion": {
+      "value": "${AZURE_ENV_EMBEDDING_MODEL_VERSION=1}"
+    },
+    "embeddingModelDeploymentType": {
+      "value": "${AZURE_ENV_EMBEDDING_MODEL_DEPLOYMENT_TYPE=GlobalStandard}"
+    },
+    "embeddingModelCapacity": {
+      "value": "${AZURE_ENV_EMBEDDING_MODEL_CAPACITY=120}"
+    },
     "enableTelemetry": {
       "value": "${AZURE_ENV_ENABLE_TELEMETRY}"
     },

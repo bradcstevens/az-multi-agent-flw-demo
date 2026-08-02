@@ -16,6 +16,10 @@ By default this template will use the environment name as the prefix to prevent 
 | `AZURE_ENV_GPT_MODEL_NAME`          | string | `gpt-5.4-mini`          | Specifies the name of the GPT model to be deployed.                                                |
 | `AZURE_ENV_GPT_MODEL_VERSION`       | string | `2026-03-17`      | Version of the GPT model to be used for deployment.                                                |
 | `AZURE_ENV_GPT_MODEL_CAPACITY`       | int | `100`      | Sets the GPT model capacity.                                                |
+| `AZURE_ENV_EMBEDDING_MODEL_NAME`     | string | `text-embedding-3-small` | Embedding deployment used by guardrail similarity checks. |
+| `AZURE_ENV_EMBEDDING_MODEL_VERSION`  | string | `1` | Version of the embedding model deployment. |
+| `AZURE_ENV_EMBEDDING_MODEL_DEPLOYMENT_TYPE` | string | `GlobalStandard` | Deployment type for the embedding model. |
+| `AZURE_ENV_EMBEDDING_MODEL_CAPACITY` | int | `120` | Embedding model capacity in TPM thousands. |
 | `AZURE_ENV_MODEL_5_4_DEPLOYMENT_TYPE` | string | `GlobalStandard` | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).                     |
 | `AZURE_ENV_MODEL_5_4_NAME`          | string | `gpt-5.4`          | Specifies the name of the GPT model to be deployed.                                                |
 | `AZURE_ENV_MODEL_5_4_VERSION`       | string | `2026-03-05`      | Version of the GPT model to be used for deployment.                                                |
