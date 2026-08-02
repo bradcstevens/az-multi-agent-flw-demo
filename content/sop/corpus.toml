@@ -1,0 +1,20 @@
+# Corpus manifest for the SOP knowledge the Copilot Studio agent is grounded on.
+# Everything named here is invented. There is no real store, no real employee and no real
+# procedure in this corpus.
+
+banner = "Brightpath Convenience"
+store = "Store 223"
+locale = "en-US"
+
+[honest_miss]
+# The rehearsed question the corpus deliberately does not answer, so the presenter can show an
+# honest miss on cue instead of stumbling into one. Keep every term below out of the corpus.
+question = "How do I restart the car wash after a vehicle stalls in the bay?"
+quick_task = "Restart the car wash"
+absent_terms = ["car wash", "carwash", "wash bay", "wash tunnel", "bay conveyor"]
+rationale = """
+Store 223 is written as a forecourt-and-shop site with no vehicle wash, so no procedure covers it.
+The question is plausible for a convenience-store associate, is phrased in ordinary store language,
+and is close enough to the forecourt procedures to be a fair test of retrieval - which is exactly
+why the agent must say plainly that it is not in the library rather than improvise.
+"""
