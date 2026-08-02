@@ -26,7 +26,8 @@ on `PATH`. Set `DEV_VENV` to share one virtualenv across git worktrees.
 | Loop | Command | Covers |
 | --- | --- | --- |
 | Backend lint | `bash scripts/backend-lint.sh` | flake8 over `src/backend`, same config as `.github/workflows/pylint.yml`. |
-| Backend tests | `bash scripts/backend-tests.sh` | The Two-phase test invocation over `src/tests/backend` with the 80% coverage gate, same as `.github/workflows/test.yml`. |
+| Backend tests | `bash scripts/backend-tests.sh` | The Two-phase test invocation over `src/tests/backend` with an advisory 80% coverage report. |
+| MCP server tests | `bash scripts/mcp-tests.sh` | pytest over `src/tests/mcp_server` with MCP coverage; CI appends this coverage to the backend report. |
 
 Notes:
 

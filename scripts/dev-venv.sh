@@ -59,3 +59,9 @@ dev_venv_ensure() {
 
   printf '%s' "$want" >"$stamp_file"
 }
+
+dev_python_test_venv_ensure() {
+  dev_venv_ensure
+  cd "$REPO_ROOT"
+  export PYTHONPATH="src:src/backend"
+}

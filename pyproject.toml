@@ -24,7 +24,6 @@ markers = [
 [tool.coverage.run]
 source = ["."]
 omit = [
-    "src/mcp_server/*",
     "src/tests/mcp_server/*",
     "src/tests/agents/*",
     "src/**/__init__.py",

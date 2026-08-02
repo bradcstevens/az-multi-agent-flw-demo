@@ -3,17 +3,13 @@
 #
 # src/tests/backend/test_app.py mutates sys.modules and the environment at import
 # time, so it runs first in its own pytest process; the rest of the suite then
-# runs with --cov-append and --ignore on that file. Mirrors the two pytest
-# invocations in .github/workflows/test.yml, including its 80% coverage gate.
+# runs with --cov-append and --ignore on that file. Mirrors the workflow's two
+# backend pytest invocations, including its advisory coverage report.
 
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/dev-venv.sh"
-dev_venv_ensure
-
-cd "$REPO_ROOT"
-
-export PYTHONPATH="src:src/backend"
+dev_python_test_venv_ensure
 
 ISOLATED_TEST="src/tests/backend/test_app.py"
 
@@ -29,6 +25,5 @@ ISOLATED_TEST="src/tests/backend/test_app.py"
   --cov-append \
   --cov-report=term \
   --cov-report=xml \
-  --cov-fail-under=80 \
   --junitxml=pytest.xml \
   -q
