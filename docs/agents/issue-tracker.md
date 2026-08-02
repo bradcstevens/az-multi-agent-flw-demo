@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues and PRDs for this repo live as GitHub issues in [`bradcstevens/az-multi-agent-flw-demo`](https://github.com/bradcstevens/az-multi-agent-flw-demo). Use the `gh` CLI for all operations.
 
 ## Conventions
 
@@ -12,6 +12,15 @@ Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all op
 - **Close**: `gh issue close <number> --comment "..."`
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
+
+## Match the repo's issue templates
+
+`.github/ISSUE_TEMPLATE/` defines two forms. `gh issue create` bypasses them, so mirror their shape in the body you write and use their title prefixes:
+
+- **Bug report** — title prefixed `[Bug]: `, body sections: Description, Reproduction, Environment.
+- **Feature request** — title prefixed `[Feature]: `, body sections: Problem, Desired outcome, Alternatives considered, Additional context.
+
+Blank issues are enabled, so anything that fits neither shape can be filed freeform.
 
 ## Pull requests as a triage surface
 

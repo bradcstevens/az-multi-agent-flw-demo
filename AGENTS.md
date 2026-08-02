@@ -1,13 +1,17 @@
+# AGENTS.md
+
+Repository instructions for coding agents working in this repo.
+
 ## Agent skills
 
 ### Issue tracker
 
-Issues and PRDs are tracked in GitHub Issues via `gh`. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues for `bradcstevens/az-multi-agent-flw-demo`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Use the six canonical triage labels, with `parallel-safe` as an additive label. See `docs/agents/triage-labels.md`.
+The five canonical triage roles plus the additive `parallel-safe` marker. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Use the single-context layout with root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+Single-context — `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
