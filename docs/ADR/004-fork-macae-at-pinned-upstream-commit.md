@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted — **partially superseded by [ADR-006](./006-macae-is-a-one-way-baseline.md)**, which
+removes the `upstream` remote clause of the decision below. Everything else here still stands and is
+still authoritative: the pinned commit, the conflict resolutions, the toolchain minimums and the
+build and test contract.
 
 ## Date
 

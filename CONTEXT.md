@@ -1,9 +1,10 @@
 # CONTEXT.md
 
-Glossary and ubiquitous language for the **Circle K Frontline Store Assistant** — a fork of the
-Microsoft Multi-Agent Custom Automation Engine (MACAE) solution accelerator, pinned to upstream
-commit `c5a7a4d1f0bfb6930b4c7b7f6356f28e7e03c309` (see
-[ADR-004](docs/ADR/004-fork-macae-at-pinned-upstream-commit.md)).
+Glossary and ubiquitous language for the **Circle K Frontline Store Assistant** — built on the
+**MACAE baseline**, the Microsoft Multi-Agent Custom Automation Engine (MACAE) solution accelerator
+taken at commit `c5a7a4d1f0bfb6930b4c7b7f6356f28e7e03c309` and diverged from (see
+[ADR-004](docs/ADR/004-fork-macae-at-pinned-upstream-commit.md) and
+[ADR-006](docs/ADR/006-macae-is-a-one-way-baseline.md)).
 
 ADRs live in `docs/ADR/` — the directory upstream already uses, with its three-digit `NNN-`
 numbering continued rather than the four-digit example in `docs/agents/domain.md`.
@@ -43,8 +44,14 @@ Upstream hardcodes it as a literal; the two-lane design makes it a per-request v
 
 ## Build and test
 
-**Pinned upstream commit** — `c5a7a4d1f0bfb6930b4c7b7f6356f28e7e03c309`. The build never tracks
-upstream `main`. Upstream fixes arrive by `git cherry-pick` from the `upstream` remote.
+**MACAE baseline** — the Microsoft accelerator as it stood at commit
+`c5a7a4d1f0bfb6930b4c7b7f6356f28e7e03c309`, merged into this repository once and never re-synced. It
+is a frozen starting point, not a sibling kept in step: there is no `upstream` remote, no
+cherry-pick path and no contribution back, so fixes to accelerator code are made here as our own
+commits. (A one-off upstream fix can be fetched by URL without persisting a remote — see
+[ADR-006](docs/ADR/006-macae-is-a-one-way-baseline.md), which also explains why a remote pointing at
+a SAML-enforced organisation breaks every `gh` command in this clone.)
+_Avoid_: fork, upstream fork, pinned upstream commit
 
 **Two-phase test invocation** — `src/tests/backend/test_app.py` runs first in its own pytest
 process, then the rest of `src/tests/backend` runs with `--cov-append` and `--ignore` on that file.

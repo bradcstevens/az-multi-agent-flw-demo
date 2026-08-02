@@ -13,6 +13,15 @@ Issues and PRDs for this repo live as GitHub issues in [`bradcstevens/az-multi-a
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
 
+> **Never add a git remote pointing at a SAML-enforced organisation** (notably anything under
+> `microsoft/`). `gh` resolves the base repository by querying GitHub for **every** remote in the
+> clone, not just `origin`, so a single such remote makes every `gh` command in this working tree
+> fail with `GraphQL: Resource protected by organization SAML enforcement`. REST calls keep working,
+> which makes the breakage look intermittent and token-related rather than structural. This repo has
+> `origin` and nothing else, by decision — see
+> [ADR-006](../ADR/006-macae-is-a-one-way-baseline.md). To pull a one-off commit from the MACAE
+> baseline, fetch it by URL; do not persist a remote.
+
 ## Match the repo's issue templates
 
 `.github/ISSUE_TEMPLATE/` defines two forms. `gh issue create` bypasses them, so mirror their shape in the body you write and use their title prefixes:
