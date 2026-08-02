@@ -1,20 +1,14 @@
 # Contributing
 
-## Before starting
+This project welcomes contributions and suggestions. Most contributions require you to
+agree to a Contributor License Agreement (CLA) declaring that you have the right to,
+and actually do, grant us the rights to use your contribution. For details, visit
+https://cla.microsoft.com.
 
-- Check existing issues and pull requests for related work.
-- Open or reference an issue for substantial changes.
-- Keep each change focused on one outcome.
+When you submit a pull request, a CLA-bot will automatically determine whether you need
+to provide a CLA and decorate the PR appropriately (e.g., label, comment). Simply follow the
+instructions provided by the bot. You will only need to do this once across all repositories using our CLA.
 
-## Making changes
-
-- Follow the repository instructions in `AGENTS.md` or `CLAUDE.md`.
-- Add or update tests and documentation with behavior changes.
-- Run the repository's relevant validation commands before opening a pull request.
-
-## Pull requests
-
-- Explain the problem and the chosen solution.
-- Link related issues.
-- Include the validation performed.
-- Call out follow-up work or known limitations.
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
+or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
