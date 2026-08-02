@@ -482,6 +482,8 @@ infra/preflight-*.bicepparam
 /.copilot-tracking
 
 # --- Fork-specific (Circle K Frontline Store Assistant) ---
+# JUnit report emitted by the two-phase pytest invocation in .github/workflows/test.yml
+pytest.xml
 Thumbs.db
 Desktop.ini
 *.swp
