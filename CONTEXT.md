@@ -42,6 +42,31 @@ agents, their models, and their prompts. `team_id` is a required non-optional `s
 **Plan review** — the approval gate the Magentic builder is configured with at Workflow build time.
 Upstream hardcodes it as a literal; the two-lane design makes it a per-request value.
 
+## Retrieval
+
+**Foundry IQ** — ambiguous on its own. This repository has used the name for two different
+mechanisms with **opposite infrastructure requirements**, and conflating them once nearly caused a
+required resource to be deleted. Always qualify it with one of the two terms below.
+_Avoid_: bare "Foundry IQ", "the search path", "RAG"
+
+**Foundry IQ vector store** — retrieval via `FileSearchTool` over vector stores managed by the
+Foundry project. Files are uploaded and chunked by the service; there is no index schema and **no
+Azure AI Search resource**. This is the architecture [ADR-002](docs/ADR/002-foundry-iq-file-search-over-azure-ai-search.md)
+described. It is a legitimate future option but is **not** what the code does today.
+
+**Foundry IQ Knowledge Base** — retrieval via a knowledge base that is an **MCP endpoint served by
+an Azure AI Search service**. This *is* what the code does: `KnowledgeBaseConfig`
+(`src/backend/config/mcp_config.py`) requires `AZURE_AI_SEARCH_ENDPOINT` and fails construction
+without it, and reaches the knowledge base through a per-KB `RemoteTool` /
+`ProjectManagedIdentity` project connection named `{kb_name}-mcp`. Selected per agent by
+`use_knowledge_base` + `knowledge_base_name` in a team configuration. **Azure AI Search is therefore
+a hard deployment dependency** — see [ADR-007](docs/ADR/007-foundry-iq-knowledge-bases-require-azure-ai-search.md).
+
+**SOP corpus** — the store-procedure knowledge owned by the Copilot Studio agent and grounded in
+**Dataverse documents**, reached over Direct Line. It is deliberately *not* held in Azure AI Search,
+and no local copy is kept as a fallback. Distinct from, and never merged with, any Foundry-side
+knowledge base — the demo's whole claim rests on the two provenances being visibly separate.
+
 ## Build and test
 
 **MACAE baseline** — the Microsoft accelerator as it stood at commit

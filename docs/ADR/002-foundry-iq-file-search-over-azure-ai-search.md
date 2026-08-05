@@ -2,7 +2,14 @@
 
 ## Status
 
-Accepted
+**Superseded by [ADR-007](./007-foundry-iq-knowledge-bases-require-azure-ai-search.md)** (2026-08-05).
+
+The Decision below held — `AzureAISearchTool` is gone from the backend. The **Consequences**
+section is wrong: eliminating Azure AI Search as a deployment dependency never happened. The
+implementation landed on Foundry IQ *Knowledge Bases*, which are MCP endpoints over an Azure AI
+Search service, rather than the `FileSearchTool` + managed vector stores described here. Search
+remains required. This ADR is retained unedited because reading its stale consequence as
+authority nearly caused a load-bearing resource to be deleted — see ADR-007.
 
 ## Date
 
