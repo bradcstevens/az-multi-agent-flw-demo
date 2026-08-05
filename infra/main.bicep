@@ -534,6 +534,9 @@ output MCP_CONTAINER_APP_NAME string = isAvm ? avmDeployment!.outputs.MCP_CONTAI
 @description('Name of the frontend Web App.')
 output FRONTEND_WEB_APP_NAME string = isAvm ? avmDeployment!.outputs.FRONTEND_WEB_APP_NAME : bicepDeployment!.outputs.FRONTEND_WEB_APP_NAME
 
+@description('Name of the frontend Container App when using the vanilla deployment.')
+output FRONTEND_CONTAINER_APP_NAME string = isBicep ? bicepDeployment!.outputs.FRONTEND_CONTAINER_APP_NAME : ''
+
 @description('Backend container image repository name.')
 output BACKEND_IMAGE_NAME string = isAvm ? avmDeployment!.outputs.BACKEND_IMAGE_NAME : bicepDeployment!.outputs.BACKEND_IMAGE_NAME
 

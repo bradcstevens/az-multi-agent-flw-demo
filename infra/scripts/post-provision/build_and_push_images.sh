@@ -60,6 +60,7 @@ RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-}"
 BACKEND_CA="${BACKEND_CONTAINER_APP_NAME:-}"
 MCP_CA="${MCP_CONTAINER_APP_NAME:-}"
 FRONTEND_APP="${FRONTEND_WEB_APP_NAME:-}"
+FRONTEND_CA="${FRONTEND_CONTAINER_APP_NAME:-}"
 BACKEND_IMAGE="${BACKEND_IMAGE_NAME:-macaebackend}"
 FRONTEND_IMAGE="${FRONTEND_IMAGE_NAME:-macaefrontend}"
 MCP_IMAGE="${MCP_IMAGE_NAME:-macaemcp}"
@@ -72,7 +73,9 @@ require AZURE_CONTAINER_REGISTRY_ENDPOINT "${ACR_ENDPOINT}"
 require AZURE_RESOURCE_GROUP              "${RESOURCE_GROUP}"
 require BACKEND_CONTAINER_APP_NAME        "${BACKEND_CA}"
 require MCP_CONTAINER_APP_NAME            "${MCP_CA}"
-require FRONTEND_WEB_APP_NAME             "${FRONTEND_APP}"
+if [ -z "${FRONTEND_APP}" ] && [ -z "${FRONTEND_CA}" ]; then
+    require FRONTEND_WEB_APP_NAME_OR_FRONTEND_CONTAINER_APP_NAME ""
+fi
 
 case "${BUILD_MODE}" in
     local|remote) ;;
@@ -83,7 +86,11 @@ echo "ACR:                ${ACR_NAME} (${ACR_ENDPOINT})"
 echo "Resource group:     ${RESOURCE_GROUP}"
 echo "Backend CA:         ${BACKEND_CA}   -> ${BACKEND_IMAGE}:${IMAGE_TAG}"
 echo "MCP CA:             ${MCP_CA}       -> ${MCP_IMAGE}:${IMAGE_TAG}"
-echo "Frontend Web App:   ${FRONTEND_APP} -> ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+if [ -n "${FRONTEND_CA}" ]; then
+    echo "Frontend Container App: ${FRONTEND_CA} -> ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+else
+    echo "Frontend Web App:       ${FRONTEND_APP} -> ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+fi
 echo "Build mode:         ${BUILD_MODE}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -149,7 +156,7 @@ for i in "${!IMAGE_NAMES[@]}"; do
     fi
 done
 
-section "Updating Container Apps and Web App to use new images"
+section "Updating application hosts to use new images"
 
 BACKEND_REF="${ACR_ENDPOINT}/${BACKEND_IMAGE}:${IMAGE_TAG}"
 MCP_REF="${ACR_ENDPOINT}/${MCP_IMAGE}:${IMAGE_TAG}"
@@ -169,20 +176,29 @@ az containerapp update \
     --image "${MCP_REF}" \
     --output none
 
-echo "Updating Frontend Web App -> ${FRONTEND_REF}"
-az webapp config container set \
-    --name "${FRONTEND_APP}" \
-    --resource-group "${RESOURCE_GROUP}" \
-    --container-image-name "${FRONTEND_REF}" \
-    --container-registry-url "https://${ACR_ENDPOINT}" \
-    --output none
+if [ -n "${FRONTEND_CA}" ]; then
+    echo "Updating Frontend Container App -> ${FRONTEND_REF}"
+    az containerapp update \
+        --name "${FRONTEND_CA}" \
+        --resource-group "${RESOURCE_GROUP}" \
+        --image "${FRONTEND_REF}" \
+        --output none
+else
+    echo "Updating Frontend Web App -> ${FRONTEND_REF}"
+    az webapp config container set \
+        --name "${FRONTEND_APP}" \
+        --resource-group "${RESOURCE_GROUP}" \
+        --container-image-name "${FRONTEND_REF}" \
+        --container-registry-url "https://${ACR_ENDPOINT}" \
+        --output none
 
-echo "Ensuring WEBSITES_PORT=${FRONTEND_PORT} and DOCKER_REGISTRY_SERVER_URL on Web App"
-az webapp config appsettings set \
-    --name "${FRONTEND_APP}" \
-    --resource-group "${RESOURCE_GROUP}" \
-    --settings "WEBSITES_PORT=${FRONTEND_PORT}" "DOCKER_REGISTRY_SERVER_URL=https://${ACR_ENDPOINT}" \
-    --output none
+    echo "Ensuring WEBSITES_PORT=${FRONTEND_PORT} and DOCKER_REGISTRY_SERVER_URL on Web App"
+    az webapp config appsettings set \
+        --name "${FRONTEND_APP}" \
+        --resource-group "${RESOURCE_GROUP}" \
+        --settings "WEBSITES_PORT=${FRONTEND_PORT}" "DOCKER_REGISTRY_SERVER_URL=https://${ACR_ENDPOINT}" \
+        --output none
+fi
 
 section "Image build & push complete"
 echo "All images built, pushed to '${ACR_ENDPOINT}' with tag '${IMAGE_TAG}', and services updated."

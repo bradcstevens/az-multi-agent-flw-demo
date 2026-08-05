@@ -262,8 +262,7 @@ var cosmosDbDatabaseMemoryContainerName = 'memory'
 var cosmosDbDatabaseMemoryPartitionKey = '/session_id'
 
 var frontendAppName = 'app-${solutionSuffix}'
-var frontendAppUrl = 'https://${frontendAppName}.azurewebsites.net'
-var appServicePlanName = 'asp-${solutionSuffix}'
+var frontendAppUrl = 'https://${frontendAppName}.${container_app_environment.outputs.defaultDomain}'
 var backendContainerAppName = 'ca-${solutionSuffix}'
 var mcpContainerAppName = 'ca-mcp-${solutionSuffix}'
 var storageAccountName = take('st${toLower(replace(solutionSuffix, '-', ''))}', 24)
@@ -527,7 +526,6 @@ module backend_container_app './modules/compute/container-app.bicep' = {
     corsPolicy: {
       allowedOrigins: [
         frontendAppUrl
-        'http://${frontendAppName}.azurewebsites.net'
       ]
       allowedMethods: [
         'GET'
@@ -701,7 +699,6 @@ module mcp_container_app './modules/compute/container-app.bicep' = {
     corsPolicy: {
       allowedOrigins: [
         frontendAppUrl
-        'http://${frontendAppName}.azurewebsites.net'
       ]
     }
     scaleSettings: {
@@ -801,38 +798,60 @@ module mcp_container_app './modules/compute/container-app.bicep' = {
   }
 }
 
-module app_service_plan './modules/compute/app-service-plan.bicep' = {
-  name: take('module.app-service-plan.${solutionSuffix}', 64)
+module frontend_container_app './modules/compute/container-app.bicep' = {
+  name: take('module.frontend-container-app.${solutionSuffix}', 64)
   params: {
-    solutionName: solutionSuffix
-    location: solutionLocation
-    tags: allTags
-    skuName: 'B3'
-    skuCapacity: 1
-  }
-}
-
-module frontend_app './modules/compute/app-service.bicep' = {
-  name: take('module.frontend-app.${solutionSuffix}', 64)
-  params: {
-    solutionName: frontendAppName
+    name: frontendAppName
     location: solutionLocation
     tags: isCustom ? union(allTags, { 'azd-service-name': 'frontend' }) : allTags
-    serverFarmResourceId: app_service_plan.outputs.resourceId
-    linuxFxVersion: 'DOCKER|${frontendContainerRegistryHostname}/${frontendContainerImageName}:${frontendContainerImageTag}'
-    containerRegistryUserAssignedIdentityResourceId: userAssignedIdentity.outputs.resourceId
-    acrUserManagedIdentityClientId: userAssignedIdentity.outputs.clientId
-    appCommandLine: ''
-    appSettings: {
-      SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
-      DOCKER_REGISTRY_SERVER_URL: 'https://${acrLoginServer}'      
-      WEBSITES_CONTAINER_START_TIME_LIMIT: '1800'
-      BACKEND_API_URL: 'https://${backend_container_app.outputs.fqdn}'
-      AUTH_ENABLED: 'false'
-      PROXY_API_REQUESTS: 'false'
-      APPLICATIONINSIGHTS_CONNECTION_STRING: app_insights.outputs.connectionString
-      APPINSIGHTS_INSTRUMENTATIONKEY: app_insights.outputs.instrumentationKey
+    environmentResourceId: container_app_environment.outputs.resourceId
+    ingressExternal: true
+    ingressTargetPort: 3000
+    managedIdentities: {
+      userAssignedResourceIds: [userAssignedIdentity.outputs.resourceId]
     }
+    scaleSettings: {
+      minReplicas: 1
+      maxReplicas: 1
+    }
+    registries: [
+      {
+        server: acrLoginServer
+        identity: userAssignedIdentity.outputs.resourceId
+      }
+    ]
+    containers: [
+      {
+        name: 'frontend'
+        image: '${frontendContainerRegistryHostname}/${frontendContainerImageName}:${frontendContainerImageTag}'
+        resources: {
+          cpu: 1
+          memory: '2Gi'
+        }
+        env: [
+          {
+            name: 'BACKEND_API_URL'
+            value: 'https://${backend_container_app.outputs.fqdn}'
+          }
+          {
+            name: 'AUTH_ENABLED'
+            value: 'false'
+          }
+          {
+            name: 'PROXY_API_REQUESTS'
+            value: 'false'
+          }
+          {
+            name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+            value: app_insights.outputs.connectionString
+          }
+          {
+            name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
+            value: app_insights.outputs.instrumentationKey
+          }
+        ]
+      }
+    ]
   }
 }
 
@@ -859,8 +878,8 @@ module role_assignments './modules/identity/role-assignments.bicep' = {
 @description('The resource group the resources were deployed into.')
 output resourceGroupName string = resourceGroup().name
 
-@description('The default hostname of the frontend web app.')
-output webSiteDefaultHostname string = replace(frontend_app.outputs.appUrl, 'https://', '')
+@description('The default hostname of the frontend application.')
+output webSiteDefaultHostname string = frontend_container_app.outputs.fqdn
 
 @description('The blob service endpoint of the deployed storage account.')
 output AZURE_STORAGE_BLOB_URL string = storage_account.outputs.blobEndpoint
@@ -1011,8 +1030,11 @@ output BACKEND_CONTAINER_APP_NAME string = backend_container_app.outputs.name
 @description('Name of the MCP Container App.')
 output MCP_CONTAINER_APP_NAME string = mcp_container_app.outputs.name
 
-@description('Name of the frontend Web App.')
-output FRONTEND_WEB_APP_NAME string = frontend_app.outputs.name
+@description('Name of the frontend Container App.')
+output FRONTEND_CONTAINER_APP_NAME string = frontend_container_app.outputs.name
+
+@description('The frontend Web App name. Empty for the vanilla Container Apps deployment.')
+output FRONTEND_WEB_APP_NAME string = ''
 
 @description('Backend container image repository name.')
 output BACKEND_IMAGE_NAME string = 'macaebackend'

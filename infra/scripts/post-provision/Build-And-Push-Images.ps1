@@ -103,6 +103,7 @@ $resourceGroup  = Get-EnvOrAzd -Name 'AZURE_RESOURCE_GROUP'              -AzdEnv
 $backendCa      = Get-EnvOrAzd -Name 'BACKEND_CONTAINER_APP_NAME'        -AzdEnv $azdEnv
 $mcpCa          = Get-EnvOrAzd -Name 'MCP_CONTAINER_APP_NAME'            -AzdEnv $azdEnv
 $frontendApp    = Get-EnvOrAzd -Name 'FRONTEND_WEB_APP_NAME'             -AzdEnv $azdEnv
+$frontendCa     = Get-EnvOrAzd -Name 'FRONTEND_CONTAINER_APP_NAME'       -AzdEnv $azdEnv
 $backendImage   = Get-EnvOrAzd -Name 'BACKEND_IMAGE_NAME'                -AzdEnv $azdEnv -Default 'macaebackend'
 $frontendImage  = Get-EnvOrAzd -Name 'FRONTEND_IMAGE_NAME'               -AzdEnv $azdEnv -Default 'macaefrontend'
 $mcpImage       = Get-EnvOrAzd -Name 'MCP_IMAGE_NAME'                    -AzdEnv $azdEnv -Default 'macaemcp'
@@ -120,19 +121,25 @@ foreach ($pair in @(
     @('AZURE_CONTAINER_REGISTRY_ENDPOINT', $acrEndpoint),
     @('AZURE_RESOURCE_GROUP',              $resourceGroup),
     @('BACKEND_CONTAINER_APP_NAME',        $backendCa),
-    @('MCP_CONTAINER_APP_NAME',            $mcpCa),
-    @('FRONTEND_WEB_APP_NAME',             $frontendApp)
+    @('MCP_CONTAINER_APP_NAME',            $mcpCa)
 )) {
     if ([string]::IsNullOrWhiteSpace($pair[1])) {
         throw "Required value '$($pair[0])' is missing. Ensure provisioning finished successfully and the outputs are present in the azd environment."
     }
+}
+if ([string]::IsNullOrWhiteSpace($frontendApp) -and [string]::IsNullOrWhiteSpace($frontendCa)) {
+    throw "Required value 'FRONTEND_WEB_APP_NAME_OR_FRONTEND_CONTAINER_APP_NAME' is missing. Ensure provisioning finished successfully and the outputs are present in the azd environment."
 }
 
 Write-Host "ACR:                $acrName ($acrEndpoint)"
 Write-Host "Resource group:     $resourceGroup"
 Write-Host "Backend CA:         $backendCa   -> $backendImage`:$ImageTag"
 Write-Host "MCP CA:             $mcpCa       -> $mcpImage`:$ImageTag"
-Write-Host "Frontend Web App:   $frontendApp -> $frontendImage`:$ImageTag"
+if ($frontendCa) {
+    Write-Host "Frontend Container App: $frontendCa -> $frontendImage`:$ImageTag"
+} else {
+    Write-Host "Frontend Web App:       $frontendApp -> $frontendImage`:$ImageTag"
+}
 Write-Host "Build mode:         $BuildMode"
 
 # --- Resolve source paths ---------------------------------------------------
@@ -211,8 +218,8 @@ foreach ($img in $images) {
     }
 }
 
-# --- Update Container Apps and Web App --------------------------------------
-Write-Section 'Updating Container Apps and Web App to use new images'
+# --- Update application hosts -------------------------------------------------
+Write-Section 'Updating application hosts to use new images'
 
 $backendRef  = "$acrEndpoint/$backendImage`:$ImageTag"
 $mcpRef      = "$acrEndpoint/$mcpImage`:$ImageTag"
@@ -226,22 +233,28 @@ Write-Host "Updating MCP Container App -> $mcpRef"
 & az containerapp update --name $mcpCa --resource-group $resourceGroup --image $mcpRef --output none
 if ($LASTEXITCODE -ne 0) { throw "Failed to update MCP Container App '$mcpCa'." }
 
-Write-Host "Updating Frontend Web App -> $frontendRef"
-& az webapp config container set `
-    --name $frontendApp `
-    --resource-group $resourceGroup `
-    --container-image-name $frontendRef `
-    --container-registry-url "https://$acrEndpoint" `
-    --output none
-if ($LASTEXITCODE -ne 0) { throw "Failed to set container image on Web App '$frontendApp'." }
+if ($frontendCa) {
+    Write-Host "Updating Frontend Container App -> $frontendRef"
+    & az containerapp update --name $frontendCa --resource-group $resourceGroup --image $frontendRef --output none
+    if ($LASTEXITCODE -ne 0) { throw "Failed to update frontend Container App '$frontendCa'." }
+} else {
+    Write-Host "Updating Frontend Web App -> $frontendRef"
+    & az webapp config container set `
+        --name $frontendApp `
+        --resource-group $resourceGroup `
+        --container-image-name $frontendRef `
+        --container-registry-url "https://$acrEndpoint" `
+        --output none
+    if ($LASTEXITCODE -ne 0) { throw "Failed to set container image on Web App '$frontendApp'." }
 
-Write-Host "Ensuring WEBSITES_PORT=$frontendPort on Web App"
-& az webapp config appsettings set `
-    --name $frontendApp `
-    --resource-group $resourceGroup `
-    --settings "WEBSITES_PORT=$frontendPort" "DOCKER_REGISTRY_SERVER_URL=https://$acrEndpoint" `
-    --output none
-if ($LASTEXITCODE -ne 0) { throw "Failed to update app settings on Web App '$frontendApp'." }
+    Write-Host "Ensuring WEBSITES_PORT=$frontendPort on Web App"
+    & az webapp config appsettings set `
+        --name $frontendApp `
+        --resource-group $resourceGroup `
+        --settings "WEBSITES_PORT=$frontendPort" "DOCKER_REGISTRY_SERVER_URL=https://$acrEndpoint" `
+        --output none
+    if ($LASTEXITCODE -ne 0) { throw "Failed to update app settings on Web App '$frontendApp'." }
+}
 
 
 Write-Section 'Image build & push complete'
