@@ -30,6 +30,9 @@ param solutionUniqueText string = take(uniqueString(subscription().id, resourceG
 ])
 param location string
 
+@description('Optional. Azure region for Azure AI Search. Defaults to the solution location.')
+param searchServiceLocation string = location
+
 @allowed(['australiaeast', 'eastus2', 'francecentral', 'japaneast', 'norwayeast', 'swedencentral', 'uksouth', 'westus', 'westus3', 'polandcentral', 'uaenorth'])
 @metadata({
   azd: {
@@ -194,6 +197,7 @@ var deployerInfo = deployer()
 var deployingUserPrincipalId = deployerInfo.objectId
 var deployerPrincipalType = contains(deployerInfo, 'userPrincipalName') ? 'User' : 'ServicePrincipal'
 var solutionLocation = location
+var resolvedSearchServiceLocation = empty(searchServiceLocation) ? solutionLocation : searchServiceLocation
 var solutionSuffix = toLower(trim(replace(
   replace(
     replace(replace(replace(replace('${solutionName}${solutionUniqueText}', '-', ''), '_', ''), '.', ''), '/', ''),
@@ -378,7 +382,7 @@ module ai_search './modules/ai/ai-search.bicep' = {
   name: take('module.ai-search.${solutionSuffix}', 64)
   params: {
     solutionName: solutionSuffix
-    location: solutionLocation
+    location: resolvedSearchServiceLocation
     tags: allTags
     skuName: 'basic'
     replicaCount: 1

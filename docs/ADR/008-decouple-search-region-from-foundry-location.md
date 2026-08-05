@@ -68,6 +68,15 @@ service in the candidate region, confirm, delete it, then provision. On capacity
 agreed fallback order is **Central US → South Central US → Canada Central**, all of which offer
 agentic retrieval and none of which Microsoft currently flags as capacity-constrained.
 
+## Verification
+
+On 2026-08-05, a one-replica, one-partition Basic service named
+`srch-macae-capacity-probe-cus` was created in Central US. Its provisioning state reached
+`succeeded` with a system-assigned identity. The service and its isolated, tagged resource
+group (`rg-macae-search-capacity-probe-centralus`) were then deleted. Central US is therefore
+the verified first choice; the fallback order remains **Central US → South Central US → Canada
+Central**.
+
 ## Considered Options
 
 - **Migrate the whole solution to UK South, Japan East or Australia East.** All three are

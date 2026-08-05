@@ -55,12 +55,17 @@ param managedIdentityType string = 'SystemAssigned'
 @description('Public network access setting.')
 param publicNetworkAccess string = 'Enabled'
 
+var resourceTags = union(tags, {
+  SecurityControl: 'Ignore'
+})
+
 // ============================================================================
 // Step 1: Initial resource creation (fast — no identity)
 // ============================================================================
 resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
   name: name
   location: location
+  tags: resourceTags
   sku: {
     name: skuName
   }
@@ -74,7 +79,7 @@ module searchServiceUpdate 'ai-search-identity.bicep' = {
   params: {
     name: aiSearch.name
     location: location
-    tags: tags
+    tags: resourceTags
     skuName: skuName
     replicaCount: replicaCount
     partitionCount: partitionCount

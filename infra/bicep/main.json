@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.45.15.27210",
-      "templateHash": "12198070815373225147"
+      "templateHash": "5473014509125113578"
     },
     "name": "Multi-Agent Custom Automation Engine - Vanilla Bicep",
     "description": "Vanilla Bicep orchestrator for the Multi-Agent Custom Automation Engine accelerator. This deployment intentionally excludes WAF features such as private networking, scale-out, redundancy, bastion, and VM resources while keeping router-compatible outputs."
@@ -45,6 +45,13 @@
           "type": "location"
         },
         "description": "Required. Azure region for app, data, and monitoring resources."
+      }
+    },
+    "searchServiceLocation": {
+      "type": "string",
+      "defaultValue": "[parameters('location')]",
+      "metadata": {
+        "description": "Optional. Azure region for Azure AI Search. Defaults to the solution location."
       }
     },
     "azureAiServiceLocation": {
@@ -388,6 +395,7 @@
     "deployingUserPrincipalId": "[variables('deployerInfo').objectId]",
     "deployerPrincipalType": "[if(contains(variables('deployerInfo'), 'userPrincipalName'), 'User', 'ServicePrincipal')]",
     "solutionLocation": "[parameters('location')]",
+    "resolvedSearchServiceLocation": "[if(empty(parameters('searchServiceLocation')), variables('solutionLocation'), parameters('searchServiceLocation'))]",
     "solutionSuffix": "[toLower(trim(replace(replace(replace(replace(replace(replace(format('{0}{1}', parameters('solutionName'), parameters('solutionUniqueText')), '-', ''), '_', ''), '.', ''), '/', ''), ' ', ''), '*', '')))]",
     "existingTags": "[coalesce(resourceGroup().tags, createObject())]",
     "useExistingContainerRegistry": "[not(empty(parameters('existingContainerRegistryResourceId')))]",
@@ -1370,7 +1378,7 @@
             "value": "[variables('solutionSuffix')]"
           },
           "location": {
-            "value": "[variables('solutionLocation')]"
+            "value": "[variables('resolvedSearchServiceLocation')]"
           },
           "tags": {
             "value": "[variables('allTags')]"
@@ -1404,7 +1412,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.45.15.27210",
-              "templateHash": "11721174189700074948"
+              "templateHash": "12718926368747002734"
             }
           },
           "parameters": {
@@ -1524,12 +1532,16 @@
               }
             }
           },
+          "variables": {
+            "resourceTags": "[union(parameters('tags'), createObject('SecurityControl', 'Ignore'))]"
+          },
           "resources": [
             {
               "type": "Microsoft.Search/searchServices",
               "apiVersion": "2025-05-01",
               "name": "[parameters('name')]",
               "location": "[parameters('location')]",
+              "tags": "[variables('resourceTags')]",
               "sku": {
                 "name": "[parameters('skuName')]"
               }
@@ -1551,7 +1563,7 @@
                     "value": "[parameters('location')]"
                   },
                   "tags": {
-                    "value": "[parameters('tags')]"
+                    "value": "[variables('resourceTags')]"
                   },
                   "skuName": {
                     "value": "[parameters('skuName')]"

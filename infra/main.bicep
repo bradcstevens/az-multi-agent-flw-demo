@@ -48,6 +48,9 @@ param solutionUniqueText string = take(uniqueString(subscription().id, resourceG
 ])
 param location string
 
+@description('Optional. Azure region for Azure AI Search. Defaults to the solution location.')
+param searchServiceLocation string = location
+
 @allowed(['australiaeast', 'eastus2', 'francecentral', 'japaneast', 'norwayeast', 'swedencentral', 'uksouth', 'westus', 'westus3', 'polandcentral', 'uaenorth'])
 @metadata({
   azd: {
@@ -250,6 +253,7 @@ param vmSize string = 'Standard_D2s_v5'
 
 var isAvm = deploymentFlavor == 'avm' || deploymentFlavor == 'avm-waf'
 var isBicep = deploymentFlavor == 'bicep'
+var resolvedSearchServiceLocation = empty(searchServiceLocation) ? location : searchServiceLocation
 
 
 // ============================================================================
@@ -318,6 +322,7 @@ module bicepDeployment './bicep/main.bicep' = if (isBicep) {
     solutionName: solutionName
     solutionUniqueText: solutionUniqueText
     location: location
+    searchServiceLocation: resolvedSearchServiceLocation
     azureAiServiceLocation: azureAiServiceLocation
     gptModelName: gptModelName
     gptModelVersion: gptModelVersion

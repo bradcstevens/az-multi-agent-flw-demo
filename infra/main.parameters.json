@@ -11,6 +11,9 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+    "searchServiceLocation": {
+      "value": "${AZURE_ENV_SEARCH_SERVICE_LOCATION}"
+    },
     "azureAiServiceLocation": {
       "value": "${AZURE_ENV_AI_SERVICE_LOCATION}"
     },
