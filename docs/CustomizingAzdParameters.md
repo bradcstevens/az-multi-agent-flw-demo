@@ -11,7 +11,7 @@ By default this template will use the environment name as the prefix to prevent 
 | `AZURE_ENV_DEPLOYMENT_FLAVOR`                | string | `bicep`           | Used for different deployment flavor, accepted values `bicep`, `avm`, `avm-waf`                   |
 | `AZURE_ENV_NAME`                | string | `macae`           | Used as a prefix for all resource names to ensure uniqueness across environments.                   |
 | `AZURE_LOCATION`                | string | `<User selects during deployment>`   | Location of the Azure resources. Controls where the infrastructure will be deployed.                |
-| `AZURE_ENV_SEARCH_SERVICE_LOCATION` | string | `AZURE_LOCATION` | Azure AI Search region. Overrides the solution location when Search capacity requires a separate region. |
+| `AZURE_ENV_SEARCH_SERVICE_LOCATION` | string | `centralus` | Azure AI Search region. Overrides the solution location when Search capacity requires a separate region. |
 | `AZURE_ENV_AI_SERVICE_LOCATION`     | string | `<User selects during deployment>`   | Specifies the region for OpenAI resource deployment.                                                |
 | `AZURE_ENV_MODEL_DEPLOYMENT_TYPE` | string | `GlobalStandard` | Defines the deployment type for the AI model (e.g., Standard, GlobalStandard).                     |
 | `AZURE_ENV_GPT_MODEL_NAME`          | string | `gpt-5.4-mini`          | Specifies the name of the GPT model to be deployed.                                                |

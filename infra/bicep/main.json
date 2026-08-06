@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.45.15.27210",
-      "templateHash": "5473014509125113578"
+      "templateHash": "5431738948713519750"
     },
     "name": "Multi-Agent Custom Automation Engine - Vanilla Bicep",
     "description": "Vanilla Bicep orchestrator for the Multi-Agent Custom Automation Engine accelerator. This deployment intentionally excludes WAF features such as private networking, scale-out, redundancy, bastion, and VM resources while keeping router-compatible outputs."
@@ -1412,7 +1412,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.45.15.27210",
-              "templateHash": "12718926368747002734"
+              "templateHash": "14502928741059516937"
             }
           },
           "parameters": {
@@ -1532,16 +1532,13 @@
               }
             }
           },
-          "variables": {
-            "resourceTags": "[union(parameters('tags'), createObject('SecurityControl', 'Ignore'))]"
-          },
           "resources": [
             {
               "type": "Microsoft.Search/searchServices",
               "apiVersion": "2025-05-01",
               "name": "[parameters('name')]",
               "location": "[parameters('location')]",
-              "tags": "[variables('resourceTags')]",
+              "tags": "[parameters('tags')]",
               "sku": {
                 "name": "[parameters('skuName')]"
               }
@@ -1563,7 +1560,7 @@
                     "value": "[parameters('location')]"
                   },
                   "tags": {
-                    "value": "[variables('resourceTags')]"
+                    "value": "[parameters('tags')]"
                   },
                   "skuName": {
                     "value": "[parameters('skuName')]"
