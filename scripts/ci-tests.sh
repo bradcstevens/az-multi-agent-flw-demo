@@ -2,8 +2,10 @@
 # CI-tooling tests feedback loop.
 #
 # Covers the helpers the other loops and .github/workflows/test.yml depend on —
-# today, the advisory coverage report. Kept separate from the backend and MCP
-# suites because it tests the loops themselves, not the application.
+# the advisory coverage report — plus the invariants of the durable record (the
+# ADR index, the corrections to the superseded requirements document, and
+# documentation links). Kept separate from the backend and MCP suites because it
+# tests the repository's own tooling and documentation, not the application.
 
 set -euo pipefail
 
