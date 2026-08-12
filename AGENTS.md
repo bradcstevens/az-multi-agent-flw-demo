@@ -28,6 +28,7 @@ capability — and re-run its script rather than re-deriving the finding by hand
 | `docs/preflight/copilot-studio-payg-meter.md` | `scripts/preflight/check-copilot-studio-meter.sh` |
 | `docs/preflight/dataverse-admin-role.md` | `scripts/preflight/check-dataverse-admin-role.sh` |
 | `docs/preflight/copilot-studio-data-policy-and-egress.md` | `scripts/preflight/check-copilot-studio-dlp.sh` |
+| `docs/preflight/deployed-environment.md` | `scripts/preflight/check-deployed-environment.sh` |
 
 Each check keeps its decision logic in a pure, importable Python module beside the shell entry
 point, so the CI-tooling loop can unit-test the verdict without a live tenant.

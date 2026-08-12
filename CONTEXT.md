@@ -249,7 +249,21 @@ _Avoid_: DLP policy, connector policy
 before the build, each backed by a re-runnable check in `scripts/preflight/`. Distinct from a
 Feedback loop: a loop guards a change, a preflight guards an assumption about the tenant or
 subscription, and its verdict is point-in-time. Read the record rather than re-deriving it, and
-re-run the check rather than trusting the date on it.
+re-run the check rather than trusting the date on it. Four today: three about the Copilot Studio
+tenant (#2, #5, #6) and one about the **deployed environment** (#12) — the model roster, Search's
+region, single-replica scale, keyless configuration and the application images in
+[docs/preflight/deployed-environment.md](docs/preflight/deployed-environment.md).
+
+**Placeholder image** — `mcr.microsoft.com/azuredocs/containerapps-helloworld`, the image all three
+Container Apps are declared with until real ones exist. It listens on `80` while the apps declare
+the ports their own images use (backend `8000`, MCP `9000`, frontend `3000`), so Container Apps
+never gets a ready revision and the module fails after twenty minutes with `Operation expired` and
+**no revision at all** to diagnose. Not a flake and not an RBAC-propagation first-pull failure — the
+accelerator's documented "provision, then `build_and_push_images.sh`" order simply cannot work,
+because the script updates Container Apps that provisioning never created. The registry is filled
+first with `az acr build`, then `azd provision` creates the apps on real images. See
+_The MCP Container App is the head of the chain_ in the deployed-environment preflight record.
+_Avoid_: bootstrap failure, ACR propagation failure
 
 **Runner state** — `.git-loopy/` at the repo root holds the runner's event log, run summaries and
 diagnostics. The runner appends `.git-loopy/` to `.gitignore` itself when the entry is missing, and
@@ -297,6 +311,27 @@ link, pay-as-you-go was not in effect and that quota did not apply; which one di
 because prepaid message packs and Microsoft 365 Copilot entitlement each set their own and neither
 was read. 100 RPM is the documented entitlement, not a measured ceiling — measuring it needs a
 published Direct Line agent (#17).
+
+### The Placeholder image, not RBAC propagation, is what stalls the first deploy (confirmed 2026-08-12, issue #12)
+
+The environment had been half-provisioned since 2026-08-03 and re-running the deployment reproduced
+the same failure exactly, because ARM is declarative and the inputs had not changed. The MCP
+Container App is the **head of a serialised chain** — the backend's `MCP_SERVER_ENDPOINT` reads
+`mcp_container_app.outputs.fqdn` and the frontend reads the backend's — so its twenty-minute
+`Operation expired` meant the backend and frontend Container Apps were never *attempted*. They had
+not failed; they did not exist.
+
+The cause is the Placeholder image against a declared ingress port it does not listen on, **not**
+the first-pull RBAC-propagation failure the issue anticipated. `AcrPull` was already held by
+`id-macaeflwv1flrpd` before any Container App was tried, and every pull after the registry was
+filled succeeded first time. Filling the registry with `az acr build` and *then* provisioning took
+**3m06s** end to end, against 20m08s to fail. The three image *names* had to become bindable first:
+they were bicep parameters `infra/main.parameters.json` never bound, so `azd` could set the registry
+hostname and the tag but not the repository.
+
+Also confirmed: `SecurityControl=Ignore` on every resource comes from two **subscription-scope
+policy assignments**, not from the templates. ADR-010's decision is about what the templates
+request, so the appended tag does not breach it.
 
 ### The Workflow is *not* tagged with a team identifier at build time (confirmed 2026-08-01, issue #9)
 

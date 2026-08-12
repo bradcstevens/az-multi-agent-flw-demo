@@ -65,17 +65,26 @@
     "backendContainerRegistryHostname": {
       "value": "${AZURE_ENV_CONTAINER_REGISTRY_ENDPOINT}"
     },
+    "backendContainerImageName": {
+      "value": "${AZURE_ENV_BACKEND_IMAGE_NAME=azuredocs/containerapps-helloworld}"
+    },
      "backendContainerImageTag": {
       "value": "${AZURE_ENV_IMAGE_TAG}"
     },
     "frontendContainerRegistryHostname": {
       "value": "${AZURE_ENV_CONTAINER_REGISTRY_ENDPOINT}"
     },
+    "frontendContainerImageName": {
+      "value": "${AZURE_ENV_FRONTEND_IMAGE_NAME=azuredocs/containerapps-helloworld}"
+    },
     "frontendContainerImageTag": {
       "value": "${AZURE_ENV_IMAGE_TAG}"
     },
     "MCPContainerRegistryHostname": {
       "value": "${AZURE_ENV_CONTAINER_REGISTRY_ENDPOINT}"
+    },
+    "MCPContainerImageName": {
+      "value": "${AZURE_ENV_MCP_IMAGE_NAME=azuredocs/containerapps-helloworld}"
     },
     "MCPContainerImageTag": {
       "value": "${AZURE_ENV_IMAGE_TAG}"
