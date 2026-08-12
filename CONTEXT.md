@@ -7,7 +7,13 @@ taken at commit `c5a7a4d1f0bfb6930b4c7b7f6356f28e7e03c309` and diverged from (se
 [ADR-006](docs/ADR/006-macae-is-a-one-way-baseline.md)).
 
 ADRs live in `docs/ADR/` — the directory upstream already uses, with its three-digit `NNN-`
-numbering continued rather than the four-digit example in `docs/agents/domain.md`.
+numbering continued rather than the four-digit example in `docs/agents/domain.md`. The index is
+[docs/ADR/README.md](docs/ADR/README.md); every ADR appears in it.
+
+The reference material this build started from is superseded and untracked — see **Superseded
+requirements document** below, and
+[docs/superseded-requirements-corrections.md](docs/superseded-requirements-corrections.md) for the
+ten things it gets wrong.
 
 Use these terms in issue titles, commit messages, test names, and module names. Where a term has a
 concrete home in the code, the file is named.
@@ -40,7 +46,40 @@ and reuses the existing agent pool. Currently unreachable in production.
 agents, their models, and their prompts. `team_id` is a required non-optional `str`.
 
 **Plan review** — the approval gate the Magentic builder is configured with at Workflow build time.
-Upstream hardcodes it as a literal; the two-lane design makes it a per-request value.
+Upstream hardcodes it as a literal; the two-lane design makes it a per-request value. See
+[ADR-013](docs/ADR/013-per-request-plan-review-over-orchestrator-bypass.md).
+
+## Request path
+
+**Fast lane** — the request path taken by an SOP lookup, a troubleshooting turn or a task query:
+the orchestration builder runs with **Plan review** off, so no plan is generated and nothing is
+approved. Target sub-10s. It is *not* a bypass of the orchestrator — no single-agent invocation
+path exists (ADR-013).
+_Avoid_: bypass, direct agent call, single-agent path
+
+**Deliberate lane** — the request path taken by escalation and ticket creation: the full
+orchestration with **Plan review** on, where the approval step *is* the associate confirming the
+ticket before it is raised.
+
+**Lane** — which of the two a request takes. Declared as metadata on a **Quick Task**, with a
+keyword fallback for free-typed input, and **surfaced in the UI as a feature**. Selection **fails
+open to the Deliberate lane**.
+
+**Identity boundary gate** — the deterministic code gate in the request path that refuses
+personal, individual-identity questions from a shared store device, executed **before the lane
+router and before orchestration**. Keyword fast path plus an embedding-similarity tier; **fails
+closed**; on a match the request short-circuits with no agent invoked and no tokens spent. It is
+not the accelerator's prompt-based team-scope evaluation, which fails open in two places. See
+[ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md).
+_Avoid_: guardrail prompt, scope prompt, content filter
+
+**Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
+**retrieval miss** — an honest "that procedure is not in the library" — because conflating the two
+makes a governed refusal look like a bug.
+
+**Mocked unlock** — the post-"sign-in" state in which the Identity boundary gate admits the
+previously refused question and answers it from mocked data. A parameter of the gate, not a
+second gate. No real identity provider is involved.
 
 ## Retrieval
 
@@ -66,8 +105,76 @@ a hard deployment dependency** — see [ADR-007](docs/ADR/007-foundry-iq-knowled
 **Dataverse documents**, reached over Direct Line. It is deliberately *not* held in Azure AI Search,
 and no local copy is kept as a fallback. Distinct from, and never merged with, any Foundry-side
 knowledge base — the demo's whole claim rests on the two provenances being visibly separate.
+Grounding **Option A only**; the SharePoint-via-service-account option is deleted, not deferred —
+see [ADR-012](docs/ADR/012-grounding-option-a-dataverse-documents-only.md).
+_Avoid_: SharePoint SOP library, the SharePoint source
+
+**Copilot Studio SOP agent** — the single low-code agent and the entire cross-platform proof.
+Published to **Direct Line** and reached from the orchestrator through an MCP tool like any other
+tool. See [ADR-011](docs/ADR/011-direct-line-over-a2a-for-the-copilot-studio-sop-agent.md).
+
+**Direct Line** — the GA transport between the orchestrator and the Copilot Studio SOP agent.
+Tokens live **3600 seconds**. Chosen over A2A on fit, **not** on availability — A2A reached GA in
+April 2026, and repeating the "A2A is Preview" line is repeating a known error (ADR-011).
+
+## Surfaces
+
+**Grounding panel** — the R6 surface showing where an answer came from. Driven by **two signals
+combined**: a "source used" event emitted server-side over the existing WebSocket, which proves
+*which platform* answered, and citation data parsed from the SOP agent's response, which supplies
+the document detail. Neither alone satisfies the requirement.
+
+**Token meter** — the R7 per-agent call and token counter. Net-new: the accelerator emits no token
+telemetry. Its emission point is the executor-completed branch of the event stream.
+
+**Presenter alert** — the R8 proactive shift-task message, triggered by a hidden backend route plus
+a keyboard chord and pushed over the existing WebSocket. No wall-clock timer.
+
+**Quick Task** — a starting task the presenter taps instead of typing. Six of them, including one
+that deliberately routes to the **Deliberate lane** and one rehearsed out-of-corpus probe. Carries
+**Lane** metadata, which the upstream starting-task model has no field for.
+
+**Simulated ticket** — the R4 service ticket. Labelled as simulated in the UI, persisted to Cosmos,
+and it **must carry the attempted steps** pulled from the troubleshooting record — if the associate
+has to re-type what they tried, the requirement has failed.
+
+**Attempted steps** — what the associate has already tried, persisted explicitly to the Cosmos
+memory container. Framework checkpoint state is in-memory and must not be relied on for this.
 
 ## Build and test
+
+**Durable record** — the tracked documentation that outlives the **superseded requirements
+document**: this glossary, [`docs/ADR/`](docs/ADR/README.md) and
+[the corrections record](docs/superseded-requirements-corrections.md). Its invariants are enforced
+by `src/tests/ci/test_durable_record.py` in the CI-tooling tests loop — every ADR reachable from the
+index, ten numbered corrections each stating a wrong claim and the correct one, and every relative
+documentation link resolving **case-sensitively** (the macOS filesystem hides case drift that the
+Linux CI runner would surface).
+
+**Superseded requirements document** —
+`.reference/Circle-K-Frontline-Store-Assistant-Demo-Build-Requirements-v1.md`, the v2.1 reference
+material this build started from. **Untracked** — `.reference/` is `.gitignore`d — so it is not the
+record of anything and does not survive a fresh clone. Ten of its statements are factually wrong; a
+reader who still has a copy should read it only alongside the corrections record.
+_Avoid_: the requirements doc, the build requirements, the spec (the spec is issue #1)
+
+**Correction** — one numbered entry in the corrections record, stating the superseded document's
+**claim** and the **correct** position. The ten are a historical record and are append-only: a new
+finding becomes correction 11, it does not rewrite an existing one.
+
+**Guardrail corpus** — 10 positive and 10 negative probes that are simultaneously R5's acceptance
+test and the tuning harness for the Identity boundary gate's similarity threshold. Runs against the
+**real** embedding deployment under the `integration` marker and is deselected in CI, because a
+mocked embedder would only prove plumbing. It must exist **before** the threshold is chosen.
+
+**Deployment flavour** — which of the three infrastructure paths `infra/main.bicep` dispatches to:
+`bicep` (**vanilla**, what this build deploys), `avm`, or `avm-waf`. Not cosmetic — several
+decisions bind the vanilla module only. Search's own region ([ADR-008](docs/ADR/008-decouple-search-region-from-foundry-location.md),
+[ADR-009](docs/ADR/009-eastus2-as-the-only-viable-primary-region.md)), the disabled storage
+shared key ([ADR-010](docs/ADR/010-keyless-by-default-over-mcaps-tag-exemption.md)) and the
+embedding deployment the Identity boundary gate needs
+([ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md)) are all absent from the AVM
+paths. **Switching flavours is not a like-for-like swap.**
 
 **MACAE baseline** — the Microsoft accelerator as it stood at commit
 `c5a7a4d1f0bfb6930b4c7b7f6356f28e7e03c309`, merged into this repository once and never re-synced. It
@@ -99,8 +206,7 @@ backend files and the coverage configuration counts test files toward the total,
 would buy noise rather than confidence on a demo with this lifespan.
 _Avoid_: coverage gate, coverage threshold gate
 
-**Runner state** — `.git-loopy/` at the repo root holds the runner's event log, run summaries and
-diagnostics. The runner appends `.git-loopy/` to `.gitignore` itself when the entry is missing, and
+**Runner state** — `.git-loopy/` at the repo root holds the runner's event log, run summaries anddiagnostics. The runner appends `.git-loopy/` to `.gitignore` itself when the entry is missing, and
 never commits that edit — which dirties the base worktree and makes the integration publish
 (`git merge --no-ff`) refuse to overwrite `.gitignore`. The entry is therefore **tracked** in
 `.gitignore`, which keeps the runner's append a permanent no-op. Do not remove it. Its diagnostic

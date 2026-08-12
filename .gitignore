@@ -496,8 +496,11 @@ logs/
 tmp/
 temp/
 
-# Superseded build-requirements reference material
-.reference/
+# Superseded build-requirements reference material. The document itself is untracked;
+# .reference/README.md is deliberately exempted from the ignore so the marker that
+# says "superseded, and here is the durable record" survives a fresh clone.
+.reference/*
+!.reference/README.md
 
 # git-loopy runner state (event log, run summaries, diagnostics). The runner
 # appends this exact line to .gitignore itself when it is missing, which dirties
