@@ -27,3 +27,7 @@ ISOLATED_TEST="src/tests/backend/test_app.py"
   --cov-report=xml \
   --junitxml=pytest.xml \
   -q
+
+# The advisory 80% report — same script CI runs, so the loop and the workflow
+# report the same number the same way. Never fails the loop.
+"$VENV_PYTHON" scripts/coverage_report.py

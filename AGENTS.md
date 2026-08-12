@@ -28,6 +28,7 @@ on `PATH`. Set `DEV_VENV` to share one virtualenv across git worktrees.
 | Backend lint | `bash scripts/backend-lint.sh` | flake8 over `src/backend`, same config as `.github/workflows/pylint.yml`. |
 | Backend tests | `bash scripts/backend-tests.sh` | The Two-phase test invocation over `src/tests/backend` with an advisory 80% coverage report. |
 | MCP server tests | `bash scripts/mcp-tests.sh` | pytest over `src/tests/mcp_server` with MCP coverage; CI appends this coverage to the backend report. |
+| CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the helpers the loops and `test.yml` share, today the advisory coverage report. |
 
 Notes:
 
@@ -40,6 +41,11 @@ Notes:
   runs to `src/tests/backend`.
 - Coverage and lint configuration live in the root `pyproject.toml` and `.flake8`. There
   is no `.coveragerc`.
+- **The 80% coverage threshold is advisory, not a gate.** `scripts/coverage_report.py`
+  prints the number and emits a GitHub Actions warning below the threshold, but always
+  exits zero; only a missing or unreadable `coverage.xml` is an error. Both the Backend
+  tests loop and `test.yml` call that one script, so do not reintroduce `--cov-fail-under`
+  or a threshold check inline in the workflow.
 - A red integration gate is not always a red loop. The runner's diagnostic log,
   `.git-loopy/logs/<iso>-<run_id>.log`, distinguishes "gate could not run" (no runnable
   table) and "publish failed" (e.g. a dirty base worktree) from a loop that actually

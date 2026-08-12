@@ -85,21 +85,15 @@ jobs:
           # Run MCP server tests and append their coverage to the backend report.
           python -m pytest src/tests/mcp_server --cov=src/mcp_server --cov-append --cov-report=term --cov-report=xml
 
+      - name: Run CI-tooling tests
+        if: env.skip_tests == 'false'
+        env:
+          PYTHONPATH: src:src/backend
+        run: python -m pytest src/tests/ci -q
+
       - name: Report coverage threshold (advisory)
         if: env.skip_tests == 'false'
-        run: |
-          if [ -f coverage.xml ]; then
-            COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib.get('line-rate', 0)) * 100)")
-            echo "Overall coverage: $COVERAGE%"
-            if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-              echo "::warning::Coverage is below the advisory 80% threshold. Current: $COVERAGE%"
-            else
-              echo "Coverage threshold met: $COVERAGE% >= 80%"
-            fi
-          else
-            echo "::error::coverage.xml not found"
-            exit 1
-          fi
+        run: python scripts/coverage_report.py
 
       - name: Pytest Coverage Comment
         if: |

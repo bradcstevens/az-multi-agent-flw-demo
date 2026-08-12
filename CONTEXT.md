@@ -83,11 +83,21 @@ process, then the rest of `src/tests/backend` runs with `--cov-append` and `--ig
 Required because the suite mutates `sys.modules` and the environment at import time. Preserve it.
 Encoded in `scripts/backend-tests.sh`.
 
-**Feedback loop** — a `(name, command)` row of the `## Feedback loops` table in `AGENTS.md`. Two
-today: **Backend lint** (`scripts/backend-lint.sh`) and **Backend tests**
-(`scripts/backend-tests.sh`). The table is the single source of truth: agents run these before
-committing and the runner re-runs them after each merge as the integration gate, so a missing or
-unrunnable table makes every merge red. See [ADR-005](docs/ADR/005-declare-feedback-loops-in-agents-md.md).
+**Feedback loop** — a `(name, command)` row of the `## Feedback loops` table in `AGENTS.md`. Four
+today: **Backend lint** (`scripts/backend-lint.sh`), **Backend tests** (`scripts/backend-tests.sh`),
+**MCP server tests** (`scripts/mcp-tests.sh`) and **CI-tooling tests** (`scripts/ci-tests.sh`). The
+table is the single source of truth: agents run these before committing and the runner re-runs them
+after each merge as the integration gate, so a missing or unrunnable table makes every merge red.
+See [ADR-005](docs/ADR/005-declare-feedback-loops-in-agents-md.md).
+
+**Advisory coverage report** — `scripts/coverage_report.py`, the one implementation of the 80%
+line-coverage threshold, called by both the Backend tests loop and `.github/workflows/test.yml`. It
+prints the overall line rate and warns below the threshold but **always exits zero**; only a missing
+or unreadable `coverage.xml` is an error, because that means the test run produced no number at all.
+It is deliberately not a gate: this build adds substantial demo scaffolding to the two largest
+backend files and the coverage configuration counts test files toward the total, so a blocking gate
+would buy noise rather than confidence on a demo with this lifespan.
+_Avoid_: coverage gate, coverage threshold gate
 
 **Runner state** — `.git-loopy/` at the repo root holds the runner's event log, run summaries and
 diagnostics. The runner appends `.git-loopy/` to `.gitignore` itself when the entry is missing, and
