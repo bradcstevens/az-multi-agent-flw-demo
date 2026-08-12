@@ -141,6 +141,25 @@ has to re-type what they tried, the requirement has failed.
 **Attempted steps** — what the associate has already tried, persisted explicitly to the Cosmos
 memory container. Framework checkpoint state is in-memory and must not be relied on for this.
 
+## Licensing and capacity
+
+**Pay-as-you-go billing plan** — a Power Platform *billing policy* (`PowerPlatformPayGo`, id
+`d94c286b…`) that bills one or more environments' metered usage to an Azure subscription instead of
+prepaid capacity. Read it with `GET https://api.powerplatform.com/licensing/billingPolicies`. The
+Power Platform admin center calls it a "billing plan"; the API calls it a billing *policy*. Chosen
+over licence-based publishing because a Microsoft 365 Copilot licence does not entitle publishing to
+Direct Line — that zero-rating requires the agent to run under an authenticated Microsoft 365 Copilot
+user's identity, and a no-auth Direct Line session has none.
+_Avoid_: billing attachment, Azure subscription link
+
+**Copilot Studio meter** — the `MCSMessages` entitlement (product category `PowerVirtualAgent`) on a
+Pay-as-you-go billing plan. A plan can be active and attached to an Azure subscription without
+carrying it, and carrying it is not the same as *covering an environment*: both the meter and the
+environment link must hold before Copilot Studio bills pay-as-you-go. Recorded in
+`docs/preflight/copilot-studio-payg-meter.md`; checked by
+`scripts/preflight/check-copilot-studio-meter.sh`.
+_Avoid_: message meter, Copilot Studio billing
+
 ## Build and test
 
 **Durable record** — the tracked documentation that outlives the **superseded requirements
@@ -214,6 +233,26 @@ log (`.git-loopy/logs/<iso>-<run_id>.log`) is the first place to look when the g
 it distinguishes "gate could not run" and "publish failed" from an actually-failing loop.
 
 ## Confirmed findings
+
+### Pay-as-you-go works on a Default environment, and the meter now covers it (confirmed 2026-08-12, issue #6)
+
+Microsoft documents pay-as-you-go for **production and sandbox** environments only, and this tenant
+has exactly one environment — `Default-0f87abfb…`, `environmentSku: Default`. Linking it to the
+Pay-as-you-go billing plan nevertheless returned **200**, so the undocumented case works and no
+second environment is needed.
+
+The plan already carried the Copilot Studio meter, but its only linked environment was
+`39bc9cf5-323a-e466-a0b6-8797aaeadf1e`, which the admin API reports as `EnvironmentNotFound` — a
+dangling reference to a deleted environment. A meter on a plan the Default environment is not linked
+to bills nothing and raises no rate limit, so **"a plan carries the meter" is not sufficient**; the
+environment link is a separate condition and is checked separately. The Default environment is now
+linked and the dangling reference removed.
+
+Consequence for the rehearsal: the generative-AI-message quota is **100 RPM / 2,000 RPH**. Before the
+link, pay-as-you-go was not in effect and that quota did not apply; which one did is not recorded,
+because prepaid message packs and Microsoft 365 Copilot entitlement each set their own and neither
+was read. 100 RPM is the documented entitlement, not a measured ceiling — measuring it needs a
+published Direct Line agent (#17).
 
 ### The Workflow is *not* tagged with a team identifier at build time (confirmed 2026-08-01, issue #9)
 
