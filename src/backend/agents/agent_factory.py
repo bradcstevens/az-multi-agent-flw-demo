@@ -128,21 +128,6 @@ class AgentFactory:
         user_responses = getattr(agent_obj, "user_responses", False)
         if use_toolbox:
             toolbox_filter = getattr(agent_obj, "toolbox_filter", None)
-            # Fallback: derive filter from agent name if the team config didn't
-            # supply one. Stops the agent from connecting to the base /mcp
-            # endpoint and pulling in cross-pack tools like generate_press_release.
-            if not toolbox_filter:
-                _NAME_TO_FILTER = {
-                    "ImageContentAgent": "image",
-                    "ImageGenerationAgent": "image",
-                }
-                toolbox_filter = _NAME_TO_FILTER.get(agent_obj.name)
-                if toolbox_filter:
-                    self.logger.warning(
-                        "Agent '%s' has use_toolbox=True but no toolbox_filter in team config; "
-                        "defaulting to filter='%s' based on agent name.",
-                        agent_obj.name, toolbox_filter,
-                    )
             mcp_config: Optional[MCPConfig] = MCPConfig.from_env(domain=toolbox_filter)
         else:
             mcp_config = None

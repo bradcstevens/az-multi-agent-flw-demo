@@ -59,7 +59,6 @@ param createdBy string = contains(deployer(), 'userPrincipalName')
     usageName: [
       'OpenAI.GlobalStandard.gpt-5.4, 150'
       'OpenAI.GlobalStandard.gpt-5.4-mini, 100'
-      'OpenAI.GlobalStandard.gpt-image-1.5, 5'
     ]
   }
 })
@@ -81,13 +80,6 @@ param gpt5_4ModelName string = 'gpt-5.4'
 param gpt5_4ModelVersion string = '2026-03-05'
 
 @minLength(1)
-@description('Optional. Name of the image-generation model to deploy. Defaults to gpt-image-1.5.')
-param gptImageModelName string = 'gpt-image-1.5'
-
-@description('Optional. Version of the image-generation model to deploy. Defaults to 2025-12-16.')
-param gptImageModelVersion string = '2025-12-16'
-
-@minLength(1)
 @allowed([
   'Standard'
   'GlobalStandard'
@@ -103,22 +95,11 @@ param deploymentType string = 'GlobalStandard'
 @description('Optional. GPT-5.4 model deployment type. Defaults to GlobalStandard.')
 param gpt5_4ModelDeploymentType string = 'GlobalStandard'
 
-@minLength(1)
-@allowed([
-  'Standard'
-  'GlobalStandard'
-])
-@description('Optional. GPT image model deployment type. Defaults to GlobalStandard.')
-param gptImageModelDeploymentType string = 'GlobalStandard'
-
 @description('Optional. AI model deployment token capacity. Defaults to 100 for optimal performance.')
 param gptDeploymentCapacity int = 100
 
 @description('Optional. AI model deployment token capacity. Defaults to 150 for optimal performance.')
 param gpt5_4ModelCapacity int = 150
-
-@description('Optional. gpt-image-1.5 deployment capacity (RPM). Defaults to 5 to support concurrent marketing-image generation across multiple sessions.')
-param gptImageModelCapacity int = 5
 
 @description('Optional. Version of the Azure OpenAI service to deploy. Defaults to 2024-12-01-preview.')
 param azureOpenaiAPIVersion string = '2024-12-01-preview'
@@ -308,18 +289,10 @@ var aiModelDeployments = [
     skuName: gpt5_4ModelDeploymentType
     skuCapacity: gpt5_4ModelCapacity
   }
-  {
-    deploymentName: gptImageModelName
-    modelName: gptImageModelName
-    modelVersion: gptImageModelVersion
-    skuName: gptImageModelDeploymentType
-    skuCapacity: gptImageModelCapacity
-  }
 ]
 var supportedModels = [
   gptModelName
   gpt5_4ModelName
-  gptImageModelName
 ]
 
 var containerAppName = 'ca-${solutionSuffix}'
@@ -1180,10 +1153,6 @@ module containerApp './modules/compute/container-app.bicep' = {
             value: gptModelName
           }
           {
-            name: 'AZURE_OPENAI_IMAGE_DEPLOYMENT'
-            value: gptImageModelName
-          }
-          {
             name: 'MCP_SERVER_ENDPOINT'
             value: 'https://${containerAppMcp.outputs.fqdn}/mcp'
           }
@@ -1328,10 +1297,6 @@ module containerAppMcp './modules/compute/container-app.bicep' = {
           {
             name: 'AZURE_OPENAI_ENDPOINT'
             value: 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/'
-          }
-          {
-            name: 'AZURE_OPENAI_IMAGE_DEPLOYMENT'
-            value: gptImageModelName
           }
           {
             name: 'AZURE_OPENAI_IMAGE_QUALITY'

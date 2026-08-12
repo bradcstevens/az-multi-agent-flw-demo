@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.45.15.27210",
-      "templateHash": "5431738948713519750"
+      "templateHash": "4623302700709077613"
     },
     "name": "Multi-Agent Custom Automation Engine - Vanilla Bicep",
     "description": "Vanilla Bicep orchestrator for the Multi-Agent Custom Automation Engine accelerator. This deployment intentionally excludes WAF features such as private networking, scale-out, redundancy, bastion, and VM resources while keeping router-compatible outputs."
@@ -74,8 +74,7 @@
           "type": "location",
           "usageName": [
             "OpenAI.GlobalStandard.gpt-5.4, 150",
-            "OpenAI.GlobalStandard.gpt-5.4-mini, 100",
-            "OpenAI.GlobalStandard.gpt-image-1.5, 5"
+            "OpenAI.GlobalStandard.gpt-5.4-mini, 100"
           ]
         },
         "description": "Required. Location for Azure AI Services and Azure AI Foundry resources."
@@ -145,40 +144,6 @@
       "minValue": 1,
       "metadata": {
         "description": "Optional. Capacity of the larger GPT model deployment."
-      }
-    },
-    "gptImageModelName": {
-      "type": "string",
-      "defaultValue": "gpt-image-1.5",
-      "minLength": 1,
-      "metadata": {
-        "description": "Optional. Name of the image-generation model to deploy. Defaults to gpt-image-1.5."
-      }
-    },
-    "gptImageModelVersion": {
-      "type": "string",
-      "defaultValue": "2025-12-16",
-      "metadata": {
-        "description": "Optional. Version of the image-generation model to deploy. Defaults to 2025-12-16."
-      }
-    },
-    "gptImageModelDeploymentType": {
-      "type": "string",
-      "defaultValue": "GlobalStandard",
-      "allowedValues": [
-        "Standard",
-        "GlobalStandard"
-      ],
-      "minLength": 1,
-      "metadata": {
-        "description": "Optional. GPT image model deployment type. Defaults to GlobalStandard."
-      }
-    },
-    "gptImageModelCapacity": {
-      "type": "int",
-      "defaultValue": 5,
-      "metadata": {
-        "description": "Optional. gpt-image-1.5 deployment capacity (RPM). Defaults to 5 to support concurrent marketing-image generation across multiple sessions."
       }
     },
     "embeddingModelName": {
@@ -423,12 +388,6 @@
         "capacity": "[parameters('gpt5_4ModelCapacity')]"
       },
       {
-        "name": "[parameters('gptImageModelName')]",
-        "version": "[parameters('gptImageModelVersion')]",
-        "skuName": "[parameters('gptImageModelDeploymentType')]",
-        "capacity": "[parameters('gptImageModelCapacity')]"
-      },
-      {
         "name": "[parameters('embeddingModelName')]",
         "version": "[parameters('embeddingModelVersion')]",
         "skuName": "[parameters('embeddingModelDeploymentType')]",
@@ -437,8 +396,7 @@
     ],
     "supportedModels": [
       "[parameters('gptModelName')]",
-      "[parameters('gpt5_4ModelName')]",
-      "[parameters('gptImageModelName')]"
+      "[parameters('gpt5_4ModelName')]"
     ],
     "cosmosDbResourceName": "[format('cosmos-{0}', variables('solutionSuffix'))]",
     "cosmosDbDatabaseName": "macae",
@@ -2861,10 +2819,6 @@
                     "value": "[parameters('gptModelName')]"
                   },
                   {
-                    "name": "AZURE_OPENAI_IMAGE_DEPLOYMENT",
-                    "value": "[parameters('gptImageModelName')]"
-                  },
-                  {
                     "name": "MCP_SERVER_ENDPOINT",
                     "value": "[format('https://{0}/mcp', reference(resourceId('Microsoft.Resources/deployments', take(format('module.mcp-container-app.{0}', variables('solutionSuffix')), 64)), '2025-04-01').outputs.fqdn.value)]"
                   },
@@ -3248,10 +3202,6 @@
                   {
                     "name": "AZURE_OPENAI_ENDPOINT",
                     "value": "[format('https://{0}.openai.azure.com/', variables('aiFoundryAiServicesResourceName'))]"
-                  },
-                  {
-                    "name": "AZURE_OPENAI_IMAGE_DEPLOYMENT",
-                    "value": "[parameters('gptImageModelName')]"
                   },
                   {
                     "name": "AZURE_OPENAI_IMAGE_QUALITY",

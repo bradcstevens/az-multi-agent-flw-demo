@@ -38,18 +38,6 @@
     "gpt5_4ModelCapacity": {
       "value": "${AZURE_ENV_MODEL_5_4_CAPACITY}"
     },
-    "gptImageModelName": {
-      "value": "${AZURE_ENV_IMAGE_MODEL_NAME}"
-    },
-    "gptImageModelVersion": {
-      "value": "${AZURE_ENV_IMAGE_MODEL_VERSION}"
-    },
-    "gptImageModelDeploymentType": {
-      "value": "${AZURE_ENV_IMAGE_MODEL_DEPLOYMENT_TYPE}"
-    },
-    "gptImageModelCapacity": {
-      "value": "${AZURE_ENV_IMAGE_MODEL_CAPACITY}"
-    },
     "enableTelemetry": {
       "value": "${AZURE_ENV_ENABLE_TELEMETRY}"
     },

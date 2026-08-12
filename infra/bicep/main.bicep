@@ -40,7 +40,6 @@ param searchServiceLocation string = location
     usageName: [
       'OpenAI.GlobalStandard.gpt-5.4, 150'
       'OpenAI.GlobalStandard.gpt-5.4-mini, 100'
-      'OpenAI.GlobalStandard.gpt-image-1.5, 5'
     ]
   }
 })
@@ -80,24 +79,6 @@ param gpt5_4ModelDeploymentType string = 'GlobalStandard'
 @minValue(1)
 @description('Optional. Capacity of the larger GPT model deployment.')
 param gpt5_4ModelCapacity int = 150
-
-@minLength(1)
-@description('Optional. Name of the image-generation model to deploy. Defaults to gpt-image-1.5.')
-param gptImageModelName string = 'gpt-image-1.5'
-
-@description('Optional. Version of the image-generation model to deploy. Defaults to 2025-12-16.')
-param gptImageModelVersion string = '2025-12-16'
-
-@minLength(1)
-@allowed([
-  'Standard'
-  'GlobalStandard'
-])
-@description('Optional. GPT image model deployment type. Defaults to GlobalStandard.')
-param gptImageModelDeploymentType string = 'GlobalStandard'
-
-@description('Optional. gpt-image-1.5 deployment capacity (RPM). Defaults to 5 to support concurrent marketing-image generation across multiple sessions.')
-param gptImageModelCapacity int = 5
 
 @description('Optional. Name of the embedding model deployed for guardrail similarity checks.')
 param embeddingModelName string = 'text-embedding-3-small'
@@ -242,12 +223,6 @@ var modelDeployments = [
     capacity: gpt5_4ModelCapacity
   }
   {
-    name: gptImageModelName
-    version: gptImageModelVersion
-    skuName: gptImageModelDeploymentType
-    capacity: gptImageModelCapacity
-  }
-  {
     name: embeddingModelName
     version: embeddingModelVersion
     skuName: embeddingModelDeploymentType
@@ -257,7 +232,6 @@ var modelDeployments = [
 var supportedModels = [
   gptModelName
   gpt5_4ModelName
-  gptImageModelName
 ]
 
 var cosmosDbResourceName = 'cosmos-${solutionSuffix}'
@@ -631,10 +605,6 @@ module backend_container_app './modules/compute/container-app.bicep' = {
             value: gptModelName
           }
           {
-            name: 'AZURE_OPENAI_IMAGE_DEPLOYMENT'
-            value: gptImageModelName
-          }
-          {
             name: 'MCP_SERVER_ENDPOINT'
             value: 'https://${mcp_container_app.outputs.fqdn}/mcp'
           }
@@ -775,10 +745,6 @@ module mcp_container_app './modules/compute/container-app.bicep' = {
           {
             name: 'AZURE_OPENAI_ENDPOINT'
             value: 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/'
-          }
-          {
-            name: 'AZURE_OPENAI_IMAGE_DEPLOYMENT'
-            value: gptImageModelName
           }
           {
             name: 'AZURE_OPENAI_IMAGE_QUALITY'

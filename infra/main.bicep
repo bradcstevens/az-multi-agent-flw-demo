@@ -58,7 +58,6 @@ param searchServiceLocation string = location
     usageName: [
       'OpenAI.GlobalStandard.gpt-5.4, 150'
       'OpenAI.GlobalStandard.gpt-5.4-mini, 100'
-      'OpenAI.GlobalStandard.gpt-image-1.5, 5'
     ]
   }
 })
@@ -103,24 +102,6 @@ param gpt5_4ModelDeploymentType string = 'GlobalStandard'
 @minValue(1)
 @description('Optional. Capacity of the larger GPT model deployment.')
 param gpt5_4ModelCapacity int = 150
-
-@minLength(1)
-@description('Optional. Name of the image-generation model to deploy. Defaults to gpt-image-1.5.')
-param gptImageModelName string = 'gpt-image-1.5'
-
-@description('Optional. Version of the image-generation model to deploy. Defaults to 2025-12-16.')
-param gptImageModelVersion string = '2025-12-16'
-
-@minLength(1)
-@allowed([
-  'Standard'
-  'GlobalStandard'
-])
-@description('Optional. GPT image model deployment type. Defaults to GlobalStandard.')
-param gptImageModelDeploymentType string = 'GlobalStandard'
-
-@description('Optional. gpt-image-1.5 deployment capacity (RPM). Defaults to 5 to support concurrent marketing-image generation across multiple sessions.')
-param gptImageModelCapacity int = 5
 
 @description('Optional. Name of the embedding model deployed for guardrail similarity checks.')
 param embeddingModelName string = 'text-embedding-3-small'
@@ -278,10 +259,6 @@ module avmDeployment './avm/main.bicep' = if (isAvm) {
     gpt5_4ModelDeploymentType: gpt5_4ModelDeploymentType
     gptDeploymentCapacity: gptDeploymentCapacity
     gpt5_4ModelCapacity: gpt5_4ModelCapacity
-    gptImageModelName: gptImageModelName
-    gptImageModelVersion: gptImageModelVersion
-    gptImageModelDeploymentType: gptImageModelDeploymentType
-    gptImageModelCapacity: gptImageModelCapacity
     backendContainerRegistryHostname: backendContainerRegistryHostname
     backendContainerImageName: backendContainerImageName
     backendContainerImageTag: backendContainerImageTag
@@ -332,10 +309,6 @@ module bicepDeployment './bicep/main.bicep' = if (isBicep) {
     gpt5_4ModelVersion: gpt5_4ModelVersion
     gpt5_4ModelDeploymentType: gpt5_4ModelDeploymentType
     gpt5_4ModelCapacity: gpt5_4ModelCapacity
-    gptImageModelName: gptImageModelName
-    gptImageModelVersion: gptImageModelVersion
-    gptImageModelDeploymentType: gptImageModelDeploymentType
-    gptImageModelCapacity: gptImageModelCapacity
     embeddingModelName: embeddingModelName
     embeddingModelVersion: embeddingModelVersion
     embeddingModelDeploymentType: embeddingModelDeploymentType
