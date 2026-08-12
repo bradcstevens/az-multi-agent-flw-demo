@@ -160,6 +160,16 @@ environment link must hold before Copilot Studio bills pay-as-you-go. Recorded i
 `scripts/preflight/check-copilot-studio-meter.sh`.
 _Avoid_: message meter, Copilot Studio billing
 
+**Dataverse System Administrator** — the Dataverse security role, held *inside* an environment, that
+lets environment-level settings (notably Dataverse search, #3) be changed. Distinct from Power
+Platform admin centre membership: a Global Administrator is not automatically granted it in the
+Default environment, and Dataverse itself refuses to assign it (`prvAssignRole`). The only route is
+**self-elevation** — `POST https://api.powerplatform.com/usermanagement/environments/{id}/user/applyAdminRole`
+— which elevates the *calling user* and so needs a user token carrying
+`UserManagement.Users.Apply`. Recorded in `docs/preflight/dataverse-admin-role.md`; checked by
+`scripts/preflight/check-dataverse-admin-role.sh`.
+_Avoid_: environment admin, Power Platform admin (a different, tenant-level thing)
+
 ## Build and test
 
 **Durable record** — the tracked documentation that outlives the **superseded requirements
@@ -233,6 +243,23 @@ log (`.git-loopy/logs/<iso>-<run_id>.log`) is the first place to look when the g
 it distinguishes "gate could not run" and "publish failed" from an actually-failing loop.
 
 ## Confirmed findings
+
+### Tenant admin does not imply Dataverse System Administrator (confirmed 2026-08-12, issue #2)
+
+The build account is a **Global Administrator** and still holds only `Basic User` and
+`Environment Maker` in the Default environment's Dataverse. Power Platform admins are no longer
+automatically granted System Administrator there, so admin centre membership is not evidence — the
+environment's own security-role list is, and it is a different API. Assigning the role from the
+Dataverse side is refused outright (`0x80040220`, missing `prvAssignRole`).
+
+The only route is Microsoft's self-elevation POST, `applyAdminRole` on the Power Platform API, which
+elevates the **calling user** and therefore needs a user token carrying
+`UserManagement.Users.Apply`. The Azure CLI is not pre-authorised for that scope, so the one-time
+consent is an interactive sign-in — the one step in this build an unattended run cannot complete.
+
+Consequence: **#3 (Dataverse search) is blocked until the consent is given**, and with it the
+#3 → #17 → #18 chain. The verification is re-runnable and the elevation is one command behind the
+consent; see `docs/preflight/dataverse-admin-role.md`.
 
 ### Pay-as-you-go works on a Default environment, and the meter now covers it (confirmed 2026-08-12, issue #6)
 
