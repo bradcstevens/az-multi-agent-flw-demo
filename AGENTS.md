@@ -28,7 +28,7 @@ on `PATH`. Set `DEV_VENV` to share one virtualenv across git worktrees.
 | Backend lint | `bash scripts/backend-lint.sh` | flake8 over `src/backend`, same config as `.github/workflows/pylint.yml`. |
 | Backend tests | `bash scripts/backend-tests.sh` | The Two-phase test invocation over `src/tests/backend` with an advisory 80% coverage report. |
 | MCP server tests | `bash scripts/mcp-tests.sh` | pytest over `src/tests/mcp_server` with MCP coverage; CI appends this coverage to the backend report. |
-| CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the helpers the loops and `test.yml` share, today the advisory coverage report. |
+| CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the repo's own tooling: the advisory coverage report the loops and `test.yml` share, and the `scripts/preflight/` checks. |
 
 Notes:
 
@@ -50,3 +50,14 @@ Notes:
   `.git-loopy/logs/<iso>-<run_id>.log`, distinguishes "gate could not run" (no runnable
   table) and "publish failed" (e.g. a dirty base worktree) from a loop that actually
   failed. Read it before assuming the loops are broken.
+
+## Preflight records
+
+Deployment preconditions that were verified before the build started are recorded under
+`docs/preflight/`, one file per verified precondition, each backed by a re-runnable check in
+`scripts/preflight/`. Read the record before assuming a subscription, tenant or environment
+capability — and re-run its script rather than re-deriving the finding by hand.
+
+| Record | Check |
+| --- | --- |
+| `docs/preflight/copilot-studio-data-policy-and-egress.md` | `scripts/preflight/check-copilot-studio-dlp.sh` |

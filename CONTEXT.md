@@ -85,7 +85,8 @@ Encoded in `scripts/backend-tests.sh`.
 
 **Feedback loop** — a `(name, command)` row of the `## Feedback loops` table in `AGENTS.md`. Four
 today: **Backend lint** (`scripts/backend-lint.sh`), **Backend tests** (`scripts/backend-tests.sh`),
-**MCP server tests** (`scripts/mcp-tests.sh`) and **CI-tooling tests** (`scripts/ci-tests.sh`). The
+**MCP server tests** (`scripts/mcp-tests.sh`) and **CI-tooling tests** (`scripts/ci-tests.sh`, which
+covers the repo's own tooling — the Advisory coverage report and the `scripts/preflight/` checks). The
 table is the single source of truth: agents run these before committing and the runner re-runs them
 after each merge as the integration gate, so a missing or unrunnable table makes every merge red.
 See [ADR-005](docs/ADR/005-declare-feedback-loops-in-agents-md.md).
@@ -98,6 +99,21 @@ It is deliberately not a gate: this build adds substantial demo scaffolding to t
 backend files and the coverage configuration counts test files toward the total, so a blocking gate
 would buy noise rather than confidence on a demo with this lifespan.
 _Avoid_: coverage gate, coverage threshold gate
+
+**Data policy** — the Power Platform tenant policy that classifies connectors into Business,
+Non-business or Blocked. Formerly, and still colloquially, "DLP". Three Copilot Studio connectors
+have to stay unblocked for this demo — `Direct Line channels in Copilot Studio`,
+`Chat without Microsoft Entra ID authentication in Copilot Studio` and
+`Knowledge source with documents in Copilot Studio` — and there has been no exemption route since
+early 2025, so a block is fatal rather than negotiable. Verified in
+[docs/preflight/copilot-studio-data-policy-and-egress.md](docs/preflight/copilot-studio-data-policy-and-egress.md).
+_Avoid_: DLP policy, connector policy
+
+**Preflight record** — a `docs/preflight/*.md` file recording a precondition that was verified
+before the build, each backed by a re-runnable check in `scripts/preflight/`. Distinct from a
+Feedback loop: a loop guards a change, a preflight guards an assumption about the tenant or
+subscription, and its verdict is point-in-time. Read the record rather than re-deriving it, and
+re-run the check rather than trusting the date on it.
 
 **Runner state** — `.git-loopy/` at the repo root holds the runner's event log, run summaries and
 diagnostics. The runner appends `.git-loopy/` to `.gitignore` itself when the entry is missing, and

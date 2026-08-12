@@ -14,9 +14,10 @@
 addopts = "-p pytest_asyncio"
 
 # Add src/ to sys.path so tests can import backend modules as
-# `from backend.xxx import ...` without runtime sys.path hacks. scripts/ joins it
-# so the CI-tooling suite can import the feedback loops' own helpers.
-pythonpath = ["src", "scripts"]
+# `from backend.xxx import ...` without runtime sys.path hacks. scripts/ and
+# scripts/preflight join it so the CI-tooling suite can import the feedback
+# loops' own helpers and the preflight checks.
+pythonpath = ["src", "scripts", "scripts/preflight"]
 
 markers = [
     "integration: marks tests as requiring a live Azure / Foundry environment (deselect with -m 'not integration')",
