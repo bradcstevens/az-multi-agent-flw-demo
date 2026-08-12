@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # CI-tooling tests feedback loop.
 #
-# Covers the helpers the other loops and .github/workflows/test.yml depend on —
-# the advisory coverage report — plus the invariants of the durable record (the
-# ADR index, the corrections to the superseded requirements document, and
-# documentation links). Kept separate from the backend and MCP suites because it
-# tests the repository's own tooling and documentation, not the application.
+# Covers the repo's own tooling: the helpers the other loops and
+# .github/workflows/test.yml depend on (the advisory coverage report), the
+# re-runnable preflight checks under scripts/preflight, and the invariants of
+# the durable record (the ADR index, the corrections to the superseded
+# requirements document, and documentation links). Kept separate from the
+# backend and MCP suites because it tests the repository's own tooling and
+# documentation, not the application.
 
 set -euo pipefail
 
