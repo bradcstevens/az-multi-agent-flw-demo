@@ -54,6 +54,34 @@ describe('parseSourceUsed', () => {
         expect(source!.citations).toEqual([]);
     });
 
+    it('keeps a citation the backend could not name, rather than reporting a miss', () => {
+        // `citations_from_activity` emits `name: ""` when a citation's
+        // appearance carries no name (src/backend/sop/citation.py). Dropping it
+        // turns a document that *was* returned into "found no matching
+        // procedure" — the panel reporting an honest miss that did not happen,
+        // which is the one thing it may never do.
+        const source = parseSourceUsed({
+            platform: 'Copilot Studio',
+            source: 'Dataverse',
+            agent_name: 'Store SOP Assistant',
+            citations: [{ position: 1, name: '', snippet: 'Close the tills, then…', url: null }],
+        });
+
+        expect(source!.citations).toHaveLength(1);
+        expect(source!.citations[0].name).toBe('');
+        expect(source!.citations[0].snippet).toBe('Close the tills, then…');
+    });
+
+    it('drops a citation carrying nothing at all, which is not a document', () => {
+        const source = parseSourceUsed({
+            platform: 'Copilot Studio',
+            source: 'Dataverse',
+            citations: [{ position: 1, name: '', snippet: '', url: null }],
+        });
+
+        expect(source!.citations).toEqual([]);
+    });
+
     it('refuses a payload that names no platform', () => {
         expect(
             parseSourceUsed({ source: 'Dataverse', agent_name: 'Store SOP Assistant' }),
@@ -102,6 +130,38 @@ describe('parseTokenUsage', () => {
                 total_tokens: undefined,
             }),
         ).toBeNull();
+    });
+
+    it('refuses on any single missing count, not only on all three at once', () => {
+        // Invalidating all three together would let a default on one of them
+        // hide behind the other two. Each is the whole reason to refuse.
+        const valid = {
+            agent_name: 'Troubleshooting Agent',
+            executor_id: 'troubleshooting_agent',
+            input_tokens: 1200,
+            output_tokens: 340,
+            total_tokens: 1540,
+        };
+
+        for (const field of ['input_tokens', 'output_tokens', 'total_tokens']) {
+            expect(parseTokenUsage({ ...valid, [field]: undefined })).toBeNull();
+            expect(parseTokenUsage({ ...valid, [field]: 'lots' })).toBeNull();
+        }
+    });
+
+    it('keeps a reported zero, which is a measurement and not an absence', () => {
+        // The counterpart to the rule above: a count nobody sent is refused,
+        // but a count the backend measured as zero is a fact and survives.
+        const usage = parseTokenUsage({
+            agent_name: 'Troubleshooting Agent',
+            executor_id: 'troubleshooting_agent',
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0,
+        });
+
+        expect(usage).not.toBeNull();
+        expect(usage!.totalTokens).toBe(0);
     });
 });
 

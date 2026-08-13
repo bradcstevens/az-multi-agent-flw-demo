@@ -19,7 +19,7 @@ import { isLane, LANE_LABELS } from "../../models/lane";
 import LaneBadge from "../lane/LaneBadge";
 import { NewTaskService } from "../../store/NewTaskService";
 import { useAppDispatch } from "@/store/hooks";
-import { refusalRecorded } from "@/store/slices/transparencySlice";
+import { refusalRecorded, requestStarted } from "@/store/slices/transparencySlice";
 
 import ChatInput from "@/commonComponents/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
@@ -108,6 +108,11 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
     if (input.trim()) {
       setSubmitting(true);
       setPolicyBlock(null);
+      // The Grounding panel's claim is about *this* answer (#24, R6), so the
+      // previous one goes dark before the next question is in flight. A
+      // question answered inside Foundry emits no source_used at all, and a
+      // stale panel would credit Copilot Studio with an answer it never gave.
+      dispatch(requestStarted());
       let id = showToast("Creating a plan", "progress");
 
       try {

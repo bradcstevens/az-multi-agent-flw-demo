@@ -78,6 +78,35 @@ const transparencySlice = createSlice({
         refusalRecorded(state, action: PayloadAction<PolicyBlock>) {
             state.meter = recordPolicyBlock(state.meter, action.payload);
         },
+        /**
+         * A new question was asked.
+         *
+         * The Grounding panel's claim is about **one answer** — *this* one left
+         * Foundry — so it goes dark the moment the next question is in flight.
+         * A troubleshooting question answered inside Foundry emits no
+         * `source_used` at all, and leaving the previous hop on screen would
+         * credit Copilot Studio on stage with an answer it never gave.
+         *
+         * Alerts survive: an alert answered no question, so a new question does
+         * not make it untrue. The meter survives because it is the
+         * walkthrough's running total, not this request's.
+         */
+        requestStarted(state) {
+            state.source = null;
+        },
+        /**
+         * A new conversation started.
+         *
+         * Everything scoped to the previous conversation goes — provenance and
+         * the alerts pushed into it — but **not** the meter. The refusal
+         * happens on the home surface and the answers happen on the plan
+         * surface, so a meter cleared at the conversation boundary would never
+         * show the guardrail's zero beside a row that cost something.
+         */
+        conversationStarted(state) {
+            state.source = null;
+            state.alerts = [];
+        },
         /** A new conversation, and every panel back to claiming nothing. */
         transparencyReset() {
             return { source: null, meter: emptyMeter(), alerts: [] };
@@ -90,6 +119,8 @@ export const {
     tokenUsageReceived,
     presenterAlertReceived,
     refusalRecorded,
+    requestStarted,
+    conversationStarted,
     transparencyReset,
 } = transparencySlice.actions;
 

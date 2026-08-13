@@ -24,6 +24,7 @@ import {
     resetStreaming,
 } from '@/store/slices/streamingSlice';
 import { setWsConnected } from '@/store/slices/appSlice';
+import { conversationStarted } from '@/store/slices/transparencySlice';
 
 /** Return type of dispatch(createAsyncThunk()) — has .abort() */
 type ThunkPromise = ReturnType<typeof fetchPlanData> extends (...args: any[]) => infer R ? R : never;
@@ -46,6 +47,12 @@ export function usePlanActions() {
         dispatch(resetChat());
         dispatch(resetStreaming());
         dispatch(setWsConnected(false));
+        // Provenance and alerts belong to the conversation that just ended
+        // (#24). The Token meter deliberately does not: it is the
+        // walkthrough's running total, and clearing it here would mean the
+        // guardrail's zero — recorded on the home surface — was never seen
+        // beside a row that cost something on the plan surface.
+        dispatch(conversationStarted());
     }, [dispatch]);
 
     /**

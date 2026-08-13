@@ -62,6 +62,41 @@ def test_the_workflow_triggers_on_a_frontend_change():
     )
 
 
+def test_the_contract_between_the_two_ends_is_asserted_somewhere():
+    # `transparency.test.ts` hand-writes the payloads it expects, so it cannot
+    # notice a rename on the backend. `test_transparency_contract.py` is what
+    # spans that seam.
+    contract = Path(__file__).with_name("test_transparency_contract.py")
+
+    assert contract.exists(), (
+        "nothing asserts that the backend's transparency payloads and the "
+        "browser's parsers still agree"
+    )
+
+
+def test_a_change_to_either_end_of_the_contract_runs_the_contract_test():
+    # The contract test runs in `test.yml`, which triggers on Python paths — so
+    # a backend rename runs it. A *frontend* rename would not have, because
+    # `frontend-tests.yml` runs vitest alone and vitest cannot see the backend.
+    # These two files are therefore named in `test.yml` explicitly, and only
+    # these two: widening it to `src/App/**` would run the backend suite for a
+    # CSS edit, which is the reason the two workflows are separate at all.
+    text = (REPO_ROOT / ".github" / "workflows" / "test.yml").read_text(
+        encoding="utf-8"
+    )
+
+    for path in ("src/App/src/models/transparency.ts", "src/App/src/models/enums.tsx"):
+        assert text.count(f"'{path}'") >= 2, (
+            f"a change to {path} does not run the transparency contract test on "
+            "both push and pull_request"
+        )
+
+    assert "'src/App/**'" not in text, (
+        "test.yml triggers on the whole frontend — a CSS edit now runs the "
+        "backend suite"
+    )
+
+
 def test_the_frontend_tests_are_a_declared_feedback_loop():
     assert LOOP.exists(), "there is no frontend tests loop script"
     assert RUN_TESTS in LOOP.read_text(encoding="utf-8"), (

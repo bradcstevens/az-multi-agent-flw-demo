@@ -32,6 +32,35 @@ Parsing happens **at the reducer** rather than in the subscription. It puts the 
 backend-payload-to-panel contract behind a plain function call — no store provider, no rendered
 page, no socket — and it means an unreadable payload is dropped in exactly one place.
 
+## Three scopes, and why the meter is not one of them
+
+The panels do not all belong to the same span of time, and treating them as if they did is how a
+surface ends up saying something that is not so:
+
+| State | Scope | Cleared by |
+| --- | --- | --- |
+| `source` | **One answer** | `requestStarted` — `HomeInput.handleSubmit` and `PlanPage.handleOnchatSubmit` |
+| `alerts` | **One conversation** | `conversationStarted` — the `planId` effect, and `resetPlanVariables` |
+| `meter` | **The whole walkthrough** | nothing but `transparencyReset` |
+
+The Grounding panel is the one that matters. Only the SOP hop emits `source_used`; a troubleshooting
+question answered inside Foundry emits nothing at all. So a panel that simply held its last value
+would still be showing `Copilot Studio → Dataverse` beside an answer that never left Foundry —
+crediting Copilot Studio on screen with an answer it did not give, which is the same lie as emitting
+for a failed reply, told from the other end.
+
+The meter is deliberately the exception. The refusal is recorded on the home surface and the costed
+answers arrive on the plan surface, so a meter cleared at the conversation boundary would never show
+the guardrail's zero beside a row that cost something — which is the entire comparison R7 exists to
+make.
+
+Both clearing points are dispatched from more than one place, because there is more than one way to
+start each. A question is started by `HomeInput.handleSubmit` (which Quick Tasks route through, so
+they need nothing of their own) **and** by `PlanPage.handleOnchatSubmit`, the clarification path — a
+follow-up produces a new answer just as much as a first question does. A conversation is started by
+the `planId` effect and not only by `resetPlanVariables`, which runs on the no-planId error path
+alone: wiring the reset there and nowhere else would have left it firing almost never.
+
 ## Grounding panel
 
 Leads with the **platform**, not the document. The claim R6 exists to make is that *this one answer
@@ -53,6 +82,13 @@ Three states, and the differences between them are the point:
 A **Policy block** never reaches this panel. A refusal is not a retrieval miss — it is a refused
 request, rendered where the question was asked (`HomeInput`), and ADR-014 exists to keep the two
 apart.
+
+A citation the backend could not **name** is rendered, labelled `Unnamed document`, rather than
+dropped. `citations_from_activity` emits `name: ""` when the appearance metadata carries none, and
+discarding it empties the citation list — which the panel renders as the *uncited* state, printing
+"found no matching procedure" about a document that did come back. That is the honest miss reported
+for a miss that did not happen, and it is the miss branch's one way of lying. Only a citation with
+neither a name nor a snippet is dropped: there is nothing there to render.
 
 ## Token meter
 
@@ -104,6 +140,10 @@ The chord is **Ctrl + Alt + Shift + A**, matched on `event.code` rather than `ev
 held, several keyboard layouts compose a different character, and a chord that only works on US
 English is a chord that fails on the borrowed laptop. Three modifiers, so it cannot be produced by
 typing a question, and `metaKey` must be up so it never fires under an operating-system combination.
+**AltGraph** must be up for the mirror-image reason — on Windows and several European layouts AltGr
+*is* Ctrl+Alt, so Shift+AltGr+A while typing a question would otherwise fire it mid-sentence — and
+an **auto-repeat is not a press**, or holding the chord POSTs one alert per repeat interval and the
+beat becomes a stack of identical cards.
 
 It is a **global** listener, which is the one place this codebase departs from its own inline
 `onKeyDown` convention — the chord has to work while focus is anywhere, including nowhere, and an
@@ -123,7 +163,7 @@ plan page would mean the guardrail's zero was never seen beside a row that cost 
 ## The first frontend tests
 
 vitest, React Testing Library and jsdom were fully configured in the accelerator baseline, with **no
-test file and no workflow**. There are now 75 tests, and the wiring that runs them:
+test file and no workflow**. There are now 88 tests, and the wiring that runs them:
 
 - `npm run test:run` — `vitest run`, never a bare `vitest`, which watches.
 - `bash scripts/frontend-tests.sh` — the feedback loop, declared in `AGENTS.md`.
@@ -132,8 +172,28 @@ test file and no workflow**. There are now 75 tests, and the wiring that runs th
 - `src/tests/ci/test_frontend_ci_wiring.py` — fails if any of the above is quietly disconnected.
 
 The suite that matters most is `transparencySlice.test.ts`: every payload in it is what
-`send_status_update_async` actually puts on the wire, so it fails if the backend's payloads and the
-frontend's reading of them ever drift apart.
+`send_status_update_async` actually puts on the wire.
+
+But it hand-writes those payloads, so **it cannot notice a rename on the backend** — a field renamed
+in `payloads.py` leaves all 88 vitest tests green and the panel silently dark. That seam is spanned
+from the Python side, by `src/tests/ci/test_transparency_contract.py`, which **imports** the backend
+dataclasses and asserts the browser's parsers read every field they carry, that the citation keys
+`/sop/ask` builds are all read, and that the three `WebsocketMessageType` wire strings are identical
+at both ends.
+
+Three details make it an assertion rather than a formality. Comments are **stripped** before
+scanning, or a field named only in prose would satisfy a check nothing satisfies in code. Each check
+is scoped to **one parser's body**, because the payloads share field names — `agent_name` is read by
+two — so a whole-file search reports a field as read after the parser that needs it stopped reading
+it. And the citation keys are read back out of `router.py` rather than listed in the test, because a
+list written down in a test is a list that agrees with itself forever.
+
+It runs on both sides of the seam: `test.yml` triggers on Python paths, and names
+`transparency.ts` and `enums.tsx` explicitly — just those two, since widening it to `src/App/**`
+would run the backend suite for a CSS edit, which is why the two workflows are separate at all.
+Mutation-checked: renaming `conversation_id` on `SourceUsed`, changing `SOURCE_USED`'s value,
+renaming a citation key in the route, dropping `agent_name` from one parser while the other keeps
+it, and defaulting a count with `|| 0` each turn it red.
 
 ## Not verified live
 

@@ -16,6 +16,13 @@ on:
       - 'scripts/**'
       - '.github/requirements.txt'
       - '.github/workflows/test.yml'
+      # The frontend's half of the transparency contract (#24). Only these two
+      # files, not all of `src/App/**`: a CSS edit must not run the backend
+      # suite, but a rename in the parsers or the message-type enum has to run
+      # `test_transparency_contract.py`, which is the only thing that spans the
+      # socket. The vitest suite hand-writes its payloads and cannot notice.
+      - 'src/App/src/models/transparency.ts'
+      - 'src/App/src/models/enums.tsx'
   pull_request:
     types:
       - opened
@@ -36,6 +43,13 @@ on:
       - '.github/requirements.txt'
       - 'src/**/pyproject.toml'
       - '.github/workflows/test.yml'
+      # The frontend's half of the transparency contract (#24). Only these two
+      # files, not all of `src/App/**`: a CSS edit must not run the backend
+      # suite, but a rename in the parsers or the message-type enum has to run
+      # `test_transparency_contract.py`, which is the only thing that spans the
+      # socket. The vitest suite hand-writes its payloads and cannot notice.
+      - 'src/App/src/models/transparency.ts'
+      - 'src/App/src/models/enums.tsx'
 
 permissions:
   contents: read

@@ -68,17 +68,28 @@ const asText = (value: unknown): string => (typeof value === 'string' ? value : 
 const asCount = (value: unknown): number | null =>
     typeof value === 'number' && Number.isFinite(value) ? value : null;
 
+/**
+ * One cited document, or null if it carries nothing to show.
+ *
+ * A citation with **no name** is kept. `citations_from_activity` emits
+ * `name: ""` when the appearance metadata has none, and discarding it would
+ * empty the citation list — which the panel renders as *found no matching
+ * procedure*. That converts a document the hop actually returned into an honest
+ * miss that did not happen. Only a citation with neither a name nor a snippet
+ * is dropped: there is nothing there to render, and nothing is what it gets.
+ */
 const parseCitation = (value: unknown, index: number): SourceCitation | null => {
     const raw = asRecord(value);
     if (!raw) return null;
 
     const name = asText(raw.name);
-    if (!name) return null;
+    const snippet = asText(raw.snippet);
+    if (!name && !snippet) return null;
 
     return {
         position: asCount(raw.position) ?? index + 1,
         name,
-        snippet: asText(raw.snippet),
+        snippet,
         url: typeof raw.url === 'string' && raw.url ? raw.url : null,
     };
 };

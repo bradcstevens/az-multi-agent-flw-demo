@@ -268,6 +268,15 @@ uncited (the honest miss, rendered explicitly rather than as an empty panel), an
 which it describes itself and asserts nothing — it does not say the answer came from Foundry,
 because nobody told it that and a swallowed push looks the same from here.
 
+The panel is **scoped to one answer** and goes dark the moment the next question is submitted
+(`requestStarted`, #24). A question answered inside Foundry emits no `source_used` at all, so a
+panel that persisted would credit Copilot Studio on stage with an answer it never gave — the same
+lie in a different direction from emitting for a failed reply. A citation the backend could not
+**name** is still rendered, labelled `Unnamed document`: `citations_from_activity` emits `name: ""`
+when the appearance metadata has none, and dropping it would empty the list and print the *uncited*
+copy, reporting an honest miss that did not happen. Only a citation with neither a name nor a
+snippet is dropped, because there is nothing there to render.
+
 **Source used** — the server-side half of that pair, emitted as `WebsocketMessageType.SOURCE_USED`
 from the `/sop/ask` bridge once the Direct Line reply is in hand (#23). Built by
 `transparency.source.source_used`, which carries `platform`, `source`, `agent_name`,
@@ -328,11 +337,18 @@ a name from a rehearsed roster in `transparency.alert` and there is no parameter
 
 **Presenter chord** — the client half: **Ctrl + Alt + Shift + A**, matched on `event.code` and not
 `event.key` (with Alt held, several layouts compose a different character, and a chord that only
-works on US English fails on the borrowed laptop), with `metaKey` required *up*. A **global**
-listener — the one place this codebase departs from its inline `onKeyDown` convention, because the
-chord must work while focus is anywhere. It POSTs an **empty body**; the words and the recipient are
-both the server's. The alert renders as visibly a different object from a reply (`role="alert"`, its
-own badge), because an alert mistaken for an answer is worse than no alert.
+works on US English fails on the borrowed laptop), with `metaKey` required *up*. **AltGraph** must
+be up too: on Windows and several European layouts AltGr *is* reported as Ctrl+Alt, so without that
+guard a presenter typing an accented character into the question box fires the chord mid-sentence.
+An **auto-repeat** is not a press — holding the chord a beat too long would otherwise POST an alert
+every repeat interval, and a stack of identical cards reads as a bug rather than a beat. A
+**global** listener — the one place this codebase departs from its inline `onKeyDown` convention,
+because the chord must work while focus is anywhere. It POSTs an **empty body**; the words and the
+recipient are both the server's. The alert renders as visibly a different object from a reply
+(`role="alert"`, its own badge), because an alert mistaken for an answer is worse than no alert.
+Alerts survive a new question — an alert answered none, so a new one does not make it untrue — and
+clear at the **conversation** boundary (`conversationStarted`), which the meter deliberately
+survives.
 
 **Out-of-band recipient** — how a push that no WebSocket asked for finds its socket.
 `ConnectionConfig.sole_user()` returns the connected user when there is **exactly one**, and `None`

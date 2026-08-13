@@ -15,7 +15,14 @@
  *
  * `metaKey` must be **up**: Cmd-shaped combinations belong to the operating
  * system, and a chord that also fires under Cmd is a chord that fires while the
- * presenter is doing something else.
+ * presenter is doing something else. `AltGraph` must be up for the mirror-image
+ * reason: on Windows and several European layouts AltGr *is* reported as
+ * Ctrl+Alt, so without this a presenter typing an ordinary accented character
+ * into the question box fires the chord mid-sentence.
+ *
+ * An **auto-repeat** is not a press. Holding the chord a beat too long would
+ * otherwise POST an alert every repeat interval, and a stack of identical cards
+ * on stage reads as a bug rather than a beat.
  */
 
 const CHORD_CODE = 'KeyA';
@@ -29,6 +36,8 @@ export function isPresenterChord(event: KeyboardEvent): boolean {
         event.ctrlKey &&
         event.altKey &&
         event.shiftKey &&
-        !event.metaKey
+        !event.metaKey &&
+        !event.repeat &&
+        !event.getModifierState?.('AltGraph')
     );
 }

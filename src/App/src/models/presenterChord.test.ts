@@ -9,6 +9,8 @@ const chord = (over: Partial<KeyboardEvent> = {}) =>
         altKey: true,
         shiftKey: true,
         metaKey: false,
+        repeat: false,
+        getModifierState: () => false,
         ...over,
     }) as KeyboardEvent;
 
@@ -40,6 +42,23 @@ describe('the presenter chord', () => {
         // is not what is matched — a chord that works only on US English is a
         // chord that fails on the borrowed laptop.
         expect(isPresenterChord(chord({ key: 'å' } as Partial<KeyboardEvent>))).toBe(true);
+    });
+
+    it('fires once per press, not once per auto-repeat', () => {
+        // Holding the chord a beat too long would otherwise POST a stream of
+        // alerts, and a stack of identical cards on stage reads as a bug.
+        expect(isPresenterChord(chord({ repeat: true }))).toBe(false);
+    });
+
+    it('does not fire under AltGr, which many layouts report as Ctrl+Alt', () => {
+        // On Windows and several European layouts AltGr sets both ctrlKey and
+        // altKey, so Shift+AltGr+A while typing a question would otherwise fire
+        // the chord mid-sentence.
+        expect(
+            isPresenterChord(
+                chord({ getModifierState: (key: string) => key === 'AltGraph' } as Partial<KeyboardEvent>),
+            ),
+        ).toBe(false);
     });
 
     it('has a label the presenter can be told, and the audience is not', () => {

@@ -88,12 +88,20 @@ const GroundingPanel: React.FC<GroundingPanelProps> = ({ source }) => (
                     </Caption1>
                 ) : (
                     <ul className="grounding-panel__citations" data-testid="grounding-citations">
-                        {source.citations.map((citation) => (
+                        {source.citations.map((citation, index) => (
                             <li
-                                key={`${citation.position}-${citation.name}`}
+                                key={`${citation.position}-${citation.name}-${index}`}
                                 className="grounding-panel__citation"
                             >
-                                <Caption1Strong>{citation.name}</Caption1Strong>
+                                <Caption1Strong>
+                                    {/*
+                                      A citation the backend could not name is
+                                      still a document that came back. Labelling
+                                      it for what it is keeps it out of the miss
+                                      branch without inventing a title for it.
+                                    */}
+                                    {citation.name || 'Unnamed document'}
+                                </Caption1Strong>
                                 {citation.snippet && <Caption1>{citation.snippet}</Caption1>}
                             </li>
                         ))}

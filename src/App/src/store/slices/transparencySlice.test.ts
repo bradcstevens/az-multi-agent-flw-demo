@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
 import reducer, {
+    conversationStarted,
     presenterAlertReceived,
     refusalRecorded,
+    requestStarted,
     sourceUsedReceived,
     tokenUsageReceived,
     transparencyReset,
@@ -117,6 +119,41 @@ describe('the transparency slice', () => {
         state = reducer(state, transparencyReset());
 
         expect(state).toEqual(initial());
+    });
+
+    it('takes the Grounding panel dark when the next question is asked', () => {
+        // The panel's claim is about *one answer*. A troubleshooting question
+        // answered inside Foundry emits no source_used at all, so leaving the
+        // previous SOP hop on screen credits Copilot Studio with an answer it
+        // never gave — the exact lie the whole feature is shaped to refuse.
+        let state = reducer(initial(), sourceUsedReceived(sourceUsed));
+        state = reducer(state, tokenUsageReceived(tokenUsage));
+
+        state = reducer(state, requestStarted());
+
+        expect(state.source).toBeNull();
+        // The meter is the walkthrough's running total and survives.
+        expect(state.meter.rows).toHaveLength(2);
+    });
+
+    it('keeps alerts up across a request, because an alert answered no question', () => {
+        let state = reducer(initial(), presenterAlertReceived(alert));
+
+        state = reducer(state, requestStarted());
+
+        expect(state.alerts).toHaveLength(1);
+    });
+
+    it('clears provenance and alerts on a new conversation, and keeps the meter', () => {
+        let state = reducer(initial(), sourceUsedReceived(sourceUsed));
+        state = reducer(state, tokenUsageReceived(tokenUsage));
+        state = reducer(state, presenterAlertReceived(alert));
+
+        state = reducer(state, conversationStarted());
+
+        expect(state.source).toBeNull();
+        expect(state.alerts).toEqual([]);
+        expect(state.meter.rows).toHaveLength(2);
     });
 
     it('keeps the meter when only the conversation moved on', () => {

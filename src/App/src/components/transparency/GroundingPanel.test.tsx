@@ -66,6 +66,23 @@ describe('the Grounding panel', () => {
         expect(screen.getByTestId('grounding-miss')).toHaveTextContent(/no matching/i);
     });
 
+    it('renders a document the backend could not name without calling it a miss', () => {
+        const unnamed = parseSourceUsed({
+            platform: 'Copilot Studio',
+            source: 'Dataverse',
+            agent_name: 'Store SOP Assistant',
+            citations: [{ position: 1, name: '', snippet: 'Cash up the tills…', url: null }],
+        });
+
+        render(<GroundingPanel source={unnamed} />);
+
+        // A document came back. Saying "no matching procedure" here would be
+        // the panel reporting an honest miss that never happened.
+        expect(screen.queryByTestId('grounding-miss')).not.toBeInTheDocument();
+        expect(screen.getByText(/Cash up the tills/)).toBeInTheDocument();
+        expect(screen.getByTestId('grounding-citations')).toHaveTextContent(/unnamed document/i);
+    });
+
     it('claims nothing at all before a signal arrives', () => {
         render(<GroundingPanel source={null} />);
 

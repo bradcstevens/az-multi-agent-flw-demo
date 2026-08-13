@@ -63,6 +63,7 @@ import { usePlanActions } from '../hooks/usePlanActions';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { usePlanCancellationAlert } from '../hooks/usePlanCancellationAlert';
 import { useTransparencySignals } from '../hooks/useTransparencySignals';
+import { conversationStarted, requestStarted } from '../store/slices/transparencySlice';
 import { usePresenterChord } from '../hooks/usePresenterChord';
 
 /* ── Components ──────────────────────────────────────────────── */
@@ -315,6 +316,11 @@ const PlanPage: React.FC = () => {
             }
             dispatch(setInput(''));
             if (!planData?.plan) return;
+            // A clarification produces a new answer, so the previous answer's
+            // provenance goes dark (#24). A Foundry-only follow-up emits no
+            // replacement `source_used`, and a panel left up would attribute it
+            // to Copilot Studio.
+            dispatch(requestStarted());
             dispatch(setSubmittingChatDisableInput(true));
             const id = showToast('Submitting clarification', 'progress');
             try {
@@ -388,6 +394,15 @@ const PlanPage: React.FC = () => {
 
     /* ── Initial plan load ──────────────────────────────────── */
     useEffect(() => {
+        // A different plan is a different conversation, so the provenance and
+        // the alerts pushed into the previous one go (#24). Dispatched here
+        // rather than only inside `resetPlanVariables`, which runs on the
+        // no-planId error path alone and so would leave a stale Grounding
+        // panel and old alerts on screen for every ordinary navigation. It is
+        // safe at this point: any signal for *this* plan arrives later, over a
+        // socket that has not connected yet.
+        dispatch(conversationStarted());
+
         if (!planId) {
             resetPlanVariables();
             dispatch(setErrorLoading(true));

@@ -101,3 +101,36 @@ describe('the plan surface with Plan review off', () => {
         expect(screen.getByText('SOP-102 Store Closing Procedure.docx')).toBeInTheDocument();
     });
 });
+
+describe('the plan surface on the deliberate lane', () => {
+    // Removing the early return was meant to stop the Fast lane rendering "No
+    // plan available" — not to change the lane that *does* have a plan to
+    // review. These pin the path the escalation beat depends on (#22).
+    const approvalRequest = {
+        steps: [
+            { action: 'Confirm the fault:', agent: 'TroubleshootingAgent' },
+            { action: 'Raise a service ticket', agent: 'EscalationAgent' },
+        ],
+        team: { agents: [] },
+    } as any;
+
+    it('renders the plan steps a presenter has to approve', () => {
+        renderPanel(makeStore(), approvalRequest);
+
+        expect(screen.queryByText(/No plan to review/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/Raise a service ticket/)).toBeInTheDocument();
+    });
+
+    it('promises a plan only while one is actually coming', () => {
+        renderPanel(makeStore(), { steps: [], team: { agents: [] } } as any);
+
+        expect(screen.getByText(/Plan is being generated/i)).toBeInTheDocument();
+    });
+
+    it('still shows the roster and the rail beside the plan', () => {
+        renderPanel(makeStore(), approvalRequest);
+
+        expect(screen.getByTestId('agent-team-member-ShiftTasksAgent')).toBeInTheDocument();
+        expect(screen.getByTestId('transparency-rail')).toBeInTheDocument();
+    });
+});
