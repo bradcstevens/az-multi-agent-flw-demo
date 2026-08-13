@@ -253,6 +253,11 @@ class InputTask(BaseModel):
     """Message representing the initial input task from the user."""
     session_id: str
     description: str
+    # Plan review, per request rather than per build (ADR-013). ``True`` is the
+    # Deliberate lane and the default, so a request that declares nothing keeps
+    # the approval gate — the lane router fails open to Deliberate, and losing
+    # the gate by omission is the one outcome that design must not allow.
+    plan_review: bool = True
 
 
 class UserLanguage(BaseModel):

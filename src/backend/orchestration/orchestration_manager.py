@@ -84,10 +84,13 @@ class OrchestrationManager:
         team_config: TeamConfiguration,
         memory_store: DatabaseBase,
         user_id: str | None = None,
+        plan_review: bool = True,
     ):
         """
         Initialize a Magentic workflow using MagenticBuilder with:
-          - enable_plan_review=True for framework-native plan approval
+          - enable_plan_review per request — on for the Deliberate lane, off for
+            the Fast lane (ADR-013). Defaults to on, so a caller that says
+            nothing gets the approval gate rather than losing it by omission.
           - Prompt customizations from get_magentic_prompt_kwargs()
           - FoundryChatClient as the underlying chat client
           - Event-based callbacks for streaming and final responses
@@ -163,8 +166,8 @@ class OrchestrationManager:
 
         cls.logger.info(
             "Building MagenticBuilder for user '%s' with max_rounds=%d, "
-            "enable_plan_review=True, has_user_responses=%s",
-            user_id, orchestration_config.max_rounds, has_user_responses,
+            "enable_plan_review=%s, has_user_responses=%s",
+            user_id, orchestration_config.max_rounds, plan_review, has_user_responses,
         )
 
         # Build participant list (unwrap AgentTemplate._agent)
@@ -179,6 +182,8 @@ class OrchestrationManager:
 
         # MagenticBuilder config:
         #   enable_plan_review=True  → emits request_info events with MagenticPlanReviewRequest
+        #   enable_plan_review=False → the Fast lane: no plan is generated and
+        #                              nothing is approved
         #   intermediate_outputs=True → streams AgentResponseUpdate per token
         #   Both request_info event types (plan review + function_approval_request)
         #   pause the workflow in IDLE_WITH_PENDING_REQUESTS until responses are provided.
@@ -190,13 +195,13 @@ class OrchestrationManager:
             max_stall_count=5,
             checkpoint_storage=storage,
             output_from="all",
-            enable_plan_review=True,
+            enable_plan_review=plan_review,
             **prompt_kwargs,
         ).build()
 
         cls.logger.info(
-            "Built Magentic workflow with %d participants (plan review enabled)",
-            len(participant_list),
+            "Built Magentic workflow with %d participants (plan review %s)",
+            len(participant_list), "enabled" if plan_review else "disabled",
         )
 
         # Attach context needed for the pre-planning team-scope gate
@@ -205,6 +210,13 @@ class OrchestrationManager:
         # without rebuilding a chat client.
         workflow._team_config = team_config
         workflow._manager_chat_client = manager_chat_client
+
+        # Tags the two cache predicates read back off a cached Workflow — the
+        # Full workflow rebuild predicate below and the cache-invalidation
+        # predicate in api/router.py. Both were already reading _team_id;
+        # nothing assigned it, so every request rebuilt the whole agent pool.
+        workflow._team_id = getattr(team_config, "team_id", None)
+        workflow._plan_review = plan_review
 
         return workflow
 
@@ -218,11 +230,14 @@ class OrchestrationManager:
         team_config: TeamConfiguration,
         team_switched: bool,
         team_service: Optional[TeamService] = None,
+        plan_review: bool = True,
     ):
         """
         Return an existing workflow for the user or create a new one if:
           - None exists
           - Team switched flag is True
+          - The cached workflow was built for the other lane, i.e. with a
+            different plan_review value (ADR-013)
 
         When a previous workflow has completed (_terminated), we reuse the
         existing agent pool and only rebuild the workflow shell (Option 3).
@@ -241,16 +256,30 @@ class OrchestrationManager:
             current is not None and current_team_id != team_config.team_id
         )
 
-        cls.logger.info(
-            "get_current_or_new_orchestration: user='%s' selected_team='%s' "
-            "cached_team='%s' team_switched=%s team_changed=%s current_is_none=%s",
-            user_id, team_config.team_id, current_team_id,
-            team_switched, team_changed, current is None,
+        # Detect a cached orchestration built for the other lane. The
+        # team-initialisation endpoint eagerly builds a workflow before any task
+        # is submitted, so without this the first request after a page load
+        # reuses that workflow and silently ignores the per-request value.
+        current_plan_review = getattr(current, "_plan_review", None)
+        plan_review_changed = (
+            current is not None and current_plan_review != plan_review
         )
 
-        # Full rebuild: no workflow exists, team explicitly switched, or the
-        # cached workflow belongs to a different team than the selected one.
-        needs_full_rebuild = current is None or team_switched or team_changed
+        cls.logger.info(
+            "get_current_or_new_orchestration: user='%s' selected_team='%s' "
+            "cached_team='%s' team_switched=%s team_changed=%s current_is_none=%s "
+            "plan_review=%s cached_plan_review=%s plan_review_changed=%s",
+            user_id, team_config.team_id, current_team_id,
+            team_switched, team_changed, current is None,
+            plan_review, current_plan_review, plan_review_changed,
+        )
+
+        # Full rebuild: no workflow exists, team explicitly switched, the cached
+        # workflow belongs to a different team than the selected one, or it was
+        # built for the other lane.
+        needs_full_rebuild = (
+            current is None or team_switched or team_changed or plan_review_changed
+        )
 
         # Lightweight reset: workflow finished but agents are still valid for the
         # same team (a team change always routes to full rebuild above so we
@@ -298,7 +327,8 @@ class OrchestrationManager:
                 cls.logger.info("Initializing new orchestration for user '%s'", user_id)
                 orchestration_config.orchestrations[user_id] = (
                     await cls.init_orchestration(
-                        agents, team_config, memory_ctx, user_id
+                        agents, team_config, memory_ctx, user_id,
+                        plan_review=plan_review,
                     )
                 )
             except Exception as e:
@@ -333,6 +363,7 @@ class OrchestrationManager:
                     await cls.init_orchestration(
                         reusable_agents, team_config,
                         reset_memory_ctx, user_id,
+                        plan_review=plan_review,
                     )
                 )
             except Exception as e:

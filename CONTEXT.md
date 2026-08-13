@@ -23,30 +23,38 @@ concrete home in the code, the file is named.
 **Workflow** — the Magentic workflow object built by
 `OrchestrationManager.init_orchestration` (`src/backend/orchestration/orchestration_manager.py`). It
 holds the participant agents and the manager chat client. Built per user and cached; it is *not* a
-per-request object. At build time it is tagged with `_team_config` and `_manager_chat_client`, and
-nothing else.
+per-request object. At build time it is tagged with `_team_config`, `_manager_chat_client`,
+`_team_id` and `_plan_review`.
 
 **Workflow cache** — `orchestration_config.orchestrations`, a process-local dictionary keyed by
 **user identifier alone**. Because it is process-local and in-memory, the application must run as a
 single replica.
 
-**Team tag** — the notional `_team_id` attribute on a Workflow, read in two places to decide whether
+**Team tag** — the `_team_id` attribute on a Workflow, read in two places to decide whether
 the cached Workflow belongs to the currently selected team:
-`orchestration_manager.get_current_or_new_orchestration` and `api/router.py`.
-**It is never assigned.** See *Confirmed findings* below.
+`orchestration_manager.get_current_or_new_orchestration` and `api/router.py`. Assigned at build
+time since #15; before that it was never assigned, which made every request a Full workflow
+rebuild. See *Confirmed findings* below.
+
+**Plan review tag** — the `_plan_review` attribute on a Workflow, recording which **Lane** it was
+built for. Read alongside the **Team tag** by the same two predicates, because a Workflow built for
+one lane must not serve a request for the other.
 
 **Full workflow rebuild** — the `needs_full_rebuild` branch of
 `get_current_or_new_orchestration`: closes every cached agent, then runs `AgentFactory.get_agents`
-and `init_orchestration` from scratch. This is the expensive path and, today, the *only* path.
+and `init_orchestration` from scratch. Taken when no Workflow is cached, on an explicit team switch,
+on a **Team tag** mismatch or on a **Plan review tag** mismatch — so a lane change costs a rebuild.
 
 **Lightweight workflow reset** — the `needs_workflow_reset` branch: rebuilds only the workflow shell
-and reuses the existing agent pool. Currently unreachable in production.
+and reuses the existing agent pool. Reachable in production since #15 assigned the **Team tag**;
+before that it was dead code.
 
 **Team configuration** — a `TeamConfiguration` (`src/backend/common/models/messages.py`): the set of
 agents, their models, and their prompts. `team_id` is a required non-optional `str`.
 
 **Plan review** — the approval gate the Magentic builder is configured with at Workflow build time.
-Upstream hardcodes it as a literal; the two-lane design makes it a per-request value. See
+Upstream hardcoded it as a literal; since #15 it is a per-request value carried on `InputTask` as
+`plan_review`, defaulting to `True`. See
 [ADR-013](docs/ADR/013-per-request-plan-review-over-orchestrator-bypass.md).
 
 ## Request path
@@ -63,7 +71,13 @@ ticket before it is raised.
 
 **Lane** — which of the two a request takes. Declared as metadata on a **Quick Task**, with a
 keyword fallback for free-typed input, and **surfaced in the UI as a feature**. Selection **fails
-open to the Deliberate lane**.
+open to the Deliberate lane** — which is also why `InputTask.plan_review` defaults to `True`: a
+request that declares nothing keeps the approval gate.
+
+**Fast-lane latency** — the measured end-to-end cost of a Fast lane request, against the sub-10s
+target. **Not yet measured.** ADR-013 makes the measurement the sole trigger for reopening the
+orchestrator-bypass question, so until there is a number, no bypass is built. The probe is
+`scripts/measure_fast_lane_latency.py`; it needs an agent roster to orchestrate, which is #19.
 
 **Identity boundary gate** — the deterministic code gate in the request path that refuses
 personal, individual-identity questions from a shared store device, executed **before the lane
@@ -417,42 +431,43 @@ Also confirmed: `SecurityControl=Ignore` on every resource comes from two **subs
 policy assignments**, not from the templates. ADR-010's decision is about what the templates
 request, so the appended tag does not breach it.
 
-### The Workflow is *not* tagged with a team identifier at build time (confirmed 2026-08-01, issue #9)
+### The Workflow was *not* tagged with a team identifier at build time (confirmed 2026-08-01, issue #9 — **fixed** 2026-08-12, issue #15)
 
-The comment at `orchestration_manager.py:236-238` claims "The team_id tag is set on every workflow we
-build/reset below". **That claim is false.** A static scan of `src/backend` finds:
+The comment at `orchestration_manager.py:236-238` claimed "The team_id tag is set on every workflow
+we build/reset below". **That claim was false.** A static scan of `src/backend` found:
 
 - **Assignments of `_team_id` on a Workflow: none.**
-- Reads of `_team_id` on a Workflow: two —
-  - `src/backend/orchestration/orchestration_manager.py:239` (`current_team_id`)
-  - `src/backend/api/router.py:380` (`cached_team_id`)
+- Reads of `_team_id` on a Workflow: two — `orchestration/orchestration_manager.py`
+  (`current_team_id`) and `api/router.py` (`cached_team_id`).
 
-`init_orchestration` assigns only `workflow._team_config` and `workflow._manager_chat_client`
-(`orchestration_manager.py:206-207`). The only place `_team_id` is ever set on a workflow object in
-the entire repository is `src/tests/backend/orchestration/test_orchestration_manager.py:441`, where
-a test hand-sets it on a mock.
+`init_orchestration` assigned only `workflow._team_config` and `workflow._manager_chat_client`. The
+only place `_team_id` was ever set on a workflow object in the entire repository was
+`src/tests/backend/orchestration/test_orchestration_manager.py:441`, where a test hand-set it on a
+mock.
 
-**Consequence — yes, every request currently performs a Full workflow rebuild.**
-`getattr(current, "_team_id", None)` always returns `None`, while `team_config.team_id` is a
-required non-empty `str`. So `team_changed` is `True` whenever a cached Workflow exists, and
-`needs_full_rebuild = current is None or team_switched or team_changed` is therefore **always**
-`True`. Two consequences follow:
+**Consequence — every request performed a Full workflow rebuild.**
+`getattr(current, "_team_id", None)` always returned `None`, while `team_config.team_id` is a
+required non-empty `str`. So `team_changed` was `True` whenever a cached Workflow existed, and
+`needs_full_rebuild = current is None or team_switched or team_changed` was therefore **always**
+`True`. Two consequences followed:
 
-1. Every call closes and recreates all agents. There is no warm path, so the latency baseline for
+1. Every call closed and recreated all agents. There was no warm path, so the latency baseline for
    the fast lane must be measured against a full agent-pool rebuild, not against a cache hit.
-2. `needs_workflow_reset` (`not needs_full_rebuild and workflow_terminated`) can never be `True` —
-   the Lightweight workflow reset branch is dead code in production.
+2. `needs_workflow_reset` (`not needs_full_rebuild and workflow_terminated`) could never be `True` —
+   the Lightweight workflow reset branch was dead code in production.
 
-The same defect appears independently at `router.py:380`, where `team_mismatch` is always `True`, so
-`workflow_unusable` is always `True` on the request path too.
+The same defect appeared independently in `router.py`, where `team_mismatch` was always `True`, so
+`workflow_unusable` was always `True` on the request path too.
 
 Confirmed empirically with a throwaway probe: replaying the existing reuse test
 (`test_given_existing_workflow_when_no_switch_then_returns_it`) against a Workflow shaped as
-production builds it — i.e. with `_team_config` set and `_team_id` absent — takes the rebuild branch
-and calls `init_orchestration` exactly once, where the committed test (which hand-sets `_team_id`)
-returns the cached Workflow untouched.
+production built it — i.e. with `_team_config` set and `_team_id` absent — took the rebuild branch
+and called `init_orchestration` exactly once, where the committed test (which hand-set `_team_id`)
+returned the cached Workflow untouched.
 
-**Implication for the workflow-cache fix:** deleting line 441 of
-`test_orchestration_manager.py` converts that passing test into a regression test for the fix. Do
-that as part of the cache change, not before — it fails until `_team_id` is genuinely assigned at
-build time.
+**Fixed in #15.** `init_orchestration` now assigns `workflow._team_id` (and `workflow._plan_review`)
+at build time, and line 441 of `test_orchestration_manager.py` is deleted — that test now builds its
+cached Workflow through `init_orchestration`, the way production builds it, so it is a regression
+test for the tag rather than a test that papers over its absence. **A warm cache is reachable for the
+first time, and the Lightweight workflow reset branch is no longer dead code.** The Fast-lane latency
+number is still owed (see *Fast-lane latency* below).

@@ -8,6 +8,13 @@ export interface InputTask {
     description: string;
     /** MANDATORY team identifier to use for this plan */
     team_id?: string;
+    /**
+     * Plan review, per request rather than per build (ADR-013). Omit or send
+     * `true` for the Deliberate lane, which keeps the approval gate; send
+     * `false` for the Fast lane. The backend defaults to `true`, so omitting
+     * it never loses the gate.
+     */
+    plan_review?: boolean;
 }
 
 /**

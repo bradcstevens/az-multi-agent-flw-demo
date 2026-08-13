@@ -65,6 +65,19 @@ Notes:
   export GUARDRAIL_EMBEDDING_ENDPOINT="$(grep AZURE_OPENAI_ENDPOINT .azure/macae-flw-v1/.env | cut -d= -f2- | tr -d '"')"
   .venv/bin/python -m pytest src/tests/backend/guardrail/test_guardrail_corpus.py -m integration -s
   ```
+- **Fast-lane latency** is measured by `scripts/measure_fast_lane_latency.py`, not by a loop —
+  it needs a live Foundry project and an agent pool to orchestrate. ADR-013 makes the number
+  the sole trigger for reopening the orchestrator-bypass question, so run it and read it before
+  building anything faster:
+
+  ```bash
+  export FAST_LANE_PROJECT_ENDPOINT="$(grep AZURE_AI_PROJECT_ENDPOINT .azure/macae-flw-v1/.env | cut -d= -f2- | tr -d '"')"
+  python scripts/measure_fast_lane_latency.py     # add --plan-review for the Deliberate lane
+  ```
+
+  It needs `agent_framework`, which the repo's `.venv` deliberately does **not** carry (the
+  backend suites stub it), so run it from the backend's own environment —
+  `cd src/backend && uv sync && uv run python ../../scripts/measure_fast_lane_latency.py`.
 - Coverage and lint configuration live in the root `pyproject.toml` and `.flake8`. There
   is no `.coveragerc`.
 - **The 80% coverage threshold is advisory, not a gate.** `scripts/coverage_report.py`

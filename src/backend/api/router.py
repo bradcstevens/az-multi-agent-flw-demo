@@ -407,16 +407,29 @@ async def process_request(
         current_workflow is not None and cached_team_id != team_id
     )
 
+    # The cache-invalidation predicate's lane term (ADR-013). /init_team eagerly
+    # builds a workflow before any task is submitted, so without this the first
+    # request after a page load reuses that workflow and silently ignores the
+    # per-request Plan review value.
+    cached_plan_review = getattr(current_workflow, "_plan_review", None)
+    plan_review_mismatch = (
+        current_workflow is not None
+        and cached_plan_review != input_task.plan_review
+    )
+
     workflow_unusable = (
         current_workflow is None
         or getattr(current_workflow, "_terminated", False)
         or getattr(current_workflow, "_is_running", False)
         or team_mismatch
+        or plan_review_mismatch
     )
     if workflow_unusable:
         logger.info(
             "Workflow unusable for user '%s' (None=%s, terminated=%s, is_running=%s, "
-            "team_mismatch=%s cached_team=%s selected_team=%s) — rebuilding",
+            "team_mismatch=%s cached_team=%s selected_team=%s, "
+            "plan_review_mismatch=%s cached_plan_review=%s requested_plan_review=%s) "
+            "— rebuilding",
             user_id,
             current_workflow is None,
             getattr(current_workflow, "_terminated", False),
@@ -424,6 +437,9 @@ async def process_request(
             team_mismatch,
             cached_team_id,
             team_id,
+            plan_review_mismatch,
+            cached_plan_review,
+            input_task.plan_review,
         )
 
         # Force-clear the running flag so get_current_or_new_orchestration
@@ -437,6 +453,7 @@ async def process_request(
             team_config=team,
             team_switched=False,
             team_service=team_service,
+            plan_review=input_task.plan_review,
         )
 
     try:

@@ -330,7 +330,13 @@ class TestInitOrchestration:
         mock_magentic_builder.return_value.build.return_value = Mock()
 
     @pytest.mark.asyncio
-    async def test_given_valid_args_when_init_then_returns_workflow(self):
+    @pytest.mark.parametrize("plan_review", [True, False])
+    async def test_given_valid_args_when_init_then_returns_workflow(self, plan_review):
+        """Plan review is a per-request value, not a literal (ADR-013).
+
+        Parametrised over both values rather than deleted: the Deliberate lane
+        still needs the gate on, and the Fast lane needs it off.
+        """
         # Arrange
         agents = [MockAgent(agent_name="A1", has_inner_agent=True), MockAgent(name="A2")]
 
@@ -340,6 +346,7 @@ class TestInitOrchestration:
             team_config=MockTeamConfiguration(),
             memory_store=MockDatabaseBase(),
             user_id="user-1",
+            plan_review=plan_review,
         )
 
         # Assert
@@ -347,8 +354,33 @@ class TestInitOrchestration:
         mock_config.get_azure_credential.assert_called_once()
         mock_magentic_builder.assert_called_once()
         call_kwargs = mock_magentic_builder.call_args.kwargs
-        assert call_kwargs["enable_plan_review"] is True
+        assert call_kwargs["enable_plan_review"] is plan_review
         assert call_kwargs["output_from"] == "all"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("plan_review", [True, False])
+    async def test_given_init_then_workflow_is_tagged_with_team_and_plan_review(
+        self, plan_review
+    ):
+        """The two cache predicates read these tags off the cached Workflow.
+
+        ``_team_id`` was never assigned in production code, so every request
+        took the Full workflow rebuild branch (CONTEXT.md, Confirmed findings);
+        ``_plan_review`` is what lets a lane change invalidate a cached
+        Workflow built for the other lane.
+        """
+        # Act
+        workflow = await OrchestrationManager.init_orchestration(
+            agents=[MockAgent(agent_name="A1")],
+            team_config=MockTeamConfiguration(team_id="team-xyz"),
+            memory_store=MockDatabaseBase(),
+            user_id="user-1",
+            plan_review=plan_review,
+        )
+
+        # Assert
+        assert workflow._team_id == "team-xyz"
+        assert workflow._plan_review is plan_review
 
     @pytest.mark.asyncio
     async def test_given_no_user_id_when_init_then_raises_value_error(self):
@@ -435,22 +467,75 @@ class TestGetCurrentOrNewOrchestration:
 
     @pytest.mark.asyncio
     async def test_given_existing_workflow_when_no_switch_then_returns_it(self):
-        # Arrange
-        mock_workflow = Mock()
-        mock_workflow._terminated = False
-        mock_workflow._team_id = "test-team-id"
-        orchestration_config.get_current_orchestration.return_value = mock_workflow
+        """Regression test for the Workflow cache fix (ADR-013).
 
-        # Act
-        result = await OrchestrationManager.get_current_or_new_orchestration(
-            user_id="user-1",
+        The cached Workflow is built the way production builds it — through
+        ``init_orchestration`` — rather than hand-tagged by the test. Before
+        ``_team_id`` was assigned at build time this took the Full workflow
+        rebuild branch, so every request closed and recreated the agent pool.
+        """
+        # Arrange — a Workflow tagged the way production tags it
+        cached = await OrchestrationManager.init_orchestration(
+            agents=[MockAgent(agent_name="A1")],
             team_config=MockTeamConfiguration(),
-            team_switched=False,
-            team_service=MockTeamService(),
+            memory_store=MockDatabaseBase(),
+            user_id="user-1",
         )
+        cached._terminated = False
+        orchestration_config.get_current_orchestration.return_value = cached
 
-        # Assert
-        assert result == mock_workflow
+        with patch.object(
+            OrchestrationManager, 'init_orchestration', new_callable=AsyncMock
+        ) as mock_init:
+            # Act
+            result = await OrchestrationManager.get_current_or_new_orchestration(
+                user_id="user-1",
+                team_config=MockTeamConfiguration(),
+                team_switched=False,
+                team_service=MockTeamService(),
+            )
+
+            # Assert — reused, not rebuilt
+            assert result is cached
+            mock_init.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_given_lane_change_when_called_then_rebuilds(self):
+        """A Workflow built for the other lane must not be reused.
+
+        The team-initialisation endpoint eagerly builds a Workflow before any
+        task is submitted, so without this the *first* request after a page
+        load silently runs in whichever lane that eager build chose.
+        """
+        # Arrange — cached Workflow built with Plan review on
+        cached = await OrchestrationManager.init_orchestration(
+            agents=[MockAgent(agent_name="A1")],
+            team_config=MockTeamConfiguration(),
+            memory_store=MockDatabaseBase(),
+            user_id="user-1",
+            plan_review=True,
+        )
+        cached._terminated = False
+        cached.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = cached
+
+        with patch.object(
+            OrchestrationManager, 'init_orchestration', new_callable=AsyncMock
+        ) as mock_init:
+            mock_init.return_value = Mock()
+
+            # Act — a Fast lane request arrives
+            await OrchestrationManager.get_current_or_new_orchestration(
+                user_id="user-1",
+                team_config=MockTeamConfiguration(),
+                team_switched=False,
+                team_service=MockTeamService(),
+                plan_review=False,
+            )
+
+            # Assert — rebuilt, and rebuilt for the requested lane
+            mock_init.assert_called_once()
+            assert mock_init.call_args.kwargs["plan_review"] is False
 
     @pytest.mark.asyncio
     async def test_given_no_workflow_when_called_then_creates_new(self):
