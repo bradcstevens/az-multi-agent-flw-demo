@@ -129,14 +129,16 @@ of its customisations that exists. `--export <dir>` writes one, and exports **`C
 `Default` ("Default Solution"), which is the system catalogue of every component in the org.
 
 The export taken at 2026-08-13T06:43:06Z is 1.6 KB, which is correct and not a truncation: nothing
-has been customised yet. It is a baseline. **Re-export after #17 publishes the SOP agent**, because
-that is the first change worth being able to restore, and the zip is a build artifact rather than
-something to commit.
+had been customised yet. It is a baseline. The export taken after #17 published the SOP agent is
+**48 KB**, carrying the bot, its configuration and all thirteen components — see
+[the SOP agent record](../copilot-studio/sop-agent.md). Re-export after any change worth being able
+to restore; the zip is a build artifact rather than something to commit.
 
 ## Scope
 
 Verified: the setting's live value, the search index's provisioned status, that a document written
 to Dataverse comes back from a search by its file content, the elapsed time from enabling to first
 hit, tenant storage capacity, and that a solution export succeeds. **Not** verified here: whether
-Copilot Studio actually offers documents-based knowledge in its own UI (#17 is what exercises that),
-the SOP corpus's own content (#8), or anything about Direct Line (#18).
+Copilot Studio actually offers documents-based knowledge in its own UI (#17 exercised that and
+[recorded it](../copilot-studio/sop-agent.md)), the SOP corpus's own content (#8), or anything about
+Direct Line (#18).

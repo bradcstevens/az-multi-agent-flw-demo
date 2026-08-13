@@ -34,6 +34,21 @@ capability — and re-run its script rather than re-deriving the finding by hand
 Each check keeps its decision logic in a pure, importable Python module beside the shell entry
 point, so the CI-tooling loop can unit-test the verdict without a live tenant.
 
+## Live tenant records
+
+Work that lives in the tenant rather than in this repository is recorded the same way — a record
+under `docs/`, backed by a re-runnable check whose logic is unit-tested by the CI-tooling loop.
+
+| Record | Check |
+| --- | --- |
+| `docs/copilot-studio/sop-agent.md` | `scripts/copilot_studio/check-sop-agent.sh` |
+
+The Copilot Studio SOP agent is authored **from this repository**, through the Dataverse Web API,
+because `pac` cannot authenticate unattended. Change the agent by editing
+`scripts/copilot_studio/sop_agent.py` and re-running the check with `--provision --publish --probe`,
+not by editing it in the portal: the check fails on any component this repository did not author,
+and a portal edit is a behaviour nobody here can review.
+
 ## Feedback loops
 
 Run the loops your change touches before committing. Each command is self-contained: it

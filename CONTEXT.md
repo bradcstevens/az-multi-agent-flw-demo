@@ -187,19 +187,51 @@ see [ADR-012](docs/ADR/012-grounding-option-a-dataverse-documents-only.md).
 _Avoid_: SharePoint SOP library, the SharePoint source
 
 **Copilot Studio SOP agent** — the single low-code agent and the entire cross-platform proof.
-Published to **Direct Line** and reached from the orchestrator through an MCP tool like any other
-tool. See [ADR-011](docs/ADR/011-direct-line-over-a2a-for-the-copilot-studio-sop-agent.md).
+**Store SOP Assistant** (`cr48b_StoreSopAssistant`) in the tenant's Default environment, grounded on
+the **SOP corpus** uploaded as Dataverse documents, published with **no authentication** and reached
+from the orchestrator through an MCP tool like any other tool. See
+[ADR-011](docs/ADR/011-direct-line-over-a2a-for-the-copilot-studio-sop-agent.md) and
+[docs/copilot-studio/sop-agent.md](docs/copilot-studio/sop-agent.md).
+
+**Authored here** — the rule that the agent's every component is written in
+`scripts/copilot_studio/sop_agent.py` and pushed through the Dataverse Web API, never edited in the
+Copilot Studio portal. `pac` cannot authenticate unattended, so the Web API is the seam; the
+consequence is that the repository is the source of truth for what the agent says, and the
+`authored-here` check fails on any component it did not write. The thirteen system topics a portal
+template copies are **not** among them — generative orchestration answers from the uploaded
+documents without any of them, measured live.
+
+**Honest miss** — the rehearsed out-of-corpus beat: a question whose procedure is not in the SOP
+corpus is refused plainly and told where to go instead, rather than answered plausibly. Two
+mechanisms together, and neither alone is enough: `useModelKnowledge: false` in the agent's
+configuration is what stops the model answering from its own knowledge, and the **Fallback topic**
+supplies the wording the check looks for.
+
+**Publish propagation** — the gap between publishing the Copilot Studio SOP agent and a
+conversation seeing the change. A **new** conversation gets published content immediately; a
+conversation **already open** across the publish keeps the old content indefinitely. The publish
+itself took 11.6–85 s across five measurements. Rehearsal rule: open a fresh conversation after
+every publish, and freeze the agent before the demo.
 
 **Direct Line** — the GA transport between the orchestrator and the Copilot Studio SOP agent.
 Tokens live **3600 seconds**. Chosen over A2A on fit, **not** on availability — A2A reached GA in
-April 2026, and repeating the "A2A is Preview" line is repeating a known error (ADR-011).
+April 2026, and repeating the "A2A is Preview" line is repeating a known error (ADR-011). The token
+endpoint is resolved per environment from `PvaGetDirectLineEndpoint`, never assembled from the
+default hostname.
 
 ## Surfaces
 
 **Grounding panel** — the R6 surface showing where an answer came from. Driven by **two signals
 combined**: a "source used" event emitted server-side over the existing WebSocket, which proves
 *which platform* answered, and citation data parsed from the SOP agent's response, which supplies
-the document detail. Neither alone satisfies the requirement.
+the document detail. Neither alone satisfies the requirement. The citation arrives structurally in
+the activity's `entities`, with **no `url`** — and `appearance.abstract` is the *filename*, not a
+snippet, while `appearance.text` is the whole document (see **Citation appearance** below).
+
+**Citation appearance** — the `appearance` object inside a Direct Line citation entity:
+`name` and `abstract` both carry the uploaded document's filename, and `text` carries the entire
+document as HTML. ADR-011 was written expecting `abstract` to be the snippet; it is not, so the
+Grounding panel truncates `text` itself or shows the name alone.
 
 **Token meter** — the R7 per-agent call and token counter. Net-new: the accelerator emits no token
 telemetry. Its emission point is the executor-completed branch of the event stream.
@@ -426,6 +458,30 @@ log (`.git-loopy/logs/<iso>-<run_id>.log`) is the first place to look when the g
 it distinguishes "gate could not run" and "publish failed" from an actually-failing loop.
 
 ## Confirmed findings
+
+### A Copilot Studio agent needs none of the thirteen template topics (confirmed 2026-08-13, issue #17)
+
+A portal-created agent copies thirteen system topics — Greeting, Escalate, Signin, Search
+("Conversational boosting"), OnError, StartOver, Goodbye and the rest. The Copilot Studio SOP agent
+was first built with all of them, copied from an existing portal agent on the assumption that at
+least the Search topic was on the retrieval path.
+
+It is not. With `GenerativeAIRecognizer` and `GenerativeActionsEnabled`, the uploaded documents are
+searched directly. All thirteen were deleted, the agent re-published and re-probed, and it answered
+identically: fifteen numbered steps citing `SOP-102 Store Closing Procedure.docx`. What remains is
+**three authored components** (instructions, greeting, honest miss) plus the ten uploaded documents,
+which is what makes the **Authored here** rule enforceable — an agent carrying eleven behaviours
+nobody wrote here cannot be reviewed here. Recorded in
+[docs/copilot-studio/sop-agent.md](docs/copilot-studio/sop-agent.md).
+
+### A Direct Line citation's `abstract` is the filename, not a snippet (confirmed 2026-08-13, issue #17)
+
+ADR-011 predicted the citation URL would be absent for a Dataverse-uploaded document, and it is —
+confirmed live. Its accompanying instruction to render "name plus snippet", reading `abstract` as
+the snippet, does not survive contact: `appearance.abstract` is **identical to `appearance.name`**,
+both the uploaded file's filename, and the snippet-shaped field is `appearance.text`, which carries
+the *entire* document as HTML (3311 characters for SOP-102). The Grounding panel (R6) must truncate
+`text` itself or show the name alone.
 
 ### Tenant admin does not imply Dataverse System Administrator (confirmed 2026-08-12, issue #2)
 
