@@ -8,17 +8,20 @@
 # Exits non-zero if any check fails, so it can be wired into a feedback loop.
 #
 #   scripts/preflight/check-dataverse-admin-role.sh             # check only
-#   scripts/preflight/check-dataverse-admin-role.sh --elevate   # + self-elevate
+#   scripts/preflight/check-dataverse-admin-role.sh --elevate   # + grant it
 #
 # --environment <id> checks the environment identifier shown in the Copilot
 # Studio URL instead of the tenant's Default one, because default-environment
 # routing can silently land a maker in a personal Developer environment.
 #
-# --elevate needs a token carrying the Power Platform API's
-# UserManagement.Users.Apply delegated scope, which the Azure CLI is not
-# pre-authorised for; consent to it once with:
+# --elevate needs no interactive step and no extra scope: it grants the role
+# through a bootstrap application user, which the BAP admin API registers as a
+# Dataverse System Administrator and which is deleted again afterwards. The
+# signed-in account must be a Global, Power Platform or Dynamics 365 admin.
 #
-#   az login --scope "https://api.powerplatform.com/UserManagement.Users.Apply"
+# It is NOT Microsoft's documented applyAdminRole self-elevation: that needs a
+# user token carrying UserManagement.Users.Apply, a scope no amount of consent
+# adds to an Azure CLI token (AADSTS65002 — first-party preauthorisation).
 #
 # The logic lives in dataverse_admin_role.py so it can be unit-tested by the
 # CI-tooling loop (scripts/ci-tests.sh); this wrapper only fixes the entry point.
