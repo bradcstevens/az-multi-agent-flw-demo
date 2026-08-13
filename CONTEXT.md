@@ -68,7 +68,9 @@ _Avoid_: bypass, direct agent call, single-agent path
 
 **Deliberate lane** — the request path taken by escalation and ticket creation: the full
 orchestration with **Plan review** on, where the approval step *is* the associate confirming the
-ticket before it is raised.
+ticket before it is raised. Not instructed — `_handle_plan_reviews`' **approved** branch submits the
+draft and pushes the card, and the rejected branch does not (#22). The seam runs on every approved
+plan, which is why `TicketStore.read` is **not** total: see **Simulated ticket**.
 
 **Lane** — which of the two a request takes (`src/backend/lane/lane.py`). Declared as metadata on a
 **Quick Task** and carried on the wire as `InputTask.lane` — the **only** lane declaration on a
@@ -350,7 +352,9 @@ is no branch to take.
 asks it to offer a service ticket. A property of the record rather than of the model's mood; below
 the threshold, offering a ticket reads as the assistant giving up after one try. #22 picks the
 record up from there — `TKT-001`'s attempted-steps field is this list, in the associate's own words,
-never re-typed.
+**never re-typed**, and that runs one way in three places rather than being asked for: the tool has
+no such parameter, the route discards a supplied value, and the draft overwrites it from the record
+even when correcting.
 
 Recorded in [docs/troubleshooting-memory.md](docs/troubleshooting-memory.md).
 
@@ -395,7 +399,7 @@ rule the transparency panels run on. No assistant is a state the surface can be 
 
 **Simulated label** — the badge on anything whose content was authored for the walkthrough rather
 than produced by a connected system (#25, R11's surviving fragment): **Store 223** and the
-**Presenter alert**'s rehearsed words today, the **Simulated ticket** when #22 lands. The converse
+**Presenter alert**'s rehearsed words and the **Simulated ticket** (#22). The converse
 matters as much — a badge on a real Foundry answer, a real Copilot Studio hop or a measured token
 count gives away the demo's strongest evidence. Label the invented things, and only those.
 
@@ -525,9 +529,30 @@ so an unrecognised lane in an uploaded team definition fails open in the **Lane 
 rejecting the whole upload. Tapping one fills the box; typing over the prompt clears the declaration,
 because edited text is free-typed input and belongs to the **Lane keyword fallback**.
 
-**Simulated ticket** — the R4 service ticket. Labelled as simulated in the UI, persisted to Cosmos,
-and it **must carry the attempted steps** pulled from the troubleshooting record — if the associate
-has to re-type what they tried, the requirement has failed.
+**Simulated ticket** — the R4 service ticket (#22). `TKT-001`'s nineteen fields, everything unknown
+reading `not reported`; the number is a sha256 of the session rendered `SIM-223-NNNN`, **derived not
+counted**, because a counter is state a restart resets and a reissued number is two faults wearing
+one identity. Labelled as simulated in the UI — unconditionally, with **no `simulated` flag on the
+wire**, since every ticket here is simulated and a flag is a field that can be omitted. Persisted to
+Cosmos, and it carries the **Attempted steps** from the troubleshooting record; if the associate has
+to re-type what they tried, the requirement has failed.
+
+**There is no submit tool** — the second confirmation is *unreachable*, not forbidden. The
+`escalation` domain exposes one tool and it drafts; `DOMAIN_ALLOWED_TOOLS["escalation"]` names it,
+and that entry is load-bearing twice, as #21 found — no entry means no filter, which lets the shared
+`ask_user` through, and `ask_user` **is** a second confirmation. `EscalationAgent` keeps
+`user_responses: false` for the same reason. A confirmation writes exactly three fields (status,
+number, timestamp) and no content; a re-draft **merges** over the previous one rather than replacing
+it, because an agent correcting the priority would otherwise blank the other eighteen fields of a
+ticket the associate has already read.
+
+**`TicketStore.read` is deliberately not total, and `TroubleshootingStore.read` is.** The
+troubleshooting caller asks *what has this associate tried*, and **nothing** is a true answer. The
+ticket caller is the approval seam, which runs on every approved plan on the **Deliberate lane** —
+a total read would raise a blank ticket every time anybody approved anything. Nothing recorded must
+stay distinguishable from a record of nothing.
+
+Recorded in [docs/escalation-ticket.md](docs/escalation-ticket.md).
 
 **Attempted steps** — what the associate has already tried, persisted explicitly to the Cosmos
 memory container. Framework checkpoint state is in-memory and must not be relied on for this.

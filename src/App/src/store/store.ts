@@ -11,6 +11,7 @@ import appReducer from './slices/appSlice';
 import teamReducer from './slices/teamSlice';
 import streamingReducer from './slices/streamingSlice';
 import transparencyReducer from './slices/transparencySlice';
+import ticketReducer from './slices/ticketSlice';
 
 export const store = configureStore({
     reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
         team: teamReducer,
         streaming: streamingReducer,
         transparency: transparencyReducer,
+        ticket: ticketReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({

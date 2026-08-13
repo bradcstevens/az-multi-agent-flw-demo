@@ -30,6 +30,12 @@ class Domain(Enum):
     # Its own domain for the same reason, and reached over HTTP because this
     # container has no Cosmos access at all.
     TROUBLESHOOTING = "troubleshooting"
+    # The Simulated ticket (#22). Its own domain so the escalation agent can
+    # draft a ticket without also being handed the shared ``ask_user`` — which
+    # would be a second question to the associate at the exact moment the
+    # requirement says there is none. One tool, and it drafts: the plan
+    # approval is the confirmation, and nothing here can reach it.
+    ESCALATION = "escalation"
 
 
 class MCPToolBase(ABC):

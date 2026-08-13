@@ -167,6 +167,12 @@ class WebsocketMessageType(str, Enum):
     SOURCE_USED = "source_used"
     TOKEN_USAGE = "token_usage"
     PRESENTER_ALERT = "presenter_alert"
+    # The Simulated ticket (issue #22), pushed from the plan-approval seam
+    # rather than by an agent — the approval **is** the confirmation, so the
+    # card is emitted by the thing that submitted the ticket. Its shape lives
+    # in ``escalation/payloads.py`` for the same reason the three above live in
+    # ``transparency/``.
+    TICKET_RAISED = "ticket_raised"
 
 
 @dataclass(slots=True)

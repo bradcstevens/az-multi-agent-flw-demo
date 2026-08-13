@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 
 import transparencyReducer from '@/store/slices/transparencySlice';
+import ticketReducer from '@/store/slices/ticketSlice';
 import { useTransparencySignals } from './useTransparencySignals';
 
 /**
@@ -25,7 +26,8 @@ vi.mock('@/store/WebSocketService', () => ({
     },
 }));
 
-const makeStore = () => configureStore({ reducer: { transparency: transparencyReducer } });
+const makeStore = () =>
+    configureStore({ reducer: { transparency: transparencyReducer, ticket: ticketReducer } });
 
 const Harness = () => {
     useTransparencySignals();
@@ -108,5 +110,43 @@ describe('the transparency subscriptions', () => {
         });
 
         expect(store.getState().transparency.meter.rows).toEqual([]);
+    });
+});
+
+describe('the Simulated ticket subscription (issue #22)', () => {
+    beforeEach(() => listeners.clear());
+
+    it('holds the ticket the plan approval raised', () => {
+        // Exercised by the message **type string** the backend actually sends.
+        // The subscription is the one seam where a rename on either side is
+        // silent: `WebSocketService` passes unrecognised types through its
+        // default branch, so drift here is a card that simply never appears.
+        const store = makeStore();
+        render(
+            <Provider store={store}>
+                <Harness />
+            </Provider>,
+        );
+
+        emit('ticket_raised', {
+            ticket_id: 'SIM-223-0041',
+            status: 'submitted',
+            fields: [{ name: 'steps_attempted', value: 'Fitted a fresh paper filter' }],
+        });
+
+        expect(store.getState().ticket.ticket?.ticketId).toBe('SIM-223-0041');
+    });
+
+    it('ignores a ticket payload it cannot read', () => {
+        const store = makeStore();
+        render(
+            <Provider store={store}>
+                <Harness />
+            </Provider>,
+        );
+
+        emit('ticket_raised', { ticket_id: '', fields: [] });
+
+        expect(store.getState().ticket.ticket).toBeNull();
     });
 });

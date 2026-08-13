@@ -36,6 +36,7 @@ from transparency.source import source_used
 from troubleshooting.steps import parse_attempted_steps
 from troubleshooting.store import TroubleshootingStore
 from troubleshooting.turn import note_turn, sole_turn
+from escalation.store import TicketStore, render_ticket
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1791,6 +1792,102 @@ async def record_attempted_steps(request: Request):
     except Exception as e:
         logger.warning("Could not record the attempted steps: %s", e)
         return {"recorded": False, "attempted": [], "note": ""}
+
+
+# ---------------------------------------------------------------------------
+# The Simulated ticket, drafted by the MCP container (issue #22)
+#
+# The same seam and the same server-side session resolution as the record
+# above — and sharper, because a mis-resolved session here drafts one
+# associate's fault onto another associate's approval.
+#
+# There is deliberately **no submit route**. TKT-001 says the associate
+# confirms the ticket once and the confirmation is the approval step, so
+# submission happens at the plan-approval seam
+# (``orchestration_manager._raise_confirmed_ticket``) and nowhere else. A route
+# that raised a ticket would be a second confirmation step reachable by a model
+# — which is exactly the step the requirement says does not exist.
+# ---------------------------------------------------------------------------
+async def _ticket_stores():
+    """The ticket store, the record store and the session, or all three None."""
+    turn = sole_turn()
+    if turn is None:
+        return None, None, None
+    user_id, session_id = turn
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    return (
+        TicketStore(memory_store, user_id=user_id),
+        TroubleshootingStore(memory_store, user_id=user_id),
+        session_id,
+    )
+
+
+def _no_ticket() -> dict:
+    """What every failure here reads as: no draft, and nothing claiming one."""
+    return {"drafted": False, "fields": {}, "rendered": ""}
+
+
+def _ticket_response(ticket) -> dict:
+    return {
+        "drafted": True,
+        "session_id": ticket.session_id,
+        "fields": ticket.fields,
+        "rendered": render_ticket(ticket.fields),
+    }
+
+
+@app_router.get("/escalation/ticket")
+async def get_service_ticket():
+    """This conversation's ticket, if one has been drafted."""
+    try:
+        store, _record, session_id = await _ticket_stores()
+        if store is None:
+            return _no_ticket()
+        ticket = await store.read(session_id)
+        if ticket is None:
+            return _no_ticket()
+        return _ticket_response(ticket)
+    except Exception as e:
+        logger.warning("Could not read the service ticket: %s", e)
+        return _no_ticket()
+
+
+@app_router.post("/escalation/ticket")
+async def draft_service_ticket(request: Request):
+    """Draft — or correct — this conversation's ticket.
+
+    ``steps_attempted`` is filled here from the troubleshooting record and a
+    value on the wire is **discarded**. That is the requirement — the ticket
+    carries what the associate already reported, with nothing re-typed —
+    enforced by the route rather than asked of a model, because a paraphrase of
+    what an associate tried is not what they tried and nobody downstream can
+    tell the difference.
+
+    ``drafted`` reports honestly whether anything was persisted: an agent told
+    a draft is waiting for approval that the approval seam will never find
+    would present the associate a ticket that confirming does nothing to.
+    """
+    body = await request.json()
+    supplied = body if isinstance(body, dict) else {}
+
+    try:
+        store, record_store, session_id = await _ticket_stores()
+        if store is None:
+            return _no_ticket()
+
+        record = await record_store.read(session_id)
+        ticket = await store.draft(
+            session_id,
+            supplied,
+            attempted=record.attempted,
+            equipment=record.equipment,
+        )
+        if ticket is None:
+            return _no_ticket()
+        return _ticket_response(ticket)
+    except Exception as e:
+        logger.warning("Could not draft the service ticket: %s", e)
+        return _no_ticket()
 
 
 # Get plans is called in the initial side rendering of the frontend

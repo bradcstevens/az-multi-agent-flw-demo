@@ -22,6 +22,11 @@ on:
       # `test_transparency_contract.py`, which is the only thing that spans the
       # socket. The vitest suite hand-writes its payloads and cannot notice.
       - 'src/App/src/models/transparency.ts'
+      # The browser's half of the Simulated ticket contract (#22), for the
+      # same reason: `test_ticket_contract.py` is the only thing that spans
+      # the socket for the ticket, and `ticket.test.ts` hand-writes its
+      # payload and cannot notice a backend rename.
+      - 'src/App/src/models/ticket.ts'
       - 'src/App/src/models/enums.tsx'
       # The deploy path's stock-pack suppression (#25). Only these two files,
       # not all of `infra/**`: a Bicep edit must not run the backend suite, but
@@ -65,6 +70,11 @@ on:
       # `test_transparency_contract.py`, which is the only thing that spans the
       # socket. The vitest suite hand-writes its payloads and cannot notice.
       - 'src/App/src/models/transparency.ts'
+      # The browser's half of the Simulated ticket contract (#22), for the
+      # same reason: `test_ticket_contract.py` is the only thing that spans
+      # the socket for the ticket, and `ticket.test.ts` hand-writes its
+      # payload and cannot notice a backend rename.
+      - 'src/App/src/models/ticket.ts'
       - 'src/App/src/models/enums.tsx'
       # The deploy path's stock-pack suppression (#25). Only these two files,
       # not all of `infra/**`: a Bicep edit must not run the backend suite, but

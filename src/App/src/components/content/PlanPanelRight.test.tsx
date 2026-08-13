@@ -8,8 +8,10 @@ import transparencyReducer, {
     sourceUsedReceived,
     tokenUsageReceived,
 } from '@/store/slices/transparencySlice';
+import ticketReducer, { ticketRaised } from '@/store/slices/ticketSlice';
 
-const makeStore = () => configureStore({ reducer: { transparency: transparencyReducer } });
+const makeStore = () =>
+    configureStore({ reducer: { transparency: transparencyReducer, ticket: ticketReducer } });
 
 const planData = {
     plan: { id: 'plan-1' },
@@ -132,5 +134,45 @@ describe('the plan surface on the deliberate lane', () => {
 
         expect(screen.getByTestId('agent-team-member-ShiftTasksAgent')).toBeInTheDocument();
         expect(screen.getByTestId('transparency-rail')).toBeInTheDocument();
+    });
+});
+
+describe('the Simulated ticket on the plan surface (issue #22)', () => {
+    // The rail is the one surface that survives the 640px breakpoint — #25
+    // drops the left panel and keeps this one — and the associate's screen is
+    // a phone. A ticket rendered only where a phone cannot reach it is a
+    // ticket the person holding the broken equipment never sees.
+    const raised = {
+        ticket_id: 'SIM-223-0041',
+        status: 'submitted',
+        fields: [
+            { name: 'symptom', value: 'left head runs cold and slow' },
+            { name: 'steps_attempted', value: 'Fitted a fresh paper filter' },
+        ],
+    };
+
+    it('shows nothing until a ticket has actually been raised', () => {
+        renderPanel(makeStore());
+
+        expect(screen.queryByTestId('simulated-ticket')).not.toBeInTheDocument();
+    });
+
+    it('shows the ticket the approval confirmed', () => {
+        const store = makeStore();
+        store.dispatch(ticketRaised(raised));
+
+        renderPanel(store);
+
+        expect(screen.getByTestId('simulated-ticket-id')).toHaveTextContent('SIM-223-0041');
+        expect(screen.getByText(/Fitted a fresh paper filter/)).toBeInTheDocument();
+    });
+
+    it('labels it simulated wherever it is shown', () => {
+        const store = makeStore();
+        store.dispatch(ticketRaised(raised));
+
+        renderPanel(store);
+
+        expect(screen.getAllByTestId('simulated-badge').length).toBeGreaterThan(0);
     });
 });

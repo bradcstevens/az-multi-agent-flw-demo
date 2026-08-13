@@ -1,0 +1,56 @@
+/*
+ * The Simulated ticket card (issue #22, R4).
+ *
+ * A definition list rather than a table: the ticket is nineteen name/value
+ * rows, and at the 640px breakpoint a table's columns collapse into something
+ * an associate cannot read. The rows stack instead.
+ */
+
+.simulated-ticket {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--colorNeutralStroke2);
+    border-radius: 6px;
+    background: var(--colorNeutralBackground1);
+}
+
+.simulated-ticket__header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.simulated-ticket__notice {
+    color: var(--colorNeutralForeground3);
+}
+
+.simulated-ticket__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+}
+
+.simulated-ticket__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.simulated-ticket__row dt {
+    flex: 0 0 auto;
+    min-width: 140px;
+    color: var(--colorNeutralForeground3);
+}
+
+.simulated-ticket__row dd {
+    flex: 1 1 160px;
+    margin: 0;
+    color: var(--colorNeutralForeground1);
+    overflow-wrap: anywhere;
+}

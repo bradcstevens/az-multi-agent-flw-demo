@@ -22,6 +22,7 @@ from fastapi import FastAPI
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.jwt import JWTVerifier
 from services.ask_user_service import AskUserService
+from services.escalation_service import EscalationService
 from services.hr_service import HRService
 from services.image_service import ImageService
 from services.marketing_service import MarketingService
@@ -47,6 +48,9 @@ factory.register_service(ImageService())
 factory.register_service(SopService())
 # The memory of one shift — what an associate has already tried (#21).
 factory.register_service(TroubleshootingService())
+# The Simulated ticket (#22). One tool, and it drafts — the plan approval is
+# the confirmation, and nothing in this container can reach it.
+factory.register_service(EscalationService())
 
 # Shared services — registered on every domain server
 factory.register_shared_service(AskUserService())

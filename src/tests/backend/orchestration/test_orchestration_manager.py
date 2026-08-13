@@ -192,6 +192,34 @@ sys.modules['common.utils'] = Mock()
 sys.modules['common.utils.markdown_utils'] = _markdown_utils
 
 
+def _real_websocket_message_type(member: str) -> str:
+    """One ``WebsocketMessageType`` member's value, read out of the real file.
+
+    ``models.messages`` is mocked wholesale here because it drags the plan
+    models in, so a mock enum has to restate the members the manager uses. A
+    restated member is a member that cannot go wrong; this reads the source of
+    truth with the source's own parser and fails loudly if the member is gone.
+    """
+    import ast
+
+    path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "..", "backend",
+        "models", "messages.py",
+    )
+    with open(path, "r", encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "WebsocketMessageType":
+            for statement in node.body:
+                if (
+                    isinstance(statement, ast.Assign)
+                    and isinstance(statement.targets[0], ast.Name)
+                    and statement.targets[0].id == member
+                ):
+                    return ast.literal_eval(statement.value)
+    raise AssertionError(f"WebsocketMessageType.{member} no longer exists")
+
+
 class MockTeamConfiguration:
     def __init__(self, name="TestTeam", deployment_name="test_deployment", team_id="test-team-id"):
         self.name = name
@@ -249,6 +277,11 @@ class MockWebsocketMessageType:
     AGENT_MESSAGE_STREAMING = "agent_message_streaming"
     TOKEN_USAGE = "token_usage"
     USER_CLARIFICATION_REQUEST = "user_clarification_request"
+    # Read out of the real enum rather than restated (issue #22). A member
+    # written here by hand agrees with itself forever: the manager would go on
+    # pushing a message type the backend had renamed, and the card would go
+    # dark on stage with every test green.
+    TICKET_RAISED = _real_websocket_message_type("TICKET_RAISED")
 
 
 class MockAgentMessageStreaming:
@@ -1452,4 +1485,171 @@ class TestAttemptedStepsMemory:
             )
 
         assert approval.approved is True
+        assert set(responses) == {"req-1"}
+
+
+# ---------------------------------------------------------------------------
+# The approval step IS the ticket confirmation (issue #22)
+# ---------------------------------------------------------------------------
+class MockPlanReview:
+    """A pending plan review, as the framework hands it over."""
+
+    def __init__(self):
+        self.approved = False
+
+    def approve(self):
+        self.approved = True
+        return Mock(approved=True)
+
+
+class FakeTicketStore:
+    """The ticket store's seam, without a container."""
+
+    def __init__(self, ticket=None):
+        self.ticket = ticket
+        self.submitted = []
+
+    async def submit(self, session_id):
+        self.submitted.append(session_id)
+        return self.ticket
+
+
+def _submitted_ticket(**overrides):
+    fields = {"ticket_id": "SIM-223-0041", "status": "submitted"}
+    fields.update(overrides)
+    return Mock(fields=fields)
+
+
+class TestTheApprovalIsTheTicketConfirmation:
+    """TKT-001: the associate confirms the ticket once, and the confirmation
+    is the approval step.
+
+    So submission is deterministic and rides the seam the approval already
+    passes through — the same move the attempted-steps memory makes at the
+    clarification seam. A model asked to call a submit tool after approval is a
+    second confirmation step that sometimes does not happen; a *tool* that
+    submits is a second confirmation step that sometimes happens twice. There
+    is no submit tool at all, and this is the only caller.
+    """
+
+    def setup_method(self):
+        connection_config.send_status_update_async.reset_mock()
+        mock_wait_approval.return_value = MockPlanApprovalResponse(
+            approved=True, m_plan_id="test-plan-id"
+        )
+
+    async def _review(self, store, *, approved=True, session="s-1"):
+        mock_wait_approval.return_value = MockPlanApprovalResponse(
+            approved=approved, m_plan_id="test-plan-id"
+        )
+        review = MockPlanReview()
+        manager = OrchestrationManager()
+        with patch.object(
+            OrchestrationManager, "_ticket_store",
+            AsyncMock(return_value=(store, session) if store else (None, None)),
+        ):
+            responses = await manager._handle_plan_reviews(
+                {"req-1": review},
+                participant_names=["EscalationAgent"],
+                task_text="I can't fix it, raise a ticket",
+                user_id="user-1",
+            )
+        return review, responses
+
+    @pytest.mark.asyncio
+    async def test_approving_the_plan_submits_the_drafted_ticket(self):
+        store = FakeTicketStore(ticket=_submitted_ticket())
+
+        await self._review(store)
+
+        assert store.submitted == ["s-1"]
+
+    @pytest.mark.asyncio
+    async def test_rejecting_the_plan_submits_nothing(self):
+        """The rejection is the associate correcting the ticket. A ticket
+        raised from a rejected plan is the one thing the approval gate exists
+        to prevent."""
+        store = FakeTicketStore(ticket=_submitted_ticket())
+
+        await self._review(store, approved=False)
+
+        assert store.submitted == []
+
+    @pytest.mark.asyncio
+    async def test_a_plan_with_no_drafted_ticket_raises_none(self):
+        """Every approved plan on the Deliberate lane reaches this seam and
+        most of them are not escalations."""
+        store = FakeTicketStore(ticket=None)
+
+        _review, responses = await self._review(store)
+
+        assert responses is not None
+        pushed = [
+            call for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "ticket_raised"
+        ]
+        assert pushed == []
+
+    @pytest.mark.asyncio
+    async def test_the_confirmed_ticket_reaches_the_surface(self):
+        store = FakeTicketStore(ticket=_submitted_ticket())
+
+        await self._review(store)
+
+        pushed = [
+            call for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "ticket_raised"
+        ]
+        assert len(pushed) == 1
+        payload = pushed[0].args[0]["data"]
+        assert payload["ticket_id"] == "SIM-223-0041"
+        assert payload["status"] == "submitted"
+
+    @pytest.mark.asyncio
+    async def test_the_card_carries_the_attempted_steps_it_was_submitted_with(self):
+        """The requirement, end to end: what the associate said they tried is
+        on the ticket they can see, and nobody re-typed it."""
+        store = FakeTicketStore(
+            ticket=_submitted_ticket(steps_attempted="Fitted a fresh paper filter")
+        )
+
+        await self._review(store)
+
+        pushed = [
+            call for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "ticket_raised"
+        ][0]
+        rows = {row["name"]: row["value"] for row in pushed.args[0]["data"]["fields"]}
+        assert rows["steps_attempted"] == "Fitted a fresh paper filter"
+
+    @pytest.mark.asyncio
+    async def test_an_unresolvable_session_raises_nothing_and_says_nothing(self):
+        _review, responses = await self._review(None)
+
+        assert responses is not None
+        assert not [
+            call for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "ticket_raised"
+        ]
+
+    @pytest.mark.asyncio
+    async def test_a_failing_ticket_store_does_not_cost_the_approval(self):
+        """The plan is approved either way. The ticket degrades to nothing
+        raised and nothing claimed — never to a turn that dies after the
+        associate already said yes."""
+        store = FakeTicketStore()
+        store.submit = AsyncMock(side_effect=RuntimeError("container unreachable"))
+
+        review, responses = await self._review(store)
+
+        assert review.approved is True
+        assert responses is not None
+
+    @pytest.mark.asyncio
+    async def test_the_plan_is_still_approved(self):
+        """All of this rides an existing seam and none of it may change what
+        that seam was for."""
+        review, responses = await self._review(FakeTicketStore(_submitted_ticket()))
+
+        assert review.approved is True
         assert set(responses) == {"req-1"}

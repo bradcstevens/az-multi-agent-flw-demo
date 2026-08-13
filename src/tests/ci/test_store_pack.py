@@ -717,3 +717,170 @@ def test_a_change_to_the_pack_or_its_tooling_runs_these_tests():
         "test.yml triggers on the whole frontend — a CSS edit now runs the "
         "backend suite"
     )
+
+
+# ---------------------------------------------------------------------------
+# The Simulated ticket (issue #22)
+# ---------------------------------------------------------------------------
+
+
+def test_given_the_roster_when_read_then_the_escalation_agent_holds_the_ticket_tool(
+    store_pack,
+):
+    # The ticket is drafted through a tool rather than written into a reply,
+    # because a ticket that exists only in a transcript is not persisted, not
+    # renderable and not something an approval can confirm.
+    escalation = store_pack.agent("EscalationAgent")
+    assert escalation["use_toolbox"] is True
+    assert escalation["toolbox_filter"] == "escalation"
+
+
+def test_given_the_roster_when_read_then_only_the_escalation_agent_holds_it(
+    store_pack,
+):
+    # One holder. A second agent able to draft a ticket is a ticket raised from
+    # a turn nobody planned to escalate.
+    holders = [
+        agent["name"]
+        for agent in store_pack.agents
+        if agent.get("use_toolbox") and agent.get("toolbox_filter") == "escalation"
+    ]
+    assert holders == ["EscalationAgent"]
+
+
+def test_given_the_escalation_agent_when_read_then_it_cannot_ask_the_associate(
+    store_pack,
+):
+    # The load-bearing one. `user_responses` is the clarification tool, and a
+    # clarification at this point in the turn *is* the second confirmation step
+    # the requirement says does not exist: the associate is about to approve
+    # the plan, and the approval is the confirmation.
+    assert store_pack.agent("EscalationAgent").get("user_responses", False) is False
+
+
+def test_given_the_escalation_prompt_when_read_then_it_names_the_drafting_tool(
+    store_pack,
+):
+    message = store_pack.agent("EscalationAgent")["system_message"]
+    assert "draft_service_ticket" in message
+
+
+def test_given_the_escalation_prompt_when_read_then_it_never_asks_for_the_steps(
+    store_pack,
+):
+    # The requirement in the agent's own words. The code discards a re-typed
+    # value anyway — this is the half that stops the agent *asking*, which is
+    # the half the associate would notice.
+    message = store_pack.agent("EscalationAgent")["system_message"].lower()
+    assert "steps_attempted" in message
+    assert "never" in message or "not" in message
+
+
+def test_given_the_escalation_prompt_when_read_then_the_approval_is_the_confirmation(
+    store_pack,
+):
+    message = store_pack.agent("EscalationAgent")["system_message"].lower()
+    assert "no second confirmation" in message
+
+
+def test_given_the_escalation_prompt_when_read_then_it_says_the_ticket_is_simulated(
+    store_pack,
+):
+    message = store_pack.agent("EscalationAgent")["system_message"].lower()
+    assert "simulated" in message
+
+
+def test_given_the_ticket_tool_when_named_then_the_container_registers_it(
+    store_pack,
+):
+    # Spans the seam between the authored prompt and the container that serves
+    # the tool, the same way the troubleshooting pair is spanned. A rename on
+    # either side is an agent calling a tool that is not there, and the
+    # framework's answer to that is silence.
+    service = (
+        REPO_ROOT / "src" / "mcp_server" / "services" / "escalation_service.py"
+    ).read_text(encoding="utf-8")
+    message = store_pack.agent("EscalationAgent")["system_message"]
+
+    assert "async def draft_service_ticket(" in service
+    assert "draft_service_ticket" in message
+
+    domain = (
+        REPO_ROOT / "src" / "mcp_server" / "core" / "factory.py"
+    ).read_text(encoding="utf-8")
+    assert 'ESCALATION = "escalation"' in domain, (
+        "the roster's toolbox_filter names a domain the container does not serve"
+    )
+
+
+def test_given_the_escalation_domain_when_filtered_then_the_allowlist_names_it(
+    store_pack,
+):
+    # A domain with no allowlist entry gets **no filter at all**, and every
+    # domain server also carries the shared `ask_user` — which is the second
+    # confirmation step this whole slice exists to make unreachable. Its
+    # absence was what #21 found by writing this test rather than by reading
+    # the code.
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_mcp_config_for_tests",
+        REPO_ROOT / "src" / "backend" / "config" / "mcp_config.py",
+    )
+    source = (
+        REPO_ROOT / "src" / "backend" / "config" / "mcp_config.py"
+    ).read_text(encoding="utf-8")
+    assert spec is not None
+    assert '"escalation": [' in source
+
+    filters = {
+        agent.get("toolbox_filter")
+        for agent in store_pack.agents
+        if agent.get("use_toolbox")
+    }
+    for domain in filters:
+        assert f'"{domain}": [' in source, (
+            f"the roster gives an agent the '{domain}' toolbox but "
+            "DOMAIN_ALLOWED_TOOLS has no entry, so no filter is applied"
+        )
+
+
+def test_given_the_escalation_allowlist_when_read_then_nothing_in_it_raises_a_ticket(
+    store_pack,
+):
+    # An allowlist naming anything beyond the draft would put a second
+    # confirmation step back within a model's reach.
+    source = (
+        REPO_ROOT / "src" / "backend" / "config" / "mcp_config.py"
+    ).read_text(encoding="utf-8")
+    block = source.split('"escalation": [')[1].split("]")[0]
+
+    assert "draft_service_ticket" in block
+    for forbidden in ("submit", "confirm", "raise", "ask_user"):
+        assert forbidden not in block
+
+
+def test_given_an_escalation_request_when_routed_then_it_takes_the_deliberate_lane(
+    store_pack,
+):
+    # The acceptance criterion, against the real router rather than by
+    # inspection of the keyword list: the plan-approval step has to appear,
+    # because it is the confirmation.
+    import importlib.util
+    import sys
+
+    backend = REPO_ROOT / "src" / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    spec = importlib.util.spec_from_file_location(
+        "_lane_router_for_tests", backend / "lane" / "router.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    for phrasing in (
+        "I can't fix it, raise a ticket",
+        "escalate this to the service desk",
+        "log a service ticket for the coffee machine",
+    ):
+        assert module.select_lane(None, phrasing).value == "deliberate", phrasing

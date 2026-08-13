@@ -66,6 +66,20 @@ DOMAIN_ALLOWED_TOOLS: dict[str, list[str]] = {
         "list_attempted_steps",
         "record_attempted_steps",
     ],
+    # The Simulated ticket (#22). One tool, and it drafts — the associate
+    # approving the plan is what raises the ticket
+    # (``orchestration_manager._raise_confirmed_ticket``), and TKT-001 says
+    # there is no step after that one.
+    #
+    # This entry is load-bearing twice over. Without it no filter is applied,
+    # so the escalation agent would be offered the shared ``ask_user`` — whose
+    # contract needs a ``SESSION_USER_ID`` nothing injects any more, and which
+    # is itself a *second question to the associate* at exactly the moment the
+    # requirement says there is none. And an entry naming anything beyond the
+    # draft would put a second confirmation step back within a model's reach.
+    "escalation": [
+        "draft_service_ticket",
+    ],
 }
 
 

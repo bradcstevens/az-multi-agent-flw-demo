@@ -19,6 +19,7 @@ class DataType(str, Enum):
     session = "session"
     session_state = "session_state"
     troubleshooting = "troubleshooting"
+    service_ticket = "service_ticket"
     plan = "plan"
     step = "step"
     agent_message = "agent_message"
@@ -163,6 +164,31 @@ class TroubleshootingRecord(BaseDataModel):
     # What broke. Carried because the turn that reports a step is rarely the
     # turn that named the equipment, and the ticket needs both.
     equipment: Optional[str] = None
+
+
+class ServiceTicket(BaseDataModel):
+    """The Simulated ticket raised from one conversation (issue #22).
+
+    A sibling of ``TroubleshootingRecord`` in the same schemaless memory
+    container — partitioned by ``session_id``, discriminated by ``data_type``,
+    reached through the generic CRUD, its ``id`` derived from the session
+    (``escalation.store.ticket_record_id``) so a re-draft **corrects** the draft
+    it replaces rather than leaving two tickets for one fault. One enumeration
+    member and this one model; no migration.
+
+    The template's fields live in one ``fields`` map rather than as columns.
+    ``TKT-001`` is content, authored in the content pack and revisable there,
+    and a model with a named attribute per row would make every future template
+    edit a schema change — and, worse, would give the ticket's status two homes
+    that could disagree.
+    """
+    data_type: Literal[DataType.service_ticket] = DataType.service_ticket
+    # Who raised it. Scoped like every other record in the container: one
+    # associate's fault, and one associate's ticket.
+    user_id: Optional[str] = None
+    # TKT-001's fields, in the template's own names. ``fields["status"]`` is the
+    # single source of draft-versus-submitted.
+    fields: Dict[str, str] = Field(default_factory=dict)
 
 
 class UserCurrentTeam(BaseDataModel):

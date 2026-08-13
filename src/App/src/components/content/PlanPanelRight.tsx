@@ -10,7 +10,11 @@ import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
 import ContentNotFound from "../NotFound/ContentNotFound";
 import AgentTeamPanel from "../transparency/AgentTeamPanel";
 import TransparencyRail from "../transparency/TransparencyRail";
+import SimulatedTicketCard from "../escalation/SimulatedTicketCard";
+import { useAppSelector } from "../../store/hooks";
+import { selectRaisedTicket } from "../../store/slices/ticketSlice";
 import "../../styles/planpanelright.css";
+import "../../styles/simulatedTicket.css";
 
 
 const PlanPanelRight: React.FC<PlanDetailsProps> = ({
@@ -18,6 +22,12 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   loading,
   planApprovalRequest
 }) => {
+
+  // The Simulated ticket this conversation raised, if it raised one (#22).
+  // Read from the slice rather than taken as a prop: it arrives on the socket
+  // at the moment the associate approves the plan, and threading it down from
+  // the page would put a second copy of the same state one render behind.
+  const raisedTicket = useAppSelector(selectRaisedTicket);
 
   if (!planData && !loading) {
     return <ContentNotFound subtitle="The requested page could not be found." />;
@@ -119,6 +129,14 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   // Main render
   return (
     <div className="plan-panel-right">
+      {/*
+        The ticket the approval raised, above the plan it was raised from.
+        This panel rather than the reply stream, and deliberately: it is the
+        one surface that survives the 640px breakpoint (#25 drops the left
+        panel and keeps the rail), and the associate's screen is a phone.
+      */}
+      {raisedTicket && <SimulatedTicketCard ticket={raisedTicket} />}
+
       {/* Plan section on top */}
       {renderPlanSection()}
 

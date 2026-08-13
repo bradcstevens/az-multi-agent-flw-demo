@@ -918,6 +918,14 @@ class OrchestrationManager:
             if approval_response and approval_response.approved:
                 self.logger.info("Plan approved (request_id=%s)", request_id)
                 responses[request_id] = plan_review.approve()
+                # The approval step **is** the ticket confirmation (issue #22,
+                # TKT-001). Deterministic and here, not a tool the agent is
+                # asked to call afterwards: a model that forgets leaves the
+                # associate believing a ticket was raised, and a submit tool
+                # the model *can* call is the second confirmation step the
+                # template says there is not. Most approved plans are not
+                # escalations, and those raise nothing — see ``_ticket_store``.
+                await self._raise_confirmed_ticket(user_id)
             else:
                 self.logger.info("Plan rejected (request_id=%s)", request_id)
                 await connection_config.send_status_update_async(
@@ -1029,6 +1037,73 @@ class OrchestrationManager:
             responses[request_id] = approval
 
         return responses
+
+    async def _ticket_store(self, user_id: str):
+        """The ticket store for the session this user has in flight.
+
+        Returns ``(store, session_id)``, or ``(None, None)``. The session is
+        resolved **server-side** from the note the request path left
+        (``troubleshooting.turn``), the same refusal to let a model carry an
+        identifier that ``_troubleshooting_store`` takes — and sharper here: a
+        mis-resolved session would submit one associate's draft against
+        another associate's approval.
+        """
+        from common.database.database_factory import DatabaseFactory
+        from escalation.store import TicketStore
+        from troubleshooting.turn import turn_for
+
+        session_id = turn_for(user_id)
+        if not session_id:
+            return None, None
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        return TicketStore(memory_store, user_id=user_id), session_id
+
+    async def _raise_confirmed_ticket(self, user_id: str):
+        """Submit this conversation's drafted ticket, if there is one, and put
+        it on the surface.
+
+        Total in the direction that matters. Every failure — no session, no
+        draft, a container that would not take the write, anything unforeseen —
+        produces *no ticket and no card*, and none of them costs the approval
+        the associate has already given. The other direction is the one this
+        whole package exists to prevent: a card claiming a ticket that no
+        container holds, quoting a number the associate could read down a
+        telephone.
+        """
+        try:
+            store, session_id = await self._ticket_store(user_id)
+            if store is None:
+                return None
+
+            ticket = await store.submit(session_id)
+            if ticket is None:
+                return None
+
+            from escalation.payloads import TicketRaised
+
+            await connection_config.send_status_update_async(
+                {
+                    "type": WebsocketMessageType.TICKET_RAISED,
+                    "data": TicketRaised.from_fields(ticket.fields).to_dict(),
+                },
+                user_id=user_id,
+                message_type=WebsocketMessageType.TICKET_RAISED,
+            )
+            self.logger.info(
+                "[TICKET] Confirmed by plan approval (session=%s, ticket=%s)",
+                session_id,
+                ticket.fields.get("ticket_id"),
+            )
+            return ticket
+        except Exception as e:
+            self.logger.warning(
+                "[TICKET] Could not raise the confirmed ticket for user '%s': "
+                "%s — no ticket was raised and nothing claims one was",
+                user_id,
+                e,
+                exc_info=True,
+            )
+            return None
 
     async def _troubleshooting_store(self, user_id: str):
         """The attempted-steps store for the session this user has in flight.

@@ -1632,3 +1632,160 @@ class TestAttemptedSteps:
         assert self._record(rt, steps="I power cycled it").status_code == 200
         assert self._read(rt).status_code == 200
         assert self._read(rt).json()["attempted"] == []
+
+
+# ---------------------------------------------------------------------------
+# /escalation/ticket — the bridge the ticket tool calls back on (issue #22)
+# ---------------------------------------------------------------------------
+class TestServiceTicket:
+    """The MCP container drafts the ticket over the same HTTP seam it reads
+    the attempted steps over, and for the same reason: it holds no Cosmos.
+
+    What the bridge adds is the requirement itself. ``steps_attempted`` is
+    filled here, from the troubleshooting record, and a value on the wire is
+    discarded — "nothing re-typed" as a property of the route rather than a
+    line in a system message.
+
+    There is deliberately **no submit route**. The plan approval is the
+    confirmation (``orchestration_manager._raise_confirmed_ticket``), so a
+    route that raised a ticket would be a second confirmation step reachable by
+    a model.
+    """
+
+    @staticmethod
+    def _turn(name):
+        return router_mod.sole_turn.__globals__[name]
+
+    @pytest.fixture(autouse=True)
+    def _clean_turns(self):
+        self._turn("forget_turns")()
+        yield
+        self._turn("forget_turns")()
+
+    def _in_flight(self, session_id="sess-1", user_id="user-1"):
+        self._turn("note_turn")(user_id, session_id)
+
+    def _tried(self, rt, steps, **body):
+        return rt.client.post(
+            "/api/v4/troubleshooting/attempted", json={"steps": steps, **body}
+        )
+
+    def _draft(self, rt, **fields):
+        return rt.client.post("/api/v4/escalation/ticket", json=fields)
+
+    def _read(self, rt):
+        return rt.client.get("/api/v4/escalation/ticket")
+
+    def test_the_draft_carries_the_steps_the_associate_already_reported(self, rt):
+        """The requirement: the ticket is pre-filled from the troubleshooting
+        record, with nothing re-typed."""
+        self._in_flight()
+        self._tried(rt, "I power cycled the brewer and I changed the filter")
+
+        drafted = self._draft(rt, symptom="the coffee comes out cold").json()
+
+        assert "power cycled the brewer" in drafted["fields"]["steps_attempted"]
+        assert "changed the filter" in drafted["fields"]["steps_attempted"]
+
+    def test_steps_supplied_on_the_wire_are_discarded(self, rt):
+        """One-way. A model that re-typed them would produce a ticket that
+        reads correct and is not the associate's account, and no reviewer
+        downstream could tell the difference."""
+        self._in_flight()
+        self._tried(rt, "I power cycled the brewer")
+
+        drafted = self._draft(rt, steps_attempted="descaled the machine").json()
+
+        assert "descaled" not in drafted["fields"]["steps_attempted"]
+        assert "power cycled the brewer" in drafted["fields"]["steps_attempted"]
+
+    def test_the_equipment_the_record_carries_becomes_the_asset(self, rt):
+        self._in_flight()
+        self._tried(rt, "I power cycled it", equipment="coffee brewer, left head")
+
+        assert self._draft(rt).json()["fields"]["asset"] == "coffee brewer, left head"
+
+    def test_the_draft_is_a_draft_and_carries_no_number(self, rt):
+        """The number is issued when the associate confirms — and the
+        confirmation is the plan approval, which this route is not."""
+        self._in_flight()
+
+        drafted = self._draft(rt, symptom="cold coffee").json()
+
+        assert drafted["fields"]["status"] == "draft"
+        assert drafted["fields"]["ticket_id"] == "not reported"
+
+    def test_the_route_returns_the_ticket_rendered_for_the_associate(self, rt):
+        """"Sees exactly what will be submitted" starts here: the agent is
+        handed the whole ticket, field by field, rather than a confirmation."""
+        self._in_flight()
+
+        rendered = self._draft(rt, symptom="cold coffee").json()["rendered"]
+
+        assert "symptom: cold coffee" in rendered
+        assert "simulated" in rendered.lower()
+
+    def test_the_ticket_is_persisted_under_its_own_data_type(self, rt):
+        """One enumeration member and one model in the container the other
+        records already live in — no migration."""
+        self._in_flight()
+        self._draft(rt, symptom="cold coffee")
+
+        document = next(
+            d for d in rt.session_documents.values()
+            if d["data_type"] == "service_ticket"
+        )
+        assert document["session_id"] == "sess-1"
+
+    def test_a_correction_leaves_the_fields_it_does_not_mention_alone(self, rt):
+        self._in_flight()
+        self._draft(rt, symptom="cold coffee", priority="3")
+
+        corrected = self._draft(rt, priority="1").json()
+
+        assert corrected["fields"]["symptom"] == "cold coffee"
+        assert corrected["fields"]["priority"] == "1"
+
+    def test_reading_back_a_session_with_no_ticket_reports_no_ticket(self, rt):
+        """Not an empty ticket. The caller downstream is the approval seam, and
+        an empty ticket read back there is a blank service ticket raised every
+        time anybody approves anything."""
+        self._in_flight()
+
+        assert self._read(rt).json()["drafted"] is False
+
+    def test_no_session_in_flight_drafts_nothing_and_says_so(self, rt):
+        """A tool call that cannot be attributed must not fail the agent's turn
+        — and must not claim a draft the approval seam will never find."""
+        response = self._draft(rt, symptom="cold coffee")
+
+        assert response.status_code == 200
+        assert response.json()["drafted"] is False
+
+    def test_two_users_in_flight_refuses_to_pick_one(self, rt):
+        """Sharper here than for the record: a mis-resolved session drafts one
+        associate's fault onto another associate's approval."""
+        self._in_flight("sess-1", "user-1")
+        self._in_flight("sess-2", "user-2")
+
+        assert self._draft(rt, symptom="cold coffee").json()["drafted"] is False
+
+    def test_an_unreachable_container_does_not_fail_the_agents_turn(self, rt):
+        self._in_flight()
+        rt.database_factory.get_database = AsyncMock(side_effect=Exception("boom"))
+
+        response = self._draft(rt, symptom="cold coffee")
+
+        assert response.status_code == 200
+        assert response.json()["drafted"] is False
+
+    def test_there_is_no_route_that_raises_a_ticket(self, rt):
+        """The plan approval is the confirmation, and it is reached through the
+        orchestration seam rather than over HTTP. A submit route would be a
+        second confirmation step a model could take by itself."""
+        paths = {
+            route.path for route in router_mod.app_router.routes
+            if hasattr(route, "path")
+        }
+        for forbidden in ("submit", "confirm", "raise"):
+            assert not [p for p in paths if "ticket" in p and forbidden in p]

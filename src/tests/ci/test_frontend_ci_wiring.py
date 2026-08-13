@@ -85,7 +85,14 @@ def test_a_change_to_either_end_of_the_contract_runs_the_contract_test():
         encoding="utf-8"
     )
 
-    for path in ("src/App/src/models/transparency.ts", "src/App/src/models/enums.tsx"):
+    # `ticket.ts` (#22) is here for exactly the same reason as `transparency.ts`
+    # — `test_ticket_contract.py` is the only thing that spans the socket for
+    # the Simulated ticket, and the vitest suite hand-writes its payloads.
+    for path in (
+        "src/App/src/models/transparency.ts",
+        "src/App/src/models/ticket.ts",
+        "src/App/src/models/enums.tsx",
+    ):
         assert text.count(f"'{path}'") >= 2, (
             f"a change to {path} does not run the transparency contract test on "
             "both push and pull_request"
