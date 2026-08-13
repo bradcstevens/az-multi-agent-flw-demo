@@ -21,7 +21,11 @@ from preflight.deployed_environment import (
     image_is_placeholder,
     main,
     normalised_location,
+    project_endpoint,
     reachability_check,
+    retrieval_check,
+    search_endpoint,
+    summarise_retrieval,
 )
 
 EXPECTED = Expected(
@@ -36,7 +40,39 @@ EXPECTED = Expected(
         "ca-mcp-macaeflwv1flrpd",
         "app-macaeflwv1flrpd",
     ),
+    knowledge_bases=("store-troubleshooting-kb", "store-operations-kb"),
 )
+
+
+_DEFAULT = object()
+
+
+def knowledge_base(name, source=None, index=_DEFAULT, documents=1):
+    stem = name[: -len("-kb")] if name.endswith("-kb") else name
+    return {
+        "name": name,
+        "sources": [
+            {
+                "name": source or f"{stem}-ks",
+                "index": f"{stem}-index" if index is _DEFAULT else index,
+                "documents": documents,
+            }
+        ],
+    }
+
+
+def kb_connection(kb, **overrides):
+    connection = {
+        "name": f"{kb}-mcp",
+        "category": "RemoteTool",
+        "authType": "ProjectManagedIdentity",
+        "target": (
+            "https://srch-macaeflwv1flrpd.search.windows.net/knowledgebases/"
+            f"{kb}/mcp?api-version=2025-11-01-preview"
+        ),
+    }
+    connection.update(overrides)
+    return connection
 
 
 def model(name, state="Succeeded"):
@@ -83,6 +119,12 @@ def deployment(**overrides):
             container_app("ca-macaeflwv1flrpd"),
             container_app("ca-mcp-macaeflwv1flrpd"),
             container_app("app-macaeflwv1flrpd"),
+        ],
+        "knowledgeBases": [
+            knowledge_base(name) for name in EXPECTED.knowledge_bases
+        ],
+        "kbConnections": [
+            kb_connection(name) for name in EXPECTED.knowledge_bases
         ],
     }
     observed.update(overrides)
@@ -468,6 +510,7 @@ def test_given_another_resource_group_when_asked_for_then_foundry_path_passes():
         registry=EXPECTED.registry,
         resource_group="rg-other",
         container_apps=EXPECTED.container_apps,
+        knowledge_bases=EXPECTED.knowledge_bases,
     )
 
     verdict = evaluate(
@@ -492,5 +535,399 @@ def test_given_a_passing_verdict_with_a_passing_probe_then_the_report_claims_unb
     verdict.checks.append(
         reachability_check({name: 200 for name in EXPECTED.models})
     )
+    verdict.checks.append(
+        retrieval_check({name: grounded() for name in EXPECTED.knowledge_bases})
+    )
 
     assert "unblocked" in format_report(verdict)
+
+
+# --- the knowledge-base path (#30) --------------------------------------------
+#
+# A Search service can be in the right region, on the right tier and keyless
+# while holding nothing at all — which is exactly what it held when the other
+# ten checks first went green. So `search-service` is not evidence that anything
+# resolves against it, and the facts below each had to be proven separately.
+
+
+def grounded(retrieved=1, **overrides):
+    """One knowledge-base probe that called the tool and got documents back."""
+    probe = {"status": "completed", "called": True, "error": None,
+             "retrieved": retrieved}
+    probe.update(overrides)
+    return probe
+
+
+def test_given_a_search_service_with_no_knowledge_bases_then_the_kb_check_fails():
+    """The state the environment sat in while all ten earlier checks passed:
+    Search provisioned, Basic, in Central US, and empty."""
+    verdict = evaluate(deployment(knowledgeBases=[]), EXPECTED)
+
+    assert not verdict.ok
+    assert not verdict.check("knowledge-bases").ok
+    assert "store-troubleshooting-kb" in verdict.check("knowledge-bases").detail
+
+
+def test_given_an_unread_knowledge_base_list_then_the_kb_check_fails():
+    """An unread list is not an empty one, and neither is a reason to pass."""
+    verdict = evaluate(deployment(knowledgeBases=None), EXPECTED)
+
+    assert not verdict.check("knowledge-bases").ok
+    assert "not read" in verdict.check("knowledge-bases").detail
+
+
+def test_given_a_knowledge_base_with_no_sources_then_the_kb_check_fails():
+    """`PUT /knowledgebases/{kb}` succeeds with an empty `knowledgeSources`, so
+    the KB can exist and resolve to nothing."""
+    sourceless = deployment(
+        knowledgeBases=[
+            dict(knowledge_base("store-troubleshooting-kb"), sources=[]),
+            knowledge_base("store-operations-kb"),
+        ],
+    )
+
+    verdict = evaluate(sourceless, EXPECTED)
+
+    assert not verdict.check("knowledge-bases").ok
+    assert "no knowledge source" in verdict.check("knowledge-bases").detail
+
+
+def test_given_a_knowledge_source_whose_index_is_missing_then_the_kb_check_fails():
+    """The knowledge source names its index by string. `index_datasets.py` not
+    having run leaves the source pointing at nothing, and the KB still exists."""
+    dangling = deployment(
+        knowledgeBases=[
+            knowledge_base("store-troubleshooting-kb", index=None),
+            knowledge_base("store-operations-kb"),
+        ],
+    )
+
+    verdict = evaluate(dangling, EXPECTED)
+
+    assert not verdict.check("knowledge-bases").ok
+    assert "store-troubleshooting-ks" in verdict.check("knowledge-bases").detail
+
+
+def test_given_an_index_with_no_documents_then_the_kb_check_fails():
+    """An empty index retrieves nothing, and an agent that retrieves nothing
+    answers from the model without saying so. That is the failure this whole
+    demonstration cannot afford, so an empty index is a failed check."""
+    empty = deployment(
+        knowledgeBases=[
+            knowledge_base("store-troubleshooting-kb", documents=0),
+            knowledge_base("store-operations-kb"),
+        ],
+    )
+
+    verdict = evaluate(empty, EXPECTED)
+
+    assert not verdict.check("knowledge-bases").ok
+    assert "store-troubleshooting-index" in verdict.check("knowledge-bases").detail
+
+
+def test_given_every_knowledge_base_seeded_then_the_kb_check_passes():
+    verdict = evaluate(deployment(), EXPECTED)
+
+    assert verdict.check("knowledge-bases").ok
+
+
+def test_given_a_missing_kb_connection_then_the_connection_check_fails():
+    """Without the per-KB `RemoteTool` connection the KB is perfect and still
+    unreachable: the agent has no identity to present at the MCP endpoint."""
+    verdict = evaluate(
+        deployment(kbConnections=[kb_connection("store-operations-kb")]),
+        EXPECTED,
+    )
+
+    assert not verdict.check("knowledge-base-connections").ok
+    assert (
+        "store-troubleshooting-kb-mcp"
+        in verdict.check("knowledge-base-connections").detail
+    )
+
+
+def test_given_a_kb_connection_authenticating_with_a_key_then_it_fails():
+    """`ProjectManagedIdentity` is the only auth mode this deployment has —
+    Search local auth is disabled, so an `ApiKey` connection cannot work and is
+    a keyless regression besides."""
+    keyed = deployment(
+        kbConnections=[
+            kb_connection("store-troubleshooting-kb", authType="ApiKey"),
+            kb_connection("store-operations-kb"),
+        ],
+    )
+
+    verdict = evaluate(keyed, EXPECTED)
+
+    assert not verdict.check("knowledge-base-connections").ok
+    assert "ApiKey" in verdict.check("knowledge-base-connections").detail
+
+
+def test_given_a_kb_connection_pointing_at_another_kb_then_it_fails():
+    """The connections are seeded in a loop over KB names and differ only in
+    that name, so a connection aimed at the wrong knowledge base is the most
+    likely way to get a confidently wrong answer rather than an error."""
+    crossed = deployment(
+        kbConnections=[
+            kb_connection(
+                "store-troubleshooting-kb",
+                target=(
+                    "https://srch-macaeflwv1flrpd.search.windows.net/"
+                    "knowledgebases/store-operations-kb/mcp"
+                ),
+            ),
+            kb_connection("store-operations-kb"),
+        ],
+    )
+
+    verdict = evaluate(crossed, EXPECTED)
+
+    assert not verdict.check("knowledge-base-connections").ok
+    assert "store-troubleshooting-kb" in verdict.check(
+        "knowledge-base-connections"
+    ).detail
+
+
+def test_given_a_non_remote_tool_connection_then_it_fails():
+    """The project already carries a `CognitiveSearch` connection to the same
+    service. It is not an MCP tool and matching on name alone would accept it."""
+    wrong_category = deployment(
+        kbConnections=[
+            kb_connection("store-troubleshooting-kb", category="CognitiveSearch"),
+            kb_connection("store-operations-kb"),
+        ],
+    )
+
+    verdict = evaluate(wrong_category, EXPECTED)
+
+    assert not verdict.check("knowledge-base-connections").ok
+    assert "CognitiveSearch" in verdict.check("knowledge-base-connections").detail
+
+
+def test_given_every_knowledge_base_retrieving_when_probed_then_retrieval_passes():
+    check = retrieval_check({name: grounded() for name in EXPECTED.knowledge_bases})
+
+    assert check.ok
+    assert check.name == "knowledge-base-retrieval"
+
+
+def test_given_no_retrieval_probes_when_asked_then_it_is_reported_unprobed():
+    """The cross-region hop is the whole claim of ADR-008's topology. An
+    unprobed hop is not a working one."""
+    check = retrieval_check({})
+
+    assert not check.ok
+    assert "not probed" in check.detail
+
+
+def test_given_an_agent_that_never_called_the_tool_then_retrieval_fails():
+    """This is the failure the check exists for. The run completes, the agent
+    answers fluently, and nothing was retrieved — the model answered from its
+    own weights and the Search service was never consulted at all."""
+    check = retrieval_check(
+        {"store-troubleshooting-kb": grounded(called=False, retrieved=0)}
+    )
+
+    assert not check.ok
+    assert "did not call" in check.detail
+    assert "store-troubleshooting-kb" in check.detail
+
+
+def test_given_a_tool_call_that_errored_then_retrieval_fails():
+    check = retrieval_check(
+        {"store-troubleshooting-kb": grounded(error="connection not found")}
+    )
+
+    assert not check.ok
+    assert "connection not found" in check.detail
+
+
+def test_given_a_tool_call_that_retrieved_nothing_then_retrieval_fails():
+    """A tool call that returns zero documents grounds nothing, so the answer
+    that follows it is the model's, not the store's."""
+    check = retrieval_check({"store-troubleshooting-kb": grounded(retrieved=0)})
+
+    assert not check.ok
+    assert "no documents" in check.detail
+
+
+def test_given_a_run_that_did_not_complete_then_retrieval_fails():
+    check = retrieval_check(
+        {"store-troubleshooting-kb": grounded(status="incomplete")}
+    )
+
+    assert not check.ok
+    assert "incomplete" in check.detail
+
+
+def test_summarise_retrieval_reads_a_grounded_agent_run():
+    """The shape the Foundry Responses API actually returns for the run
+    recorded in the preflight: a tool listing, the retrieval, then the answer."""
+    probe = summarise_retrieval(
+        {
+            "status": "completed",
+            "output": [
+                {"type": "mcp_list_tools", "tools": [{"name": "knowledge_base_retrieve"}]},
+                {
+                    "type": "mcp_call",
+                    "name": "knowledge_base_retrieve",
+                    "error": None,
+                    "output": "Retrieved 1 documents.\n\n【4:0†source】",
+                },
+                {
+                    "type": "message",
+                    "content": [{"text": "Check that the brew basket is seated."}],
+                },
+            ],
+        }
+    )
+
+    assert probe == {
+        "status": "completed",
+        "called": True,
+        "error": None,
+        "retrieved": 1,
+    }
+
+
+def test_summarise_retrieval_reports_an_ungrounded_run_as_uncalled():
+    """No `mcp_call` in the output means the model answered by itself. The
+    payload looks entirely healthy, which is precisely the danger."""
+    probe = summarise_retrieval(
+        {
+            "status": "completed",
+            "output": [
+                {"type": "message", "content": [{"text": "Try turning it off."}]},
+            ],
+        }
+    )
+
+    assert probe["called"] is False
+    assert probe["retrieved"] == 0
+
+
+def test_summarise_retrieval_carries_the_tool_error_through():
+    probe = summarise_retrieval(
+        {
+            "status": "completed",
+            "output": [
+                {
+                    "type": "mcp_call",
+                    "name": "knowledge_base_retrieve",
+                    "error": "Forbidden",
+                    "output": None,
+                },
+            ],
+        }
+    )
+
+    assert probe["called"] is True
+    assert probe["error"] == "Forbidden"
+
+
+def test_summarise_retrieval_reports_a_transport_failure_as_the_status():
+    """An HTTP failure has no `output` at all, and must not read as a run that
+    completed without retrieving."""
+    probe = summarise_retrieval({"status": "403", "output": []})
+
+    assert probe["status"] == "403"
+    assert probe["called"] is False
+
+
+def test_summarise_retrieval_counts_documents_across_several_calls():
+    """The agent batches queries and may call the tool more than once; the
+    grounded fact is that documents came back overall."""
+    probe = summarise_retrieval(
+        {
+            "status": "completed",
+            "output": [
+                {"type": "mcp_call", "error": None, "output": "Retrieved 0 documents."},
+                {"type": "mcp_call", "error": None, "output": "Retrieved 3 documents."},
+            ],
+        }
+    )
+
+    assert probe["retrieved"] == 3
+
+
+def test_given_a_converged_deployment_without_probing_then_retrieval_is_unproven(
+    capsys,
+):
+    exit_code = main(argv=["--no-probe"], read=lambda *_: deployment())
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "FAIL  knowledge-base-retrieval" in out
+    assert "not probed" in out
+
+
+def test_given_probe_is_the_default_when_main_runs_then_the_knowledge_bases_probe(
+    capsys,
+):
+    asked = {}
+
+    def retrieve(project, search_endpoint, knowledge_bases):
+        asked["kbs"] = knowledge_bases
+        return {name: grounded() for name in knowledge_bases}
+
+    exit_code = main(
+        argv=[],
+        read=lambda *_: deployment(),
+        probe=lambda foundry, models: {name: 200 for name in models},
+        retrieve=retrieve,
+    )
+
+    assert exit_code == 0
+    assert "store-troubleshooting-kb" in asked["kbs"]
+    assert "PASS  knowledge-base-retrieval" in capsys.readouterr().out
+
+
+def test_given_an_agent_that_answers_ungrounded_when_main_runs_then_it_exits_nonzero(
+    capsys,
+):
+    exit_code = main(
+        argv=[],
+        read=lambda *_: deployment(),
+        probe=lambda foundry, models: {name: 200 for name in models},
+        retrieve=lambda project, endpoint, kbs: {
+            name: grounded(called=False, retrieved=0) for name in kbs
+        },
+    )
+
+    assert exit_code == 1
+    assert "FAIL  knowledge-base-retrieval" in capsys.readouterr().out
+
+
+def test_given_no_search_service_when_main_probes_then_retrieval_is_not_attempted(
+    capsys,
+):
+    """With no Search service there is no endpoint to probe. Inventing one
+    would report a transport error where the real finding — no Search service
+    at all — is already stated by `search-service`."""
+    attempted = []
+
+    exit_code = main(
+        argv=[],
+        read=lambda *_: deployment(search=None),
+        probe=lambda foundry, models: {name: 200 for name in models},
+        retrieve=lambda *args: attempted.append(args) or {},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert attempted == []
+    assert "FAIL  search-service" in out
+    assert "not probed" in out
+
+
+def test_project_endpoint_and_search_endpoint_are_derived_from_the_read():
+    observed = deployment()
+
+    assert project_endpoint("aif-x", observed) == (
+        "https://aif-x.services.ai.azure.com/api/projects/proj-macaeflwv1flrpd"
+    )
+    assert search_endpoint(observed) == (
+        "https://srch-macaeflwv1flrpd.search.windows.net"
+    )
+    assert search_endpoint(deployment(search=None)) is None
+    assert project_endpoint("aif-x", deployment(project={})) is None

@@ -115,10 +115,32 @@ def _discover_project_resource_id(credential: DefaultAzureCredential) -> str:
     return ""
 
 
+def _connection_exists(
+    resource_id: str, connection_name: str, target_url: str, credential: DefaultAzureCredential
+) -> bool:
+    """Read a connection back and report whether it is the one we asked for."""
+    arm_url = f"https://management.azure.com{resource_id}/connections/{connection_name}?api-version=2025-04-01-preview"
+    resp = httpx.get(arm_url, headers=_get_management_headers(credential), timeout=30)
+    if resp.status_code != 200:
+        return False
+    properties = resp.json().get("properties") or {}
+    return properties.get("target") == target_url
+
+
 def _create_connection_via_arm(
     resource_id: str, connection_name: str, target_url: str, credential: DefaultAzureCredential
 ) -> bool:
-    """Create or update a RemoteTool connection via ARM REST API."""
+    """Create or update a RemoteTool connection via ARM REST API.
+
+    The status code is not the answer. `PUT` on a `RemoteTool` connection
+    answers `500 InternalServerError` from `account-rp` on every call — first
+    creation and idempotent re-run alike — and creates the connection anyway.
+    Trusting the code makes the script report `0/2 provisioned` for two
+    connections that are both live, tells the operator to re-run something that
+    will "fail" identically forever, and turns a healthy post-deploy into
+    `has_errors=true`. So a non-success code is resolved by reading the
+    connection back rather than by believing it.
+    """
     # ARM endpoint for connections:
     # PUT https://management.azure.com{resource_id}/connections/{name}?api-version=2025-04-01-preview
     arm_url = f"https://management.azure.com{resource_id}/connections/{connection_name}?api-version=2025-04-01-preview"
@@ -139,14 +161,13 @@ def _create_connection_via_arm(
 
     headers = _get_management_headers(credential)
     resp = httpx.put(arm_url, json=body, headers=headers, timeout=30)
-    if resp.status_code in (200, 201):
+    if resp.status_code in (200, 201, 409):
         return True
-    elif resp.status_code == 409:
-        # Already exists — treat as success
+    if _connection_exists(resource_id, connection_name, target_url, credential):
+        print(f"  ~ ARM answered {resp.status_code}; the connection is present and correct.")
         return True
-    else:
-        print(f"  ✗ Failed ({resp.status_code}): {resp.text[:300]}")
-        return False
+    print(f"  ✗ Failed ({resp.status_code}): {resp.text[:300]}")
+    return False
 
 
 def _parse_only_filter() -> set[str] | None:

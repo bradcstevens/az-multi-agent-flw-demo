@@ -1,14 +1,16 @@
 # Preflight: the deployed environment matches the vanilla flavour
 
-**Verdict: `macae-flw-v1` is fully provisioned and every application host runs its own image.**
-Observed 2026-08-12 (issue #12), in `rg-macae-flw-v1`, subscription
+**Verdict: `macae-flw-v1` is fully provisioned, every application host runs its own image, and an
+agent resolves a knowledge base across the region boundary.** Observed 2026-08-12 (issue #12) and
+extended 2026-08-13 (issue #30), in `rg-macae-flw-v1`, subscription
 `3523b0e6-bb53-4e87-8340-25c416e26093`, primary region `eastus2`, **vanilla** (non-WAF) flavour.
 
 Re-check with `scripts/preflight/check-deployed-environment.sh` — it exits non-zero the moment any
 of the facts below stops being true. Unlike the tenant preflights, this one guards a *subscription*
 assumption that every downstream ticket leans on: #13 and #14 need the embedding deployment to
-answer, #20 needs Cosmos reachable without a key, and #15's Workflow cache is only deterministic
-because there is exactly one replica.
+answer, #20 needs Cosmos reachable without a key, #15's Workflow cache is only deterministic
+because there is exactly one replica, and #19's store assistant is grounded in nothing at all
+unless the knowledge bases resolve.
 
 ## What the check proves, and why each fact needed proving
 
@@ -23,9 +25,119 @@ because there is exactly one replica.
 | `application-images` | Every Container App boots on the Placeholder image. An app still serving it is a workload that never deployed. |
 | `own-foundry-project` | The reuse-an-existing-Foundry-project path's deployer role grants are commented out upstream, so a deployment that took it is silently short of role assignments. |
 | `foundry-tags` | The AI Foundry project module deployed completely untagged upstream. |
+| `knowledge-bases` | `search-service` proves the service is in the right region on the right tier and keyless. It does not prove anything is *on* it — and for the first day of this environment's life, **nothing was**. See below. |
+| `knowledge-base-connections` | The knowledge base can be perfect and the agent still unable to reach it: the per-KB `RemoteTool` connection is the only thing that gives the agent an identity to present at the MCP endpoint. It needs its own check for a second reason — the ARM call that creates these connections **reports failure and succeeds**, so the seeding script's exit code is not evidence either way. See below. |
 | `model-reachability` | `Succeeded` is a **control-plane** fact. Whether the deployment answers a request is a different one, and it is the one #13 and #14 actually need. One real request goes to each deployment — chat or embeddings, chosen by name — and the roster is probed **by default**. `--no-probe` does not quietly omit the check: it reports the roster as unproven and exits non-zero, because a run that asked nothing must not claim feature work is ready. |
+| `knowledge-base-retrieval` | The same argument, one layer up, and the only check that exercises ADR-008's split-region topology end to end. A knowledge base that *exists* is a control-plane fact; whether an agent in `eastus2` resolves it against a Search service in `centralus` is the fact the topology actually claims. Probed by default, and unprobed is reported as unproven. |
 
-Observed 2026-08-12, all ten green, with `text-embedding-3-small` returning 1536 dimensions.
+Observed 2026-08-13, all thirteen green, with `text-embedding-3-small` returning 1536 dimensions and
+both store knowledge bases returning grounded, cited documents.
+
+## Ten checks passed against an empty Search service
+
+This is the finding that justifies the three checks #30 added, and it is uncomfortable: on
+2026-08-12 every check in this record was green, and the Search service held **zero indexes, zero
+knowledge sources and zero knowledge bases**. Nothing was wrong with the service. Nothing had ever
+been put on it.
+
+That state is invisible from the control plane. `search-service` asks where the service is, what
+tier it is on and whether local auth is off — all true of an empty service. Foundry IQ knowledge
+bases are an ADR-007 *hard dependency*, so an agent with `use_knowledge_base: true` starts happily,
+retrieves nothing, and answers from the model without saying so. The demonstration's whole claim is
+that an answer's provenance is visible; a silent fallback to model knowledge is the one failure it
+cannot afford.
+
+So the chain is walked rather than sampled — knowledge base → knowledge source → index →
+**documents** — because every link breaks quietly:
+
+- `PUT /knowledgebases/{kb}` accepts an empty `knowledgeSources` list.
+- A knowledge source names its index by string, so it survives that index not existing.
+- An index that exists holds nothing until `index_datasets.py` has run against it.
+
+An empty index is therefore a **failed** check here, not a warning.
+
+### The seeding order that fills it
+
+The store assistant's two knowledge bases are seeded on every deployment whichever stock content
+pack was chosen, so they are what the check expects by default (`--knowledge-base` overrides it).
+`post_deploy.sh` does this as part of a much larger run; the four steps on their own are:
+
+```bash
+az storage container create --account-name stmacaeflwv1flrpd --name store-troubleshooting-dataset --auth-mode login
+az storage blob upload-batch --account-name stmacaeflwv1flrpd --destination store-troubleshooting-dataset \
+  --source content_packs/store_assistant/datasets/troubleshooting --auth-mode login --pattern '*.md' --overwrite
+
+python infra/scripts/post-provision/index_datasets.py \
+  stmacaeflwv1flrpd store-troubleshooting-dataset srch-macaeflwv1flrpd store-troubleshooting-index
+
+AZURE_AI_SEARCH_ENDPOINT=https://srch-macaeflwv1flrpd.search.windows.net \
+AZURE_OPENAI_ENDPOINT=https://aif-macaeflwv1flrpd.openai.azure.com/ \
+python infra/scripts/post-provision/seed_knowledge_bases.py --only store-troubleshooting-kb,store-operations-kb
+
+AZURE_AI_SEARCH_ENDPOINT=https://srch-macaeflwv1flrpd.search.windows.net \
+AZURE_AI_PROJECT_ENDPOINT=https://aif-macaeflwv1flrpd.services.ai.azure.com/api/projects/proj-macaeflwv1flrpd \
+PYTHONPATH=infra/scripts/post-provision \
+python infra/scripts/post-provision/seed_kb_connections.py --only store-troubleshooting-kb,store-operations-kb
+```
+
+The RBAC this needs was already in place and did not have to be granted: the project's managed
+identity holds `Search Index Data Reader` and `Search Service Contributor` on the Search service,
+and the **Search service's** own identity holds `Cognitive Services OpenAI User` on the Foundry
+account, which is what lets the knowledge base call `gpt-5.4-mini` for reranking.
+
+## The connection PUT reports failure and succeeds anyway
+
+`seed_kb_connections.py` answered `Done — 0/2 connections provisioned.` and exited non-zero. Both
+connections existed. ARM answers every `PUT` of a `RemoteTool` connection with
+
+```
+500 InternalServerError  code: ServiceError  componentName: account-rp
+```
+
+and writes the connection regardless. It is not a first-write race: a re-`PUT` of a connection that
+demonstrably exists answers `500` identically, with `isSharedToAll` true or false. In
+`post_deploy.sh` that lands as `has_errors=true` plus an instruction to re-run a script that will
+"fail" the same way forever, over an environment that is completely healthy.
+
+`_create_connection_via_arm` now resolves a non-success code by **reading the connection back** and
+comparing its target, and prints `~ ARM answered 500; the connection is present and correct.` A
+status code that is known to lie is not evidence, and neither is the script's exit code — which is
+why `knowledge-base-connections` reads the connections from ARM rather than trusting that the
+seeding step said it worked.
+
+## The cross-region hop, proven with one agent run
+
+`knowledge-base-retrieval` is the acceptance criterion of #30 and the only check that touches every
+part of ADR-008's topology at once. One request does all of it: an agent runs in the Foundry project
+in `eastus2`, holding an `mcp` tool whose `server_url` is a knowledge base on the Search service in
+`centralus` and whose `project_connection_id` is the `ProjectManagedIdentity` connection above.
+Nothing but the project's managed identity is presented anywhere, because Search local auth is off.
+
+The probe deliberately does not grade the prose. A fluent answer is exactly what an ungrounded run
+produces, so what is read off the run is the `mcp_call` output item — whether
+`knowledge_base_retrieve` was called at all, whether it errored, and how many documents came back.
+An agent that answered without calling the tool **fails** this check, even though its response is a
+`completed` `200`.
+
+Observed 2026-08-13, `store-troubleshooting-kb`, asked which brew-basket fault stops a cycle
+starting:
+
+```
+mcp_call  knowledge_base_retrieve  error=None
+  queries: ["RB-201 coffee brewer display lit cycle will not start brew basket", ...]
+  output : Retrieved 1 documents. 【4:0†source】 RB-201 Coffee Brewer Not Brewing
+message : "Check that the brew basket is seated all the way into its rails; if it sits a
+           few millimetres proud, it holds the interlock open and the machine will not
+           start. Remove the basket, refit it firmly, and try again.【4:0†source】"
+```
+
+That is RB-201's Branch B, quoted from the indexed document with a citation — knowledge that exists
+in this deployment only because it was indexed into Central US, reached from East US 2. The split
+region topology works.
+
+The probe's prompt asks for *any* document and a quoted line rather than for a fact from a
+particular corpus, so `--knowledge-base` can point the check at a different content pack's knowledge
+bases without rewriting the question. What is being proven is that retrieval happened.
 
 ## The MCP Container App is the head of the chain, and the placeholder image cannot satisfy it
 
@@ -102,6 +214,8 @@ set** (`azd-env-name`) reached the Foundry account, which is the tag the templat
 Verified: the primary region, the model roster and that every deployment **answers**, Search's region
 and tier, that all three application hosts are provisioned with ingress on one replica, keyless
 configuration across Foundry, Cosmos, Search, storage and the registry, that each Container App runs
-an image from our own registry, that the Foundry project is ours, and that it is tagged. **Not**
-verified here: that an agent answers end to end (#19), that a knowledge base resolves against Search
-(#30), or anything in the Copilot Studio tenant (#2, #3, #5, #6, recorded separately).
+an image from our own registry, that the Foundry project is ours, that it is tagged, that the store
+assistant's knowledge bases resolve to populated indexes behind `ProjectManagedIdentity` connections,
+and that an agent **retrieves grounded documents from them across the region boundary** (#30).
+**Not** verified here: that the multi-agent orchestration answers end to end through the deployed
+surface (#19), or anything in the Copilot Studio tenant (#2, #3, #5, #6, recorded separately).

@@ -4,21 +4,29 @@
 The first deploy (#12) settled a handful of facts that every downstream ticket
 leans on — the embedding deployment the Identity boundary gate needs is present
 and finished, Azure AI Search provisioned in its own region, the application
-hosts run exactly one replica, and nothing anywhere fell back to key auth. Those
-are point-in-time facts about a subscription, so they are recorded as a preflight
-and re-checked rather than re-derived; see docs/preflight/deployed-environment.md.
+hosts run exactly one replica, and nothing anywhere fell back to key auth. #30
+added the one that closes the loop: an agent in the primary region resolves a
+Foundry IQ knowledge base served by that out-of-region Search service. Those
+are point-in-time facts about a subscription, so they are recorded as a
+preflight and re-checked rather than re-derived; see
+docs/preflight/deployed-environment.md.
 
 `evaluate` is pure: it takes the resource group as ARM returns it and returns a
-`Verdict`. The live `az` reads are in `main`.
+`Verdict`. The live `az` reads and the two probes are in `main`.
 """
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 
 RESOURCE_GROUP = "rg-macae-flw-v1"
 OPENAI_API_VERSION = "2024-10-21"
+SEARCH_API_VERSION = "2025-05-01-preview"
+KB_API_VERSION = "2025-11-01-preview"
+PROJECT_API_VERSION = "2025-04-01-preview"
+SEARCH_SCOPE = "https://search.azure.com"
 
 # Container Apps boot on one of the accelerator's placeholder images before any
 # application image exists. A container app still serving one is a workload that
@@ -46,6 +54,7 @@ class Expected:
         registry,
         resource_group,
         container_apps,
+        knowledge_bases=(),
     ):
         self.location = location
         self.search_location = search_location
@@ -54,6 +63,7 @@ class Expected:
         self.registry = registry
         self.resource_group = resource_group
         self.container_apps = tuple(container_apps)
+        self.knowledge_bases = tuple(knowledge_bases)
 
 
 class Check:
@@ -97,6 +107,8 @@ def evaluate(observed, expected):
             _application_images_check(container_apps, expected),
             _own_foundry_project_check(observed.get("project"), expected),
             _foundry_tags_check(observed.get("foundry")),
+            _knowledge_bases_check(observed.get("knowledgeBases"), expected),
+            _kb_connections_check(observed.get("kbConnections"), expected),
         ]
     )
 
@@ -363,23 +375,246 @@ def _foundry_tags_check(foundry):
     )
 
 
+def _knowledge_bases_check(knowledge_bases, expected):
+    """Every expected knowledge base resolves to a populated index. Pure.
+
+    `search-service` proves the service is in the right region on the right
+    tier and keyless. It does not prove anything is *on* it — the service
+    passed all of that while holding zero indexes, zero knowledge sources and
+    zero knowledge bases, which is the state that made the Foundry IQ path
+    (ADR-007) unusable without failing a single check.
+
+    The chain is KB → knowledge source → index → documents, and every link
+    breaks quietly: `PUT /knowledgebases/{kb}` accepts an empty source list, a
+    knowledge source names its index by string so it survives the index being
+    absent, and an empty index retrieves nothing at all. An agent that
+    retrieves nothing answers from the model without saying so, so an empty
+    index is a failure here rather than a warning.
+    """
+    if knowledge_bases is None:
+        return Check(
+            "knowledge-bases",
+            False,
+            "the Search service's knowledge bases were not read — an unread "
+            "list is not an empty one",
+        )
+    by_name = {kb.get("name"): kb for kb in knowledge_bases}
+    problems = []
+    for name in expected.knowledge_bases:
+        kb = by_name.get(name)
+        if kb is None:
+            problems.append(f"{name} does not exist")
+            continue
+        sources = kb.get("sources") or []
+        if not sources:
+            problems.append(f"{name} has no knowledge source")
+            continue
+        for source in sources:
+            index = source.get("index")
+            if not index:
+                problems.append(
+                    f"{source.get('name')} names no index that exists"
+                )
+            elif not source.get("documents"):
+                problems.append(f"{index} holds no documents")
+    if problems:
+        return Check("knowledge-bases", False, "; ".join(problems))
+    return Check(
+        "knowledge-bases",
+        True,
+        f"all of {', '.join(expected.knowledge_bases)} resolve to a populated index",
+    )
+
+
+def _kb_connections_check(connections, expected):
+    """Every knowledge base has its own RemoteTool connection. Pure.
+
+    Kept separate from `knowledge-bases` because it fails differently and in a
+    different subscription plane: the knowledge base can be perfect and the
+    agent still unable to reach it, because the connection is the only thing
+    that gives the agent an identity to present at the MCP endpoint.
+
+    It earns its own check for a second reason. The ARM PUT that creates these
+    connections answers `500 InternalServerError` and creates them anyway, so
+    the seeding script's own exit code is not evidence either way — only a read
+    is.
+    """
+    if connections is None:
+        return Check(
+            "knowledge-base-connections",
+            False,
+            "the project's connections were not read — an unread list is not "
+            "an empty one",
+        )
+    by_name = {connection.get("name"): connection for connection in connections}
+    problems = []
+    for kb in expected.knowledge_bases:
+        name = f"{kb}-mcp"
+        connection = by_name.get(name)
+        if connection is None:
+            problems.append(f"{name} does not exist")
+            continue
+        category = connection.get("category")
+        if category != "RemoteTool":
+            # The project already carries a `CognitiveSearch` connection to the
+            # same service, so a name match alone would accept the wrong thing.
+            problems.append(f"{name} is a {category} connection, not a RemoteTool")
+        if connection.get("authType") != "ProjectManagedIdentity":
+            problems.append(
+                f"{name} authenticates with {connection.get('authType')}, not "
+                "ProjectManagedIdentity"
+            )
+        if f"/knowledgebases/{kb}/mcp" not in (connection.get("target") or ""):
+            # These are seeded in a loop and differ only in the KB name, so a
+            # connection aimed at the wrong one answers confidently and wrongly.
+            problems.append(f"{name} does not target {kb}")
+    if problems:
+        return Check("knowledge-base-connections", False, "; ".join(problems))
+    return Check(
+        "knowledge-base-connections",
+        True,
+        f"all {len(expected.knowledge_bases)} knowledge bases have a "
+        "ProjectManagedIdentity RemoteTool connection",
+    )
+
+
+def summarise_retrieval(response):
+    """Reduce a Foundry Responses API payload to a retrieval probe. Pure.
+
+    Reading the payload is the subtle part, so it is separated from the HTTP
+    call. A run that completes is not a run that retrieved: the interesting
+    output item is `mcp_call`, and its absence means the model answered from
+    its own weights and the Search service was never consulted.
+    """
+    output = response.get("output") or []
+    called = False
+    error = None
+    retrieved = 0
+    for item in output:
+        if item.get("type") != "mcp_call":
+            continue
+        called = True
+        error = error or item.get("error")
+        retrieved = max(retrieved, _retrieved_count(item.get("output")))
+    return {
+        "status": response.get("status"),
+        "called": called,
+        "error": error,
+        "retrieved": retrieved,
+    }
+
+
+def _retrieved_count(output):
+    """Return the document count reported by one `knowledge_base_retrieve`. Pure."""
+    counts = re.findall(r"Retrieved (\d+) documents", output or "")
+    return max((int(count) for count in counts), default=0)
+
+
+def retrieval_check(probes):
+    """Return the `Check` for a knowledge-base retrieval probe. Pure.
+
+    The counterpart to `reachability_check`, and for the same reason: a
+    knowledge base that exists is a control-plane fact, and whether an agent
+    resolves against it is the one ADR-008's split-region topology actually
+    claims. The hop crosses regions — the project is in the primary location
+    and Search is not — so it is probed rather than assumed.
+    """
+    if not probes:
+        return Check(
+            "knowledge-base-retrieval",
+            False,
+            "the knowledge bases were not probed — an unprobed cross-region "
+            "hop is not a working one (drop --no-probe)",
+        )
+    problems = []
+    for name, probe in sorted(probes.items()):
+        if probe.get("status") != "completed":
+            problems.append(f"{name} answered {probe.get('status')}")
+        elif not probe.get("called"):
+            problems.append(
+                f"{name}: the agent did not call knowledge_base_retrieve — it "
+                "answered from the model, not from Search"
+            )
+        elif probe.get("error"):
+            problems.append(f"{name}: {probe['error']}")
+        elif not probe.get("retrieved"):
+            problems.append(f"{name}: the retrieval returned no documents")
+    if problems:
+        return Check("knowledge-base-retrieval", False, "; ".join(problems))
+    return Check(
+        "knowledge-base-retrieval",
+        True,
+        f"an agent retrieved grounded documents from {', '.join(sorted(probes))} "
+        "across the region boundary",
+    )
+
+
+def retrieval_topics(knowledge_bases, expected):
+    """Return {kb: a document title to ask about}, for the retrieval probe. Pure.
+
+    The probe has to make retrieval happen without knowing which content pack
+    is installed. Asking an open question ("name any document and quote it")
+    does neither: it leaves the model to invent search terms, and an invented
+    term matches nothing often enough that the check reports a failure the
+    deployment does not have.
+
+    So the question is derived from the corpus that is actually there — the
+    title of a document the read already found in the index behind the
+    knowledge base. That names something real in every pack, and a knowledge
+    base with no title to offer is asked the open question anyway, because it
+    has already failed `knowledge-bases` and the probe must not silently skip
+    it.
+    """
+    by_name = {kb.get("name"): kb for kb in knowledge_bases or []}
+    topics = {}
+    for name in expected.knowledge_bases:
+        titles = [
+            source.get("sample")
+            for source in (by_name.get(name) or {}).get("sources") or []
+            if source.get("sample")
+        ]
+        topics[name] = titles[0] if titles else None
+    return topics
+
+
+def project_endpoint(foundry, observed):
+    """Return the Foundry project's data-plane endpoint. Pure.
+
+    Derived rather than passed in, because the account and project names are
+    already both known — the account from the arguments, the project from the
+    read that `own-foundry-project` checks.
+    """
+    name = (observed.get("project") or {}).get("name")
+    if not name:
+        return None
+    return f"https://{foundry}.services.ai.azure.com/api/projects/{name}"
+
+
+def search_endpoint(observed):
+    """Return the Search service's data-plane endpoint. Pure."""
+    name = (observed.get("search") or {}).get("name")
+    return f"https://{name}.search.windows.net" if name else None
+
+
 def format_report(verdict):
     """Return the human-readable report for a `Verdict`. Pure.
 
     The consequence line is derived, not asserted. "Feature work is unblocked"
-    is a claim about the models *answering*, so a control-plane-only run — every
-    resource shaped correctly, nothing asked a question — reports that the
-    roster is unproven rather than that the environment is ready.
+    is a claim about the models *answering* and the knowledge bases *resolving*,
+    so a control-plane-only run — every resource shaped correctly, nothing asked
+    a question — reports those as unproven rather than the environment as ready.
     """
     checks = list(verdict.checks)
     if not any(check.name == "model-reachability" for check in checks):
         checks.append(reachability_check({}))
+    if not any(check.name == "knowledge-base-retrieval" for check in checks):
+        checks.append(retrieval_check({}))
     lines = [
         f"  {'PASS' if c.ok else 'FAIL'}  {c.name}: {c.detail}" for c in checks
     ]
     ready = all(check.ok for check in checks)
     lines.append(
-        "  ----  feature work (#13, #14, #20): "
+        "  ----  feature work (#13, #14, #19, #20): "
         + ("unblocked" if ready else "blocked on the failures above")
     )
     return "\n".join(lines)
@@ -426,6 +661,10 @@ def read_deployment(resource_group, foundry, registry_name):
             "{name:name,location:location,sku:sku.name,"
             "disableLocalAuth:disableLocalAuth,provisioningState:provisioningState}",
         )
+    project_id = (project or {}).get("id")
+    search_endpoint = (
+        f"https://{searches[0]['name']}.search.windows.net" if searches else None
+    )
     return {
         "location": _az("group", "show", "-n", resource_group, "--query", "location"),
         "foundry": _az(
@@ -466,7 +705,93 @@ def read_deployment(resource_group, foundry, registry_name):
             "fqdn:properties.configuration.ingress.fqdn,"
             "provisioningState:properties.provisioningState}",
         ),
+        "knowledgeBases": read_knowledge_bases(search_endpoint),
+        "kbConnections": read_kb_connections(project_id),
     }
+
+
+def read_knowledge_bases(search_endpoint):
+    """Read the Search service's knowledge bases, their sources and the size of
+    each source's index, in the shape `_knowledge_bases_check` expects.
+
+    Three reads rather than one because the three live on different paths and
+    the chain has to be walked: knowledge bases name their sources, sources name
+    their index, and only the index knows whether anything was ever loaded into
+    it.
+    """
+    if not search_endpoint:
+        return None
+    bases = _search_get(search_endpoint, "knowledgebases") or []
+    sources = {
+        source.get("name"): (source.get("searchIndexParameters") or {}).get(
+            "searchIndexName"
+        )
+        for source in (_search_get(search_endpoint, "knowledgesources") or [])
+    }
+    indexes = {
+        index.get("name") for index in (_search_get(search_endpoint, "indexes") or [])
+    }
+    counts = {}
+    observed = []
+    for base in bases:
+        resolved = []
+        for reference in base.get("knowledgeSources") or []:
+            name = reference.get("name")
+            index = sources.get(name)
+            if index and index not in counts:
+                counts[index] = _index_document_count(search_endpoint, index)
+            resolved.append(
+                {
+                    "name": name,
+                    "index": index if index in indexes else None,
+                    "documents": counts.get(index, 0),
+                }
+            )
+        observed.append({"name": base.get("name"), "sources": resolved})
+    return observed
+
+
+def _search_get(search_endpoint, collection):
+    """GET one Search data-plane collection and return its `value`."""
+    return _az(
+        "rest", "--method", "GET",
+        "--resource", SEARCH_SCOPE,
+        "--url",
+        f"{search_endpoint}/{collection}?api-version={KB_API_VERSION}",
+        "--query", "value",
+    )
+
+
+def _index_document_count(search_endpoint, index):
+    """Return how many documents an index holds.
+
+    `$count` answers `text/plain`, which `az rest` will not parse, so the count
+    is asked for as part of an empty search instead.
+    """
+    return _az(
+        "rest", "--method", "POST",
+        "--resource", SEARCH_SCOPE,
+        "--url",
+        f"{search_endpoint}/indexes/{index}/docs/search"
+        f"?api-version={SEARCH_API_VERSION}",
+        "--body", json.dumps({"search": "*", "count": True, "top": 0}),
+        "--query", '"@odata.count"',
+    ) or 0
+
+
+def read_kb_connections(project_id):
+    """Read the Foundry project's connections in the shape the check expects."""
+    if not project_id:
+        return None
+    return _az(
+        "rest", "--method", "GET",
+        "--url",
+        f"https://management.azure.com{project_id}/connections"
+        f"?api-version={PROJECT_API_VERSION}",
+        "--query",
+        "value[].{name:name,category:properties.category,"
+        "authType:properties.authType,target:properties.target}",
+    )
 
 
 def probe_models(foundry, models):
@@ -480,16 +805,7 @@ def probe_models(foundry, models):
     import urllib.error
     import urllib.request
 
-    token = subprocess.run(
-        [
-            "az", "account", "get-access-token",
-            "--resource", "https://cognitiveservices.azure.com",
-            "--query", "accessToken", "-o", "tsv",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
+    token = _access_token("https://cognitiveservices.azure.com")
 
     statuses = {}
     for name in models:
@@ -521,7 +837,84 @@ def probe_models(foundry, models):
     return statuses
 
 
-def main(argv=None, read=None, probe=None):
+def _access_token(resource):
+    """Return a bearer token for one audience."""
+    return subprocess.run(
+        [
+            "az", "account", "get-access-token",
+            "--resource", resource,
+            "--query", "accessToken", "-o", "tsv",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+
+def probe_knowledge_bases(project_endpoint, search_endpoint, knowledge_bases):
+    """Run one real agent against each knowledge base; return {name: probe}.
+
+    This is the end-to-end fact and nothing smaller stands in for it. The agent
+    runs in the Foundry project, in the primary region; the knowledge base it
+    reaches is an MCP endpoint on a Search service in another one; and the only
+    credential in play is the project's managed identity, presented through the
+    per-KB RemoteTool connection. Every link in ADR-008's split-region topology
+    is exercised by one request, and a failure anywhere in it shows up here.
+
+    The prompt asks for a quotation rather than a fact from any particular
+    corpus, so the probe is not coupled to which content pack is installed —
+    what is being proven is that retrieval happened, and `summarise_retrieval`
+    reads that off the run rather than off the prose.
+    """
+    import urllib.error
+    import urllib.request
+
+    token = _access_token("https://ai.azure.com")
+
+    probes = {}
+    for name in knowledge_bases:
+        body = {
+            "model": "gpt-5.4-mini",
+            "instructions": (
+                "Answer only from the attached knowledge base. Never answer "
+                "from your own knowledge."
+            ),
+            "input": (
+                "Name one document in this knowledge base and quote a single "
+                "line from it."
+            ),
+            "tools": [
+                {
+                    "type": "mcp",
+                    "server_label": name,
+                    "server_url": (
+                        f"{search_endpoint}/knowledgebases/{name}/mcp"
+                        f"?api-version={KB_API_VERSION}"
+                    ),
+                    "require_approval": "never",
+                    "allowed_tools": ["knowledge_base_retrieve"],
+                    "project_connection_id": f"{name}-mcp",
+                }
+            ],
+        }
+        request = urllib.request.Request(
+            f"{project_endpoint}/openai/v1/responses",
+            data=json.dumps(body).encode(),
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=180) as response:
+                probes[name] = summarise_retrieval(json.load(response))
+        except urllib.error.HTTPError as error:
+            probes[name] = summarise_retrieval({"status": str(error.code)})
+    return probes
+
+
+def main(argv=None, read=None, probe=None, retrieve=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--resource-group", default=RESOURCE_GROUP)
     parser.add_argument("--foundry", default="aif-macaeflwv1flrpd")
@@ -532,9 +925,10 @@ def main(argv=None, read=None, probe=None):
     parser.add_argument(
         "--no-probe",
         action="store_true",
-        help="skip the live request to each model deployment. The roster is "
-             "then reported as unproven, not as reachable — the probe spends a "
-             "handful of tokens and proves the fact #13 and #14 depend on.",
+        help="skip the live requests — one per model deployment, one agent run "
+             "per knowledge base. Both are then reported as unproven rather "
+             "than as working; they spend a handful of tokens and prove the "
+             "facts #13, #14 and #19 depend on.",
     )
     parser.add_argument(
         "--model",
@@ -547,6 +941,12 @@ def main(argv=None, read=None, probe=None):
         action="append",
         default=None,
         help="expected container app name; repeatable",
+    )
+    parser.add_argument(
+        "--knowledge-base",
+        action="append",
+        default=None,
+        help="expected Foundry IQ knowledge base name; repeatable",
     )
     args = parser.parse_args(argv)
 
@@ -564,6 +964,10 @@ def main(argv=None, read=None, probe=None):
             "ca-mcp-macaeflwv1flrpd",
             "app-macaeflwv1flrpd",
         ),
+        # The store assistant's two knowledge bases are seeded on every
+        # deployment, whichever stock content pack was chosen (issue #25).
+        knowledge_bases=args.knowledge_base
+        or ("store-troubleshooting-kb", "store-operations-kb"),
     )
     reader = read or read_deployment
     observed = reader(args.resource_group, args.foundry, args.registry)
@@ -573,8 +977,22 @@ def main(argv=None, read=None, probe=None):
         verdict.checks.append(
             reachability_check(prober(args.foundry, expected.models))
         )
+        retriever = retrieve or probe_knowledge_bases
+        project = project_endpoint(args.foundry, observed)
+        search = search_endpoint(observed)
+        # Without both endpoints there is nothing to probe and no honest way to
+        # say so except by leaving the probe unrun — `search-service` and
+        # `own-foundry-project` already report why.
+        verdict.checks.append(
+            retrieval_check(
+                retriever(project, search, expected.knowledge_bases)
+                if project and search
+                else {}
+            )
+        )
     else:
         verdict.checks.append(reachability_check({}))
+        verdict.checks.append(retrieval_check({}))
 
     print(f"Deployed environment: {args.resource_group}")
     print(format_report(verdict))
