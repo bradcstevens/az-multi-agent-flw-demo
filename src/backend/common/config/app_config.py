@@ -58,6 +58,16 @@ class AppConfig:
             "AZURE_OPENAI_API_VERSION", "2024-11-20"
         )
         self.AZURE_OPENAI_ENDPOINT = self._get_required("AZURE_OPENAI_ENDPOINT")
+        # The Identity boundary gate's similarity tier (ADR-014). The API
+        # version is separate from the chat one on purpose: the measured
+        # threshold in ADR-015 was produced on this embedding api-version, and
+        # silently scoring on another one would invalidate it.
+        self.AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME = self._get_optional(
+            "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small"
+        )
+        self.AZURE_OPENAI_EMBEDDING_API_VERSION = self._get_optional(
+            "AZURE_OPENAI_EMBEDDING_API_VERSION", "2024-12-01-preview"
+        )
         self.ORCHESTRATOR_MODEL_NAME = self._get_optional("ORCHESTRATOR_MODEL_NAME", "gpt-5.4-mini")
         # self.AZURE_BING_CONNECTION_NAME = self._get_optional(
         #     "AZURE_BING_CONNECTION_NAME"

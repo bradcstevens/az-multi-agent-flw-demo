@@ -7,11 +7,12 @@ assignment — the client takes its endpoint, deployment and token provider as
 arguments, and only reaches AppConfig from `from_config`.
 """
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
-from backend.guardrail.embeddings import EmbeddingClient
+from guardrail.embeddings import EmbeddingClient
 
 ENDPOINT = "https://aif-test.openai.azure.com/"
 DEPLOYMENT = "text-embedding-3-small"
@@ -117,3 +118,59 @@ class TestEmbed:
         client = client_with_response(embedding_response([0.1, 0.2]))
 
         assert await client.embed_one("one") == [0.1, 0.2]
+
+
+class TestFromAppConfig:
+    """The wiring #14 adds: the gate points this client at AppConfig.
+
+    Deliberately *not* an override of the inherited `from_config`, which takes
+    an endpoint attribute name and would be a differently-shaped method under
+    the same name. The AppConfig object is patched by name on the module under
+    test — no `sys.modules` assignment.
+    """
+
+    def test_it_reads_the_endpoint_deployment_and_api_version(self, monkeypatch):
+        from guardrail import embeddings as embeddings_mod
+
+        monkeypatch.setattr(
+            embeddings_mod,
+            "config",
+            SimpleNamespace(
+                AZURE_OPENAI_ENDPOINT=ENDPOINT,
+                AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME="text-embedding-3-small",
+                AZURE_OPENAI_EMBEDDING_API_VERSION="2024-12-01-preview",
+                get_access_token=AsyncMock(return_value="a-token"),
+            ),
+        )
+
+        client = EmbeddingClient.from_app_config()
+
+        assert client.base_url == ENDPOINT.rstrip("/")
+        assert client.deployment == "text-embedding-3-small"
+        assert client.api_version == "2024-12-01-preview"
+
+    @pytest.mark.asyncio
+    async def test_it_authenticates_with_the_configured_credential(self, monkeypatch):
+        """Keyless, per ADR-010: the token comes from AppConfig's credential."""
+        from guardrail import embeddings as embeddings_mod
+
+        get_access_token = AsyncMock(return_value="a-token")
+        monkeypatch.setattr(
+            embeddings_mod,
+            "config",
+            SimpleNamespace(
+                AZURE_OPENAI_ENDPOINT=ENDPOINT,
+                AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=DEPLOYMENT,
+                AZURE_OPENAI_EMBEDDING_API_VERSION="2024-12-01-preview",
+                get_access_token=get_access_token,
+            ),
+        )
+        client = EmbeddingClient.from_app_config()
+        response = AsyncMock()
+        response.json = AsyncMock(return_value=embedding_response([0.1, 0.2]))
+        response.raise_for_status = lambda: None
+        client._request = AsyncMock(return_value=response)
+
+        await client.embed(["one"])
+
+        get_access_token.assert_awaited_once()

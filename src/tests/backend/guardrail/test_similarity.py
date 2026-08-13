@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from backend.guardrail.similarity import (
+from guardrail.similarity import (
     cosine_similarity,
     max_similarity,
     personal_intent_margin,

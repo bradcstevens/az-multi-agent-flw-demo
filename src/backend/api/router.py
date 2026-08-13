@@ -18,6 +18,9 @@ from common.utils.team_utils import (find_first_available_team, rai_success,
                                      rai_validate_team_config)
 from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
                      Request, UploadFile, WebSocket, WebSocketDisconnect)
+from guardrail.gate import identity_boundary_gate
+from guardrail.identity import resolve_session_identity
+from guardrail.refusal import policy_block_detail
 from orchestration.connection_config import (connection_config,
                                              orchestration_config, team_config)
 from orchestration.orchestration_manager import OrchestrationManager
@@ -295,6 +298,28 @@ async def process_request(
             event_props["session_id"] = input_task.session_id
         track_event_if_configured("Error_User_Not_Found", event_props)
         raise HTTPException(status_code=400, detail="no user found")
+
+    # The Identity boundary gate (ADR-014). Deliberately the first thing that
+    # happens after the caller is known and before *anything* costs money: the
+    # team lookup, the RAI agent and the orchestration manager are all below
+    # it, so a refused request short-circuits with no agent invoked and no
+    # tokens spent. Identity is anonymous until #20 stores session state and
+    # #27 writes a name into it; the gate admits a named one outright.
+    identity = resolve_session_identity(None)
+    verdict = await identity_boundary_gate().evaluate(
+        input_task.description, identity
+    )
+    if verdict.refused:
+        track_event_if_configured(
+            "Identity_Boundary_Refusal",
+            {
+                "status": "Request refused - identity boundary",
+                "reason": verdict.reason.value,
+                "session_id": input_task.session_id,
+            },
+        )
+        raise HTTPException(status_code=403, detail=policy_block_detail())
+
     try:
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
         user_current_team = await memory_store.get_current_team(user_id=user_id)

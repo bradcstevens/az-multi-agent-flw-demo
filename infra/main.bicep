@@ -384,6 +384,15 @@ output AZURE_OPENAI_RAI_DEPLOYMENT_NAME string = isAvm ? avmDeployment!.outputs.
 
 @description('The Azure OpenAI REST API version used by the backend SDK clients.')
 output AZURE_OPENAI_API_VERSION string = isAvm ? avmDeployment!.outputs.AZURE_OPENAI_API_VERSION : bicepDeployment!.outputs.AZURE_OPENAI_API_VERSION
+
+// The Identity boundary gate's similarity tier (ADR-014). Only the vanilla
+// flavour deploys an embedding model — this template does not forward
+// embeddingModelName to the AVM path — so the AVM branch reports no
+// deployment at all rather than naming one that does not exist. On AVM the
+// gate therefore fails closed, which is ADR-014's recorded consequence and
+// not something to paper over here.
+@description('The embedding deployment backing the Identity boundary gate. Empty on the AVM flavour, which deploys no embedding model.')
+output AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME string = isAvm ? '' : bicepDeployment!.outputs.AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME
 // AI / Foundry context
 @description('The subscription ID hosting the AI Foundry / AI Services resource.')
 output AZURE_AI_SUBSCRIPTION_ID string = isAvm ? avmDeployment!.outputs.AZURE_AI_SUBSCRIPTION_ID : bicepDeployment!.outputs.AZURE_AI_SUBSCRIPTION_ID

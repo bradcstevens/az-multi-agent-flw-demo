@@ -8,7 +8,7 @@ already-scored probes.
 
 import pytest
 
-from backend.guardrail.similarity import (
+from guardrail.similarity import (
     IDENTITY_BOUNDARY_SIMILARITY_THRESHOLD,
     choose_threshold,
     format_sweep,

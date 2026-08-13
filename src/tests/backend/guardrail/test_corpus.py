@@ -10,7 +10,7 @@ whole reason ADR-014 adds an embedding tier at all.
 
 import re
 
-from backend.guardrail.corpus import (
+from guardrail.corpus import (
     NEGATIVE_CONTROLS,
     PERSONAL_INTENT_ANCHORS,
     POSITIVE_PROBES,

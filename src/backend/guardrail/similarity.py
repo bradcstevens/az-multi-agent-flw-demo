@@ -2,7 +2,7 @@
 
 ADR-014 keeps the threshold comparison free of collaborators so it can be
 tested with no mocks at all. Nothing in this module performs I/O: embeddings
-arrive already computed, from `backend.guardrail.embeddings` in production and
+arrive already computed, from `guardrail.embeddings` in production and
 from the Guardrail corpus harness when the threshold is being tuned.
 """
 

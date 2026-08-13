@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.45.15.27210",
-      "templateHash": "4623302700709077613"
+      "templateHash": "8681346562598437165"
     },
     "name": "Multi-Agent Custom Automation Engine - Vanilla Bicep",
     "description": "Vanilla Bicep orchestrator for the Multi-Agent Custom Automation Engine accelerator. This deployment intentionally excludes WAF features such as private networking, scale-out, redundancy, bastion, and VM resources while keeping router-compatible outputs."
@@ -2779,6 +2779,10 @@
                     "value": "[parameters('azureOpenaiAPIVersion')]"
                   },
                   {
+                    "name": "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME",
+                    "value": "[parameters('embeddingModelName')]"
+                  },
+                  {
                     "name": "APPLICATIONINSIGHTS_INSTRUMENTATION_KEY",
                     "value": "[reference(resourceId('Microsoft.Resources/deployments', take(format('module.app-insights.{0}', variables('solutionSuffix')), 64)), '2025-04-01').outputs.instrumentationKey.value]"
                   },
@@ -4518,6 +4522,13 @@
         "description": "The Azure OpenAI API version used by the application."
       },
       "value": "[parameters('azureOpenaiAPIVersion')]"
+    },
+    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME": {
+      "type": "string",
+      "metadata": {
+        "description": "The embedding deployment name backing the Identity boundary gate's similarity tier."
+      },
+      "value": "[parameters('embeddingModelName')]"
     },
     "AZURE_AI_SUBSCRIPTION_ID": {
       "type": "string",

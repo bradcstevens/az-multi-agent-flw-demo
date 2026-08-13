@@ -30,18 +30,18 @@ import os
 import pytest
 import pytest_asyncio
 
-from backend.guardrail.corpus import (
+from guardrail.corpus import (
     NEGATIVE_CONTROLS,
     PERSONAL_INTENT_ANCHORS,
     POSITIVE_PROBES,
     STORE_SCOPE_ANCHORS,
 )
-from backend.guardrail.embeddings import (
+from guardrail.embeddings import (
     COGNITIVE_SERVICES_SCOPE,
     DEFAULT_EMBEDDING_DEPLOYMENT,
     EmbeddingClient,
 )
-from backend.guardrail.similarity import (
+from guardrail.similarity import (
     IDENTITY_BOUNDARY_SIMILARITY_THRESHOLD,
     choose_threshold,
     format_sweep,

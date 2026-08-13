@@ -561,6 +561,13 @@ module backend_container_app './modules/compute/container-app.bicep' = {
             value: azureOpenaiAPIVersion
           }
           {
+            // The Identity boundary gate's similarity tier (ADR-014). The
+            // model is deployed above; without its name the backend would
+            // fall back to a default and the gate would fail closed.
+            name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME'
+            value: embeddingModelName
+          }
+          {
             name: 'APPLICATIONINSIGHTS_INSTRUMENTATION_KEY'
             value: app_insights.outputs.instrumentationKey
           }
@@ -883,6 +890,9 @@ output AZURE_OPENAI_RAI_DEPLOYMENT_NAME string = gpt5_4ModelName
 
 @description('The Azure OpenAI API version used by the application.')
 output AZURE_OPENAI_API_VERSION string = azureOpenaiAPIVersion
+
+@description('The embedding deployment name backing the Identity boundary gate\'s similarity tier.')
+output AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME string = embeddingModelName
 
 @description('The subscription id that hosts the AI Foundry / AI Services resources.')
 output AZURE_AI_SUBSCRIPTION_ID string = subscription().subscriptionId

@@ -83,6 +83,38 @@ def _import_router():
 router_mod, _app = _import_router()
 from fastapi.testclient import TestClient  # noqa: E402
 
+from guardrail.corpus import (  # noqa: E402
+    PERSONAL_INTENT_ANCHORS,
+    STORE_SCOPE_ANCHORS,
+)
+from guardrail.gate import IdentityBoundaryGate  # noqa: E402
+from guardrail.identity import SessionIdentity  # noqa: E402
+from guardrail.refusal import IDENTITY_BOUNDARY_REFUSAL  # noqa: E402
+
+
+class StubEmbedder:
+    """Canned two-dimensional embeddings for the Identity boundary gate.
+
+    The gate under test is the *real* one — the real keyword fast path, the
+    real Two-class margin, the real fail-closed rule — so only the embedding
+    deployment is stood in for. Anchors point along their own axis and any
+    other text is store-shaped unless a test says otherwise, which makes the
+    default verdict "admitted" and keeps every pre-existing router test honest.
+    """
+
+    def __init__(self):
+        self.personal_texts = set()
+
+    async def __call__(self, texts):
+        return [self._vector(text) for text in texts]
+
+    def _vector(self, text):
+        if text in PERSONAL_INTENT_ANCHORS or text in self.personal_texts:
+            return [1.0, 0.0]
+        if text in STORE_SCOPE_ANCHORS:
+            return [0.0, 1.0]
+        return [0.05, 1.0]
+
 
 # ---------------------------------------------------------------------------
 # Fixture: TestClient with all collaborators mocked
@@ -147,7 +179,11 @@ def rt(monkeypatch):
     rai_validate_team_config = AsyncMock(return_value=(True, None))
     get_user = MagicMock(return_value={"user_principal_id": "user-1"})
 
+    embedder = StubEmbedder()
+    gate = IdentityBoundaryGate(embed=embedder)
+
     monkeypatch.setattr(router_mod, "get_authenticated_user_details", get_user)
+    monkeypatch.setattr(router_mod, "identity_boundary_gate", lambda: gate)
     monkeypatch.setattr(router_mod, "DatabaseFactory", database_factory)
     monkeypatch.setattr(router_mod, "TeamService", team_service_cls)
     monkeypatch.setattr(router_mod, "PlanService", plan_service)
@@ -180,6 +216,8 @@ def rt(monkeypatch):
         rai_success=rai_success,
         rai_validate_team_config=rai_validate_team_config,
         get_user=get_user,
+        gate=gate,
+        embedder=embedder,
     )
 
 
@@ -286,6 +324,110 @@ class TestProcessRequest:
         )
         assert resp.status_code == 200
         assert resp.json()["session_id"]
+
+
+# ---------------------------------------------------------------------------
+# /process_request — the Identity boundary gate (issue #14, ADR-014)
+# ---------------------------------------------------------------------------
+class TestTheIdentityBoundaryGate:
+    """The centerpiece, driven through real HTTP against the real gate.
+
+    Only the embedding deployment is stood in for; the keyword fast path, the
+    Two-class margin and the fail-closed rule are all the production code.
+    """
+
+    PERSONAL = "my name is Tanya, how much PTO do I have?"
+    STORE = "How do I close the store?"
+
+    def _post(self, rt, description):
+        return rt.client.post(
+            "/api/v4/process_request",
+            json={"session_id": "sess-1", "description": description},
+        )
+
+    def test_a_personal_question_is_refused_as_a_policy_block(self, rt):
+        resp = self._post(rt, self.PERSONAL)
+
+        assert resp.status_code == 403
+        detail = resp.json()["detail"]
+        assert detail["kind"] == "policy_block"
+        assert detail["code"] == "identity_boundary"
+        assert detail["message"] == IDENTITY_BOUNDARY_REFUSAL
+
+    def test_the_orchestration_manager_is_never_invoked(self, rt):
+        """"No agent ran, no tokens spent" is the requirement, so assert the
+        non-call rather than the refusal — the demo's cost claim rests on it."""
+        self._post(rt, self.PERSONAL)
+
+        rt.orchestration_manager.assert_not_called()
+        rt.orchestration_manager.return_value.run_orchestration.assert_not_awaited()
+
+    def test_the_safety_check_agent_is_never_created_either(self, rt):
+        """The gate runs *before* `rai_success`, which instantiates an agent.
+
+        Placing it after would have spent a model call on every refusal and
+        quietly falsified "the guardrail costs nothing".
+        """
+        self._post(rt, self.PERSONAL)
+
+        rt.rai_success.assert_not_awaited()
+
+    def test_no_plan_is_persisted_for_a_refused_request(self, rt):
+        self._post(rt, self.PERSONAL)
+
+        rt.store.add_plan.assert_not_awaited()
+
+    def test_it_refuses_before_the_team_is_even_resolved(self, rt):
+        """Ordering, asserted through a failure that would otherwise win.
+
+        A missing team is a 400. If this returns 403 the gate genuinely ran
+        first, which is what "before the lane router and before orchestration"
+        has to mean at the top of the request path.
+        """
+        rt.store.get_current_team.return_value = None
+        rt.store.get_team_by_id.return_value = None
+
+        assert self._post(rt, self.PERSONAL).status_code == 403
+
+    def test_a_store_level_question_is_unaffected(self, rt):
+        """The guardrail must not make the tool useless."""
+        resp = self._post(rt, self.STORE)
+
+        assert resp.status_code == 200
+        rt.orchestration_manager.assert_called()
+
+    def test_a_paraphrase_with_no_personal_vocabulary_is_still_refused(self, rt):
+        """The similarity tier, exercised through the endpoint."""
+        paraphrase = "Am I working tomorrow evening?"
+        rt.embedder.personal_texts.add(paraphrase)
+
+        assert self._post(rt, paraphrase).status_code == 403
+
+    def test_a_signed_in_identity_is_admitted(self, rt, monkeypatch):
+        """The mocked unlock: same question, same gate, different identity.
+
+        #20 supplies the session-state record and #27 writes a name into it;
+        the router resolves through this one seam either way.
+        """
+        monkeypatch.setattr(
+            router_mod,
+            "resolve_session_identity",
+            lambda _state: SessionIdentity(display_name="Tanya Reyes"),
+        )
+
+        resp = self._post(rt, self.PERSONAL)
+
+        assert resp.status_code == 200
+        rt.orchestration_manager.assert_called()
+
+    def test_a_gate_that_cannot_score_refuses(self, rt, monkeypatch):
+        """Fail closed all the way out to the HTTP response."""
+        async def broken(_texts):
+            raise RuntimeError("the embedding deployment is unreachable")
+
+        monkeypatch.setattr(rt.gate, "_embed", broken)
+
+        assert self._post(rt, self.STORE).status_code == 403
 
 
 # ---------------------------------------------------------------------------

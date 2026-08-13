@@ -14,7 +14,9 @@ it at the deployed environment, and the gate will point it at AppConfig when
 
 from typing import Any, Awaitable, Callable, List, Sequence
 
-from backend.services.base_api_service import BaseAPIService
+from common.config.app_config import config
+
+from services.base_api_service import BaseAPIService
 
 DEFAULT_EMBEDDING_DEPLOYMENT = "text-embedding-3-small"
 COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default"
@@ -24,6 +26,26 @@ TokenProvider = Callable[[], Awaitable[str]]
 
 class EmbeddingClient(BaseAPIService):
     """Azure OpenAI embeddings, keyless."""
+
+    @classmethod
+    def from_app_config(cls, **kwargs: Any) -> "EmbeddingClient":
+        """The client the Identity boundary gate runs on in production.
+
+        Deliberately not named `from_config`: the inherited factory of that
+        name takes an AppConfig *attribute name* for the endpoint, and giving
+        a differently-shaped method the same name would make the base class
+        lie about its own contract.
+
+        The token provider is AppConfig's own credential, so the gate is
+        keyless like everything else the templates deploy (ADR-010).
+        """
+        return cls(
+            config.AZURE_OPENAI_ENDPOINT,
+            config.AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME,
+            api_version=config.AZURE_OPENAI_EMBEDDING_API_VERSION,
+            token_provider=config.get_access_token,
+            **kwargs,
+        )
 
     def __init__(
         self,

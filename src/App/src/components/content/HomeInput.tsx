@@ -14,13 +14,14 @@ import "./../../styles/HomeInput.css";
 
 import { HomeInputProps, iconMap, QuickTask } from "../../models/homeInput";
 import { TaskService } from "../../store/TaskService";
+import { parsePolicyBlock, PolicyBlock } from "../../api/policyBlock";
 import { NewTaskService } from "../../store/NewTaskService";
 
 import ChatInput from "@/commonComponents/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
 import PromptCard from "@/commonComponents/components/PromptCard";
 import { Send } from "@/commonComponents/imports/bundleicons";
-import { Clipboard20Regular } from "@fluentui/react-icons";
+import { Clipboard20Regular, ShieldCheckmark20Regular } from "@fluentui/react-icons";
 
 // Icon mapping function to convert string icons to FluentUI icons
 const getIconFromString = (
@@ -60,6 +61,7 @@ interface ExtendedQuickTask extends QuickTask {
 const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [input, setInput] = useState<string>("");
+  const [policyBlock, setPolicyBlock] = useState<PolicyBlock | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
@@ -93,6 +95,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
   const handleSubmit = async () => {
     if (input.trim()) {
       setSubmitting(true);
+      setPolicyBlock(null);
       let id = showToast("Creating a plan", "progress");
 
       try {
@@ -116,8 +119,21 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
           dismissToast(id);
         }
       } catch (error: any) {
-        let errorMessage = "Unable to create plan. Please try again.";
         dismissToast(id);
+
+        // A Policy block is the Identity boundary gate working, so it gets its
+        // own surface rather than the error toast (ADR-014). Rendering it as
+        // an error would make a governed refusal look like a bug — and look
+        // identical to a retrieval miss, which is an answer, not a policy.
+        const refusal = parsePolicyBlock(error);
+        if (refusal) {
+          setPolicyBlock(refusal);
+          setInput("");
+          setSubmitting(false);
+          return;
+        }
+
+        let errorMessage = "Unable to create plan. Please try again.";
         // Check if this is an RAI validation error
         try {
           // errorDetail = JSON.parse(error);
@@ -216,6 +232,29 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                             onDismiss={() => setRAIError(null)}
                         />
                     )} */}
+
+          {/*
+            A Policy block: the Identity boundary gate refusing a personal
+            question on a shared store device (ADR-014). Deliberately not a
+            toast and deliberately not styled as an error — it reads as policy,
+            and it is visibly a different thing from a retrieval miss, which
+            arrives as an answer rather than as a failed request.
+          */}
+          {policyBlock && (
+            <div
+              className="home-input-policy-block"
+              role="note"
+              aria-live="polite"
+              data-testid="policy-block"
+              data-policy-code={policyBlock.code}
+            >
+              <div className="home-input-policy-block-header">
+                <ShieldCheckmark20Regular aria-hidden="true" />
+                <Body1Strong>Store-scoped assistant</Body1Strong>
+              </div>
+              <Caption1>{policyBlock.message}</Caption1>
+            </div>
+          )}
 
           <ChatInput
             ref={textareaRef} // forwarding

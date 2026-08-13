@@ -70,14 +70,34 @@ personal, individual-identity questions from a shared store device, executed **b
 router and before orchestration**. Keyword fast path plus an embedding-similarity tier; **fails
 closed**; on a match the request short-circuits with no agent invoked and no tokens spent. It is
 not the accelerator's prompt-based team-scope evaluation, which fails open in two places. The
-similarity tier scores a **Two-class margin**, not a bare similarity. See
-[ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md) and
+similarity tier scores a **Two-class margin**, not a bare similarity. Lives in
+`src/backend/guardrail/gate.py` and runs from `process_request` as the **first** thing after the
+caller is known — above the team lookup, above `rai_success` and above the orchestration manager,
+because the content-safety check instantiates an agent and a refusal that paid for one would
+falsify the cost claim. See [ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md) and
 [ADR-015](docs/ADR/015-two-class-margin-for-the-identity-boundary-gate.md).
 _Avoid_: guardrail prompt, scope prompt, content filter
 
+**Keyword fast path** — the gate's first tier (`src/backend/guardrail/keywords.py`): pure HR and
+payroll vocabulary, no I/O, matched on word boundaries. Chosen for **what the vocabulary is**, not
+tuned until it swept the Guardrail corpus — a list fitted to the corpus would stop the corpus being
+evidence, the failure mode ADR-015 rejected for the anchors. Its hard requirement runs one way
+only: it may miss a personal question (the similarity tier is behind it), but it may **never** trip
+on a store-level one.
+
+**Session identity** — who, if anyone, is signed in on the shared device
+(`src/backend/guardrail/identity.py`). Defaults to **anonymous**, and anonymous is the *refusing*
+state, so absent, empty, half-written and malformed records all resolve to it. The gate checks it
+first and admits a named identity outright — the **Mocked unlock** is a parameter of the gate, not
+a second gate. #20 supplies the session-state record; #27 writes a name into it.
+
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
 **retrieval miss** — an honest "that procedure is not in the library" — because conflating the two
-makes a governed refusal look like a bug.
+makes a governed refusal look like a bug. On the wire it is HTTP **403** with
+`detail.kind == "policy_block"` (`src/backend/guardrail/refusal.py`), which is what lets the
+frontend give it its own neutral surface instead of the error toast
+(`src/App/src/api/policyBlock.ts`). A retrieval miss is not a failed request at all — it arrives
+as an answer.
 
 **Mocked unlock** — the post-"sign-in" state in which the Identity boundary gate admits the
 previously refused question and answers it from mocked data. A parameter of the gate, not a
@@ -215,8 +235,10 @@ _Avoid_: guardrail test set, probe set (the probes are one half of it)
 
 **Personal-intent anchors** / **Store-scope anchors** — the two sets of exemplar phrasings the
 similarity tier scores an incoming request against. **Production data, not test data**: the gate
-embeds them once at startup. The store-scope set is a counterweight, not a second corpus — it
-exists so shared sentence shape cancels.
+embeds them once per process, on first use, and reuses them for every later request — a failure is
+deliberately not cached, so a bad minute does not become a gate that refuses everything until the
+container restarts. The store-scope set is a counterweight, not a second corpus — it exists so
+shared sentence shape cancels.
 
 **Two-class margin** — the similarity tier's score: nearest personal-intent anchor minus nearest
 store-scope anchor (`similarity.personal_intent_margin`). Roughly ±0.6, **not** a cosine value in

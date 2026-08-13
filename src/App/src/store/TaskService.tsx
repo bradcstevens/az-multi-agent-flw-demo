@@ -1,6 +1,7 @@
 import { Plan, PlanStatus } from "../models";
 import { Task } from "../models/taskList";
 import { apiService } from "../api/apiService";
+import { parsePolicyBlock, PolicyBlockError } from "../api/policyBlock";
 import { InputTask, InputTaskResponse } from "../models/inputTask";
 
 /**
@@ -195,6 +196,14 @@ export class TaskService {
     try {
       return await apiService.createPlan(inputTask);
     } catch (error: any) {
+
+      // A Policy block is not a failure to create a plan — it is the Identity
+      // boundary gate working (ADR-014). Rethrow it intact so the surface can
+      // render it as policy; everything else keeps the generic message.
+      const policyBlock = parsePolicyBlock(error);
+      if (policyBlock) {
+        throw new PolicyBlockError(policyBlock);
+      }
 
       // You can customize this logic as needed
       let message = "Unable to create plan. Please try again.";
