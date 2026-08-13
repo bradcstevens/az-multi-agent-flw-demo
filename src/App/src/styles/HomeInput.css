@@ -185,3 +185,23 @@
   gap: 8px;
   color: var(--colorNeutralForeground1);
 }
+
+/*
+ * The door in the wall (issue #27). Sits inside the refusal rather than beside
+ * it, so the boundary and the way through it are visibly one thing — a button
+ * floating elsewhere on the surface reads as an unrelated affordance.
+ *
+ * Wraps at the phone breakpoint: the associate's screen is 640px, and a caption
+ * that says the sign-in is simulated is not optional copy.
+ */
+.home-input-policy-block-door {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.home-input-policy-block-note {
+  color: var(--colorNeutralForeground3);
+}

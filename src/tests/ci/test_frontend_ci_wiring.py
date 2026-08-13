@@ -74,6 +74,18 @@ def test_the_contract_between_the_two_ends_is_asserted_somewhere():
     )
 
 
+def test_the_mocked_unlock_contract_is_asserted_somewhere():
+    # The same seam for the **Personal answer** (#27). A card that fails to
+    # render says nothing at the moment the presenter has just told the room the
+    # sign-in changed something, which turns the closing beat into its opposite.
+    contract = Path(__file__).with_name("test_personal_answer_contract.py")
+
+    assert contract.exists(), (
+        "nothing asserts that the backend's personal answer and the browser's "
+        "parser still agree"
+    )
+
+
 def test_a_change_to_either_end_of_the_contract_runs_the_contract_test():
     # The contract test runs in `test.yml`, which triggers on Python paths — so
     # a backend rename runs it. A *frontend* rename would not have, because
@@ -91,11 +103,17 @@ def test_a_change_to_either_end_of_the_contract_runs_the_contract_test():
     # `rehearsedReply.ts` (#26) is here for the third time for the same
     # reason: `test_store_pack.py` is the only thing that reads the browser's
     # reader and the authored pack together, and vitest cannot see the pack.
+    # `personalAnswer.ts` and `signedInDevice.ts` (#27) are the fourth:
+    # `test_personal_answer_contract.py` spans the socket for the Mocked
+    # unlock, and it is also the only thing that checks the browser authors no
+    # associate's name of its own.
     for path in (
         "src/App/src/models/transparency.ts",
         "src/App/src/models/ticket.ts",
         "src/App/src/models/enums.tsx",
         "src/App/src/models/rehearsedReply.ts",
+        "src/App/src/models/personalAnswer.ts",
+        "src/App/src/models/signedInDevice.ts",
     ):
         assert text.count(f"'{path}'") >= 2, (
             f"a change to {path} does not run the transparency contract test on "

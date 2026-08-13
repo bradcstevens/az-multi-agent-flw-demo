@@ -3,6 +3,11 @@ import { Task } from "../models/taskList";
 import { apiService } from "../api/apiService";
 import { parsePolicyBlock, PolicyBlockError } from "../api/policyBlock";
 import { InputTask, InputTaskResponse } from "../models/inputTask";
+import {
+  forgetSignedInDevice,
+  rememberSignedInName,
+  signedInName,
+} from "../models/signedInDevice";
 
 /**
  * TaskService - Service for handling task-related operations and transformations
@@ -192,6 +197,28 @@ export class TaskService {
   ): Promise<InputTaskResponse> {
     const sessionId = this.generateSessionId();
 
+    // The **Mocked unlock** (#27), materialised into this request's own
+    // session. A session is one conversation — one **Simulated ticket**, one
+    // **Lane** taken, one troubleshooting record — so the tab cannot simply
+    // re-use the session it signed in on; each new one has the identity
+    // written into it as it is created.
+    //
+    // The gate belongs here rather than at the call site, for the reason #22's
+    // approval seam and #26's chips do: a gate the caller owns is a gate the
+    // second caller forgets, and forgetting it here means the closing beat
+    // silently refuses.
+    //
+    // Fails closed. A sign-in that could not be written leaves the request
+    // anonymous — and the device forgets, so the header stops naming an
+    // associate the gate is about to decline to answer for.
+    if (signedInName()) {
+      try {
+        await apiService.signIn(sessionId);
+      } catch {
+        forgetSignedInDevice();
+      }
+    }
+
     const inputTask: InputTask = {
       session_id: sessionId,
       description: description,
@@ -216,6 +243,34 @@ export class TaskService {
 
       throw new Error(message);
     }
+  }
+
+  /**
+   * Sign this device in, the mocked way (issue #27).
+   *
+   * The closing beat's one tap. It writes an identity into server-side
+   * **Session state** — which is what the acceptance criterion asks for and
+   * what makes the sign-in survive a mid-demo reload — and remembers the name
+   * the route returned so the header and every later request agree about who
+   * is signed in.
+   *
+   * The session it writes into is a fresh one and is not itself re-used: a
+   * session is one conversation, and `createPlan` signs each new one in as it
+   * creates it. One spare session-state record is a cheaper price than a tab
+   * whose every conversation shares a ticket and a lane.
+   *
+   * @returns The associate's name, or null if nobody was signed in
+   */
+  static async signInDevice(): Promise<string | null> {
+    try {
+      const state = await apiService.signIn(this.generateSessionId());
+      rememberSignedInName(state?.identity?.display_name);
+    } catch {
+      // Fails closed: an unwritten identity is an anonymous device, and an
+      // anonymous device is the refusing state. Nothing is claimed.
+      forgetSignedInDevice();
+    }
+    return signedInName();
   }
 }
 

@@ -18,6 +18,8 @@ from common.utils.team_utils import (find_first_available_team, rai_success,
                                      rai_validate_team_config)
 from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
                      Request, UploadFile, WebSocket, WebSocketDisconnect)
+from associate.answer import personal_answer_detail
+from associate.records import DEMO_ASSOCIATE, lookup_associate
 from guardrail.gate import identity_boundary_gate
 from guardrail.identity import ANONYMOUS
 from guardrail.refusal import policy_block_detail
@@ -349,6 +351,37 @@ async def process_request(
             },
         )
         raise HTTPException(status_code=403, detail=policy_block_detail())
+
+    # The Mocked unlock (issue #27). The mirror image of the refusal directly
+    # above it: the *same* keyword match decided both, and the only thing that
+    # differs between the two outcomes is whether anybody is signed in. So it
+    # short-circuits here for the same reasons the refusal does — no agent
+    # invoked, no plan persisted, no tokens spent — and the presenter sees the
+    # answer land in the place the refusal just was.
+    #
+    # An admitted personal question whose name has no **Associate record**
+    # falls through to the ordinary request path, which is the honest
+    # direction: the agents say they hold nothing about an individual, and
+    # nobody is ever shown a balance nobody authored.
+    if verdict.personal:
+        record = lookup_associate(identity.display_name)
+        if record is not None:
+            track_event_if_configured(
+                "Identity_Boundary_Unlocked",
+                {
+                    "status": "Answered from the associate's record",
+                    "session_id": input_task.session_id,
+                },
+            )
+            return {
+                "status": "Answered from the associate's record",
+                "session_id": input_task.session_id,
+                # No plan was created, so there is nothing to navigate to. A
+                # plan id here would send the surface to a page that does not
+                # exist.
+                "plan_id": None,
+                "personal_answer": personal_answer_detail(record),
+            }
 
     try:
         if memory_store is None:
@@ -1667,6 +1700,49 @@ async def get_session_state(session_id: str, request: Request):
         raise HTTPException(
             status_code=500, detail="Internal server error occurred"
         ) from e
+
+
+@app_router.post("/session_state/{session_id}/sign_in")
+async def sign_in_session(session_id: str, request: Request):
+    """The Mocked sign-in (issue #27) — the whole of the identity provider.
+
+    **It takes no name.** The route declares no body, so a caller that supplies
+    one is ignored: the name the header shows and the name the **Associate
+    record** is keyed by would otherwise be two strings in two languages, free
+    to drift, and the drift's symptom is a header confidently naming somebody
+    the Identity boundary gate will not answer for. The one associate the demo
+    signs in as is authored in ``associate/records.py`` and read from there.
+
+    Its own route rather than a ``PATCH`` with a name in it for the same
+    reason. Signing out *is* that patch — clearing an identity needs no
+    authored content and a present-but-null field already means it.
+
+    No real identity provider is involved anywhere in this flow, which is the
+    beat's plainest requirement and the conversation it exists to open.
+    """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(status_code=400, detail="no user found")
+
+    try:
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        store = SessionStateStore(memory_store, user_id=user_id)
+        state = await store.write(
+            session_id,
+            identity={"display_name": DEMO_ASSOCIATE.display_name},
+        )
+    except Exception as e:
+        logger.error("Error signing in session '%s': %s", session_id, e)
+        raise HTTPException(
+            status_code=500, detail="Internal server error occurred"
+        ) from e
+
+    track_event_if_configured(
+        "Identity_Mocked_Sign_In",
+        {"status": "Signed in (mocked)", "session_id": session_id},
+    )
+    return state
 
 
 @app_router.patch("/session_state/{session_id}")

@@ -11,7 +11,9 @@ Three tiers, cheapest first:
 
 1. **Identity.** A signed-in session is admitted outright. The mocked unlock is
    a parameter of this gate, not a second gate, so it costs nothing and is
-   checked first.
+   checked first. It still runs the keyword tier — not to decide the verdict,
+   which is already *admit*, but to record **which** admitted question this
+   was, because #27 answers a personal one out of the associate's own record.
 2. **Keyword fast path** (`guardrail.keywords`). Pure, no I/O, refuses
    the obvious personal question without an embedding round trip.
 3. **Similarity tier** (`guardrail.similarity`). One embedding call,
@@ -69,6 +71,15 @@ class GateVerdict:
     refused: bool
     reason: GateReason
     score: Optional[float] = None
+    # Whether the gate classified this as a personal, individual-identity
+    # question. Distinct from `refused`, and the distinction is the whole of
+    # the Mocked unlock: a signed-in associate's personal question is
+    # `personal=True, refused=False`, which is the one combination that the
+    # associate's own record answers. Recording it here rather than letting the
+    # request path ask again is ADR-014's "a parameter of the gate, not a
+    # second gate" — a second classifier could disagree with this one, and the
+    # disagreement would be invisible.
+    personal: bool = False
 
 
 @dataclass(frozen=True)
@@ -104,10 +115,27 @@ class IdentityBoundaryGate:
     ) -> GateVerdict:
         """Decide one request, cheapest tier first."""
         if not identity.is_anonymous:
-            return GateVerdict(refused=False, reason=GateReason.SIGNED_IN)
+            # A signed-in request is admitted whatever it asks, so there is
+            # nothing left for the similarity tier to decide — but *which*
+            # admitted question this was still matters, because the Mocked
+            # unlock answers a personal one out of the associate's own record.
+            # The classification it needs is the pure keyword one, so the
+            # unlock costs no embedding call and cannot be taken down by an
+            # unreachable embedding deployment. It inherits the fast path's
+            # one-way requirement whole: it may miss a personal question — that
+            # one reaches the ordinary agents and is honestly declined — but it
+            # may never claim a store question as personal, which would answer
+            # "how do I close the store?" out of somebody's PTO balance.
+            return GateVerdict(
+                refused=False,
+                reason=GateReason.SIGNED_IN,
+                personal=matches_personal_keyword(request_text),
+            )
 
         if matches_personal_keyword(request_text):
-            return GateVerdict(refused=True, reason=GateReason.KEYWORD)
+            return GateVerdict(
+                refused=True, reason=GateReason.KEYWORD, personal=True
+            )
 
         try:
             score = await asyncio.wait_for(
@@ -123,12 +151,21 @@ class IdentityBoundaryGate:
                 "(fail-closed, ADR-014).",
                 exc_info=True,
             )
-            return GateVerdict(refused=True, reason=GateReason.UNAVAILABLE)
+            # Refused, but deliberately **not** reported personal: this request
+            # was refused because the gate could not tell what it was, which is
+            # a different fact from having decided it was personal. Saying so
+            # keeps `personal` a classification rather than a synonym for
+            # `refused`.
+            return GateVerdict(
+                refused=True, reason=GateReason.UNAVAILABLE, personal=False
+            )
 
+        refused = refuses(score, self.threshold)
         return GateVerdict(
-            refused=refuses(score, self.threshold),
+            refused=refused,
             reason=GateReason.MARGIN,
             score=score,
+            personal=refused,
         )
 
     async def _score(self, request_text: str) -> float:

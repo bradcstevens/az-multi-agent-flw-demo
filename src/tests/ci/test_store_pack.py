@@ -1069,6 +1069,32 @@ def test_given_the_boundary_probe_when_read_then_it_is_a_measured_probe(
     assert gate_keywords.normalise(probe["prompt"]) in measured
 
 
+def test_given_the_boundary_probe_when_read_then_the_unlock_answers_for_it(
+    store_pack, gate_keywords
+):
+    # The **Mocked unlock** (#27) rides this same tap: refused, signed in,
+    # answered. So the name the probe gives has to be the name the **Associate
+    # record** is keyed by — sign in as anybody else and the audience is
+    # watching one person's question answered with another person's record,
+    # which is the beat making the opposite of its point.
+    #
+    # Read out of `associate.records` rather than restated here, because a name
+    # written in a test agrees with itself forever.
+    from associate.records import lookup_associate
+
+    probe = _boundary_probe(store_pack, gate_keywords)
+    named = [
+        word.strip(".,?!")
+        for word in probe["prompt"].split()
+        if lookup_associate(word.strip(".,?!")) is not None
+    ]
+
+    assert named, (
+        "the boundary probe names nobody the mocked sign-in has a record for — "
+        "the closing beat would answer as somebody the presenter never named"
+    )
+
+
 def test_given_the_other_quick_tasks_when_read_then_none_of_them_trips_the_gate(
     store_pack, gate_keywords
 ):

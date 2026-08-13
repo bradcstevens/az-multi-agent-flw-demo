@@ -49,6 +49,13 @@ on:
       # green and the chips silently absent; `test_store_pack.py` is
       # the only thing that reads this file and the pack together.
       - 'src/App/src/models/rehearsedReply.ts'
+      # The browser's half of the Personal answer (#27). Fourth time, same
+      # reason: `test_personal_answer_contract.py` is the only thing that
+      # spans the socket for the Mocked unlock, and `personalAnswer.test.ts`
+      # hand-writes its payload. `signedInDevice.ts` is here because the same
+      # contract asserts that the browser authors no associate name of its own.
+      - 'src/App/src/models/personalAnswer.ts'
+      - 'src/App/src/models/signedInDevice.ts'
       # The SOP corpus, for the six Quick Tasks (#26). Two of the walkthrough's
       # taps are read out of `content/sop/corpus.toml` rather than restated —
       # the rehearsed honest miss and the rehearsed hit — and the hit names a
@@ -110,6 +117,13 @@ on:
       # green and the chips silently absent; `test_store_pack.py` is
       # the only thing that reads this file and the pack together.
       - 'src/App/src/models/rehearsedReply.ts'
+      # The browser's half of the Personal answer (#27). Fourth time, same
+      # reason: `test_personal_answer_contract.py` is the only thing that
+      # spans the socket for the Mocked unlock, and `personalAnswer.test.ts`
+      # hand-writes its payload. `signedInDevice.ts` is here because the same
+      # contract asserts that the browser authors no associate name of its own.
+      - 'src/App/src/models/personalAnswer.ts'
+      - 'src/App/src/models/signedInDevice.ts'
       # The SOP corpus, for the six Quick Tasks (#26). Two of the walkthrough's
       # taps are read out of `content/sop/corpus.toml` rather than restated —
       # the rehearsed honest miss and the rehearsed hit — and the hit names a

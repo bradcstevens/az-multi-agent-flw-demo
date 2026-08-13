@@ -197,6 +197,29 @@ export class APIService {
         );
     }
 
+    /**
+     * The Mocked sign-in (issue #27) — the whole of the identity provider.
+     *
+     * **It sends no name.** The route takes none: the associate is authored in
+     * the backend's `associate/records.py` and comes back on the response, so
+     * the name the header shows and the name the **Associate record** is keyed
+     * by cannot drift apart. A name supplied from here would be a header
+     * confidently claiming somebody the Identity boundary gate will not answer
+     * for.
+     *
+     * No real identity provider is involved anywhere in this flow — not here,
+     * not behind the route. That is the point of the beat.
+     *
+     * @param sessionId The session to write the identity into.
+     * @returns Promise with the session's state, identity included
+     */
+    async signIn(sessionId: string): Promise<SessionState> {
+        return apiClient.post(
+            `${API_ENDPOINTS.SESSION_STATE}/${encodeURIComponent(sessionId)}/sign_in`,
+            {}
+        );
+    }
+
 
     /**
    * Approve a plan for execution 

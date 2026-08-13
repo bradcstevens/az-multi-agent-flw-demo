@@ -180,13 +180,35 @@ describe('six Quick Tasks on a phone-sized screen', () => {
         // element declared `display: grid`, which does nothing at all. A
         // breakpoint that is present, correct and inert is the exact failure
         // #25 found in the shell's inline row.
+        //
+        // The block is read to its **matching** brace, not to the last one in
+        // the file: anything declared after the last media query is not inside
+        // it, and reading it as though it were makes this test fail on rules it
+        // was never about.
         const css = readFileSync(STYLESHEET, 'utf8');
-        const blocks = css.split('@media').slice(1);
 
-        for (const block of blocks) {
-            const scoped = block.slice(0, block.lastIndexOf('}'));
-            if (!scoped.includes('.home-input-quick-tasks')) continue;
-            expect(scoped).not.toMatch(/flex-wrap|flex:/);
+        for (const block of mediaBlocks(css)) {
+            if (!block.includes('.home-input-quick-tasks')) continue;
+            expect(block).not.toMatch(/flex-wrap|flex:/);
         }
     });
 });
+
+/** Each `@media` block's body, read to its matching close brace. */
+const mediaBlocks = (css: string): string[] => {
+    const blocks: string[] = [];
+
+    for (const match of css.matchAll(/@media[^{]*\{/g)) {
+        let depth = 1;
+        let index = match.index! + match[0].length;
+        const start = index;
+        while (index < css.length && depth > 0) {
+            if (css[index] === '{') depth += 1;
+            if (css[index] === '}') depth -= 1;
+            index += 1;
+        }
+        blocks.push(css.slice(start, index - 1));
+    }
+
+    return blocks;
+};

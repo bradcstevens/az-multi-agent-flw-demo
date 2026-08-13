@@ -15,6 +15,9 @@ import "./../../styles/HomeInput.css";
 import { HomeInputProps, iconMap, QuickTask } from "../../models/homeInput";
 import { TaskService } from "../../store/TaskService";
 import { parsePolicyBlock, PolicyBlock } from "../../api/policyBlock";
+import { PersonalAnswer, parsePersonalAnswer } from "../../models/personalAnswer";
+import { forgetSignedInDevice } from "../../models/signedInDevice";
+import PersonalAnswerCard from "../identity/PersonalAnswerCard";
 import { isLane, LANE_LABELS } from "../../models/lane";
 import LaneBadge from "../lane/LaneBadge";
 import { NewTaskService } from "../../store/NewTaskService";
@@ -26,7 +29,11 @@ import ChatInput from "@/commonComponents/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
 import PromptCard from "@/commonComponents/components/PromptCard";
 import { Send } from "@/commonComponents/imports/bundleicons";
-import { Clipboard20Regular, ShieldCheckmark20Regular } from "@fluentui/react-icons";
+import {
+  Clipboard20Regular,
+  PersonKey20Regular,
+  ShieldCheckmark20Regular,
+} from "@fluentui/react-icons";
 
 // Icon mapping function to convert string icons to FluentUI icons
 const getIconFromString = (
@@ -70,6 +77,14 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
   const [input, setInput] = useState<string>("");
   const [policyBlock, setPolicyBlock] = useState<PolicyBlock | null>(null);
   /**
+   * The question the Identity boundary gate refused, kept so the sign-in can
+   * re-ask it. Cleared the moment anything else is asked.
+   */
+  const [refusedQuestion, setRefusedQuestion] = useState<string | null>(null);
+  /** The signed-in associate's record, once the unlock has answered (#27). */
+  const [personalAnswer, setPersonalAnswer] = useState<PersonalAnswer | null>(null);
+  const [signingIn, setSigningIn] = useState<boolean>(false);
+  /**
    * The Lane declared by the Quick Task that was tapped, if the text in the
    * box is still that task's prompt. Editing the text clears it — edited text
    * is free-typed input, and free-typed input is the keyword fallback's job.
@@ -106,85 +121,151 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
   }, []);
 
   const handleSubmit = async () => {
-    if (input.trim()) {
-      setSubmitting(true);
-      setPolicyBlock(null);
-      // The Grounding panel's claim is about *this* answer (#24, R6), so the
-      // previous one goes dark before the next question is in flight. A
-      // question answered inside Foundry emits no source_used at all, and a
-      // stale panel would credit Copilot Studio with an answer it never gave.
-      dispatch(requestStarted());
-      let id = showToast("Creating a plan", "progress");
+    await submitQuestion(input.trim());
+  };
 
-      try {
-        const response = await TaskService.createPlan(
-          input.trim(),
-          selectedTeam?.team_id,
-          declaredLane
+  /**
+   * Ask one question.
+   *
+   * Takes the words rather than reading the box, because the **Mocked unlock**
+   * (#27) asks the *same* question a second time after the sign-in and the box
+   * has been cleared by then. Re-typing it would put a typo or an autocorrect
+   * between the presenter and the payoff, which is the thing the Rehearsed
+   * replies exist to prevent (#26).
+   */
+  const submitQuestion = async (question: string) => {
+    if (!question) return;
+
+    setSubmitting(true);
+    setPolicyBlock(null);
+    setRefusedQuestion(null);
+    setPersonalAnswer(null);
+    // The Grounding panel's claim is about *this* answer (#24, R6), so the
+    // previous one goes dark before the next question is in flight. A
+    // question answered inside Foundry emits no source_used at all, and a
+    // stale panel would credit Copilot Studio with an answer it never gave.
+    dispatch(requestStarted());
+    let id = showToast("Creating a plan", "progress");
+
+    try {
+      const response = await TaskService.createPlan(
+        question,
+        selectedTeam?.team_id,
+        declaredLane
+      );
+      setInput("");
+
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+
+      // The Mocked unlock's answer (#27): the previously refused question,
+      // answered out of the signed-in associate's own record. It arrives on a
+      // *successful* request with no plan, because it cost no agent and no
+      // tokens — exactly as the refusal did. Checked before the plan id, since
+      // a null plan here is not a failure to create one.
+      const answer = parsePersonalAnswer(response);
+      if (answer) {
+        dismissToast(id);
+        setPersonalAnswer(answer);
+        setSubmitting(false);
+        return;
+      }
+
+      // The lane taken, as the lane router reported it — a feature of the
+      // assistant, not an implementation detail (ADR-013). It is not always
+      // the lane declared: free-typed input declares nothing, and an
+      // unreadable declaration falls open to the Deliberate lane. It is
+      // carried to the plan page, where the answer (or the approval step)
+      // arrives, so it outlives this toast.
+      if (response.plan_id && response.plan_id !== null) {
+        showToast(
+          isLane(response.lane)
+            ? `Plan created — ${LANE_LABELS[response.lane]}`
+            : "Plan created!",
+          "success"
         );
-        setInput("");
-
-        if (textareaRef.current) {
-          textareaRef.current.style.height = "auto";
-        }
-
-        // The lane taken, as the lane router reported it — a feature of the
-        // assistant, not an implementation detail (ADR-013). It is not always
-        // the lane declared: free-typed input declares nothing, and an
-        // unreadable declaration falls open to the Deliberate lane. It is
-        // carried to the plan page, where the answer (or the approval step)
-        // arrives, so it outlives this toast.
-        if (response.plan_id && response.plan_id !== null) {
-          showToast(
-            isLane(response.lane)
-              ? `Plan created — ${LANE_LABELS[response.lane]}`
-              : "Plan created!",
-            "success"
-          );
-          dismissToast(id);
-
-          navigate(`/plan/${response.plan_id}`, {
-            state: { lane: response.lane },
-          });
-        } else {
-          showToast("Failed to create plan", "error");
-          dismissToast(id);
-        }
-      } catch (error: any) {
         dismissToast(id);
 
-        // A Policy block is the Identity boundary gate working, so it gets its
-        // own surface rather than the error toast (ADR-014). Rendering it as
-        // an error would make a governed refusal look like a bug — and look
-        // identical to a retrieval miss, which is an answer, not a policy.
-        const refusal = parsePolicyBlock(error);
-        if (refusal) {
-          setPolicyBlock(refusal);
-          // The refusal goes on the Token meter too (#24, R7): a refused
-          // request adds nothing, and the row showing a measured zero beside
-          // rows that cost something is what makes "nothing" legible.
-          dispatch(refusalRecorded(refusal));
-          setInput("");
-          setSubmitting(false);
-          return;
-        }
+        navigate(`/plan/${response.plan_id}`, {
+          state: { lane: response.lane },
+        });
+      } else {
+        showToast("Failed to create plan", "error");
+        dismissToast(id);
+      }
+    } catch (error: any) {
+      dismissToast(id);
 
-        let errorMessage = "Unable to create plan. Please try again.";
-        // Check if this is an RAI validation error
-        try {
-          // errorDetail = JSON.parse(error);
-          errorMessage = error?.message || errorMessage;
-        } catch (parseError) {
-          console.error("Error parsing error response", parseError);
-        }
-
-        showToast(errorMessage, "error");
-      } finally {
+      // A Policy block is the Identity boundary gate working, so it gets its
+      // own surface rather than the error toast (ADR-014). Rendering it as
+      // an error would make a governed refusal look like a bug — and look
+      // identical to a retrieval miss, which is an answer, not a policy.
+      const refusal = parsePolicyBlock(error);
+      if (refusal) {
+        setPolicyBlock(refusal);
+        // The question, kept so the sign-in can re-ask it on one tap. This is
+        // the only place in the walkthrough where the same words are said
+        // twice, and the second saying has to be identical to the first or the
+        // before-and-after is not a comparison.
+        setRefusedQuestion(question);
+        // A refusal *is* the gate stating that nobody is signed in. A header
+        // that went on naming an associate the gate has just declined to
+        // answer for would be the surface saying something that is not so.
+        forgetSignedInDevice();
+        // The refusal goes on the Token meter too (#24, R7): a refused
+        // request adds nothing, and the row showing a measured zero beside
+        // rows that cost something is what makes "nothing" legible.
+        dispatch(refusalRecorded(refusal));
         setInput("");
         setSubmitting(false);
+        return;
       }
+
+      let errorMessage = "Unable to create plan. Please try again.";
+      // Check if this is an RAI validation error
+      try {
+        // errorDetail = JSON.parse(error);
+        errorMessage = error?.message || errorMessage;
+      } catch (parseError) {
+        console.error("Error parsing error response", parseError);
+      }
+
+      showToast(errorMessage, "error");
+    } finally {
+      setInput("");
+      setSubmitting(false);
     }
   };
+
+  /**
+   * The door beside the wall (#27): sign in, then ask again.
+   *
+   * The sign-in is **mocked end to end** — no Entra, no Okta, no identity
+   * provider of any kind. It writes a name into server-side session state and
+   * the very same question, unedited, goes back through the very same gate.
+   *
+   * A sign-in that signed nobody in does **not** re-ask. Asking again
+   * anonymously would show the identical refusal a second time and read on
+   * stage as the tap having done nothing at all.
+   */
+  const handleSignIn = async () => {
+    const question = refusedQuestion;
+    setSigningIn(true);
+    try {
+      const name = await TaskService.signInDevice();
+      if (!name) {
+        showToast("Could not sign in", "error");
+        return;
+      }
+      if (question) {
+        await submitQuestion(question);
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
 
   const handleQuickTaskClick = (task: ExtendedQuickTask) => {
     setInput(task.fullDescription);
@@ -301,8 +382,43 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                 <Body1Strong>Store-scoped assistant</Body1Strong>
               </div>
               <Caption1>{policyBlock.message}</Caption1>
+
+              {/*
+                The door in the wall (#27). The boundary is meant to read as a
+                door rather than a wall, and the delta between the refusal above
+                and the answer that replaces it is the licensing and governance
+                conversation this whole demo exists to open.
+
+                The sign-in is mocked end to end. It is said out loud, here,
+                beside the button — a stakeholder who discovers afterwards that
+                an identity provider was implied has stopped believing the rest
+                of the demonstration.
+              */}
+              <div className="home-input-policy-block-door">
+                <Button
+                  appearance="primary"
+                  size="small"
+                  data-testid="sign-in-to-continue"
+                  icon={<PersonKey20Regular />}
+                  disabled={signingIn || submitting}
+                  onClick={handleSignIn}
+                >
+                  Sign in to continue
+                </Button>
+                <Caption1 className="home-input-policy-block-note">
+                  Simulated sign-in — no identity provider is involved.
+                </Caption1>
+              </div>
             </div>
           )}
+
+          {/*
+            The Mocked unlock's answer, rendered where the refusal was, because
+            landing it anywhere else would stop the before-and-after being a
+            comparison.
+          */}
+          {personalAnswer && <PersonalAnswerCard answer={personalAnswer} />}
+
 
           <ChatInput
             ref={textareaRef} // forwarding

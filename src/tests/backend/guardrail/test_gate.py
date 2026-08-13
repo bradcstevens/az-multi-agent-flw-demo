@@ -90,6 +90,66 @@ class TestASignedInIdentity:
         assert verdict.refused is True
         assert ANONYMOUS.is_anonymous is True
 
+    @pytest.mark.asyncio
+    async def test_an_admitted_personal_question_is_still_reported_personal(self):
+        """The Mocked unlock needs to know *which* admitted question this was.
+
+        Signing in does not make "how much PTO do I have?" a store question —
+        it makes it an answerable one. If the verdict forgot the classification
+        it made, the request path would need a second classifier to find it
+        again, which is the thing ADR-014 refuses.
+        """
+        embedder = StubEmbedder()
+        gate = IdentityBoundaryGate(embed=embedder)
+
+        verdict = await gate.evaluate(
+            "my name is Tanya, how much PTO do I have?",
+            identity=SessionIdentity(display_name="Tanya Reyes"),
+        )
+
+        assert verdict.refused is False
+        assert verdict.personal is True
+
+    @pytest.mark.asyncio
+    async def test_a_signed_in_store_question_is_not_reported_personal(self):
+        """Signing in must not route the whole shift through a pay record.
+
+        This is the mocked answer's one-way requirement, inherited whole from
+        the Keyword fast path's: it may miss a personal question — which then
+        reaches the ordinary agents and is honestly declined — but it may never
+        claim a store question as personal, because that answers "how do I
+        close the store?" out of somebody's PTO balance.
+        """
+        embedder = StubEmbedder()
+        gate = IdentityBoundaryGate(embed=embedder)
+
+        verdict = await gate.evaluate(
+            "how do I restart the car wash?",
+            identity=SessionIdentity(display_name="Tanya Reyes"),
+        )
+
+        assert verdict.refused is False
+        assert verdict.personal is False
+
+    @pytest.mark.asyncio
+    async def test_a_signed_in_verdict_still_spends_no_embedding_call(self):
+        """The answer costs exactly what the refusal costs: nothing.
+
+        The classification a signed-in request needs is the pure keyword one,
+        so the mocked unlock never depends on a reachable embedder — a beat
+        that went slow or fell through when the embedding deployment blinked
+        would be the closing beat of the demo.
+        """
+        embedder = StubEmbedder()
+        gate = IdentityBoundaryGate(embed=embedder)
+
+        await gate.evaluate(
+            "how do I restart the car wash?",
+            identity=SessionIdentity(display_name="Tanya Reyes"),
+        )
+
+        assert embedder.calls == []
+
 
 class TestTheKeywordFastPath:
     @pytest.mark.asyncio

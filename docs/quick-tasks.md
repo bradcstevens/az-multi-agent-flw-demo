@@ -89,6 +89,14 @@ store-level one — and a false positive here does not slow the demonstration
 down. It refuses the beat outright, with copy explaining that the assistant is
 store-scoped, which is the most convincing possible way to look broken.
 
+The probe is also where the walkthrough ends, so the name it gives is not
+decoration. The **Mocked unlock** (#27) rides this same tap — refused, signed
+in, asked again unedited — and it answers out of the **Associate record**, which
+is keyed by name. A probe naming somebody the record does not hold would have
+the beat answer one person's question with another person's PTO balance, which
+is the closing argument making the opposite of its point. Asserted by putting
+the prompt's own words through `lookup_associate`, not by restating the name.
+
 ## The probe declares the Fast lane, and the badge stopped promising an answer
 
 The probe never reaches the lane router: the gate runs above it and above

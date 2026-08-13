@@ -26,8 +26,14 @@ screenshot has already lost the argument it exists to make.
 | --- | --- |
 | Assistant | Circle K Frontline Store Assistant |
 | Store | Store 223 — **labelled simulated** |
-| User | *No user signed in*, until #27 |
+| User | *No user signed in*, until the **Mocked unlock** (#27) names one |
 | Team identifier | `00000000-0000-0000-0000-000000000223` |
+
+The user chip reads the **Session identity** and nothing else — never the EasyAuth principal.
+Two identities that can disagree are one identity too many, and the Identity boundary gate reads
+server-side **Session state** (ADR-014); on this deployment EasyAuth is off, so a chip driven by it
+would have claimed a signed-in user while every personal question was refused. See
+[mocked-unlock.md](mocked-unlock.md).
 
 The mark beside the name is an abstract storefront, **not** a reproduction of Circle K's trademark.
 This is a demonstration built for a customer conversation, not a licensed use of their brand

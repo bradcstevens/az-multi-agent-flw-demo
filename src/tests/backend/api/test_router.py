@@ -9,6 +9,7 @@ interpreter state for other test files that import the same real modules.
 import contextlib
 import os
 import sys
+from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -83,6 +84,8 @@ def _import_router():
 router_mod, _app = _import_router()
 from fastapi.testclient import TestClient  # noqa: E402
 
+from associate.answer import PERSONAL_ANSWER_KIND  # noqa: E402
+from associate.records import DEMO_ASSOCIATE  # noqa: E402
 from guardrail.corpus import (  # noqa: E402
     PERSONAL_INTENT_ANCHORS,
     STORE_SCOPE_ANCHORS,
@@ -454,9 +457,15 @@ class TestTheIdentityBoundaryGate:
         """The mocked unlock: same question, same gate, different identity.
 
         The name is written into server-side session state (#20) exactly as the
-        sign-in beat (#27) will write it, and the gate reads it back through
-        that one seam — which is ADR-014's claim that the unlock is a
-        *parameter* of the gate and not a second gate.
+        sign-in beat (#27) writes it, and the gate reads it back through that
+        one seam — which is ADR-014's claim that the unlock is a *parameter* of
+        the gate and not a second gate.
+
+        This name has no **Associate record**, so the request falls through to
+        the ordinary agents rather than being answered from mocked data. That
+        is the honest direction: a personal question nobody authored an answer
+        for reaches an assistant that says it holds nothing, and never a
+        fabricated balance.
         """
         rt.client.patch(
             "/api/v4/session_state/sess-1",
@@ -476,6 +485,201 @@ class TestTheIdentityBoundaryGate:
         monkeypatch.setattr(rt.gate, "_embed", broken)
 
         assert self._post(rt, self.STORE).status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# /process_request — the Mocked unlock (issue #27)
+# ---------------------------------------------------------------------------
+class TestTheMockedUnlock:
+    """The refused question, answered — through real HTTP against the real gate.
+
+    The mirror image of ``TestTheIdentityBoundaryGate`` above: the same
+    question, the same keyword match, the same short-circuit with no agent
+    invoked. The only thing that differs between the two classes is whether
+    anybody is signed in, which is the whole of the closing beat.
+    """
+
+    PERSONAL = "my name is Tanya, how much PTO do I have?"
+    STORE = "How do I close the store?"
+
+    def _sign_in(self, rt, display_name=None):
+        return rt.client.post(
+            "/api/v4/session_state/sess-1/sign_in",
+            json={"display_name": display_name} if display_name else {},
+        )
+
+    def _post(self, rt, description):
+        return rt.client.post(
+            "/api/v4/process_request",
+            json={"session_id": "sess-1", "description": description},
+        )
+
+    def test_the_previously_refused_question_is_answered(self, rt):
+        assert self._post(rt, self.PERSONAL).status_code == 403
+
+        self._sign_in(rt)
+        resp = self._post(rt, self.PERSONAL)
+
+        assert resp.status_code == 200
+        assert resp.json()["personal_answer"]["kind"] == PERSONAL_ANSWER_KIND
+
+    def test_the_answer_is_the_signed_in_associates_own_record(self, rt):
+        self._sign_in(rt)
+
+        answer = self._post(rt, self.PERSONAL).json()["personal_answer"]
+
+        assert answer["display_name"] == DEMO_ASSOCIATE.display_name
+        assert [f["label"] for f in answer["facts"]] == [
+            f.label for f in DEMO_ASSOCIATE.facts
+        ]
+
+    def test_the_answer_says_it_is_simulated(self, rt):
+        """A claim about somebody's pay, made in their name, on a stage."""
+        self._sign_in(rt)
+
+        answer = self._post(rt, self.PERSONAL).json()["personal_answer"]
+
+        assert "simulated" in answer["note"].lower()
+
+    def test_the_answer_costs_no_agent_and_no_plan(self, rt):
+        """The unlock costs exactly what the refusal costs: nothing.
+
+        The point of the beat is that the *governance* changed, not that a
+        second, more expensive machine was started — and an answer that ran an
+        orchestration would put an approval step between the tap and the payoff.
+        """
+        self._sign_in(rt)
+
+        self._post(rt, self.PERSONAL)
+
+        rt.orchestration_manager.assert_not_called()
+        rt.store.add_plan.assert_not_awaited()
+        rt.rai_success.assert_not_awaited()
+
+    def test_the_answer_carries_no_plan_id(self, rt):
+        """No plan was created, so there is nothing to navigate to. A plan id
+        here would send the surface to a plan page that does not exist."""
+        self._sign_in(rt)
+
+        assert self._post(rt, self.PERSONAL).json()["plan_id"] is None
+
+    def test_a_store_question_is_never_answered_from_the_record(self, rt):
+        """The one-way requirement, at the seam that actually runs.
+
+        Signing in must not turn the rest of the shift into a pay enquiry: the
+        shift-task and procedure beats all run signed-in once the presenter has
+        tapped sign-in, and every one of them has to still reach the agents.
+        """
+        self._sign_in(rt)
+
+        resp = self._post(rt, self.STORE)
+
+        assert "personal_answer" not in resp.json()
+        rt.orchestration_manager.assert_called()
+
+    def test_an_anonymous_personal_question_is_still_refused(self, rt):
+        """Nothing about adding an answer may soften the refusal."""
+        assert self._post(rt, self.PERSONAL).status_code == 403
+
+    def test_signing_out_returns_to_the_refusing_state(self, rt):
+        """A present-but-null identity is an explicit clear, which is what
+        signing out is — and the very next question is refused again."""
+        self._sign_in(rt)
+        assert self._post(rt, self.PERSONAL).status_code == 200
+
+        rt.client.patch("/api/v4/session_state/sess-1", json={"identity": None})
+
+        assert self._post(rt, self.PERSONAL).status_code == 403
+
+    def test_a_fresh_session_is_anonymous(self, rt):
+        """Identity is a property of one session on one device, so a session
+        nobody signed in on refuses — no expiry to wait for and nothing to
+        reset between rehearsals."""
+        self._sign_in(rt)
+
+        resp = rt.client.post(
+            "/api/v4/process_request",
+            json={"session_id": "sess-fresh", "description": self.PERSONAL},
+        )
+
+        assert resp.status_code == 403
+
+
+class TestTheMockedSignIn:
+    """``POST /session_state/{id}/sign_in`` — the whole of the identity provider."""
+
+    def test_signing_in_writes_the_authored_associate(self, rt):
+        """The browser does not name the associate.
+
+        If it did, the name on the header and the name the **Associate record**
+        is keyed by would be two strings in two languages, free to drift — and
+        the drift's symptom is a header confidently naming somebody the gate
+        will not answer for.
+        """
+        resp = rt.client.post("/api/v4/session_state/sess-1/sign_in", json={})
+
+        assert resp.status_code == 200
+        assert resp.json()["identity"]["display_name"] == DEMO_ASSOCIATE.display_name
+
+    def test_the_identity_is_readable_back_from_session_state(self, rt):
+        """Server-side, so a mid-demo reload does not sign the presenter out."""
+        rt.client.post("/api/v4/session_state/sess-1/sign_in", json={})
+
+        state = rt.client.get("/api/v4/session_state/sess-1").json()
+
+        assert state["identity"]["display_name"] == DEMO_ASSOCIATE.display_name
+
+    def test_signing_in_does_not_erase_the_lane_taken(self, rt):
+        """Two surfaces write this record and neither may erase the other."""
+        rt.client.patch("/api/v4/session_state/sess-1", json={"lane": "fast"})
+
+        state = rt.client.post(
+            "/api/v4/session_state/sess-1/sign_in", json={}
+        ).json()
+
+        assert state["lane"] == "fast"
+
+    def test_a_supplied_name_is_ignored(self, rt):
+        """The route takes no name. A caller-supplied one is a way to put a
+        name on the header that no record answers for, and the surface would
+        claim an identity the gate does not honour.
+
+        Both shapes a caller might reach for — the bare field and the nested
+        identity the `PATCH` route takes — because a route that grew a body
+        would grow the one next door's.
+        """
+        for body in (
+            {"display_name": "Somebody Else"},
+            {"identity": {"display_name": "Somebody Else"}},
+        ):
+            resp = rt.client.post(
+                "/api/v4/session_state/sess-1/sign_in", json=body
+            )
+
+            assert (
+                resp.json()["identity"]["display_name"]
+                == DEMO_ASSOCIATE.display_name
+            )
+
+    def test_no_identity_provider_is_involved(self, rt):
+        """R-whatever's plainest criterion, asserted rather than assumed.
+
+        Read out of the modules the sign-in actually runs through, so a later
+        iteration that reaches for MSAL here turns this red rather than
+        quietly making the demo's "no IdP" claim false.
+        """
+        import associate.records as records_mod
+        import associate.answer as answer_mod
+        import session.store as store_mod
+
+        forbidden = ("msal", "azure.identity", "oauth", "openid", "entra", "okta")
+        for module in (records_mod, answer_mod, store_mod):
+            source = Path(module.__file__).read_text(encoding="utf-8").lower()
+            for token in forbidden:
+                assert f"import {token}" not in source, (
+                    f"{module.__name__} reaches for {token} — the sign-in is "
+                    "mocked end to end"
+                )
 
 
 # ---------------------------------------------------------------------------

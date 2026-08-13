@@ -1,0 +1,74 @@
+/*
+ * The Personal answer (issue #27, R5's closing beat).
+ *
+ * Styled as a sibling of the Policy block it replaces — same width, same
+ * placement, same neutral surface — because the before-and-after only reads if
+ * the two land in the same place. Deliberately not styled as a success: the
+ * point being made is about governance, not about a happy path.
+ *
+ * A definition list rather than a table: the associate's screen is a phone, and
+ * a table's columns collapse into something unreadable at the 640px breakpoint.
+ */
+
+.personal-answer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--colorNeutralStroke2);
+    border-left: 3px solid var(--colorBrandStroke1);
+    border-radius: var(--borderRadiusMedium);
+    background-color: var(--colorNeutralBackground3);
+    color: var(--colorNeutralForeground2);
+}
+
+.personal-answer__header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--colorNeutralForeground1);
+}
+
+.personal-answer__role {
+    color: var(--colorNeutralForeground3);
+}
+
+.personal-answer__facts {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 0 0;
+}
+
+.personal-answer__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.personal-answer__label {
+    flex: 0 0 200px;
+    margin: 0;
+    color: var(--colorNeutralForeground3);
+}
+
+.personal-answer__value {
+    flex: 1 1 200px;
+    margin: 0;
+    color: var(--colorNeutralForeground1);
+}
+
+.personal-answer__note {
+    margin-top: 4px;
+    color: var(--colorNeutralForeground3);
+}
+
+@media (max-width: 640px) {
+    .personal-answer__label {
+        flex-basis: 100%;
+    }
+}

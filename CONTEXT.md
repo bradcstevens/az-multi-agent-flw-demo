@@ -157,9 +157,52 @@ frontend give it its own neutral surface instead of the error toast
 as an answer.
 
 **Mocked unlock** — the post-"sign-in" state in which the Identity boundary gate admits the
-previously refused question and answers it from mocked data. A parameter of the gate, not a
+previously refused question and answers it from mocked data (#27). A parameter of the gate, not a
 second gate. Mechanically it is a name written into **Session state**; the gate reads it back on
-the next request. No real identity provider is involved.
+the next request. No real identity provider is involved — no Entra, no Okta, nothing.
+
+The gate reports **which** admitted question it saw (`GateVerdict.personal`) rather than letting the
+request path classify it again: a second classifier could disagree with the first, and the
+disagreement would be invisible. `personal` is a classification, **not** a synonym for `refused` —
+a request refused because the embedding tier was unreachable is `refused, not personal`, because
+*could not tell* is a different fact from *decided it was personal*. The answer inherits the
+**Keyword fast path**'s one-way requirement whole: it may miss a personal question, which then
+reaches the ordinary agents and is honestly declined, but it may never claim a store question as
+personal — that answers "how do I close the store?" out of somebody's PTO balance.
+
+It short-circuits where the refusal does, with **no agent invoked and no plan persisted**, so the
+answer costs what the refusal cost. It arrives on a *successful* request carrying a null `plan_id`,
+which the surface must not read as a failure to create a plan.
+
+**Associate record** — the mocked personal record the unlock answers from
+(`src/backend/associate/records.py`). Authored demo content, and the demo's most sensitive: every
+other invented thing here is about a store, this is about a person's pay. Looked up by **whole
+name** or whole first name, never by substring — a loose match answers one associate's question out
+of another's record, which is the identity form of the claim the gate exists to refuse. **No record
+is a true answer**: a name nobody authored a record for falls through to the ordinary agents, which
+hold nothing about an individual, rather than inventing a balance. The **Personal answer** shows the
+record **whole** rather than picking out the field the question asked about — that would be a third
+classifier behind the gate's two, and a third classifier can report the wrong number.
+
+**Signed-in device** — the browser's memory that the presenter tapped sign in
+(`src/App/src/models/signedInDevice.ts`). **Not** the identity: the identity is the record in
+**Session state** that the gate reads, and the gate reads nothing else. `sessionStorage`, so a fresh
+tab is an anonymous shared device and there is nothing to reset between rehearsals; **signing out is
+forgetting**, because there was never an identity provider to revoke anything with. A **Policy
+block** forgets it too — the gate refusing *is* the statement that nobody is signed in, and a header
+that went on naming an associate the gate has just declined to answer for would be the surface
+saying something that is not so. A session is one conversation (one **Simulated ticket**, one
+**Lane** taken), so the tab does not re-use the session it signed in on: `TaskService.createPlan`
+writes the identity into each new session as it creates it, and a sign-in that could not be written
+leaves the request anonymous, which refuses.
+
+The browser **never authors the associate's name**; it stores what the sign-in route returned. Two
+strings in two languages are free to drift, and the drift's symptom is a header confidently naming
+somebody the gate will not answer for. The header therefore also ignores the EasyAuth principal
+entirely — on this deployment EasyAuth is off, so a header driven by it would have claimed a
+signed-in user while every personal question was refused.
+
+Recorded in [docs/mocked-unlock.md](docs/mocked-unlock.md).
 
 ## Retrieval
 
