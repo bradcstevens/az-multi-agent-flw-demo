@@ -431,15 +431,17 @@ class TestTheIdentityBoundaryGate:
 
 
 # ---------------------------------------------------------------------------
-# /process_request — per-request Plan review and the Workflow cache (issue #15,
-# ADR-013)
+# /process_request — the lane router and the Workflow cache (issues #15 and
+# #16, ADR-013)
 # ---------------------------------------------------------------------------
 class TestPerRequestPlanReview:
-    """Plan review reaches the orchestration call as a per-request value.
+    """The Lane a request takes reaches the orchestration call as Plan review.
 
     The Fast lane is the same orchestration path with the approval gate off,
     not a second path — so the only thing to observe here is which value the
-    orchestration call was handed.
+    orchestration call was handed. The request declares a **Lane**; the
+    endpoint is where the lane router maps it onto Plan review, which is why
+    this is the seam ADR-013 names for lane behaviour.
     """
 
     def _post(self, rt, **body):
@@ -489,18 +491,59 @@ class TestPerRequestPlanReview:
         return cache
 
     def test_a_deliberate_lane_request_keeps_the_approval_gate(self, rt):
-        assert self._post(rt, plan_review=True).status_code == 200
+        assert self._post(rt, lane="deliberate").status_code == 200
         assert self._plan_review_passed(rt) is True
 
     def test_a_fast_lane_request_turns_the_approval_gate_off(self, rt):
-        assert self._post(rt, plan_review=False).status_code == 200
+        assert self._post(rt, lane="fast").status_code == 200
         assert self._plan_review_passed(rt) is False
 
-    def test_a_request_that_declares_nothing_keeps_the_approval_gate(self, rt):
-        """Fail open to the Deliberate lane: losing the gate by omission is
-        the one outcome the two-lane design must not allow."""
+    def test_free_typed_input_falls_back_to_the_keyword_selection(self, rt):
+        """No declared lane at all — the fixture's description is an SOP lookup.
+
+        Asserting Fast here is what proves the keyword fallback is wired into
+        the request path rather than merely unit-tested: a request that
+        declares nothing would otherwise take the Deliberate default.
+        """
         assert self._post(rt).status_code == 200
+        assert self._plan_review_passed(rt) is False
+
+    def test_free_typed_escalation_keeps_the_approval_gate(self, rt):
+        resp = self._post(rt, description="I can't fix it, please escalate this")
+
+        assert resp.status_code == 200
         assert self._plan_review_passed(rt) is True
+
+    def test_an_unparseable_lane_fails_open_to_the_deliberate_lane(self, rt):
+        """A router failure never becomes a policy failure on stage.
+
+        The description is a plain Fast lane lookup, so the keyword fallback
+        would say Fast. A corrupt declaration must outrank it.
+        """
+        assert self._post(rt, lane="quick").status_code == 200
+        assert self._plan_review_passed(rt) is True
+
+    def test_a_lane_that_is_not_even_a_string_is_rejected_by_the_schema(self, rt):
+        """Where the fail-open rule stops, and why that is safe.
+
+        Fail open covers an unreadable *lane* — a string that is not one of the
+        two. A lane that is not a string at all is a malformed request, and the
+        schema refuses it before the router is reached. That is not a lane
+        decision going the wrong way: nothing is routed, no plan is created and
+        no orchestration is built, so the approval gate cannot be lost.
+        """
+        assert self._post(rt, lane=7).status_code == 422
+        rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
+
+    def test_the_lane_taken_comes_back_on_the_response(self, rt):
+        """Surfaced as a feature, not hidden as an implementation detail.
+
+        The lane *taken* is the router's output, not the client's declaration,
+        so free-typed input is the case worth asserting: the client cannot
+        know it without being told.
+        """
+        assert self._post(rt).json()["lane"] == "fast"
+        assert self._post(rt, lane="deliberate").json()["lane"] == "deliberate"
 
     def test_the_first_request_after_a_page_load_is_not_served_the_eager_workflow(
         self, rt
@@ -514,7 +557,7 @@ class TestPerRequestPlanReview:
         cache = self._eagerly_built_workflow(rt, plan_review=True)
         eager = cache["current"]
 
-        assert self._post(rt, plan_review=False).status_code == 200
+        assert self._post(rt, lane="fast").status_code == 200
 
         rt.orchestration_manager.get_current_or_new_orchestration.assert_awaited()
         assert self._plan_review_passed(rt) is False
@@ -531,7 +574,7 @@ class TestPerRequestPlanReview:
         cache = self._eagerly_built_workflow(rt, plan_review=False)
         cached = cache["current"]
 
-        assert self._post(rt, plan_review=False).status_code == 200
+        assert self._post(rt, lane="fast").status_code == 200
 
         rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
         assert cache["current"] is cached

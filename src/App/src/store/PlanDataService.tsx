@@ -116,7 +116,8 @@ export class PlanDataService {
         prompt: taskBE.prompt,
         created: taskBE.created,
         creator: taskBE.creator,
-        logo: taskBE.logo
+        logo: taskBE.logo,
+        lane: taskBE.lane
       }))
     };
   }

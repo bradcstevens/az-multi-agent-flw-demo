@@ -24,6 +24,13 @@ export interface StartingTask {
     created: string;
     creator: string;
     logo: string;
+    /**
+     * The declared Lane (issue #16, ADR-013). Deliberately a plain string
+     * rather than `Lane`: it arrives from an uploaded team definition, and an
+     * unreadable value must fail open to the Deliberate lane in the backend's
+     * lane router rather than be assumed valid here.
+     */
+    lane?: string;
 }
 
 export interface Team {

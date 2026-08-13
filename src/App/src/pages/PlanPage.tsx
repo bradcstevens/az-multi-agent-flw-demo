@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect} from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Spinner, Text } from '@fluentui/react-components';
 
 /* ── Services / API ──────────────────────────────────────────── */
@@ -71,6 +71,8 @@ import CoralShellColumn from '../commonComponents/components/Layout/CoralShellCo
 import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import ContentToolbar from '../commonComponents/components/Content/ContentToolbar';
+import LaneBadge from '../components/lane/LaneBadge';
+import { isLane } from '../models/lane';
 import { useInlineToaster } from '../components/toast/InlineToaster';
 import Octo from '../commonComponents/imports/Octopus.png';
 import LoadingMessage, { loadingMessages } from '../commonComponents/components/LoadingMessage';
@@ -111,6 +113,14 @@ const getPlanProcessingStatusMessage = (elapsedSeconds: number): string => {
 const PlanPage: React.FC = () => {
     const { planId } = useParams<{ planId: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
+    /**
+     * The Lane this plan was routed into, handed over by the surface that
+     * submitted the request (issue #16, ADR-013). Absent on a page reloaded
+     * from a bookmark — #20's server-side session state is what will survive
+     * that, so this deliberately renders nothing rather than guessing.
+     */
+    const laneTaken = (location.state as { lane?: string } | null)?.lane;
     const dispatch = useAppDispatch();
     const { showToast, dismissToast } = useInlineToaster();
     const { messagesContainerRef, finalResultRef, scrollToBottom, scrollToFinalResult } = useAutoScroll();
@@ -399,7 +409,18 @@ const PlanPage: React.FC = () => {
                         </>
                     ) : (
                         <>
-                            <ContentToolbar panelTitle="Multi-Agent Planner" />
+                            <ContentToolbar panelTitle="Multi-Agent Planner">
+                                {/*
+                                  The Lane this plan was routed into (ADR-013),
+                                  handed over by the surface that submitted it.
+                                  It is the lane *taken*, which is why it sits
+                                  beside the plan rather than beside the Quick
+                                  Task that declared one.
+                                */}
+                                {isLane(laneTaken) && (
+                                    <LaneBadge lane={laneTaken} variant="taken" />
+                                )}
+                            </ContentToolbar>
                             <PlanChat
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}

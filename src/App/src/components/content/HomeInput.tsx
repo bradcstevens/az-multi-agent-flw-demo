@@ -15,6 +15,8 @@ import "./../../styles/HomeInput.css";
 import { HomeInputProps, iconMap, QuickTask } from "../../models/homeInput";
 import { TaskService } from "../../store/TaskService";
 import { parsePolicyBlock, PolicyBlock } from "../../api/policyBlock";
+import { isLane, LANE_LABELS } from "../../models/lane";
+import LaneBadge from "../lane/LaneBadge";
 import { NewTaskService } from "../../store/NewTaskService";
 
 import ChatInput from "@/commonComponents/modules/ChatInput";
@@ -56,12 +58,19 @@ const truncateDescription = (
 // Extended QuickTask interface to store both truncated and full descriptions
 interface ExtendedQuickTask extends QuickTask {
   fullDescription: string; // Store the full, untruncated description
+  lane?: string; // The Lane this Quick Task declares (issue #16, ADR-013)
 }
 
 const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [input, setInput] = useState<string>("");
   const [policyBlock, setPolicyBlock] = useState<PolicyBlock | null>(null);
+  /**
+   * The Lane declared by the Quick Task that was tapped, if the text in the
+   * box is still that task's prompt. Editing the text clears it — edited text
+   * is free-typed input, and free-typed input is the keyword fallback's job.
+   */
+  const [declaredLane, setDeclaredLane] = useState<string | undefined>(undefined);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
@@ -101,7 +110,8 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       try {
         const response = await TaskService.createPlan(
           input.trim(),
-          selectedTeam?.team_id
+          selectedTeam?.team_id,
+          declaredLane
         );
         setInput("");
 
@@ -109,11 +119,24 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
           textareaRef.current.style.height = "auto";
         }
 
+        // The lane taken, as the lane router reported it — a feature of the
+        // assistant, not an implementation detail (ADR-013). It is not always
+        // the lane declared: free-typed input declares nothing, and an
+        // unreadable declaration falls open to the Deliberate lane. It is
+        // carried to the plan page, where the answer (or the approval step)
+        // arrives, so it outlives this toast.
         if (response.plan_id && response.plan_id !== null) {
-          showToast("Plan created!", "success");
+          showToast(
+            isLane(response.lane)
+              ? `Plan created — ${LANE_LABELS[response.lane]}`
+              : "Plan created!",
+            "success"
+          );
           dismissToast(id);
 
-          navigate(`/plan/${response.plan_id}`);
+          navigate(`/plan/${response.plan_id}`, {
+            state: { lane: response.lane },
+          });
         } else {
           showToast("Failed to create plan", "error");
           dismissToast(id);
@@ -152,9 +175,20 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
 
   const handleQuickTaskClick = (task: ExtendedQuickTask) => {
     setInput(task.fullDescription);
+    setDeclaredLane(task.lane);
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
+  };
+
+  /**
+   * Typing over a Quick Task's prompt makes it free-typed input, so the
+   * declared Lane goes with it — the backend's keyword fallback is what routes
+   * text the presenter wrote, and a stale declaration would outrank it.
+   */
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    setDeclaredLane(undefined);
   };
 
   useEffect(() => {
@@ -188,6 +222,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
               description: truncateDescription(taskDescription),
               fullDescription: taskDescription, // Store the full description
               icon: getIconFromString(startingTask.logo || "📋"),
+              lane: startingTask.lane,
             };
           }
         })
@@ -260,7 +295,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
             ref={textareaRef} // forwarding
             value={input}
             placeholder="Tell us what needs planning, building, or connecting—we'll handle the rest."
-            onChange={setInput}
+            onChange={handleInputChange}
             onEnter={handleSubmit}
             disabledChat={submitting}
           >
@@ -292,6 +327,11 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                         description={task.description}
                         onClick={() => handleQuickTaskClick(task)}
                         disabled={submitting}
+                        badge={
+                          isLane(task.lane) ? (
+                            <LaneBadge lane={task.lane} variant="declared" />
+                          ) : undefined
+                        }
                       />
                     ))}
                   </div>

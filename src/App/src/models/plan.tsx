@@ -65,6 +65,8 @@ export interface StartingTaskBE {
     creator: string;
     /** Logo for the task */
     logo: string;
+    /** The declared Lane (issue #16, ADR-013), absent on older definitions */
+    lane?: string;
 }
 
 /**

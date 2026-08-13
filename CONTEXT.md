@@ -53,8 +53,9 @@ before that it was dead code.
 agents, their models, and their prompts. `team_id` is a required non-optional `str`.
 
 **Plan review** — the approval gate the Magentic builder is configured with at Workflow build time.
-Upstream hardcoded it as a literal; since #15 it is a per-request value carried on `InputTask` as
-`plan_review`, defaulting to `True`. See
+Upstream hardcoded it as a literal; since #15 it is a per-request value, and since #16 it is not
+declared by the client at all — the **Lane router** derives it from the request's **Lane**, and
+`Lane.plan_review` is the one place "fast means no approval gate" is written down. See
 [ADR-013](docs/ADR/013-per-request-plan-review-over-orchestrator-bypass.md).
 
 ## Request path
@@ -69,10 +70,30 @@ _Avoid_: bypass, direct agent call, single-agent path
 orchestration with **Plan review** on, where the approval step *is* the associate confirming the
 ticket before it is raised.
 
-**Lane** — which of the two a request takes. Declared as metadata on a **Quick Task**, with a
-keyword fallback for free-typed input, and **surfaced in the UI as a feature**. Selection **fails
-open to the Deliberate lane** — which is also why `InputTask.plan_review` defaults to `True`: a
-request that declares nothing keeps the approval gate.
+**Lane** — which of the two a request takes (`src/backend/lane/lane.py`). Declared as metadata on a
+**Quick Task** and carried on the wire as `InputTask.lane` — the **only** lane declaration on a
+request, because two ways to say the same thing on one message is how a request ends up in a lane
+nobody chose. A Lane decides exactly one thing: **Plan review**. The lane *taken* comes back on the
+`/process_request` response and is **surfaced in the UI as a feature** (`LaneBadge`) — on a Quick
+Task as the lane declared, on a plan as the lane taken.
+
+**Lane router** — `lane.router.select_lane`: declared Lane wins, no declaration falls back to the
+**Lane keyword fallback**, and an **unparseable declaration goes straight to the Deliberate lane**
+without consulting the keywords, because guessing from a request whose metadata is corrupt is how a
+router failure becomes a policy failure on stage. Fail open covers an unreadable *lane*; a `lane`
+that is not a string at all is a malformed request and the schema refuses it before the router is
+reached, which routes nothing and so cannot lose the gate. Deliberately a **separate component from
+the Identity boundary gate** and below it in the request path: the gate fails **closed**, the router
+fails **open to the Deliberate lane**, and merging them would force one failure mode onto both
+(ADR-013 §4).
+_Avoid_: lane classifier, intent router
+
+**Lane keyword fallback** — `lane.keywords.keyword_lane`, the router's second choice, for free-typed
+input that declares nothing. Pure, no I/O, and its requirement runs **one way only**, like the
+guardrail's **Keyword fast path**: it may miss a Fast lane request — the miss costs an approval step
+— but it may never claim an escalation or a ticket for the Fast lane, because the approval step *is*
+the associate confirming the ticket before it is raised. Hence the Deliberate vocabulary is matched
+first, wins outright, and is the broader list; the default when nothing matches is Deliberate.
 
 **Fast-lane latency** — the measured end-to-end cost of a Fast lane request, against the sub-10s
 target. **Not yet measured.** ADR-013 makes the measurement the sole trigger for reopening the
@@ -168,7 +189,10 @@ a keyboard chord and pushed over the existing WebSocket. No wall-clock timer.
 
 **Quick Task** — a starting task the presenter taps instead of typing. Six of them, including one
 that deliberately routes to the **Deliberate lane** and one rehearsed out-of-corpus probe. Carries
-**Lane** metadata, which the upstream starting-task model has no field for.
+**Lane** metadata as `StartingTask.lane` (#16) — an unvalidated `str` rather than the `Lane` enum,
+so an unrecognised lane in an uploaded team definition fails open in the **Lane router** instead of
+rejecting the whole upload. Tapping one fills the box; typing over the prompt clears the declaration,
+because edited text is free-typed input and belongs to the **Lane keyword fallback**.
 
 **Simulated ticket** — the R4 service ticket. Labelled as simulated in the UI, persisted to Cosmos,
 and it **must carry the attempted steps** pulled from the troubleshooting record — if the associate

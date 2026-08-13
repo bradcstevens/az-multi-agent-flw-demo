@@ -188,6 +188,13 @@ class StartingTask(BaseModel):
     created: str
     creator: str
     logo: str
+    # The declared Lane (issue #16, ADR-013). Deliberately an unvalidated
+    # ``str`` rather than the ``Lane`` enum: a value that is not one of the two
+    # lanes — the realistic authoring slip — must fail open to the Deliberate
+    # lane in the lane router rather than reject the whole team definition. A
+    # value that is not a string at all is still a malformed definition and is
+    # rejected here, loudly, at upload time.
+    lane: Optional[str] = None
 
 
 class TeamConfiguration(BaseDataModel):
@@ -253,11 +260,13 @@ class InputTask(BaseModel):
     """Message representing the initial input task from the user."""
     session_id: str
     description: str
-    # Plan review, per request rather than per build (ADR-013). ``True`` is the
-    # Deliberate lane and the default, so a request that declares nothing keeps
-    # the approval gate — the lane router fails open to Deliberate, and losing
-    # the gate by omission is the one outcome that design must not allow.
-    plan_review: bool = True
+    # The Lane the request declares (issue #16, ADR-013), carried through from
+    # the Quick Task the presenter tapped. Absent for free-typed input, which
+    # the lane router then routes by its keyword fallback. It is deliberately
+    # the *only* lane declaration on the wire — Plan review is what the router
+    # maps it onto, and two ways to say the same thing on one message is how a
+    # request ends up in a lane nobody chose.
+    lane: Optional[str] = None
 
 
 class UserLanguage(BaseModel):

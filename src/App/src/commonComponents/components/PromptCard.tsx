@@ -9,6 +9,8 @@ type PromptCardProps = {
   icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean; 
+  /** Optional trailing element beside the title, e.g. a Lane badge. */
+  badge?: React.ReactNode;
 };
 
 const PromptCard: React.FC<PromptCardProps> = ({
@@ -17,6 +19,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
   icon,
   onClick,
   disabled = false,
+  badge,
 }) => {
   return (
     <Card
@@ -68,6 +71,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
               </div>
             )}
             <Body1Strong>{title}</Body1Strong>
+            {badge}
           </div>
           <Body1 style={{ color: "var(--colorNeutralForeground3)" }}>
             {description}

@@ -179,11 +179,16 @@ export class TaskService {
    * Create a new plan with RAI validation
    * @param description Task description
    * @param teamId Optional team ID to use for this plan
-   * @returns Promise with the response containing plan ID and status
+   * @param lane The Lane declared by the Quick Task that was tapped, if any.
+   *   Omitted for free-typed input, which the backend's lane router then
+   *   routes by its keyword fallback (issue #16, ADR-013).
+   * @returns Promise with the response containing plan ID, status and the
+   *   lane actually taken
    */
   static async createPlan(
     description: string,
-    teamId?: string
+    teamId?: string,
+    lane?: string
   ): Promise<InputTaskResponse> {
     const sessionId = this.generateSessionId();
 
@@ -191,6 +196,7 @@ export class TaskService {
       session_id: sessionId,
       description: description,
       team_id: teamId,
+      lane: lane,
     };
 
     try {

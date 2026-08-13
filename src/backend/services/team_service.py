@@ -158,6 +158,12 @@ class TeamService:
             created=task_data["created"],
             creator=task_data["creator"],
             logo=task_data["logo"],
+            # The declared Lane (issue #16, ADR-013) — optional, so pre-#16
+            # definitions still upload, and deliberately not checked against
+            # the two lanes here: an unrecognised one fails open to the
+            # Deliberate lane in the lane router, where that rule is written
+            # down, rather than being enforced twice in two places.
+            lane=task_data.get("lane"),
         )
 
     async def save_team_configuration(self, team_config: TeamConfiguration) -> str:

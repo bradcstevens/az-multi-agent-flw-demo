@@ -95,6 +95,7 @@ class MockStartingTask:
     created: str = ""
     creator: str = ""
     logo: str = ""
+    lane: str = None
 
 @dataclass
 class MockTeamConfiguration:
@@ -323,6 +324,28 @@ class TestTeamConfigurationValidation:
         assert isinstance(result, MockStartingTask)
         assert result.name == "Test Task"
         assert result.prompt == "Do something"
+
+    def test_a_declared_lane_survives_the_upload(self):
+        """The Quick Task's Lane metadata (issue #16, ADR-013).
+
+        Parsing is field-by-field, so a lane the team definition declares is
+        dropped unless it is named here — and a dropped declaration is silent:
+        every task would simply be routed by its wording instead.
+        """
+        service = TeamService()
+        task_data = _valid_task_data(lane="fast")
+
+        assert service._validate_and_parse_task(task_data).lane == "fast"
+
+    def test_a_task_declaring_no_lane_parses_without_one(self):
+        """Lane is optional, so pre-#16 team definitions still upload.
+
+        The absent declaration is what sends the request to the keyword
+        fallback, which fails open to the Deliberate lane.
+        """
+        service = TeamService()
+
+        assert service._validate_and_parse_task(_valid_task_data()).lane is None
 
 
 class TestTeamCrudOperations:

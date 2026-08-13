@@ -21,6 +21,7 @@ from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
 from guardrail.gate import identity_boundary_gate
 from guardrail.identity import resolve_session_identity
 from guardrail.refusal import policy_block_detail
+from lane.router import select_lane
 from orchestration.connection_config import (connection_config,
                                              orchestration_config, team_config)
 from orchestration.orchestration_manager import OrchestrationManager
@@ -407,14 +408,21 @@ async def process_request(
         current_workflow is not None and cached_team_id != team_id
     )
 
+    # The lane router (ADR-013). Below the Identity boundary gate on purpose:
+    # the two are separate components with opposite failure modes — the gate
+    # fails closed, this fails open to the Deliberate lane — and a refused
+    # request must never have paid for routing. This is the one place a Lane
+    # becomes a Plan review value.
+    lane = select_lane(input_task.lane, input_task.description)
+
     # The cache-invalidation predicate's lane term (ADR-013). /init_team eagerly
     # builds a workflow before any task is submitted, so without this the first
     # request after a page load reuses that workflow and silently ignores the
-    # per-request Plan review value.
+    # lane this request was routed into.
     cached_plan_review = getattr(current_workflow, "_plan_review", None)
     plan_review_mismatch = (
         current_workflow is not None
-        and cached_plan_review != input_task.plan_review
+        and cached_plan_review != lane.plan_review
     )
 
     workflow_unusable = (
@@ -428,7 +436,7 @@ async def process_request(
         logger.info(
             "Workflow unusable for user '%s' (None=%s, terminated=%s, is_running=%s, "
             "team_mismatch=%s cached_team=%s selected_team=%s, "
-            "plan_review_mismatch=%s cached_plan_review=%s requested_plan_review=%s) "
+            "plan_review_mismatch=%s cached_plan_review=%s lane=%s) "
             "— rebuilding",
             user_id,
             current_workflow is None,
@@ -439,7 +447,7 @@ async def process_request(
             team_id,
             plan_review_mismatch,
             cached_plan_review,
-            input_task.plan_review,
+            lane.value,
         )
 
         # Force-clear the running flag so get_current_or_new_orchestration
@@ -453,7 +461,7 @@ async def process_request(
             team_config=team,
             team_switched=False,
             team_service=team_service,
-            plan_review=input_task.plan_review,
+            plan_review=lane.plan_review,
         )
 
     try:
@@ -488,6 +496,11 @@ async def process_request(
             "status": "Request started successfully",
             "session_id": input_task.session_id,
             "plan_id": plan_id,
+            # The lane taken, surfaced as a feature rather than hidden as an
+            # implementation detail (ADR-013). It is the router's output, not
+            # the client's declaration — free-typed input cannot know it
+            # without being told.
+            "lane": lane.value,
         }
 
     except Exception as e:
