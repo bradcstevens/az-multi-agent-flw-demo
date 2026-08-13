@@ -62,6 +62,8 @@ import { usePlanWebSocket } from '../hooks/usePlanWebSocket';
 import { usePlanActions } from '../hooks/usePlanActions';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { usePlanCancellationAlert } from '../hooks/usePlanCancellationAlert';
+import { useTransparencySignals } from '../hooks/useTransparencySignals';
+import { usePresenterChord } from '../hooks/usePresenterChord';
 
 /* ── Components ──────────────────────────────────────────────── */
 import PlanChat from '../components/content/PlanChat';
@@ -205,6 +207,13 @@ const PlanPage: React.FC = () => {
 
     /* ── WebSocket subscriptions (extracted hook) ───────────── */
     usePlanWebSocket({ planId, scrollToBottom, scrollToFinalResult, formatErrorMessage, showToast });
+
+    // The three transparency signals (#23) and the hidden chord that fires the
+    // last of them (#24). Both live here rather than in `usePlanWebSocket`
+    // because they are one feature of their own — the audience watching the
+    // architecture work — and neither touches the plan's own flow.
+    useTransparencySignals();
+    usePresenterChord();
 
     /* ── Navigation with cancellation check ─────────────────── */
     const handleNavigationWithAlert = useCallback(

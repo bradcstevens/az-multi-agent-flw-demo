@@ -18,6 +18,8 @@ import { parsePolicyBlock, PolicyBlock } from "../../api/policyBlock";
 import { isLane, LANE_LABELS } from "../../models/lane";
 import LaneBadge from "../lane/LaneBadge";
 import { NewTaskService } from "../../store/NewTaskService";
+import { useAppDispatch } from "@/store/hooks";
+import { refusalRecorded } from "@/store/slices/transparencySlice";
 
 import ChatInput from "@/commonComponents/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
@@ -62,6 +64,7 @@ interface ExtendedQuickTask extends QuickTask {
 }
 
 const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
+  const dispatch = useAppDispatch();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [input, setInput] = useState<string>("");
   const [policyBlock, setPolicyBlock] = useState<PolicyBlock | null>(null);
@@ -151,6 +154,10 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
         const refusal = parsePolicyBlock(error);
         if (refusal) {
           setPolicyBlock(refusal);
+          // The refusal goes on the Token meter too (#24, R7): a refused
+          // request adds nothing, and the row showing a measured zero beside
+          // rows that cost something is what makes "nothing" legible.
+          dispatch(refusalRecorded(refusal));
           setInput("");
           setSubmitting(false);
           return;

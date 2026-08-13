@@ -261,6 +261,13 @@ snippet, while `appearance.text` is the whole document (see **Citation appearanc
 panel renders `Citation.snippet()`, which truncates `text`; rendering `abstract` prints the filename
 twice.
 
+The panel leads with the **platform** and not the document — `Copilot Studio`, over the route
+`Foundry orchestrator → Copilot Studio → Dataverse` — because the claim R6 exists to make is that
+*this one answer left Foundry*. **Dataverse**, never SharePoint. It has three states (#24): cited,
+uncited (the honest miss, rendered explicitly rather than as an empty panel), and **no signal**, in
+which it describes itself and asserts nothing — it does not say the answer came from Foundry,
+because nobody told it that and a swallowed push looks the same from here.
+
 **Source used** — the server-side half of that pair, emitted as `WebsocketMessageType.SOURCE_USED`
 from the `/sop/ask` bridge once the Direct Line reply is in hand (#23). Built by
 `transparency.source.source_used`, which carries `platform`, `source`, `agent_name`,
@@ -290,11 +297,42 @@ reports the orchestrator's own usage is **not verified live**, because
 `StandardMagenticManager._complete` returns `response.messages[-1]` and drops
 `AgentResponse.usage_details` on the way.
 
+The panel (#24) is one row per agent in the order each first spent, with **tokens and estimated
+Copilot Credits side by side** and a **model** column read from the workflow roster's
+`deployment_name`, which is how "cheap models on cheap work" becomes checkable. Each row fills only
+its own billing column, because the point is that the two models are not uniform.
+
+**Not reported vs measured** — the rendering rule the whole meter turns on: `—` means *nobody told
+us*, `0` means *we know it was nothing*. The Copilot Studio row's tokens are `—` because Direct Line
+reports no count; the **Identity boundary gate**'s row is a real `0`, because the gate refuses before
+the Lane router and before orchestration, so no agent ran. If an unreported cost also rendered `0`,
+the one row that proves a refused request adds nothing would look exactly like an agent whose cost
+never arrived. (The gate's own similarity tier *is* a model call — a small one, not an agent, and the
+row's tooltip says which zero this is.)
+
+**Copilot Credits** — Copilot Studio's unit of metered consumption. **2 per generative answer**
+([Billing rates and management](https://learn.microsoft.com/microsoft-copilot-studio/requirements-messages-management);
+a classic answer is 1), and the **Copilot Studio SOP agent** answers with `GenerativeAIRecognizer`,
+so every answer it gives is generative. One constant in `models/meter.ts`, labelled **Est.** on
+screen: it is Microsoft's published rate, not a measured bill.
+
+**Transparency rail** — the host for the three panels, reading the Redux slice directly rather than
+taking props so it can sit on **both** surfaces. It has to: the refusal happens on the home surface
+and the answers happen on the plan surface, while the meter's total spans both.
+
 **Presenter alert** — the R8 proactive shift-task message, triggered by a hidden backend route plus
 a keyboard chord and pushed over the existing WebSocket. No wall-clock timer. The route is
 `POST /api/v4/presenter/alert` with `include_in_schema=False` (#23) — hidden rather than
 authenticated, which is why the **words and the recipient are both the server's**: the body selects
 a name from a rehearsed roster in `transparency.alert` and there is no parameter that accepts prose.
+
+**Presenter chord** — the client half: **Ctrl + Alt + Shift + A**, matched on `event.code` and not
+`event.key` (with Alt held, several layouts compose a different character, and a chord that only
+works on US English fails on the borrowed laptop), with `metaKey` required *up*. A **global**
+listener — the one place this codebase departs from its inline `onKeyDown` convention, because the
+chord must work while focus is anywhere. It POSTs an **empty body**; the words and the recipient are
+both the server's. The alert renders as visibly a different object from a reply (`role="alert"`, its
+own badge), because an alert mistaken for an answer is worse than no alert.
 
 **Out-of-band recipient** — how a push that no WebSocket asked for finds its socket.
 `ConnectionConfig.sole_user()` returns the connected user when there is **exactly one**, and `None`
@@ -305,7 +343,8 @@ and the alert route does not — the presenter pressed a key, and being told not
 difference between a bug and a chord that missed.
 
 All three signals are recorded in full in
-[docs/transparency-signals.md](docs/transparency-signals.md).
+[docs/transparency-signals.md](docs/transparency-signals.md), and the panels that render them in
+[docs/transparency-panels.md](docs/transparency-panels.md).
 
 **Quick Task** — a starting task the presenter taps instead of typing. Six of them, including one
 that deliberately routes to the **Deliberate lane** and one rehearsed out-of-corpus probe. Carries
@@ -470,10 +509,12 @@ process, then the rest of `src/tests/backend` runs with `--cov-append` and `--ig
 Required because the suite mutates `sys.modules` and the environment at import time. Preserve it.
 Encoded in `scripts/backend-tests.sh`.
 
-**Feedback loop** — a `(name, command)` row of the `## Feedback loops` table in `AGENTS.md`. Four
+**Feedback loop** — a `(name, command)` row of the `## Feedback loops` table in `AGENTS.md`. Five
 today: **Backend lint** (`scripts/backend-lint.sh`), **Backend tests** (`scripts/backend-tests.sh`),
-**MCP server tests** (`scripts/mcp-tests.sh`) and **CI-tooling tests** (`scripts/ci-tests.sh`, which
-covers the repo's own tooling — the Advisory coverage report and the `scripts/preflight/` checks). The
+**MCP server tests** (`scripts/mcp-tests.sh`), **CI-tooling tests** (`scripts/ci-tests.sh`, which
+covers the repo's own tooling — the Advisory coverage report and the `scripts/preflight/` checks) and
+**Frontend tests** (`scripts/frontend-tests.sh`, vitest over `src/App/src`, added by #24 — the
+accelerator shipped vitest fully configured with no test file and no workflow). The
 table is the single source of truth: agents run these before committing and the runner re-runs them
 after each merge as the integration gate, so a missing or unrunnable table makes every merge red.
 See [ADR-005](docs/ADR/005-declare-feedback-loops-in-agents-md.md).

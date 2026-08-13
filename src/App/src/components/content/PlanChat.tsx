@@ -9,6 +9,9 @@ import ContentNotFound from "../NotFound/ContentNotFound";
 import PlanChatBody from "./PlanChatBody";
 import renderAgentMessages from "./streaming/StreamingAgentMessage";
 import StreamingBufferMessage from "./streaming/StreamingBufferMessage";
+import PresenterAlertCard from "../transparency/PresenterAlertCard";
+import { useAppSelector } from "@/store/hooks";
+import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
@@ -54,6 +57,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   handleRejectPlan,
   processingApproval
 }) => {
+  // Read before the early return: hooks may not sit behind a condition.
+  const presenterAlerts = useAppSelector(selectPresenterAlerts);
+
   if (!planData)
     return (
       <ContentNotFound subtitle="The requested page could not be found." />
@@ -87,6 +93,16 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         {/* Plan response with all information */}
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
         {renderAgentMessages(agentMessages, undefined, undefined, finalResultRef)}
+
+        {/*
+          Presenter alerts (issue #24, R8). Rendered after the replies rather
+          than among them, and as visibly different objects: an alert answers
+          no question, because nobody asked one. An alert mistaken for an
+          answer is worse than no alert at all.
+        */}
+        {presenterAlerts.map((alert, index) => (
+          <PresenterAlertCard key={`${alert.timestamp}-${index}`} alert={alert} />
+        ))}
 
         {showProcessingPlanSpinner && renderPlanExecutionMessage(processingElapsedSeconds, processingStatusMessage)}
         {/* Streaming plan updates — hidden while an approval prompt is pending so

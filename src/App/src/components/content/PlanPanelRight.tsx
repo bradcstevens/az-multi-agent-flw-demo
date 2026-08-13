@@ -6,8 +6,10 @@ import {
   ArrowTurnDownRightRegular,
 } from "@fluentui/react-icons";
 import { PlanDetailsProps } from "../../models";
-import { getAgentIcon, getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
+import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
 import ContentNotFound from "../NotFound/ContentNotFound";
+import AgentTeamPanel from "../transparency/AgentTeamPanel";
+import TransparencyRail from "../transparency/TransparencyRail";
 import "../../styles/planpanelright.css";
 
 
@@ -21,17 +23,9 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
     return <ContentNotFound subtitle="The requested page could not be found." />;
   }
 
-  if (!planApprovalRequest) {
-    return (
-      <div className="plan-panel-right__no-data">
-        No plan available
-      </div>
-    );
-  }
-
   // Extract plan steps from the planApprovalRequest
   const extractPlanSteps = () => {
-    if (!planApprovalRequest.steps || planApprovalRequest.steps.length === 0) {
+    if (!planApprovalRequest?.steps || planApprovalRequest.steps.length === 0) {
       return [];
     }
 
@@ -64,7 +58,15 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
 
         {planSteps.length === 0 ? (
           <div className="plan-section__empty">
-            Plan is being generated...
+            {/*
+              Two different silences, and they must not read alike: a plan on
+              its way, and a request that will never have one because it took
+              the Fast lane. "Plan is being generated…" for the second is a
+              spinner that never resolves.
+            */}
+            {planApprovalRequest
+              ? 'Plan is being generated...'
+              : 'No plan to review on this request.'}
           </div>
         ) : (
           <div className="plan-steps">
@@ -101,41 +103,18 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   };
 
   // Render Agents Section
-  const renderAgentsSection = () => {
-    const agents = planApprovalRequest?.team || [];
-
-    return (
-      <div className="agents-section">
-        <Body1 className="agents-section__title">
-          Agent Team
-        </Body1>
-
-        {agents.length === 0 ? (
-          <div className="agents-section__empty">
-            No agents assigned yet...
-          </div>
-        ) : (
-          <div className="agents-list">
-            {agents.map((agentName, index) => (
-              <div key={`${agentName}-${index}`} className="agent-item">
-                {/* Agent Icon */}
-                <div className="agent-item__icon">
-                  {getAgentIcon(agentName, planData, planApprovalRequest)}
-                </div>
-
-                {/* Agent Info - just name */}
-                <div className="agent-item__info">
-                  <Body1 className="agent-item__name">
-                    {getAgentDisplayNameWithSuffix(agentName)}
-                  </Body1>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+  //
+  // From the **workflow roster** (issue #24), not from the plan. With Plan
+  // review off there is no plan object to read agent names out of (ADR-013),
+  // so the previous `planApprovalRequest.team` source left this panel empty for
+  // the whole of the Fast lane — which is most of the walkthrough. The roster
+  // also carries the per-agent model assignment, which is the point.
+  const renderAgentsSection = () => (
+    <AgentTeamPanel
+      team={planData?.team ?? null}
+      plan={planApprovalRequest?.team ?? null}
+    />
+  );
 
   // Main render
   return (
@@ -143,8 +122,10 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
       {/* Plan section on top */}
       {renderPlanSection()}
 
-      {/* Agents section below with line demarcation */}
-      {renderAgentsSection()}
+      {/* Agents section, and the transparency rail below it */}
+      <TransparencyRail team={planData?.team ?? null}>
+        {renderAgentsSection()}
+      </TransparencyRail>
     </div>
   );
 };

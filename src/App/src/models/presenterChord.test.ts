@@ -1,0 +1,48 @@
+import { describe, it, expect } from 'vitest';
+
+import { PRESENTER_CHORD_LABEL, isPresenterChord } from './presenterChord';
+
+const chord = (over: Partial<KeyboardEvent> = {}) =>
+    ({
+        code: 'KeyA',
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: true,
+        metaKey: false,
+        ...over,
+    }) as KeyboardEvent;
+
+describe('the presenter chord', () => {
+    it('fires on all three modifiers plus the key', () => {
+        expect(isPresenterChord(chord())).toBe(true);
+    });
+
+    it('does not fire on the key alone — the audience is watching this keyboard', () => {
+        expect(isPresenterChord(chord({ ctrlKey: false }))).toBe(false);
+        expect(isPresenterChord(chord({ altKey: false }))).toBe(false);
+        expect(isPresenterChord(chord({ shiftKey: false }))).toBe(false);
+    });
+
+    it('does not fire on ordinary typing', () => {
+        expect(
+            isPresenterChord(
+                chord({ ctrlKey: false, altKey: false, shiftKey: false }),
+            ),
+        ).toBe(false);
+    });
+
+    it('does not fire on another key held with the same modifiers', () => {
+        expect(isPresenterChord(chord({ code: 'KeyB' }))).toBe(false);
+    });
+
+    it('ignores the layout, matching the physical key', () => {
+        // Alt+A composes a different character on several layouts, so `key`
+        // is not what is matched — a chord that works only on US English is a
+        // chord that fails on the borrowed laptop.
+        expect(isPresenterChord(chord({ key: 'å' } as Partial<KeyboardEvent>))).toBe(true);
+    });
+
+    it('has a label the presenter can be told, and the audience is not', () => {
+        expect(PRESENTER_CHORD_LABEL).toMatch(/Ctrl/i);
+    });
+});

@@ -63,6 +63,7 @@ on `PATH`. Set `DEV_VENV` to share one virtualenv across git worktrees.
 | Backend tests | `bash scripts/backend-tests.sh` | The Two-phase test invocation over `src/tests/backend` with an advisory 80% coverage report. |
 | MCP server tests | `bash scripts/mcp-tests.sh` | pytest over `src/tests/mcp_server` with MCP coverage; CI appends this coverage to the backend report. |
 | CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the repo's own tooling: the helpers the loops and `test.yml` share (the advisory coverage report and the `scripts/preflight/` checks) plus the durable record's invariants (ADR index, corrections record, documentation links). |
+| Frontend tests | `bash scripts/frontend-tests.sh` | vitest over `src/App/src` — the transparency panels and the WebSocket message contract they render. `npm ci` on first use, a no-op afterwards; runs in `.github/workflows/frontend-tests.yml`. |
 | SOP corpus | `python3 -m pytest tools/tests -q` | `content/sop/` and its builder `tools/sop_corpus/`. After editing a source, rebuild with `PYTHONPATH=tools python3 -m sop_corpus build`. |
 
 Notes:

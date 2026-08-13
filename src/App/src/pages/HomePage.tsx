@@ -5,6 +5,7 @@ import CoralShellColumn from '../commonComponents/components/Layout/CoralShellCo
 import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import HomeInput from '@/components/content/HomeInput';
+import TransparencyRail from '@/components/transparency/TransparencyRail';
 import { NewTaskService } from '../store/NewTaskService';
 import PlanPanelLeft from '@/components/content/PlanPanelLeft';
 import ContentToolbar from '@/commonComponents/components/Content/ContentToolbar';
@@ -202,6 +203,15 @@ const HomePage: React.FC = () => {
                             </div>
                         )}
                     </Content>
+                    {/*
+                      The transparency rail (issue #24). It is on the home
+                      surface as well as the plan surface because the meter is
+                      a running total across the whole walkthrough: the
+                      identity boundary gate refuses a question *here*, and the
+                      row proving that refusal cost nothing has to be beside
+                      the rows that did cost something.
+                    */}
+                    <TransparencyRail team={selectedTeam} />
                 </CoralShellRow>
             </CoralShellColumn>
         </>

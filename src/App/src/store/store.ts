@@ -10,6 +10,7 @@ import chatReducer from './slices/chatSlice';
 import appReducer from './slices/appSlice';
 import teamReducer from './slices/teamSlice';
 import streamingReducer from './slices/streamingSlice';
+import transparencyReducer from './slices/transparencySlice';
 
 export const store = configureStore({
     reducer: {
@@ -18,6 +19,7 @@ export const store = configureStore({
         app: appReducer,
         team: teamReducer,
         streaming: streamingReducer,
+        transparency: transparencyReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({

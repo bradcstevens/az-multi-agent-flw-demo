@@ -1,0 +1,37 @@
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+
+import PresenterAlertCard from './PresenterAlertCard';
+import { parsePresenterAlert } from '../../models/transparency';
+
+const alert = parsePresenterAlert({
+    title: 'Shift task due',
+    content: 'The coffee station deep clean is due before the 15:00 handover at Store 223.',
+    timestamp: '2026-08-13T09:00:00+00:00',
+})!;
+
+describe('the Presenter alert', () => {
+    it('shows the title and the words the server chose', () => {
+        render(<PresenterAlertCard alert={alert} />);
+
+        expect(screen.getByText('Shift task due')).toBeInTheDocument();
+        expect(screen.getByText(/coffee station deep clean/)).toBeInTheDocument();
+    });
+
+    it('renders as an alert and not as a reply, so it is never mistaken for an answer', () => {
+        render(<PresenterAlertCard alert={alert} />);
+
+        const card = screen.getByTestId('presenter-alert');
+        expect(card).toHaveAttribute('role', 'alert');
+        expect(card).toHaveAttribute('data-message-kind', 'alert');
+        // An agent reply carries an agent name; an alert carries a title and
+        // deliberately no agent, because nothing was asked.
+        expect(screen.queryByTestId('agent-message')).not.toBeInTheDocument();
+    });
+
+    it('says out loud that nobody asked for it', () => {
+        render(<PresenterAlertCard alert={alert} />);
+
+        expect(screen.getByTestId('presenter-alert-kind')).toHaveTextContent(/proactive/i);
+    });
+});

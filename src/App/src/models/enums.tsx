@@ -255,7 +255,17 @@ export enum WebsocketMessageType {
     FINAL_RESULT_MESSAGE = "final_result_message",
     TIMEOUT_NOTIFICATION = "timeout_notification",
     ERROR_MESSAGE = 'error_message',
-    PING = "ping"
+    PING = "ping",
+    /**
+     * The three transparency signals (issues #23, #24). They ride the socket
+     * the client already has open rather than a channel of their own — the
+     * frontend is already subscribed here, and a second transport is a second
+     * thing to fail on stage. Their string values are the members of the
+     * backend's `WebsocketMessageType`; drift here is a panel that never lights.
+     */
+    SOURCE_USED = "source_used",
+    TOKEN_USAGE = "token_usage",
+    PRESENTER_ALERT = "presenter_alert"
 }
 
 export enum AgentMessageType {
