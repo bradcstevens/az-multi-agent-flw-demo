@@ -69,8 +69,10 @@ open to the Deliberate lane**.
 personal, individual-identity questions from a shared store device, executed **before the lane
 router and before orchestration**. Keyword fast path plus an embedding-similarity tier; **fails
 closed**; on a match the request short-circuits with no agent invoked and no tokens spent. It is
-not the accelerator's prompt-based team-scope evaluation, which fails open in two places. See
-[ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md).
+not the accelerator's prompt-based team-scope evaluation, which fails open in two places. The
+similarity tier scores a **Two-class margin**, not a bare similarity. See
+[ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md) and
+[ADR-015](docs/ADR/015-two-class-margin-for-the-identity-boundary-gate.md).
 _Avoid_: guardrail prompt, scope prompt, content filter
 
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
@@ -200,10 +202,41 @@ _Avoid_: the requirements doc, the build requirements, the spec (the spec is iss
 **claim** and the **correct** position. The ten are a historical record and are append-only: a new
 finding becomes correction 11, it does not rewrite an existing one.
 
-**Guardrail corpus** — 10 positive and 10 negative probes that are simultaneously R5's acceptance
-test and the tuning harness for the Identity boundary gate's similarity threshold. Runs against the
-**real** embedding deployment under the `integration` marker and is deselected in CI, because a
-mocked embedder would only prove plumbing. It must exist **before** the threshold is chosen.
+**Guardrail corpus** — 10 positive probes and 10 negative controls that are simultaneously R5's
+acceptance test and the tuning harness for the Identity boundary gate's similarity threshold
+(`src/backend/guardrail/corpus.py`, scored by
+`src/tests/backend/guardrail/test_guardrail_corpus.py`). Runs against the **real** embedding
+deployment under the `integration` marker and is deselected in CI — by `-m "not integration"` in
+both `scripts/backend-tests.sh` and `.github/workflows/test.yml`, guarded by
+`src/tests/ci/test_integration_marker.py` — because a mocked embedder would only prove plumbing.
+It must exist **before** the threshold is chosen, and it earned that: the first scoring rule tried
+did not separate it, and the corpus is what said so (ADR-015).
+_Avoid_: guardrail test set, probe set (the probes are one half of it)
+
+**Personal-intent anchors** / **Store-scope anchors** — the two sets of exemplar phrasings the
+similarity tier scores an incoming request against. **Production data, not test data**: the gate
+embeds them once at startup. The store-scope set is a counterweight, not a second corpus — it
+exists so shared sentence shape cancels.
+
+**Two-class margin** — the similarity tier's score: nearest personal-intent anchor minus nearest
+store-scope anchor (`similarity.personal_intent_margin`). Roughly ±0.6, **not** a cosine value in
+0–1, so the sweep band straddles zero and a threshold read cold will be mis-read. Similarity to the
+personal anchors alone does not separate the Guardrail corpus at any threshold — a store question
+shaped like a personal one outscores a personal question shaped like neither. See
+[ADR-015](docs/ADR/015-two-class-margin-for-the-identity-boundary-gate.md).
+_Avoid_: similarity score, cosine score
+
+**Measured threshold** — `IDENTITY_BOUNDARY_SIMILARITY_THRESHOLD`, **−0.08**: the midpoint of the
+perfect band (−0.23 to +0.07) measured against `text-embedding-3-small` on the deployed
+environment, 10/10 refused and 0/10 falsely refused. Negative on purpose — the fail-closed half of
+ADR-014 expressed as a number. Re-derive it by running the corpus suite; the recorded value is
+asserted to sit inside the band, so drift fails loudly.
+_Avoid_: the guardrail threshold (ambiguous — the content-safety check has one too)
+
+**Threshold sweep** — the corpus's report: one row per candidate threshold with probes refused and
+controls falsely refused, marked `PERFECT` where both numbers are right. It is how the threshold is
+**read off numbers** rather than guessed, and it is the reason a scoring rule that does not
+separate is a visible finding rather than a silent one.
 
 **Deployment flavour** — which of the three infrastructure paths `infra/main.bicep` dispatches to:
 `bicep` (**vanilla**, what this build deploys), `avm`, or `avm-waf`. Not cosmetic — several

@@ -25,6 +25,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [012](./012-grounding-option-a-dataverse-documents-only.md) | Ground the SOP agent on Dataverse Documents only — Option B deleted, not deferred | Accepted |
 | [013](./013-per-request-plan-review-over-orchestrator-bypass.md) | Vary Plan review per request instead of building an orchestrator bypass | Accepted |
 | [014](./014-deterministic-identity-boundary-gate.md) | The identity boundary gate is deterministic code, not a prompt | Accepted |
+| [015](./015-two-class-margin-for-the-identity-boundary-gate.md) | Score the identity boundary gate's similarity tier as a two-class margin | Accepted |
 
 ## Writing a new one
 

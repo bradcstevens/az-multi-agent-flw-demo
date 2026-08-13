@@ -56,6 +56,15 @@ Notes:
 - A bare `pytest` from the repo root is **not** a loop: it collects `test_mcp_tools.py`
   (which dials a live MCP server) and `tests/e2e-test` (which needs Playwright). Scope
   runs to `src/tests/backend`.
+- Both backend phases pass `-m "not integration"`, so the **Guardrail corpus** — which
+  scores against the live embedding deployment — stays out of unattended runs.
+  `src/tests/ci/test_integration_marker.py` fails if that deselection is dropped from
+  either the loop or `test.yml`. Run the corpus deliberately, after `az login`:
+
+  ```bash
+  export GUARDRAIL_EMBEDDING_ENDPOINT="$(grep AZURE_OPENAI_ENDPOINT .azure/macae-flw-v1/.env | cut -d= -f2- | tr -d '"')"
+  .venv/bin/python -m pytest src/tests/backend/guardrail/test_guardrail_corpus.py -m integration -s
+  ```
 - Coverage and lint configuration live in the root `pyproject.toml` and `.flake8`. There
   is no `.coveragerc`.
 - **The 80% coverage threshold is advisory, not a gate.** `scripts/coverage_report.py`

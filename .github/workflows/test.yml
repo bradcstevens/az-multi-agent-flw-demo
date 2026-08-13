@@ -76,11 +76,13 @@ jobs:
         env:
           PYTHONPATH: src:src/backend
         run: |
-          # Run test_app.py first (isolation required)
-          python -m pytest src/tests/backend/test_app.py --cov=src/backend -q
+          # Run test_app.py first (isolation required). Both backend phases
+          # deselect the integration marker: the Guardrail corpus (#13) scores
+          # against the live embedding deployment, which CI cannot reach.
+          python -m pytest src/tests/backend/test_app.py --cov=src/backend -m "not integration" -q
 
           # Run remaining backend tests with coverage append
-          python -m pytest src/tests/backend --cov=src/backend --cov-append --cov-report=term --cov-report=xml --junitxml=pytest.xml --ignore=src/tests/backend/test_app.py
+          python -m pytest src/tests/backend --cov=src/backend --cov-append --cov-report=term --cov-report=xml --junitxml=pytest.xml -m "not integration" --ignore=src/tests/backend/test_app.py
 
           # Run MCP server tests and append their coverage to the backend report.
           python -m pytest src/tests/mcp_server --cov=src/mcp_server --cov-append --cov-report=term --cov-report=xml
