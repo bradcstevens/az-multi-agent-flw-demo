@@ -252,6 +252,54 @@ spoken: a preamble returned because the clock ran out is a timeout dressed as an
 
 ## Surfaces
 
+**Store surface** — the branded chat surface the presenter opens: the **Circle K Frontline Store
+Assistant**, scoped to **Store 223**, with **no user identity** (#25). One module,
+`src/App/src/models/storeSurface.ts`, holds every string the surface says about itself, because the
+left panel's toolbar, the conversation's header, the browser tab and the identity chip are four
+places to disagree about which assistant this is.
+
+**Store identity** — the header's two claims: the store the shared device belongs to, and who is
+signed in on it. The anonymous state is **stated out loud** ("No user signed in") rather than left
+as blank space — blank space reads as a component that failed to load, and the audience has to be
+able to see the "before" of the before-and-after that #27's sign-in completes. `anonymous` is the
+literal principal the backend returns with EasyAuth off, so it is *nobody*, not somebody called
+anonymous. It lives in the conversation's header and **not** in the left panel, which is hidden at
+the phone breakpoint — an identity claim the associate cannot see is not a claim.
+_Avoid_: user card, login button (both were the accelerator's, and both are gone)
+
+**One assistant** — there is no team picker (#25). Choosing between specialists is the **Lane
+router**'s job and the orchestrator's job; an associate mid-shift has no basis for the choice, and
+asking them to make it turns getting an answer into a routing decision. The picker, its upload
+dialog and the EasyAuth login button were deleted rather than hidden — a picker that is merely not
+rendered is one prop away from returning.
+
+**Stock content packs** — the accelerator's six seeded agent teams (RFP Evaluation, Retail Customer
+Satisfaction, HR Employee Onboarding, Marketing Press Release, Contract Compliance Review, Content
+Generation). Suppressed as part of R1's single-assistant surface (#25), in two places, because
+either alone leaks:
+
+| Half | Where | What it stops |
+| --- | --- | --- |
+| Surface | `selectStoreAssistant` | A pack already in Cosmos being shown under the Circle K header |
+| Deploy | `installs_use_case`, `MACAE_USE_CASE=none` | Six unused agent teams being seeded at all |
+
+`selectStoreAssistant` **recognises** the store assistant — by `STORE_ASSISTANT_TEAM_ID`
+(`00000000-0000-0000-0000-000000000223`, hex-only, and `223` reads as the store), and failing that
+by name. There is deliberately **no `teams[0]` fallback**: that fallback *is* the suppression
+failing, and a surface branded as one assistant while running another is the identity form of the
+rule the transparency panels run on. No assistant is a state the surface can be in, and it says so.
+
+**Simulated label** — the badge on anything whose content was authored for the walkthrough rather
+than produced by a connected system (#25, R11's surviving fragment): **Store 223** and the
+**Presenter alert**'s rehearsed words today, the **Simulated ticket** when #22 lands. The converse
+matters as much — a badge on a real Foundry answer, a real Copilot Studio hop or a measured token
+count gives away the demo's strongest evidence. Label the invented things, and only those.
+
+**Phone breakpoint** — 640px, below which the shell's columns stack and the task-history panel is
+dropped rather than squeezed (#25). The associate is holding a phone in a store. `CoralShellRow`'s
+layout had to move out of an inline style to get there: an inline `flex-direction: row` beats a
+media query, so the breakpoint would have been present, correct and completely inert.
+
 **Grounding panel** — the R6 surface showing where an answer came from. Driven by **two signals
 combined**: a "source used" event emitted server-side over the existing WebSocket, which proves
 *which platform* answered, and citation data parsed from the SOP agent's response, which supplies
@@ -360,7 +408,8 @@ difference between a bug and a chord that missed.
 
 All three signals are recorded in full in
 [docs/transparency-signals.md](docs/transparency-signals.md), and the panels that render them in
-[docs/transparency-panels.md](docs/transparency-panels.md).
+[docs/transparency-panels.md](docs/transparency-panels.md). The rebrand that surrounds them is
+recorded in [docs/store-surface.md](docs/store-surface.md).
 
 **Quick Task** — a starting task the presenter taps instead of typing. Six of them, including one
 that deliberately routes to the **Deliberate lane** and one rehearsed out-of-corpus probe. Carries

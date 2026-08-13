@@ -23,6 +23,13 @@ on:
       # socket. The vitest suite hand-writes its payloads and cannot notice.
       - 'src/App/src/models/transparency.ts'
       - 'src/App/src/models/enums.tsx'
+      # The deploy path's stock-pack suppression (#25). Only these two files,
+      # not all of `infra/**`: a Bicep edit must not run the backend suite, but
+      # an edit to either post-deploy entry point has to run
+      # `test_stock_pack_suppression.py`, which sources one of them and calls
+      # its predicate.
+      - 'infra/scripts/post-provision/post_deploy.sh'
+      - 'infra/scripts/post-provision/post_deploy.ps1'
   pull_request:
     types:
       - opened
@@ -50,6 +57,13 @@ on:
       # socket. The vitest suite hand-writes its payloads and cannot notice.
       - 'src/App/src/models/transparency.ts'
       - 'src/App/src/models/enums.tsx'
+      # The deploy path's stock-pack suppression (#25). Only these two files,
+      # not all of `infra/**`: a Bicep edit must not run the backend suite, but
+      # an edit to either post-deploy entry point has to run
+      # `test_stock_pack_suppression.py`, which sources one of them and calls
+      # its predicate.
+      - 'infra/scripts/post-provision/post_deploy.sh'
+      - 'infra/scripts/post-provision/post_deploy.ps1'
 
 permissions:
   contents: read

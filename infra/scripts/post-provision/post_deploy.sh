@@ -536,6 +536,19 @@ upload_team_config() {
 }
 
 select_use_case() {
+  # The store assistant's own content pack is the only one this demonstration
+  # wants seeded (issue #25, R1). `none` is therefore a first-class selection
+  # rather than an omission, and `MACAE_USE_CASE` makes the whole choice
+  # non-interactive so `azd hooks run postdeploy` on the rehearsal machine does
+  # not stop on a prompt nobody is watching.
+  if [ -n "${MACAE_USE_CASE:-}" ]; then
+    if ! set_use_case "$MACAE_USE_CASE"; then
+      fatal "MACAE_USE_CASE=$MACAE_USE_CASE is not a use case. Expected 1-7, all, or none."
+    fi
+    info "Use case selected non-interactively: $selected_use_case_label"
+    return 0
+  fi
+
   echo ""
   echo "==============================================="
   echo "Available Use Cases:"
@@ -547,23 +560,53 @@ select_use_case() {
   echo "5. Contract Compliance Review"
   echo "6. Content Generation"
   echo "7. All"
+  echo "8. None - install no stock content pack"
   echo "==============================================="
   echo ""
 
   local selected=""
   while true; do
-    read -rp "Please enter the number of the use case you would like to install (1-7): " selected
-    case "$selected" in
-      1) selected_use_case="1"; selected_use_case_label="RFP Evaluation"; break ;; 
-      2) selected_use_case="2"; selected_use_case_label="Retail Customer Satisfaction"; break ;; 
-      3) selected_use_case="3"; selected_use_case_label="HR Employee Onboarding"; break ;; 
-      4) selected_use_case="4"; selected_use_case_label="Marketing Press Release"; break ;; 
-      5) selected_use_case="5"; selected_use_case_label="Contract Compliance Review"; break ;; 
-      6) selected_use_case="6"; selected_use_case_label="Content Generation"; break ;; 
-      7|all) selected_use_case="7"; selected_use_case_label="All"; break ;; 
-      *) warn "Invalid selection. Please enter a number from 1-7." ;;
-    esac
+    read -rp "Please enter the number of the use case you would like to install (1-8): " selected
+    if set_use_case "$selected"; then
+      break
+    fi
+    warn "Invalid selection. Please enter a number from 1-8."
   done
+}
+
+# The selection, as a pure function of the string the operator supplied.
+# Returns non-zero for anything it does not recognise: defaulting here would
+# quietly seed six stock content packs because somebody typed something this
+# script does not understand.
+#
+# Case-folded, because PowerShell's `switch` is case-insensitive and the two
+# entry points must not disagree about whether `MACAE_USE_CASE=None` is a
+# selection. Folded with `tr` rather than `${1,,}`, which needs bash 4 and so
+# would be a syntax error on macOS's stock 3.2.
+set_use_case() {
+  local raw
+  raw="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  case "$raw" in
+    1) selected_use_case="1"; selected_use_case_label="RFP Evaluation" ;;
+    2) selected_use_case="2"; selected_use_case_label="Retail Customer Satisfaction" ;;
+    3) selected_use_case="3"; selected_use_case_label="HR Employee Onboarding" ;;
+    4) selected_use_case="4"; selected_use_case_label="Marketing Press Release" ;;
+    5) selected_use_case="5"; selected_use_case_label="Contract Compliance Review" ;;
+    6) selected_use_case="6"; selected_use_case_label="Content Generation" ;;
+    7|all) selected_use_case="7"; selected_use_case_label="All" ;;
+    8|none) selected_use_case="none"; selected_use_case_label="None (no stock content pack)" ;;
+    *) return 1 ;;
+  esac
+  return 0
+}
+
+# Does the current selection install the pack belonging to use case $1?
+#
+# One predicate, used by every upload guard, so that "none installs nothing" is
+# a property something can actually be asserted about rather than six inline
+# comparisons that have to agree by inspection.
+installs_use_case() {
+  [[ "$selected_use_case" == "$1" || "$selected_use_case" == "7" ]]
 }
 
 select_subscription() {
@@ -762,19 +805,19 @@ main() {
   local is_team_config_failed=false
   local is_sample_data_failed=false
 
-  if [[ "$selected_use_case" == "3" || "$selected_use_case" == "7" ]]; then
+  if installs_use_case 3; then
     if ! upload_team_config "HR Employee Onboarding" "content_packs/hr_onboarding/agent_teams" "00000000-0000-0000-0000-000000000001"; then
       is_team_config_failed=true
     fi
   fi
 
-  if [[ "$selected_use_case" == "4" || "$selected_use_case" == "7" ]]; then
+  if installs_use_case 4; then
     if ! upload_team_config "Marketing Press Release" "content_packs/marketing_press_release/agent_teams" "00000000-0000-0000-0000-000000000002"; then
       is_team_config_failed=true
     fi
   fi
 
-  if [[ "$selected_use_case" == "1" || "$selected_use_case" == "7" ]]; then
+  if installs_use_case 1; then
     if ! upload_team_config "RFP Evaluation" "content_packs/rfp_evaluation/agent_teams" "00000000-0000-0000-0000-000000000004"; then
       is_team_config_failed=true
     fi
@@ -785,7 +828,7 @@ main() {
     fi
   fi
 
-  if [[ "$selected_use_case" == "5" || "$selected_use_case" == "7" ]]; then
+  if installs_use_case 5; then
     if ! upload_team_config "Contract Compliance Review" "content_packs/contract_compliance/agent_teams" "00000000-0000-0000-0000-000000000005"; then
       is_team_config_failed=true
     fi
@@ -796,7 +839,7 @@ main() {
     fi
   fi
 
-  if [[ "$selected_use_case" == "2" || "$selected_use_case" == "7" ]]; then
+  if installs_use_case 2; then
     if ! upload_team_config "Retail Customer Satisfaction" "content_packs/retail_customer/agent_teams" "00000000-0000-0000-0000-000000000003"; then
       is_team_config_failed=true
     fi
@@ -807,7 +850,7 @@ main() {
     fi
   fi
 
-  if [[ "$selected_use_case" == "6" || "$selected_use_case" == "7" ]]; then
+  if installs_use_case 6; then
     if ! upload_team_config "Content Generation" "content_packs/content_gen/agent_teams" "00000000-0000-0000-0000-000000000007"; then
       is_team_config_failed=true
     fi
@@ -905,4 +948,9 @@ main() {
     echo ""
   fi
 }
-main "$@"
+# Sourced by `src/tests/ci/test_stock_pack_suppression.py`, which calls
+# `select_use_case` and `installs_use_case` directly. Nothing else about this
+# script is a library; the guard exists so the predicate can be asserted on.
+if [ "${MACAE_POST_DEPLOY_LIB_ONLY:-}" != "1" ]; then
+  main "$@"
+fi

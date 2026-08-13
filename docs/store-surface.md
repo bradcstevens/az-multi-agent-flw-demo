@@ -1,0 +1,155 @@
+# The store surface
+
+Issue #25. The rebrand from the accelerator's Contoso-branded "Multi-Agent Planner" to the
+**Circle K Frontline Store Assistant**, and the point at which the demo stops looking like a
+solution accelerator with a feature bolted on.
+
+It lands after the centrepiece deliberately: if the **Identity boundary gate** is not convincing,
+the rest is decoration. It is also the last thing #26's Quick Tasks and #27's sign-in need in
+place, because both of them are affordances *on* this surface.
+
+The rule the transparency panels run on (#23, #24) carries over, applied to **identity**:
+
+> A surface may say nothing, but it may not say something that is not so.
+
+Rendering the accelerator's HR Onboarding roster under a Circle K header is that rule broken — and
+broken in the way that is hardest to notice, because nothing on screen looks wrong.
+
+## What the surface claims
+
+Every string the surface says about itself lives in `src/App/src/models/storeSurface.ts`. Four
+places would otherwise have to agree by inspection: the left panel's toolbar, the conversation's
+header, the browser tab and the identity chip. A demo that calls itself two things in one
+screenshot has already lost the argument it exists to make.
+
+| Claim | Value |
+| --- | --- |
+| Assistant | Circle K Frontline Store Assistant |
+| Store | Store 223 — **labelled simulated** |
+| User | *No user signed in*, until #27 |
+| Team identifier | `00000000-0000-0000-0000-000000000223` |
+
+The mark beside the name is an abstract storefront, **not** a reproduction of Circle K's trademark.
+This is a demonstration built for a customer conversation, not a licensed use of their brand
+assets, and a wrong-looking copy of a real logo on a stakeholder's screen is worse than an honest
+placeholder.
+
+## One assistant, and no picker
+
+There is no team picker. Choosing between specialists is the **Lane router**'s job and the
+orchestrator's job; an associate mid-shift has no basis for the choice, and asking them to make it
+turns getting an answer into a routing decision they cannot make.
+
+`TeamSelector`, `TeamSelected`, `useTeamSelection` and the EasyAuth `LoginButton` were **deleted**
+rather than left unrendered. A picker that is merely not rendered is one prop away from returning,
+and the upload dialog inside it was also the last route by which a suppressed stock content pack
+could reach the surface.
+
+The resolution stays; only the choice goes. `HomePage` still asks the backend for the teams it
+holds — it just does not offer them.
+
+## Suppressing the stock content packs
+
+The spec puts this inside R1's single-assistant surface, and it needs two halves because either
+alone leaks:
+
+| Half | Where | What it stops |
+| --- | --- | --- |
+| Surface | `selectStoreAssistant` | A pack already in Cosmos being shown under the Circle K header |
+| Deploy | `installs_use_case`, `MACAE_USE_CASE=none` | Six unused agent teams being seeded at all |
+
+### The surface half
+
+`selectStoreAssistant` **recognises** the store assistant rather than taking whatever the backend
+listed first: by `STORE_ASSISTANT_TEAM_ID`, and failing that by name, because the pack is uploaded
+by a script and re-uploaded by hand more than once.
+
+There is deliberately **no `teams[0]` fallback.** That fallback *is* the suppression failing. A
+deployment that still holds the HR Onboarding or RFP Evaluation packs — and this one does — would
+otherwise put one of them under the Circle K header the moment the store assistant's own pack was
+missing or renumbered.
+
+So **no assistant is a state the surface can be in**, and it says so plainly:
+
+> The Circle K Frontline Store Assistant is not loaded on this deployment.
+
+That is a worse-looking demo and a more honest one. It is also self-diagnosing: the message names
+exactly what is missing, where the accelerator's copy ("Select a team to see available tasks")
+blamed the associate for not making a choice that no longer exists.
+
+### The deploy half
+
+`post_deploy.sh` and `post_deploy.ps1` gain an eighth selection, `none`, and honour
+`MACAE_USE_CASE` so the whole choice can be made non-interactively — `azd hooks run postdeploy` on
+the rehearsal machine must not stop on a `read -rp` nobody is watching.
+
+Two smaller decisions inside that:
+
+- **An unrecognised override is refused, not defaulted.** Defaulting would quietly seed six stock
+  packs because somebody typed `None` with a capital N.
+- **The six upload guards go through one predicate**, `installs_use_case`. Six inline comparisons
+  that have to agree by inspection are six chances for one to be missed; one predicate is a thing
+  `src/tests/ci/test_stock_pack_suppression.py` can **source and call**, rather than reading the
+  menu text and agreeing with itself about what it means.
+
+`test.yml` names both post-deploy scripts in its paths — those two files only, not `infra/**`,
+since widening it would run the backend suite for a Bicep edit. Without that, the one change that
+can break these tests is the one change that would not have run them.
+
+## The phone
+
+The associate is holding a phone, in a store, on a shared device. The accelerator's shell is three
+columns — task history, conversation, transparency rail — which is roughly 900px of furniture
+before the conversation gets any width at all.
+
+At **640px** the columns stack and the task-history panel is dropped rather than squeezed: 280px of
+it beside a 390px viewport leaves the conversation unusable, and the conversation is the one thing
+that must still work here. The panel is presenter furniture, not associate furniture.
+
+Getting there required moving `CoralShellRow`'s layout out of an inline style, and that is the
+whole reason it has a test: **an inline `flex-direction: row` beats a media query**, so the phone
+breakpoint would have been present, correct and completely inert. `CoralShellRow.test.tsx` asserts
+the element carries no inline `display` or `flexDirection` at all.
+
+That test also reads the breakpoint's selectors **out of the stylesheet** and checks each one is a
+class something actually renders. A list of class names written in the test would agree with itself
+forever; a rename in a component while the breakpoint keeps the old name is a layout that silently
+stops applying, and it would be discovered on a phone, on stage.
+
+## Labelling what is simulated
+
+`SimulatedBadge` marks anything whose content was authored for the walkthrough rather than produced
+by a connected system:
+
+| Labelled | Why |
+| --- | --- |
+| **Store 223** | A fictional store, with fictional employees and invented procedures |
+| The **Presenter alert** | Its words come from a rehearsed roster in `transparency.alert` (#23), not from a shift-task system |
+| The **Simulated ticket** | When #22 lands |
+
+The converse matters as much, and is easier to get wrong: a badge on a **real** Foundry answer, a
+real Copilot Studio hop or a measured token count gives away the demo's strongest evidence. A
+stakeholder who is told everything is simulated has been told nothing. Label the invented things,
+and only those.
+
+## Which agent answered
+
+Already true, and now pinned. `StreamingAgentMessage` renders `getAgentDisplayName(msg.agent)` in
+the reply's header, which is the executor identifier the backend attributed the output to — the
+same attribution the **Token meter** keys its rows by, and the one that survives **Plan review**
+being off (ADR-013).
+
+The **Agent Team** panel lists who *could* have answered. Only this says who did, which is the
+difference between the assistant reading as several specialists and reading as one black box. An
+unnamed executor renders `Assistant` rather than a blank, because a blank where a name belongs
+reads as a broken layout.
+
+## Not verified live
+
+Nothing here has rendered against a deployed backend. In particular:
+
+- **The store assistant's pack does not exist yet** — #19 authors it. Until then this surface
+  resolves to no assistant and says so, which is the honest behaviour and also an unusable demo.
+  #19 must use `00000000-0000-0000-0000-000000000223`.
+- **The phone breakpoint has not been seen on a phone.** jsdom does not evaluate media queries, so
+  the tests prove the stylesheet can reach the elements, not that the result is usable at 390px.

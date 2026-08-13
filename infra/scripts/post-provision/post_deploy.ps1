@@ -593,22 +593,35 @@ try {
     }
 
     # ── Use case selection ────────────────────────────────────────────────────
-    Write-Host ""
-    Write-Host "==============================================="
-    Write-Host "Available Use Cases:"
-    Write-Host "==============================================="
-    Write-Host "1. RFP Evaluation"
-    Write-Host "2. Retail Customer Satisfaction"
-    Write-Host "3. HR Employee Onboarding"
-    Write-Host "4. Marketing Press Release"
-    Write-Host "5. Contract Compliance Review"
-    Write-Host "6. Content Generation"
-    Write-Host "7. All"
-    Write-Host "==============================================="
-    Write-Host ""
+    # The store assistant's own content pack is the only one this
+    # demonstration wants seeded (issue #25, R1), so "none" is a first-class
+    # selection here rather than an omission, and $env:MACAE_USE_CASE makes the
+    # choice non-interactive. This file and post_deploy.sh are separate entry
+    # points onto the same environment; one platform seeding six stock packs
+    # while the other seeds none is the same defect, discovered later.
+    $useCaseValid = $false
+    if ($env:MACAE_USE_CASE) {
+        $useCaseSelection = $env:MACAE_USE_CASE
+    }
 
     do {
-        $useCaseSelection = Read-Host "Please enter the number of the use case you would like to install (1-7)"
+        if (-not $useCaseSelection) {
+            Write-Host ""
+            Write-Host "==============================================="
+            Write-Host "Available Use Cases:"
+            Write-Host "==============================================="
+            Write-Host "1. RFP Evaluation"
+            Write-Host "2. Retail Customer Satisfaction"
+            Write-Host "3. HR Employee Onboarding"
+            Write-Host "4. Marketing Press Release"
+            Write-Host "5. Contract Compliance Review"
+            Write-Host "6. Content Generation"
+            Write-Host "7. All"
+            Write-Host "8. None - install no stock content pack"
+            Write-Host "==============================================="
+            Write-Host ""
+            $useCaseSelection = Read-Host "Please enter the number of the use case you would like to install (1-8)"
+        }
         switch ($useCaseSelection) {
             "1" { $selectedUseCase = "RFP Evaluation";              $useCaseValid = $true }
             "2" { $selectedUseCase = "Retail Customer Satisfaction"; $useCaseValid = $true }
@@ -618,9 +631,20 @@ try {
             "6" { $selectedUseCase = "Content Generation";           $useCaseValid = $true }
             "7" { $selectedUseCase = "All";                          $useCaseValid = $true }
             "all" { $useCaseSelection = "7"; $selectedUseCase = "All"; $useCaseValid = $true }
+            "8" { $useCaseSelection = "none"; $selectedUseCase = "None (no stock content pack)"; $useCaseValid = $true }
+            "none" { $selectedUseCase = "None (no stock content pack)"; $useCaseValid = $true }
             default {
                 $useCaseValid = $false
-                Write-Host "Invalid selection. Please enter a number from 1-7." -ForegroundColor Red
+                # An unreadable override is refused rather than defaulted:
+                # defaulting would seed six stock packs because somebody typed
+                # something this script does not understand. `switch` is
+                # case-insensitive here, and post_deploy.sh case-folds its own
+                # input so that the two entry points agree about "None".
+                if ($env:MACAE_USE_CASE -and $useCaseSelection -eq $env:MACAE_USE_CASE) {
+                    throw "MACAE_USE_CASE=$($env:MACAE_USE_CASE) is not a use case. Expected 1-8, all, or none."
+                }
+                $useCaseSelection = $null
+                Write-Host "Invalid selection. Please enter a number from 1-8." -ForegroundColor Red
             }
         }
     } while (-not $useCaseValid)

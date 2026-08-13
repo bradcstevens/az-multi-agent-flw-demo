@@ -34,4 +34,14 @@ describe('the Presenter alert', () => {
 
         expect(screen.getByTestId('presenter-alert-kind')).toHaveTextContent(/proactive/i);
     });
+
+    it('is labelled as simulated, because the shift task is rehearsed', () => {
+        // The alert's words come from a rehearsed roster in the backend, not
+        // from a shift-task system this demo is connected to (#23). A
+        // stakeholder who discovers that afterwards discounts everything else
+        // on the surface — including the parts that are real.
+        render(<PresenterAlertCard alert={alert} />);
+
+        expect(screen.getByTestId('presenter-alert')).toHaveTextContent(/simulated/i);
+    });
 });

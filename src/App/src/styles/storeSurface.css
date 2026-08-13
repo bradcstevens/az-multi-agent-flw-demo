@@ -1,0 +1,62 @@
+/*
+ * The store surface (issue #25) — the shell's shape, and the store identity
+ * that sits in its header.
+ *
+ * The phone breakpoint is a requirement, not a nicety: the associate this demo
+ * is about is holding a phone in a store, on a shared device, mid-shift. The
+ * accelerator's three-column desktop shell (task history | conversation |
+ * transparency rail) is roughly 900px of furniture before the conversation
+ * gets any width at all, so on a phone the columns stack and the task history —
+ * presenter furniture, not associate furniture — goes away entirely.
+ *
+ * Layout only. Nothing here decides what the surface *says*; a stylesheet must
+ * never be the reason a claim is or is not made.
+ */
+
+.coral-shell-row {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.store-identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.store-identity__store,
+.store-identity__user {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.store-identity__user {
+    color: var(--colorNeutralForeground2);
+}
+
+/*
+ * Phone. The columns stack, the surface scrolls as one, and the task-history
+ * panel is dropped rather than squeezed — 280px of it beside a 390px viewport
+ * leaves the conversation unusable, which is the one thing that must still work
+ * here.
+ */
+@media (max-width: 640px) {
+    .coral-shell-row {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .panel-left-container {
+        display: none;
+    }
+
+    .transparency-rail {
+        width: 100%;
+        min-width: 0;
+        border-left: none;
+        border-top: 1px solid var(--colorNeutralStroke2);
+    }
+}

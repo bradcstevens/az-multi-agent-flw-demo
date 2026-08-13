@@ -9,8 +9,9 @@ import TransparencyRail from '@/components/transparency/TransparencyRail';
 import { NewTaskService } from '../store/NewTaskService';
 import PlanPanelLeft from '@/components/content/PlanPanelLeft';
 import ContentToolbar from '@/commonComponents/components/Content/ContentToolbar';
-import { TeamConfig } from '../models/Team';
 import { TeamService } from '../store/TeamService';
+import StoreIdentity from '../components/branding/StoreIdentity';
+import { ASSISTANT_NAME, selectStoreAssistant } from '../models/storeSurface';
 import InlineToaster, { useInlineToaster } from '../components/toast/InlineToaster';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
@@ -19,7 +20,7 @@ import {
     setSelectedTeam,
     setIsLoadingTeam,
 } from '../store/slices/teamSlice';
-import { selectReloadLeftList, setReloadLeftList } from '../store/slices/planSlice';
+import { selectReloadLeftList } from '../store/slices/planSlice';
 
 /**
  * HomePage component - displays task lists and provides navigation
@@ -32,60 +33,50 @@ const HomePage: React.FC = () => {
     const isLoadingTeam = useAppSelector(selectIsLoadingTeam);
     const reloadLeftList = useAppSelector(selectReloadLeftList);
 
+    /*
+     * The one assistant, resolved (issue #25).
+     *
+     * `selectStoreAssistant` recognises the store assistant rather than taking
+     * whatever the backend listed first. That is where the accelerator's stock
+     * content packs are suppressed: a deployment that still holds the HR
+     * Onboarding or RFP Evaluation packs would otherwise put one of them under
+     * the Circle K header, and a surface that is branded as one assistant while
+     * running another is the one thing these surfaces may not do.
+     *
+     * No assistant is therefore a state the surface has to be able to be in,
+     * and it says so plainly instead of quietly picking a stranger.
+     */
     useEffect(() => {
         const initTeam = async () => {
             dispatch(setIsLoadingTeam(true));
             try {
-                // Get available teams first
                 const teams = await TeamService.getUserTeams();
-                
-                // Check if we have a stored team and if it still exists in the backend
-                const storedTeam = TeamService.getStoredTeam();
-                if (storedTeam) {
-                    const backendTeam = teams.find(t => t.team_id === storedTeam.team_id);
-                    if (backendTeam) {
-                        // Stored team still exists, use backend-fresh object
-                        dispatch(setSelectedTeam(backendTeam));
-                        showToast(`${backendTeam.name} team restored from storage`, 'success');
-                        dispatch(setIsLoadingTeam(false));
-                        return;
-                    } else {
-                        // Stored team was deleted, clear localStorage
-                        console.warn(`Stored team ${storedTeam.team_id} no longer exists, clearing storage`);
-                        TeamService.clearStoredTeam();
-                    }
+                const storeAssistant = selectStoreAssistant(teams);
+
+                if (!storeAssistant) {
+                    TeamService.clearStoredTeam();
+                    dispatch(setSelectedTeam(null));
+                    showToast(
+                        `${ASSISTANT_NAME} is not loaded on this deployment.`,
+                        'warning',
+                    );
+                    return;
                 }
 
-                // Now initialize team from backend
+                dispatch(setSelectedTeam(storeAssistant));
+                TeamService.storageTeam(storeAssistant);
+
+                // The backend still has to build the workflow for it; the
+                // response is only interesting when it fails.
                 const initResponse = await TeamService.initializeTeam();
-
-                if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
-                    const initializedTeam = teams.find(team => team.team_id === initResponse.data?.team_id);
-
-                    if (initializedTeam) {
-                        dispatch(setSelectedTeam(initializedTeam));
-                        TeamService.storageTeam(initializedTeam);
-                        showToast(
-                            `${initializedTeam.name} team initialized successfully with ${initializedTeam.agents?.length || 0} agents`,
-                            'success',
-                        );
-                    } else if (teams.length > 0) {
-                        const defaultTeam = teams[0];
-                        dispatch(setSelectedTeam(defaultTeam));
-                        TeamService.storageTeam(defaultTeam);
-                        showToast(`${defaultTeam.name} team loaded as default`, 'success');
-                    }
-                } else if (initResponse.data?.requires_team_upload) {
-                    dispatch(setSelectedTeam(null));
-                    showToast('Welcome! Please upload a team configuration file to get started.', 'info');
-                } else if (!initResponse.success) {
-                    console.error('Team init failed:', initResponse.error);
-                    showToast(initResponse.error || 'Team initialization failed. Please try again.', 'warning');
+                if (!initResponse.success) {
+                    console.error('Store assistant init failed:', initResponse.error);
+                    showToast('The store assistant could not be started. Please try again.', 'warning');
                 }
             } catch (error) {
-                console.error('Team initialization error:', error);
-                showToast('Team initialization failed. You can still upload a custom team configuration.', 'info');
+                console.error('Store assistant initialization error:', error);
                 dispatch(setSelectedTeam(null));
+                showToast('The store assistant could not be reached.', 'warning');
             } finally {
                 dispatch(setIsLoadingTeam(false));
             }
@@ -98,80 +89,6 @@ const HomePage: React.FC = () => {
         NewTaskService.handleNewTaskFromHome();
     }, []);
 
-    const handleTeamSelect = useCallback(
-        async (team: TeamConfig | null) => {
-            dispatch(setSelectedTeam(team));
-            dispatch(setReloadLeftList(true));
-            
-            // Immediately save selected team to localStorage so it persists on reload
-            if (team) {
-                TeamService.storageTeam(team);
-            }
-            
-            if (team) {
-                try {
-                    dispatch(setIsLoadingTeam(true));
-                    const initResponse = await TeamService.initializeTeam(true);
-
-                    if (initResponse.data?.status === 'Request started successfully' && initResponse.data?.team_id) {
-                        const teams = await TeamService.getUserTeams();
-                        const initializedTeam = teams.find(t => t.team_id === initResponse.data?.team_id);
-
-                        if (initializedTeam) {
-                            dispatch(setSelectedTeam(initializedTeam));
-                            TeamService.storageTeam(initializedTeam);
-                            dispatch(setReloadLeftList(true));
-                            showToast(
-                                `${initializedTeam.name} team initialized successfully with ${initializedTeam.agents?.length || 0} agents`,
-                                'success',
-                            );
-                        }
-                    } else if (initResponse.data?.requires_team_upload) {
-                        dispatch(setSelectedTeam(null));
-                        showToast('No teams are configured. Please upload a team configuration to continue.', 'info');
-                    } else {
-                        throw new Error('Invalid response from init_team endpoint');
-                    }
-                } catch {
-                    showToast('Error switching team. Please try again.', 'warning');
-                } finally {
-                    dispatch(setIsLoadingTeam(false));
-                }
-            } else {
-                showToast('No team is currently selected', 'info');
-            }
-        },
-        [dispatch, showToast],
-    );
-
-    const handleTeamUpload = useCallback(async (uploadedTeam?: TeamConfig) => {
-        try {
-            console.log('handleTeamUpload called with:', uploadedTeam);
-            if (uploadedTeam) {
-                const teamName = uploadedTeam.name || 'Uploaded Team';
-                dispatch(setSelectedTeam(uploadedTeam));
-                TeamService.storageTeam(uploadedTeam);
-                showToast(`Default team set to ${teamName}`, 'success');
-
-                // Also inform backend to use this team for the session
-                if (uploadedTeam.team_id) {
-                    try {
-                        await TeamService.selectTeam(uploadedTeam.team_id);
-                        console.log('Team selected in backend:', uploadedTeam.team_id);
-                    } catch (selectError) {
-                        console.warn('Failed to select team in backend:', selectError);
-                        // Don't fail the upload if backend selection fails
-                    }
-                }
-            } else {
-                console.warn('No uploaded team provided to handleTeamUpload');
-            }
-        } catch (error) {
-            console.error('Team upload failed:', error);
-            showToast('Team upload failed. Please try again.', 'warning');
-        }
-    }, [dispatch, showToast]);
-
     return (
         <>
             <InlineToaster />
@@ -180,14 +97,12 @@ const HomePage: React.FC = () => {
                     <PlanPanelLeft
                         reloadTasks={reloadLeftList}
                         onNewTaskButton={handleNewTaskButton}
-                        onTeamSelect={handleTeamSelect}
-                        onTeamUpload={handleTeamUpload}
-                        isHomePage={true}
-                        selectedTeam={selectedTeam}
                         isLoadingTeam={isLoadingTeam}
                     />
                     <Content>
-                        <ContentToolbar panelTitle="Multi-Agent Planner" />
+                        <ContentToolbar panelTitle={ASSISTANT_NAME}>
+                            <StoreIdentity />
+                        </ContentToolbar>
                         {!isLoadingTeam ? (
                             <HomeInput selectedTeam={selectedTeam} />
                         ) : (
@@ -199,7 +114,7 @@ const HomePage: React.FC = () => {
                                     height: '200px',
                                 }}
                             >
-                                <Spinner label="Loading team configuration..." />
+                                <Spinner label="Starting the store assistant..." />
                             </div>
                         )}
                     </Content>

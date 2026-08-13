@@ -74,6 +74,8 @@ import CoralShellColumn from '../commonComponents/components/Layout/CoralShellCo
 import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import ContentToolbar from '../commonComponents/components/Content/ContentToolbar';
+import StoreIdentity from '../components/branding/StoreIdentity';
+import { ASSISTANT_NAME } from '../models/storeSurface';
 import LaneBadge from '../components/lane/LaneBadge';
 import { isLane } from '../models/lane';
 import { useInlineToaster } from '../components/toast/InlineToaster';
@@ -420,10 +422,6 @@ const PlanPage: React.FC = () => {
                         reloadTasks={reloadLeftList}
                         onNewTaskButton={handleNewTaskButton}
                         restReload={resetReload}
-                        onTeamSelect={() => {}}
-                        onTeamUpload={async () => {}}
-                        isHomePage={false}
-                        selectedTeam={selectedTeam}
                         onNavigationWithAlert={handleNavigationWithAlert}
                     />
                     <Content>
@@ -444,10 +442,6 @@ const PlanPage: React.FC = () => {
                     reloadTasks={reloadLeftList}
                     onNewTaskButton={handleNewTaskButton}
                     restReload={resetReload}
-                    onTeamSelect={() => {}}
-                    onTeamUpload={async () => {}}
-                    isHomePage={false}
-                    selectedTeam={selectedTeam}
                     onNavigationWithAlert={handleNavigationWithAlert}
                 />
 
@@ -462,7 +456,8 @@ const PlanPage: React.FC = () => {
                         </>
                     ) : (
                         <>
-                            <ContentToolbar panelTitle="Multi-Agent Planner">
+                            <ContentToolbar panelTitle={ASSISTANT_NAME}>
+                                <StoreIdentity />
                                 {/*
                                   The Lane this plan was routed into (ADR-013).
                                   It is the lane *taken*, which is why it sits

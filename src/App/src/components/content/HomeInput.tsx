@@ -20,6 +20,7 @@ import LaneBadge from "../lane/LaneBadge";
 import { NewTaskService } from "../../store/NewTaskService";
 import { useAppDispatch } from "@/store/hooks";
 import { refusalRecorded, requestStarted } from "@/store/slices/transparencySlice";
+import { ASSISTANT_NAME } from "../../models/storeSurface";
 
 import ChatInput from "@/commonComponents/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
@@ -306,7 +307,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
           <ChatInput
             ref={textareaRef} // forwarding
             value={input}
-            placeholder="Tell us what needs planning, building, or connecting—we'll handle the rest."
+            placeholder="Ask about a store procedure, or report something that is not working."
             onChange={handleInputChange}
             onEnter={handleSubmit}
             disabledChat={submitting}
@@ -358,18 +359,31 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                   color: "#666",
                 }}
               >
-                <Caption1>No starting tasks available for this team</Caption1>
+                <Caption1>No quick tasks are configured yet</Caption1>
               </div>
             )}
+            {/*
+              No assistant. The stock content packs are suppressed (issue #25),
+              so an empty surface here means the store assistant's own pack has
+              not reached this deployment — not that the associate forgot to
+              choose something. The accelerator's copy asked them to "select a
+              team", which is a routing decision presented as a precondition,
+              and there is nothing left to select.
+            */}
             {!selectedTeam && (
               <div
+                className="home-input-unavailable"
+                data-testid="assistant-unavailable"
+                role="note"
                 style={{
                   textAlign: "center",
                   padding: "32px 16px",
-                  color: "#666",
+                  color: "var(--colorNeutralForeground3)",
                 }}
               >
-                <Caption1>Select a team to see available tasks</Caption1>
+                <Caption1>
+                  The {ASSISTANT_NAME} is not loaded on this deployment.
+                </Caption1>
               </div>
             )}
           </div>

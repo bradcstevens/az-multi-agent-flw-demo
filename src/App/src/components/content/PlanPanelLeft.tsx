@@ -20,21 +20,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Plan, PlanPanelLefProps, Task } from "@/models";
 import { apiService } from "@/api";
 import { TaskService } from "@/store";
-import ContosoLogo from "../../commonComponents/imports/ContosoLogo";
 import "../../styles/PlanPanelLeft.css";
-import LoginButton from "../auth/LoginButton";
-import TeamSelector from "../common/TeamSelector";
-import { TeamConfig } from "../../models/Team";
-import TeamSelected from "../common/TeamSelected";
+import { ASSISTANT_NAME } from "../../models/storeSurface";
+import StoreAssistantLogo from "../branding/StoreAssistantLogo";
 
 const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   reloadTasks,
   onNewTaskButton,
   restReload,
-  onTeamSelect,
-  onTeamUpload,
-  isHomePage,
-  selectedTeam: parentSelectedTeam,
   onNavigationWithAlert,
   isLoadingTeam
 }) => {
@@ -46,10 +39,6 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [plansLoading, setPlansLoading] = useState<boolean>(false);
   const [plansError, setPlansError] = useState<Error | null>(null);
-
-  // Use parent's selected team if provided, otherwise use local state
-  const [localSelectedTeam, setLocalSelectedTeam] = useState<TeamConfig | null>(null);
-  const selectedTeam = parentSelectedTeam || localSelectedTeam;
 
   const loadPlansData = useCallback(async (forceRefresh = false) => {
     try {
@@ -149,73 +138,26 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
     }
   }, [navigate, onNavigationWithAlert]);
 
-  const handleTeamSelect = useCallback(
-    (team: TeamConfig | null) => {
-      // Use parent's team select handler if provided, otherwise use local state
-      loadPlansData();
-      if (onTeamSelect) {
-        onTeamSelect(team);
-      } else {
-        if (team) {
-          setLocalSelectedTeam(team);
-          dispatchToast(
-            <Toast>
-              <ToastTitle>Team Selected</ToastTitle>
-              <ToastBody>
-                {team.name} team has been selected with {team.agents.length} agents
-              </ToastBody>
-            </Toast>,
-            { intent: "success" }
-          );
-        } else {
-          // Handle team deselection (null case)
-          setLocalSelectedTeam(null);
-          dispatchToast(
-            <Toast>
-              <ToastTitle>Team Deselected</ToastTitle>
-              <ToastBody>
-                No team is currently selected
-              </ToastBody>
-            </Toast>,
-            { intent: "info" }
-          );
-        }
-      }
-    },
-    [onTeamSelect, dispatchToast, loadPlansData]
-  );
-
   return (
     <div className="panel-left-container">
       <PanelLeft panelWidth={280} panelResize={true}>
         <PanelLeftToolbar
           linkTo={onNavigationWithAlert ? undefined : "/"}
           onTitleClick={onNavigationWithAlert ? handleLogoClick : undefined}
-          panelTitle="Contoso"
-          panelIcon={<ContosoLogo />}
+          panelTitle={ASSISTANT_NAME}
+          panelIcon={<StoreAssistantLogo />}
         >
           <Tooltip content="New task" relationship={"label"} />
         </PanelLeftToolbar>
 
-        {/* Team Selector right under the toolbar */}
-
-        <div className="team-selector-container">
-          {isHomePage && (
-            <TeamSelector
-              onTeamSelect={handleTeamSelect}
-              onTeamUpload={onTeamUpload}
-              selectedTeam={selectedTeam}
-              isHomePage={isHomePage}
-            />
-          )}
-
-          {!isHomePage && (
-            <TeamSelected
-              selectedTeam={selectedTeam}
-            />
-          )}
-
-        </div>
+        {/*
+          No team picker (issue #25). Choosing between specialists is the lane
+          router's job and the orchestrator's job; an associate mid-shift has no
+          basis for the choice, and asking them to make it turns getting an
+          answer into a routing decision. The upload dialog goes with it — a
+          picker with one entry is still a picker, and it was also the last way
+          a suppressed stock content pack could reach the surface.
+        */}
         <div
           className="tab tab-new-task"
           onClick={onNewTaskButton}
@@ -244,9 +186,14 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         />
 
         <PanelFooter>
-          <div className="panel-footer-content">
-            <LoginButton showName />
-          </div>
+          {/*
+            No identity here. It lives in the conversation's header instead
+            (issue #25): this panel is hidden at the phone breakpoint, and the
+            associate's screen is a phone — an identity claim the associate
+            cannot see is not a claim. A second one here would also be a second
+            place for #27's sign-in to have to stay in step with.
+          */}
+          <div className="panel-footer-content" />
         </PanelFooter>
       </PanelLeft>
     </div>
