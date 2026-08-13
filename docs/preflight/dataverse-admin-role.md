@@ -128,5 +128,6 @@ between them.
 Verified: the Default environment's identity, its Dataverse instance state, the build account's
 actual security roles, that the Dataverse-side self-assignment is refused, and that the bootstrap
 elevation grants the role end to end from a revoked state. **Not** verified here: Dataverse search
-itself (#3, now unblocked but not enabled), DLP connectors (#5), and the Copilot Studio meter
-(#6, recorded separately and already passing).
+itself (#3 — now enabled and its index proven synced, recorded separately in
+[docs/preflight/dataverse-search.md](dataverse-search.md)), DLP connectors (#5), and the Copilot
+Studio meter (#6, recorded separately and already passing).

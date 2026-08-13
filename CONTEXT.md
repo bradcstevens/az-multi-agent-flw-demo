@@ -259,6 +259,23 @@ elevation route for #2, in place of Microsoft's documented `applyAdminRole`, whi
 cannot reach at all.
 _Avoid_: service principal admin, app user (ambiguous — Dataverse also calls ordinary users "users")
 
+**Dataverse search** — the environment-level index that makes **documents-based knowledge**
+selectable, and so the thing the **Copilot Studio SOP agent** is grounded through. Off by default in
+a Default environment; turned on by `Organization.isexternalsearchindexenabled`, which needs
+**Dataverse System Administrator**.
+
+The term names two facts that are easy to conflate and must not be: the **toggle**, which is true the
+instant the PATCH returns, and the **sync**, which runs afterwards on its own clock and is what #17
+actually waits on. Only a document coming back out of the index — **by its file content**, not by its
+metadata, because knowledge sources retrieve against content — is evidence of the second. Recorded in
+[docs/preflight/dataverse-search.md](docs/preflight/dataverse-search.md); checked by
+`scripts/preflight/check-dataverse-search.sh --probe`, which probes rather than reads.
+
+Measured at **181 seconds** cold on this environment against Microsoft's documented 15-minute
+minimum — a floor, not a promise: the environment holds 148 MB and becomes populated as #8 and #19
+land.
+_Avoid_: relevance search (the old name), Dataverse search toggle (it is the sync that matters)
+
 ## Build and test
 
 **Durable record** — the tracked documentation that outlives the **superseded requirements
@@ -383,9 +400,10 @@ _Avoid_: DLP policy, connector policy
 before the build, each backed by a re-runnable check in `scripts/preflight/`. Distinct from a
 Feedback loop: a loop guards a change, a preflight guards an assumption about the tenant or
 subscription, and its verdict is point-in-time. Read the record rather than re-deriving it, and
-re-run the check rather than trusting the date on it. Four today: three about the Copilot Studio
-tenant (#2, #5, #6) and one about the **deployed environment** (#12) — the model roster, Search's
-region, single-replica scale, keyless configuration and the application images in
+re-run the check rather than trusting the date on it. Five today: three about the Copilot Studio
+tenant (#2, #5, #6), one about **Dataverse search** (#3) and one about the **deployed environment**
+(#12) — the model roster, Search's region, single-replica scale, keyless configuration and the
+application images in
 [docs/preflight/deployed-environment.md](docs/preflight/deployed-environment.md).
 
 **Placeholder image** — `mcr.microsoft.com/azuredocs/containerapps-helloworld`, the image all three

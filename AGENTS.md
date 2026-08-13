@@ -27,6 +27,7 @@ capability — and re-run its script rather than re-deriving the finding by hand
 | --- | --- |
 | `docs/preflight/copilot-studio-payg-meter.md` | `scripts/preflight/check-copilot-studio-meter.sh` |
 | `docs/preflight/dataverse-admin-role.md` | `scripts/preflight/check-dataverse-admin-role.sh` |
+| `docs/preflight/dataverse-search.md` | `scripts/preflight/check-dataverse-search.sh --probe` |
 | `docs/preflight/copilot-studio-data-policy-and-egress.md` | `scripts/preflight/check-copilot-studio-dlp.sh` |
 | `docs/preflight/deployed-environment.md` | `scripts/preflight/check-deployed-environment.sh` |
 
