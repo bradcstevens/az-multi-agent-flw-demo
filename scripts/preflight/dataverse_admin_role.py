@@ -11,11 +11,16 @@ Dataverse search setting cannot be changed without it (#3).
 `evaluate` is pure: it takes the Default environment as the admin API returns it
 and the build account's Dataverse security roles, and returns a `Verdict`. The
 live calls are in `main`.
+
+`--elevate` grants the role through a Bootstrap application user rather than
+Microsoft's documented `applyAdminRole`, which the Azure CLI cannot obtain a
+token for at all (see ELEVATION_INSTRUCTIONS below).
 """
 
 DEFAULT_ENVIRONMENT_ID = "Default-0f87abfb-0840-4199-96b7-1882c01a998b"
 SYSTEM_ADMINISTRATOR = "System Administrator"
 READY = "Ready"
+DATAVERSE_API_VERSION = "v9.2"
 
 # Why the identity check exists at all: a maker who follows a Copilot Studio URL
 # without an explicit environment can be routed into their personal Developer
@@ -29,6 +34,10 @@ DEVELOPER_REDIRECT_HAZARD = (
 
 POWER_PLATFORM_API = "https://api.powerplatform.com"
 ELEVATION_SCOPE = f"{POWER_PLATFORM_API}/UserManagement.Users.Apply"
+
+# The elevation route that works unattended (issue #2). Named here because the
+# report, the error classification and the live steps all have to agree on it.
+BOOTSTRAP_APPLICATION_USER = "bootstrap application user"
 
 
 class Check:
@@ -208,38 +217,132 @@ def _remedy(verdict):
     return ELEVATION_INSTRUCTIONS
 
 
-# The recorded elevation method (issue #2). Self-elevation goes through the
-# Power Platform API's applyAdminRole, which requires a *user* token carrying
-# the UserManagement.Users.Apply delegated scope — the Azure CLI is
-# pre-authorised for EnvironmentManagement.Environments.Read and
-# CopilotStudio.Copilots.Test but not for this one, so the scope has to be
-# consented interactively once. The caller must be a Global, Power Platform or
-# Dynamics 365 admin; no other Entra role can self-elevate.
+# The recorded elevation method (issue #2), and why it is not Microsoft's
+# documented self-elevation. `applyAdminRole` on the Power Platform API elevates
+# the *calling user* and so needs a user token carrying
+# UserManagement.Users.Apply — a scope the Azure CLI can never carry, because
+# consent between two Microsoft first-party applications is configured by the API
+# owner (preauthorisation), not by a tenant admin. Signing in does not help.
+#
+# What does work is a Bootstrap application user: an Entra app registration that
+# the BAP admin API registers as a Dataverse application user *with* System
+# Administrator, which then assigns the role to the build account and is deleted.
+# It needs no user token beyond the tenant-admin one the Azure CLI already holds
+# for the BAP admin API, so it runs unattended.
 ELEVATION_INSTRUCTIONS = f"""
-Remedy — self-elevate to {SYSTEM_ADMINISTRATOR} (Global / Power Platform /
-Dynamics 365 admin only). One interactive consent, then a re-runnable step:
+Remedy — elevate via a {BOOTSTRAP_APPLICATION_USER} (Global / Power Platform /
+Dynamics 365 admin only). No interactive consent; re-runnable:
 
-  az login --scope "{ELEVATION_SCOPE}"
   scripts/preflight/check-dataverse-admin-role.sh --elevate
 """
 
-# The two ways applyAdminRole says no. They have opposite remedies, so a bare
+# The ways elevation says no. They have different remedies, so a bare
 # "403 Forbidden" is not enough for an operator to act on.
 MISSING_SCOPE = "InsufficientDelegatedPermissions"
 NOT_A_TENANT_ADMIN = "Global admin"
+FIRST_PARTY_PREAUTHORISATION = "AADSTS65002"
+
+
+def disable_user_request():
+    """Return the patch that retires a Dataverse application user. Pure.
+
+    Dataverse does not delete system users, so the bootstrap principal's user
+    record outlives the Entra app registration that gave it meaning. Disabling
+    is what stops it appearing as a live System Administrator.
+    """
+    return {"isdisabled": True}
+
+
+def odata_url(base, entity, params):
+    """Return an encoded Dataverse query URL. Pure.
+
+    OData filters carry spaces and quotes (`name eq 'System Administrator'`),
+    which `urllib` rejects outright as control characters in a URL. Percent
+    encoding — not `+` — is what Dataverse reads back as a space.
+    """
+    from urllib.parse import quote, urlencode
+
+    query = urlencode(params, quote_via=quote, safe="")
+    return f"{base}/{entity}?{query}"
+
+
+def is_propagation_delay(status):
+    """True when a refusal is Entra propagation rather than an answer. Pure.
+
+    A service principal created a moment ago is not yet visible to the BAP admin
+    API, which answers `500 InternalServerError` rather than "not found". A 4xx
+    is a decision — retrying it only spends a minute to hear the same thing.
+    """
+    return status >= 500
+
+
+def select_system_user(users, object_id):
+    """Return `(systemuserid, business unit id)` for an Entra object id. Pure.
+
+    An Entra account is not automatically a Dataverse user, and an empty result
+    means "no user to hold a role" rather than "no role" — a distinction that is
+    invisible once a `None` id reaches the assignment call.
+    """
+    if len(users) != 1:
+        raise RuntimeError(
+            f"expected exactly one Dataverse user for Entra object {object_id}; "
+            f"found {len(users)}"
+        )
+    return users[0]["systemuserid"], users[0]["_businessunitid_value"]
+
+
+def role_reference(instance_url, role_id):
+    """Return the `$ref` body associating a role with a user. Pure.
+
+    `@odata.id` must be an absolute URL, and `instanceUrl` arrives with a
+    trailing slash, so the join is not a concatenation.
+    """
+    base = f"{instance_url.rstrip('/')}/api/data/{DATAVERSE_API_VERSION}"
+    return {"@odata.id": f"{base}/roles({role_id})"}
+
+
+def select_role(roles, business_unit_id):
+    """Return the id of `System Administrator` in `business_unit_id`. Pure.
+
+    Dataverse defines the role once per business unit, so the name does not
+    identify it. Assigning the copy from another business unit is a different
+    grant from the one the environment's settings answer to.
+    """
+    named = [r for r in roles if r.get("name") == SYSTEM_ADMINISTRATOR]
+    in_unit = [
+        r for r in named if r.get("_businessunitid_value") == business_unit_id
+    ]
+    if len(in_unit) == 1:
+        return in_unit[0]["roleid"]
+    raise RuntimeError(
+        f"expected exactly one {SYSTEM_ADMINISTRATOR!r} role in business unit "
+        f"{business_unit_id}; found {len(in_unit)} of {len(named)} by that name"
+    )
+
+
+def app_user_request(sp_object_id, app_id):
+    """Return the BAP admin API's `UserIdentity` for `addAppUser`. Pure.
+
+    The endpoint wants *both* identifiers of the same principal: the service
+    principal's directory object id and the application's client id. Sending
+    `applicationId` is rejected as an unknown member of `UserIdentity`, and
+    sending the object id alone is rejected as `MissingServicePrincipalAppId`.
+    """
+    return {"objectId": sp_object_id, "servicePrincipalAppId": app_id}
 
 
 def elevation_error(status, body):
-    """Return a readable message for a failed self-elevation. Pure."""
-    if MISSING_SCOPE in body:
+    """Return a readable message for a failed elevation. Pure."""
+    if FIRST_PARTY_PREAUTHORISATION in body or MISSING_SCOPE in body:
         return (
-            f"HTTP {status}: the token does not carry {ELEVATION_SCOPE}. "
-            f"{ELEVATION_INSTRUCTIONS}"
+            f"HTTP {status}: the Power Platform API's {ELEVATION_SCOPE} scope is "
+            "reserved by first-party preauthorisation, so no sign-in can add it "
+            f"to an Azure CLI token. {ELEVATION_INSTRUCTIONS}"
         )
     if NOT_A_TENANT_ADMIN in body:
         return (
             f"HTTP {status}: only a Global admin, Power Platform admin or "
-            "Dynamics 365 admin can self-elevate. Ask a tenant admin to grant "
+            "Dynamics 365 admin can elevate. Ask a tenant admin to grant "
             f"{SYSTEM_ADMINISTRATOR} in {DEFAULT_ENVIRONMENT_ID}."
         )
     return f"HTTP {status}: {body}"
@@ -250,8 +353,17 @@ def elevation_error(status, body):
 # ---------------------------------------------------------------------------
 
 BAP_API = "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform"
-DATAVERSE_API_VERSION = "v9.2"
-ELEVATION_API_VERSION = "2022-03-01-preview"
+BAP_RESOURCE = "https://api.bap.microsoft.com/"
+BAP_API_VERSION = "2020-10-01"
+# The bootstrap app registration's display name. Deliberately identifiable: if a
+# run dies between creating it and deleting it, the leftover is obvious.
+BOOTSTRAP_APP_NAME = "flw-dataverse-bootstrap"
+
+# Nothing about a freshly-created Entra principal is usable immediately: the BAP
+# admin API cannot see it, and its client secret is refused, for the first tens
+# of seconds. Both are waited out rather than reported as failures.
+PROPAGATION_ATTEMPTS = 8
+PROPAGATION_DELAY_SECONDS = 10
 
 
 def _token(resource):
@@ -271,12 +383,13 @@ def _token(resource):
     return result.stdout.strip()
 
 
-def _get(url, resource):
+def _get(url, resource, token=None):
     import json
     import urllib.request
 
     request = urllib.request.Request(
-        url, headers={"Authorization": f"Bearer {_token(resource)}"}
+        url,
+        headers={"Authorization": "Bearer " + (token or _token(resource))},
     )
     with urllib.request.urlopen(request) as response:
         return json.load(response)
@@ -315,38 +428,244 @@ def read_roles_live(url):
     return [role["name"] for role in roles]
 
 
-def elevate_live(environment_id):
-    """Self-elevate the signed-in user to System Administrator.
+def _az(args, redact=False):
+    """Run an `az` command and return its stdout."""
+    import subprocess
 
-    The documented Power Platform API path — see
-    https://learn.microsoft.com/power-platform/admin/manage-high-privileged-admin-roles.
-    Returns the response body; raises if the token lacks the scope.
-    """
+    result = subprocess.run(
+        ["az", *args], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        shown = args[0] if redact else " ".join(args)
+        raise RuntimeError(f"az {shown} failed: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def _post(url, resource, body, token=None):
+    """POST JSON and return the decoded response, classifying refusals."""
     import json
     import urllib.error
     import urllib.request
 
-    url = (
-        f"{POWER_PLATFORM_API}/usermanagement/environments/{environment_id}"
-        f"/user/applyAdminRole?api-version={ELEVATION_API_VERSION}"
-    )
     request = urllib.request.Request(
         url,
-        data=b"",
+        data=json.dumps(body).encode(),
         method="POST",
         headers={
-            "Authorization": f"Bearer {_token(f'{POWER_PLATFORM_API}/')}",
+            "Authorization": "Bearer " + (token or _token(resource)),
             "Content-Type": "application/json",
         },
     )
     try:
         with urllib.request.urlopen(request) as response:
-            body = response.read().decode() or "{}"
+            return json.loads(response.read().decode() or "{}")
     except urllib.error.HTTPError as error:
         raise RuntimeError(
             elevation_error(error.code, error.read().decode())
         ) from error
-    return json.loads(body)
+
+
+def _create_bootstrap_app():
+    """Create the short-lived app registration, its principal and a secret."""
+    app_id = _az([
+        "ad", "app", "create", "--display-name", BOOTSTRAP_APP_NAME,
+        "--sign-in-audience", "AzureADMyOrg", "--query", "appId", "-o", "tsv",
+    ])
+    sp_object_id = _az([
+        "ad", "sp", "create", "--id", app_id, "--query", "id", "-o", "tsv",
+    ])
+    secret = _az([
+        "ad", "app", "credential", "reset", "--id", app_id, "--append",
+        "--years", "1", "--query", "password", "-o", "tsv",
+    ], redact=True)
+    return {"app_id": app_id, "sp_object_id": sp_object_id, "secret": secret}
+
+
+def _patch(url, resource, body, token=None):
+    """PATCH JSON, classifying refusals the same way `_post` does."""
+    import json
+    import urllib.error
+    import urllib.request
+
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        method="PATCH",
+        headers={
+            "Authorization": "Bearer " + (token or _token(resource)),
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request) as response:
+            response.read()
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(
+            elevation_error(error.code, error.read().decode())
+        ) from error
+
+
+def _retire_bootstrap(app, url):
+    """Delete the bootstrap app registration and retire its Dataverse user.
+
+    Teardown is unconditional and does both halves: the granted role outlives
+    the bootstrap, so leaving a standing System Administrator behind would be a
+    worse end state than the one this set out to repair. Deleting the Entra app
+    alone is not enough — Dataverse keeps the application user, still enabled
+    and still a System Administrator, merely with no credential left to use it.
+
+    Disabling runs as the signed-in admin rather than as the bootstrap
+    principal, which cannot disable itself and stay alive long enough to finish.
+    """
+    app_user = _find_app_user(url, app["app_id"])
+    _az(["ad", "app", "delete", "--id", app["app_id"]])
+    if app_user:
+        _patch(
+            f"{url.rstrip('/')}/api/data/{DATAVERSE_API_VERSION}"
+            f"/systemusers({app_user})",
+            f"{url.rstrip('/')}/",
+            disable_user_request(),
+        )
+
+
+def _find_app_user(url, app_id):
+    """Return the Dataverse user id for an application id, or None."""
+    base = f"{url.rstrip('/')}/api/data/{DATAVERSE_API_VERSION}"
+    found = _get(
+        odata_url(base, "systemusers", {
+            "$filter": f"applicationid eq {app_id}",
+            "$select": "systemuserid",
+        }),
+        f"{url.rstrip('/')}/",
+    )["value"]
+    return found[0]["systemuserid"] if found else None
+
+
+def _app_token(app, resource):
+    """Return an app-only token, waiting out client-secret propagation.
+
+    A secret is not usable the instant it is created; the first
+    client-credentials request after `az ad app credential reset` is refused
+    while it propagates, which is indistinguishable from a wrong secret except
+    that it stops happening.
+    """
+    import json
+    import time
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    tenant_id = _az(["account", "show", "--query", "tenantId", "-o", "tsv"])
+    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    form = urllib.parse.urlencode({
+        "client_id": app["app_id"],
+        "client_secret": app["secret"],
+        "scope": f"{resource}.default",
+        "grant_type": "client_credentials",
+    }).encode()
+
+    refusal = ""
+    for attempt in range(PROPAGATION_ATTEMPTS):
+        if attempt:
+            time.sleep(PROPAGATION_DELAY_SECONDS)
+        try:
+            with urllib.request.urlopen(
+                urllib.request.Request(url, data=form, method="POST")
+            ) as response:
+                return json.loads(response.read().decode())["access_token"]
+        except urllib.error.HTTPError as error:
+            refusal = error.read().decode()
+    raise RuntimeError(
+        f"the bootstrap application's credential never became usable: {refusal}"
+    )
+
+
+def _register_app_user(environment_id, app):
+    """Register the bootstrap principal as a Dataverse System Administrator.
+
+    The BAP admin API grants the role itself, which is the whole point: it is
+    reachable with the tenant-admin token the Azure CLI already holds, whereas
+    the Dataverse side refuses to assign the role at all (`prvAssignRole`).
+    """
+    import time
+    import urllib.error
+
+    url = (
+        f"{BAP_API}/scopes/admin/environments/{environment_id}"
+        f"/addAppUser?api-version={BAP_API_VERSION}"
+    )
+    body = app_user_request(app["sp_object_id"], app["app_id"])
+    for attempt in range(PROPAGATION_ATTEMPTS):
+        if attempt:
+            time.sleep(PROPAGATION_DELAY_SECONDS)
+        try:
+            return _post(url, BAP_RESOURCE, body)
+        except RuntimeError as refusal:
+            status = getattr(refusal.__cause__, "code", None)
+            if not isinstance(
+                refusal.__cause__, urllib.error.HTTPError
+            ) or not is_propagation_delay(status):
+                raise
+            last = refusal
+    raise last
+
+
+def _assign_system_administrator(url, token, object_id):
+    """Assign System Administrator to an Entra principal, as the bootstrap app."""
+    base = f"{url.rstrip('/')}/api/data/{DATAVERSE_API_VERSION}"
+    resource = f"{url.rstrip('/')}/"
+    users = _get(
+        odata_url(base, "systemusers", {
+            "$filter": f"azureactivedirectoryobjectid eq {object_id}",
+            "$select": "systemuserid,_businessunitid_value",
+        }),
+        resource,
+        token=token,
+    )["value"]
+    user_id, business_unit_id = select_system_user(users, object_id)
+    roles = _get(
+        odata_url(base, "roles", {
+            "$filter": f"name eq '{SYSTEM_ADMINISTRATOR}'",
+            "$select": "roleid,name,_businessunitid_value",
+        }),
+        resource,
+        token=token,
+    )["value"]
+    _post(
+        f"{base}/systemusers({user_id})/systemuserroles_association/$ref",
+        resource,
+        role_reference(url, select_role(roles, business_unit_id)),
+        token=token,
+    )
+
+
+def elevate_live(environment):
+    """Grant the signed-in user System Administrator via a bootstrap app user.
+
+    Microsoft's documented self-elevation (`applyAdminRole` on the Power
+    Platform API) is unreachable from here: it elevates the calling user and so
+    needs a user token carrying `UserManagement.Users.Apply`, a scope the Azure
+    CLI is not preauthorised for — and consent between two first-party
+    applications is the API owner's to give, not a tenant admin's
+    (AADSTS65002). No sign-in can obtain it.
+
+    So the role is granted by something that already holds it. The BAP admin
+    API registers a fresh app registration as a Dataverse application user
+    *with* System Administrator; that principal has `prvAssignRole`, so it
+    assigns the role to the signed-in user, and is then deleted.
+    """
+    environment_id = environment["name"]
+    url = instance_url(environment)
+    object_id = _az(["ad", "signed-in-user", "show", "--query", "id", "-o", "tsv"])
+
+    app = _create_bootstrap_app()
+    try:
+        _register_app_user(environment_id, app)
+        token = _app_token(app, f"{url.rstrip('/')}/")
+        _assign_system_administrator(url, token, object_id)
+    finally:
+        _retire_bootstrap(app, url)
+    return {"elevated": object_id, "environment": environment_id}
 
 
 def main(argv=None, read_tenant=read_tenant_live, elevate=elevate_live):
@@ -364,13 +683,13 @@ def main(argv=None, read_tenant=read_tenant_live, elevate=elevate_live):
 
     if "--elevate" in argv and _elevatable(verdict):
         try:
-            elevate(environment["name"])
+            elevate(environment)
         except Exception as error:  # noqa: BLE001 — reported, not swallowed
             # The refusal already carries the remedy that fits it, and it is not
             # always the consent step — offering both would contradict itself.
-            remedy = f"\nSelf-elevation was refused. {error}"
+            remedy = f"\nElevation was refused. {error}"
         else:
-            print(f"self-elevated in {environment['name']}")
+            print(f"granted {SYSTEM_ADMINISTRATOR} in {environment['name']}")
             environment, roles = read_tenant(observed)
             verdict = evaluate(environment, roles)
 
