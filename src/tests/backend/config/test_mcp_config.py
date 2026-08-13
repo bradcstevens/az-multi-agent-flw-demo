@@ -61,6 +61,21 @@ class TestMCPConfigFromEnv:
         assert cfg.url == "https://host/base/tech_support"
         assert cfg.allowed_tools == DOMAIN_ALLOWED_TOOLS["tech_support"]
 
+    def test_from_env_sop_domain_reaches_the_copilot_studio_agent(self):
+        """Issue #18: the orchestrator reaches the low-code agent as a tool.
+
+        An agent declaring the ``sop`` toolbox is pointed at the SOP domain
+        server and allowed exactly the one tool it serves. Without the entry
+        the agent connects to the right endpoint with no client-side filter,
+        so a server layout change would silently hand it every domain's tools
+        — and the demo's cross-platform hop is the one call that must not be
+        ambiguous about where the answer came from.
+        """
+        with patch.object(mcp_config_module, "config", _mcp_config_stub()):
+            cfg = MCPConfig.from_env(domain="sop")
+        assert cfg.url == "https://host/sop/mcp"
+        assert cfg.allowed_tools == ["search_store_procedures"]
+
     def test_from_env_domain_unknown_has_no_allowed_tools(self):
         with patch.object(mcp_config_module, "config", _mcp_config_stub()):
             cfg = MCPConfig.from_env(domain="does_not_exist")

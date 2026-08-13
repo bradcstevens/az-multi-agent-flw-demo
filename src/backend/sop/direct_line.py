@@ -23,6 +23,7 @@ import base64
 import binascii
 import json
 import logging
+import socket
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -51,6 +52,25 @@ TOKEN_LIFETIME_SECONDS = 3600
 # A generative answer over the corpus came back in 5-20 seconds live (#17).
 ANSWER_TIMEOUT_SECONDS = 45
 POLL_INTERVAL_SECONDS = 1.0
+
+# How many consecutive polls must add nothing before the agent counts as having
+# finished. One is not enough: a poll landing between two activities is quiet
+# without the answer being over, and an answer cut short there loses its
+# citations — the Grounding panel's whole subject.
+SETTLE_POLLS = 2
+
+# The two answers that mean an environment serves no channel settings service:
+# the host has no such path, or the host has no such name. Everything else is
+# retried — see `_is_absent`.
+ABSENT_STATUSES = frozenset({404, 501})
+ABSENT_DNS_ERRORS = frozenset(
+    code
+    for code in (
+        getattr(socket, "EAI_NONAME", None),
+        getattr(socket, "EAI_NODATA", None),
+    )
+    if code is not None
+)
 RETRY_DELAY_SECONDS = 0.5
 
 # The fixed failure message. It says the SOP agent could not be reached rather
@@ -100,6 +120,27 @@ def _root_from_token_claims(token: str) -> Optional[str]:
     return audience if isinstance(audience, str) and audience else None
 
 
+def _is_absent(exc: BaseException) -> bool:
+    """Whether a failed settings call means *this environment has none*.
+
+    Narrow on purpose. Only two answers are final: **404** (and 501, an API the
+    host does not implement), which is how the legacy gateway says it serves no
+    channel settings — finding 8 — and a name the resolver says **does not
+    exist**. Everything else is this minute's weather and is retried on the next
+    conversation: a 408 or 429 is the service asking for patience, a 5xx is an
+    outage, and `EAI_AGAIN` is a resolver that could not reach *its* server,
+    which is the opposite of a name that is not there.
+    """
+    status = getattr(exc, "status", None)
+    if isinstance(status, int):
+        return status in ABSENT_STATUSES
+    causes = (exc, exc.__cause__, getattr(exc, "os_error", None))
+    return any(
+        isinstance(cause, socket.gaierror) and cause.errno in ABSENT_DNS_ERRORS
+        for cause in causes
+    )
+
+
 class DirectLineClient(BaseAPIService):
     """Drives one Direct Line conversation per question, anonymously."""
 
@@ -127,6 +168,7 @@ class DirectLineClient(BaseAPIService):
         *,
         answer_timeout: float = ANSWER_TIMEOUT_SECONDS,
         poll_interval: float = POLL_INTERVAL_SECONDS,
+        settle_polls: int = SETTLE_POLLS,
         retry_delay: float = RETRY_DELAY_SECONDS,
         clock: Callable[[], float] = time.monotonic,
         **kwargs: Any,
@@ -141,9 +183,11 @@ class DirectLineClient(BaseAPIService):
         self.token_endpoint = token_endpoint
         self.answer_timeout = answer_timeout
         self.poll_interval = poll_interval
+        self.settle_polls = settle_polls
         self.retry_delay = retry_delay
         self._clock = clock
         self._direct_line_base: Optional[str] = None
+        self._settings_absent = False
         self._token_lifetime: float = TOKEN_LIFETIME_SECONDS
 
     def _url(self, path: str) -> str:
@@ -177,10 +221,16 @@ class DirectLineClient(BaseAPIService):
 
         Neither answering raises. A demo pointed at a hostname nobody chose
         fails subtly on stage; this fails loudly here.
+
+        The answer is cached only when it is a **verdict** rather than a bad
+        minute: settings that answered, or an environment that said it has no
+        settings service. A 503 or a timeout resolves this one conversation
+        from the token claim and leaves the preferred source to be asked again.
         """
         if self._direct_line_base:
             return self._direct_line_base
         root = await self._root_from_channel_settings()
+        durable = root is not None or self._settings_absent
         if not root:
             root = _root_from_token_claims(token or await self.token())
         if not root:
@@ -189,8 +239,10 @@ class DirectLineClient(BaseAPIService):
                 "named a Direct Line service; the default hostname is never "
                 "assembled (ADR-011)"
             )
-        self._direct_line_base = _api_base(root)
-        return self._direct_line_base
+        base = _api_base(root)
+        if durable:
+            self._direct_line_base = base
+        return base
 
     async def _root_from_channel_settings(self) -> Optional[str]:
         """The Direct Line root the settings service names, or None."""
@@ -201,8 +253,16 @@ class DirectLineClient(BaseAPIService):
             )
         except Exception as exc:
             # An environment on the legacy gateway has no settings service at
-            # all. That is a shape, not an outage — the token claim answers it.
-            logger.info("sop: no regional channel settings service: %s", exc)
+            # all. That is a shape, not an outage — the token claim answers it,
+            # and the answer is good for the life of the process. Anything else
+            # is this minute's weather, and is not allowed to retire the source
+            # ADR-011 names.
+            self._settings_absent = _is_absent(exc)
+            logger.info(
+                "sop: no regional channel settings (%s): %s",
+                "absent" if self._settings_absent else "transient",
+                exc,
+            )
             return None
         return ((settings or {}).get("channelUrlsById") or {}).get("directline")
 
@@ -304,10 +364,25 @@ class DirectLineClient(BaseAPIService):
     async def _drain(
         self, base: str, identifier: str, token: str
     ) -> List[Dict[str, Any]]:
-        """Poll the transcript until the agent has spoken, or time runs out."""
+        """Poll the transcript until the agent has finished, or time runs out.
+
+        "Finished" is `SETTLE_POLLS` consecutive polls that add nothing, not
+        the first activity that arrives: a generative answer is delivered as
+        however many activities the agent chose to send, so returning on the
+        first one hands back the preamble and drops both the procedure and its
+        citations. More than one quiet poll is required because a poll landing
+        between two activities is quiet without the agent being done.
+
+        The deadline stays a **failure** even once the agent has spoken. "Let
+        me look that up" is not a procedure, and returning it because the clock
+        ran out dresses a timeout as an answer — the one outcome this demo
+        cannot survive. A timed-out answer takes the retry and then the fixed
+        failure message, which says what actually happened.
+        """
         watermark: Optional[str] = None
         seen: set = set()
         replies: List[Dict[str, Any]] = []
+        quiet = 0
         deadline = self._clock() + self.answer_timeout
         while True:
             path = f"{base}/conversations/{identifier}/activities"
@@ -317,6 +392,7 @@ class DirectLineClient(BaseAPIService):
                 params={"watermark": watermark} if watermark else None,
             )
             watermark = payload.get("watermark") or watermark
+            arrived = 0
             for activity in payload.get("activities") or []:
                 if (activity.get("from") or {}).get("role") != "bot":
                     continue
@@ -325,11 +401,13 @@ class DirectLineClient(BaseAPIService):
                 seen.add(activity.get("id"))
                 if activity.get("type") == "message":
                     replies.append(activity)
-            if replies:
+                    arrived += 1
+            quiet = 0 if arrived else quiet + 1
+            if replies and quiet >= self.settle_polls:
                 return replies
             if self._clock() >= deadline:
                 raise TimeoutError(
-                    f"the SOP agent said nothing within {self.answer_timeout}s"
+                    f"the SOP agent had not finished within {self.answer_timeout}s"
                 )
             if self.poll_interval:
                 await asyncio.sleep(self.poll_interval)

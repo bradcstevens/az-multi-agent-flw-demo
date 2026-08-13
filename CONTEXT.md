@@ -225,7 +225,10 @@ channel settings service first, then the **`aud`/`iss` claim of the token the en
 then an error that becomes the fixed failure message. The second step exists because this
 environment serves *no* channel settings — `PvaGetDirectLineEndpoint` returns a legacy
 `powervamg…gateway.prod.island.powerapps.com` host that 404s on every settings path, and the
-`<envid>.environment.api.powerplatform.com` host is NXDOMAIN.
+`<envid>.environment.api.powerplatform.com` host is NXDOMAIN. The resolution is cached only when it
+is a **verdict** — settings that answered, a 404 or 501, or a name that does not exist. A 408, 429,
+5xx, timeout or `EAI_AGAIN` resolves that one conversation from the token claim and leaves the
+preferred source to be asked again.
 
 **Conversation-scoped token** — a Copilot Studio Direct Line token carries a `conv` claim, so it
 belongs to one conversation. Reusing it for a second `POST /conversations` **rejoins the first** and
@@ -234,10 +237,18 @@ token is fetched per conversation and never cached across them; the **3600 secon
 that one conversation, and the client refuses an answer timeout that would outlive it.
 
 **SOP tool** — `search_store_procedures`, the MCP tool on its own `sop` domain that puts the
-Copilot Studio agent in the orchestrator's hands. One fast retry, then a fixed failure message with
+Copilot Studio agent in the orchestrator's hands. An agent is given it by declaring
+`use_toolbox: true` and `toolbox_filter: "sop"`, which points it at the `/sop/mcp` domain server and
+allows that one tool. One fast retry, then a fixed failure message with
 no citations — never a fallback to model knowledge and never a local copy of the SOP corpus, because
 an answer arriving when the Direct Line path is broken is evidence against the cross-platform claim,
 not for it.
+
+**Settle polls** — the drain returns after **two** consecutive polls that add *nothing*, not on the
+first activity that arrives. A generative answer is delivered as however many activities the agent
+chose to send, and a single quiet poll can land between two of them, so returning early hands back a
+preamble and drops the citations with it. The answer timeout stays a failure even once the agent has
+spoken: a preamble returned because the clock ran out is a timeout dressed as an answer.
 
 ## Surfaces
 

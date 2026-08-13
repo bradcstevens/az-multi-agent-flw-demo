@@ -104,6 +104,12 @@ param gpt5_4ModelCapacity int = 150
 @description('Optional. Version of the Azure OpenAI service to deploy. Defaults to 2024-12-01-preview.')
 param azureOpenaiAPIVersion string = '2024-12-01-preview'
 
+@description('Optional. Direct Line token endpoint of the published Copilot Studio SOP agent, as returned by PvaGetDirectLineEndpoint. Never assembled from a hostname (ADR-011); empty leaves the SOP tool reporting its fixed failure message rather than guessing.')
+param copilotStudioDirectLineTokenEndpoint string = ''
+
+@description('Optional. Display name of the published Copilot Studio SOP agent.')
+param copilotStudioAgentName string = 'Store SOP Assistant'
+
 // ============================================================================
 // Parameters — Compute
 // ============================================================================
@@ -1151,6 +1157,18 @@ module containerApp './modules/compute/container-app.bicep' = {
           {
             name: 'ORCHESTRATOR_MODEL_NAME'
             value: gptModelName
+          }
+          {
+            // The published Copilot Studio SOP agent, reached over Direct Line
+            // (ADR-011). Tenant-specific and not creatable here, so it is a
+            // parameter; unset, the SOP tool answers with its fixed failure
+            // message rather than falling back to model knowledge.
+            name: 'COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT'
+            value: copilotStudioDirectLineTokenEndpoint
+          }
+          {
+            name: 'COPILOT_STUDIO_AGENT_NAME'
+            value: copilotStudioAgentName
           }
           {
             name: 'MCP_SERVER_ENDPOINT'

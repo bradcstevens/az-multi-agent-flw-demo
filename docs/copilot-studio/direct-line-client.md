@@ -58,6 +58,17 @@ Live, this environment takes step 2 and resolves to `https://directline.botframe
 — the same string the doc hardcodes. That is the point: it is right *here*, and the code does not
 know that until the service says so.
 
+The resolution is cached only when it is a **verdict** rather than a bad minute, and the verdict is
+deliberately narrow. **404** — how the legacy gateway host says it serves no channel settings,
+which is finding 8 — and **501**, and a name the resolver says **does not exist** (`EAI_NONAME`),
+are final, so this environment pays the 404 once rather than every conversation. Everything else
+resolves *this* conversation from the token claim and leaves the preferred source to be asked again:
+a **408 or 429** is the service asking for patience, a **5xx** is an outage, and **`EAI_AGAIN`** is a
+resolver that could not reach *its* server, which is the opposite of a name that is not there. One
+bad minute must not retire the source ADR-011 names for as long as the container runs. The
+classification is a pure function of the exception, so both branches are pinned by tests rather than
+by a live outage.
+
 ## A token per conversation
 
 Finding 10 is the bug this ticket nearly shipped. The first implementation cached the token for its
@@ -82,12 +93,27 @@ specific test red.
   which is precisely what ADR-011 forbids and would drop every bot activity here.
 - **De-duplicate by activity id**, and carry the watermark. A poll that overlaps the previous one
   returns activities already seen.
+- **Drain to quiescence, not to the first activity.** A generative answer is delivered as however
+  many activities the agent chose to send, so the poll that finds the first message is not
+  necessarily the poll that finds the procedure. The drain returns after `SETTLE_POLLS` consecutive
+  polls that add *nothing* — two, because a single poll landing between two activities is quiet
+  without the answer being over. Returning early hands back a preamble and drops the citations with
+  it, which is the Grounding panel going dark on the one answer it exists to prove.
+- **The deadline stays a failure even once the agent has spoken.** "Let me look that up" is not a
+  procedure, and returning it because the clock ran out dresses a timeout as an answer. A timed-out
+  answer takes the retry and then the fixed failure message, which says what actually happened.
 - **Citations come from `entities`**, filtered to `type == "https://schema.org/Message"` and sorted
   by `position`. The markdown reference form in the text (`[1]: cite:1 "Citation-1"`) is the
   parallel representation ADR-011 warns against parsing.
 - **`snippet()` truncates `text`, never `abstract`** — `abstract` is the filename (the correction
   [#17 recorded](./sop-agent.md#the-citation-shape-for-the-orchestrator-18)), and `text` is the whole
   document as HTML. R6's Grounding panel renders `Citation.snippet()`.
+
+The snippet crosses to the panel on the **`/api/v4/sop/ask` reply**, not in the string the MCP tool
+returns to the orchestrator. The tool's string names the cited documents and stops there: a
+240-character extract of a document the answer already summarises bloats every transcript, and gives
+the orchestrator SOP prose it could answer from itself — which is the fallback this whole client
+refuses to have.
 
 ## Failure
 
@@ -104,6 +130,25 @@ evidence of the opposite.
 | `COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT` | The endpoint `PvaGetDirectLineEndpoint` returned. Tenant-specific, so a bicep parameter rather than something the deployment creates. Unset, the SOP tool answers with its fixed failure message. |
 | `COPILOT_STUDIO_AGENT_NAME` | Display name, for the Grounding panel. Defaults to `Store SOP Assistant`. |
 
+Both reach the backend container on **every deployment flavour** — `bicep`, `avm` and `avm-waf`.
+The flavours keep separate template trees, so a setting added to one is absent from the others and
+the symptom is indistinguishable from an unconfigured agent: the fixed failure message, on stage,
+with nothing in the logs to say the endpoint was never passed.
+
+## How the orchestrator is given the tool
+
+`MCPConfig.from_env(domain="sop")` rewrites the MCP endpoint to the domain-scoped `/sop/mcp` the
+container mounts for `Domain.SOP`, and allows exactly `search_store_procedures`. The domain server
+is the boundary; the allowlist is the client-side net for the day the server layout changes.
+
+The two names live in different images and nothing at runtime reconciles them — a rename on one side
+is an agent allowed a tool that does not exist, which presents as the orchestrator quietly having no
+procedure tool at all. `src/tests/ci/test_sop_tool_wiring.py` is what notices.
+
+**Which agent carries the toolbox is #19's**, not this ticket's: an agent gets the tool by declaring
+`use_toolbox: true` and `toolbox_filter: "sop"` in the team definition, and the roster that does so
+is authored there. The accelerator's stock packs deliberately do not — #25 suppresses them.
+
 Re-read the endpoint rather than storing it long-term — it is what
 `PvaGetDirectLineEndpoint` says today:
 
@@ -119,4 +164,9 @@ citation carrying `url=None` and a working snippet, and — after the per-conver
 second question in a **distinct** conversation producing the honest miss.
 
 Not verified: concurrent conversations, behaviour against an environment that *does* serve regional
-channel settings (step 1 is exercised only in tests), and R6's rendering of these citations.
+channel settings (step 1 is exercised only in tests), a transient settings outage (the retry path is
+exercised only in tests), an answer the agent actually splits across activities (the live probes each
+arrived in one), and R6's rendering of these citations.
+
+The live probes above pre-date the settle polls, which add two poll intervals to every answer and
+change no answer already measured. Re-probe before the rehearsal.

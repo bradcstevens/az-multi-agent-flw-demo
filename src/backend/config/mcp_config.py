@@ -48,6 +48,13 @@ DOMAIN_ALLOWED_TOOLS: dict[str, list[str]] = {
     "image": [
         "generate_marketing_image",
     ],
+    # The Copilot Studio SOP agent, reached over Direct Line (#18, ADR-011).
+    # One tool, on its own domain: an agent given the store-procedure tool is
+    # not also given every other domain's, and the cross-platform hop stays the
+    # only way a procedure question can be answered.
+    "sop": [
+        "search_store_procedures",
+    ],
 }
 
 

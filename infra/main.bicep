@@ -265,6 +265,8 @@ module avmDeployment './avm/main.bicep' = if (isAvm) {
     gpt5_4ModelDeploymentType: gpt5_4ModelDeploymentType
     gptDeploymentCapacity: gptDeploymentCapacity
     gpt5_4ModelCapacity: gpt5_4ModelCapacity
+    copilotStudioDirectLineTokenEndpoint: copilotStudioDirectLineTokenEndpoint
+    copilotStudioAgentName: copilotStudioAgentName
     backendContainerRegistryHostname: backendContainerRegistryHostname
     backendContainerImageName: backendContainerImageName
     backendContainerImageTag: backendContainerImageTag

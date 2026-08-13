@@ -8,10 +8,13 @@ dependency is added. Every payload here is the shape recorded live in
 
 from unittest.mock import AsyncMock
 
+import aiohttp
 import pytest
+import socket
 
 from sop.direct_line import (CHANNEL_SETTINGS_API_VERSION, DIRECT_LINE_FAILURE,
-                             REGIONAL_CHANNEL_SETTINGS, DirectLineClient)
+                             REGIONAL_CHANNEL_SETTINGS, SETTLE_POLLS,
+                             DirectLineClient, _is_absent)
 
 TOKEN_ENDPOINT = (
     "https://0f87abfb.environment.api.powerplatform.com/powervirtualagents"
@@ -107,6 +110,23 @@ def user_echo(identifier="echo-1", text="How do I close the store?"):
     }
 
 
+def http_error(status):
+    """What `raise_for_status()` raises for a status the service returned."""
+    return aiohttp.ClientResponseError(
+        request_info=None, history=(), status=status, message=f"{status}"
+    )
+
+
+def dns_failure(code=None):
+    """A host that does not resolve, the way aiohttp reports one."""
+    error = aiohttp.ClientConnectionError("Cannot connect to host")
+    error.__cause__ = socket.gaierror(
+        socket.EAI_NONAME if code is None else code,
+        "nodename nor servname provided",
+    )
+    return error
+
+
 class FakeTransport:
     """Canned responses keyed by (method, url-fragment), in call order."""
 
@@ -150,6 +170,11 @@ def conversation_only(*activity_batches):
     ]
     for index, batch in enumerate(activity_batches):
         responses.append({"activities": list(batch), "watermark": str(index + 1)})
+    # The settle polls: the drain keeps asking after the agent has spoken, so
+    # an answer delivered as several activities arrives whole. These are the
+    # quiet polls that end the conversation. The count is imported rather than
+    # written out, so the fixture cannot drift from the rule it stands for.
+    responses.extend([{"activities": [], "watermark": "settled"}] * SETTLE_POLLS)
     return responses
 
 
@@ -223,6 +248,62 @@ class TestAsk:
 
         assert answer.text == ANSWER
         assert [citation.name for citation in answer.citations] == [SOP_102]
+
+    @pytest.mark.asyncio
+    async def test_an_answer_delivered_in_two_activities_is_not_truncated(self):
+        # A generative answer arrives as whatever activities the agent chose to
+        # send. Returning on the first one delivers the preamble and drops the
+        # procedure — and drops its citations with it, which is the Grounding
+        # panel going dark on the answer it exists to prove.
+        client = client_with(
+            *conversation_responses(
+                [bot_message("reply-1", text="Let me look that up.", cites=())],
+                [bot_message("reply-2")],
+            )
+        )
+
+        answer = await client.ask("How do I close the store?")
+
+        assert "Let me look that up." in answer.text
+        assert ANSWER in answer.text
+        assert [citation.name for citation in answer.citations] == [SOP_102]
+
+    @pytest.mark.asyncio
+    async def test_a_quiet_poll_between_two_activities_does_not_end_the_answer(self):
+        # The service answers a poll that lands between two activities with
+        # nothing. Treating one quiet poll as "the agent has finished" cuts the
+        # answer at exactly the moment it is still being written.
+        client = client_with(
+            *conversation_responses(
+                [bot_message("reply-1", text="Let me look that up.", cites=())],
+                [],
+                [bot_message("reply-2")],
+            )
+        )
+
+        answer = await client.ask("How do I close the store?")
+
+        assert ANSWER in answer.text
+        assert [citation.name for citation in answer.citations] == [SOP_102]
+
+    @pytest.mark.asyncio
+    async def test_a_preamble_at_the_deadline_is_a_failure_not_an_answer(self):
+        # "Let me look that up" is not a procedure. Returning it because the
+        # clock ran out dresses a timeout as an answer, which is the failure
+        # this whole client is arranged to make impossible — the fixed message
+        # says what happened, a preamble says the agent answered.
+        ticking = iter([step * 100.0 for step in range(20)])
+        client = client_with(
+            *conversation_responses(
+                [bot_message("reply-1", text="Let me look that up.", cites=())]
+            ),
+            clock=lambda: next(ticking),
+        )
+
+        answer = await client.ask("How do I close the store?")
+
+        assert answer.failed is True
+        assert answer.text == DIRECT_LINE_FAILURE
 
     @pytest.mark.asyncio
     async def test_starts_a_fresh_conversation_for_every_question(self):
@@ -353,6 +434,76 @@ class TestDirectLineBase:
         }
 
     @pytest.mark.asyncio
+    async def test_a_transient_settings_failure_is_not_a_permanent_verdict(self):
+        # A 503 or a timeout is the settings service having a bad minute, not
+        # an environment that has none. Caching the token-claim fallback on the
+        # strength of one bad minute retires the source ADR-011 names for the
+        # life of the process — and the next conversation would be resolved
+        # from the weaker source for no reason anybody could see.
+        client = client_with(
+            token_payload(),
+            http_error(503),
+            *conversation_only([bot_message()]),
+            *conversation_responses(
+                [bot_message("reply-2", text="Second.")]
+            ),
+        )
+
+        await client.ask("How do I close the store?")
+        await client.ask("How do I open the store?")
+
+        settings_calls = [
+            call
+            for call in client._request.calls
+            if REGIONAL_CHANNEL_SETTINGS in call[1]
+        ]
+        assert len(settings_calls) == 2
+
+    @pytest.mark.asyncio
+    async def test_an_environment_with_no_settings_service_is_asked_once(self):
+        # A 404 is the environment's own answer: there is no settings service
+        # here (finding 8, measured live on the legacy gateway host). That is a
+        # shape, not an outage, so asking again every conversation buys a
+        # round-trip and the same 404.
+        client = client_with(
+            token_payload(),
+            http_error(404),
+            *conversation_only([bot_message()]),
+            *conversation_with_token([bot_message("reply-2", text="Second.")]),
+        )
+
+        await client.ask("How do I close the store?")
+        await client.ask("How do I open the store?")
+
+        settings_calls = [
+            call
+            for call in client._request.calls
+            if REGIONAL_CHANNEL_SETTINGS in call[1]
+        ]
+        assert len(settings_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_a_host_that_does_not_resolve_is_no_settings_service_either(self):
+        # The `<envid>.environment.api.powerplatform.com` host is NXDOMAIN here.
+        # A name that does not exist is as final an answer as a 404.
+        client = client_with(
+            token_payload(),
+            dns_failure(),
+            *conversation_only([bot_message()]),
+            *conversation_with_token([bot_message("reply-2", text="Second.")]),
+        )
+
+        await client.ask("How do I close the store?")
+        await client.ask("How do I open the store?")
+
+        settings_calls = [
+            call
+            for call in client._request.calls
+            if REGIONAL_CHANNEL_SETTINGS in call[1]
+        ]
+        assert len(settings_calls) == 1
+
+    @pytest.mark.asyncio
     async def test_resolves_the_base_url_once_per_client(self):
         client = client_with(
             *conversation_responses([bot_message()]),
@@ -368,6 +519,42 @@ class TestDirectLineBase:
             if REGIONAL_CHANNEL_SETTINGS in call[1]
         ]
         assert len(settings_calls) == 1
+
+
+class TestSettingsAbsence:
+    """Which failures are the environment's answer, and which are its weather.
+
+    The distinction decides whether the token claim replaces the source ADR-011
+    prefers for one conversation or for the life of the container, so it is
+    pinned as the pure function it is rather than through five conversations.
+    """
+
+    def test_a_missing_path_is_the_environments_own_answer(self):
+        assert _is_absent(http_error(404)) is True
+
+    def test_an_api_the_host_does_not_implement_is_final_too(self):
+        assert _is_absent(http_error(501)) is True
+
+    def test_being_asked_to_wait_is_not_an_absent_service(self):
+        # 408 and 429 are the service asking for patience. Reading either as
+        # "there is no settings service here" retires the preferred source for
+        # the life of the container over one busy minute.
+        assert _is_absent(http_error(408)) is False
+        assert _is_absent(http_error(429)) is False
+
+    def test_an_outage_is_not_an_absent_service(self):
+        assert _is_absent(http_error(503)) is False
+
+    def test_a_name_that_does_not_exist_is_final(self):
+        assert _is_absent(dns_failure()) is True
+
+    def test_a_resolver_that_could_not_be_reached_is_not(self):
+        # EAI_AGAIN is the resolver failing to reach *its* server, which is the
+        # opposite of a name that is not there.
+        assert _is_absent(dns_failure(socket.EAI_AGAIN)) is False
+
+    def test_a_timeout_is_not_an_absent_service(self):
+        assert _is_absent(TimeoutError("settings timed out")) is False
 
 
 class TestToken:
