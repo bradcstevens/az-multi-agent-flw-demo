@@ -116,8 +116,13 @@ def test_the_six_upload_guards_all_go_through_the_predicate():
     # that reverts to `[[ "$selected_use_case" == "3" ... ]]` would keep the
     # tests above green while uploading a stock pack anyway.
     source = POST_DEPLOY_SH.read_text(encoding="utf-8")
-    assert source.count("if installs_use_case ") == len(STOCK_PACKS)
-    # Once, in the predicate's own body, and nowhere else.
+    for pack, selection in STOCK_PACKS.items():
+        assert f"if installs_use_case {selection};" in source, pack
+    # Once, in the predicate's own body, and nowhere else — the guards may
+    # multiply (a pack's data and its team configuration are deployed in two
+    # different places since #19), but never by growing a comparison of their
+    # own.
+    assert source.count('"$selected_use_case" == ') == 2
     assert source.count('"$selected_use_case" == "7"') == 1
 
 

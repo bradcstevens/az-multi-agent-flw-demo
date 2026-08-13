@@ -148,8 +148,10 @@ reads as a broken layout.
 
 Nothing here has rendered against a deployed backend. In particular:
 
-- **The store assistant's pack does not exist yet** — #19 authors it. Until then this surface
-  resolves to no assistant and says so, which is the honest behaviour and also an unusable demo.
-  #19 must use `00000000-0000-0000-0000-000000000223`.
+- **The store assistant's pack is authored** (#19) under
+  `00000000-0000-0000-0000-000000000223`, and `post_deploy.{sh,ps1}` upload it whatever the stock
+  use-case selection is. Recorded in [store-content-pack.md](store-content-pack.md). What is still
+  unverified is that the upload lands: nothing here has been run against a deployment, so
+  `selectStoreAssistant` has never resolved against a real Cosmos team.
 - **The phone breakpoint has not been seen on a phone.** jsdom does not evaluate media queries, so
   the tests prove the stylesheet can reach the elements, not that the result is usable at 390px.

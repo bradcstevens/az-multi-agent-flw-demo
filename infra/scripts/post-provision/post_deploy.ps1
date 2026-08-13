@@ -737,14 +737,33 @@ try {
     if ($script:aiSearchEndpoint) { $env:AZURE_AI_SEARCH_ENDPOINT  = $script:aiSearchEndpoint }
     if ($script:openaiEndpoint)   { $env:AZURE_OPENAI_ENDPOINT     = $script:openaiEndpoint }
 
-    # ── WAF: temporarily enable public access for use cases that need data ──
-    $usesData = $useCaseSelection -in @("1","2","5","6","7")
+    # ── WAF: temporarily enable public access ────────────────────────────────
+    # Every deployment now deploys data: the store assistant's own pack always
+    # uploads blobs and creates two search indexes, whatever the stock
+    # selection is.
+    $usesData = $true
     if ($usesData) {
         Enable-PublicAccessIfWaf
     }
 
     $isTeamConfigFailed = $false
     $isSampleDataFailed = $false
+
+    # ── The Circle K Frontline Store Assistant (issue #19) ───────────────────
+    # Not one of the six stock content packs, which is why the selection does
+    # not gate it: `none` means no *stock* pack, and a deployment that seeded
+    # nothing at all leaves the surface truthfully reporting that the assistant
+    # is not loaded.
+    #
+    # Its data is deployed here and its team configuration is uploaded after
+    # the stock ones below. That ordering *is* the requirement that every
+    # search index a definition references already exists before the definition
+    # is uploaded.
+    Write-Host "Deploying data for the Circle K Frontline Store Assistant content pack..."
+    if (-not (Deploy-ContentPack -PackPath "content_packs/store_assistant" -StorageAccountName $script:storageAccount -AiSearchName $script:aiSearch -PythonCmd $pythonCmd)) {
+        Write-Host "Error: Data deployment for the Circle K Frontline Store Assistant failed." -ForegroundColor Red
+        $isSampleDataFailed = $true
+    }
 
     # ── Use Case 3: HR Onboarding (team config only, no data) ─────────────────
     if ($useCaseSelection -in @("3","7")) {
@@ -830,6 +849,34 @@ try {
         }
     }
 
+    # ── The store assistant's team configuration, last and unconditional ─────
+    if (-not (Upload-TeamConfig -Label "Circle K Frontline Store Assistant" `
+                -TeamConfigDir "content_packs/store_assistant/agent_teams" `
+                -TeamId "00000000-0000-0000-0000-000000000223" `
+                -PythonCmd $pythonCmd)) {
+        $isTeamConfigFailed = $true
+    }
+
+    # ── The roster, read back out of the deployment ──────────────────────────
+    # `AgentFactory.get_agents` skips an agent whose `deployment_name` is not in
+    # SUPPORTED_MODELS with a warning and nothing else: the upload returned 200,
+    # the team is in Cosmos, the surface shows the assistant, and one member of
+    # the cast never arrives. Nobody reads a container's warnings during a
+    # rehearsal, so this asks.
+    if (-not $isTeamConfigFailed) {
+        Write-Host ""
+        Write-Host "Verifying the Circle K Frontline Store Assistant agent roster..."
+        $env:PYTHONPATH = (Resolve-Path "$PSScriptRoot/../../..").Path + "/tools"
+        $process = Start-Process -FilePath $pythonCmd `
+            -ArgumentList "-m", "store_pack", "roster", "--backend-url", $script:backendUrl, "--user-principal-id", $script:userPrincipalId `
+            -Wait -NoNewWindow -PassThru
+        if ($process.ExitCode -ne 0) {
+            Write-Host "  ERROR: The store assistant's roster is not what was authored. The surface will" -ForegroundColor Red
+            Write-Host "         either report that the assistant is not loaded, or run one agent short." -ForegroundColor Red
+            $script:hasErrors = $true
+        }
+    }
+
     if ($isTeamConfigFailed -or $isSampleDataFailed) {
         $script:hasErrors = $true
         Write-Host ""
@@ -865,6 +912,15 @@ try {
 
         $selectedVectorStores = $vectorStoreMap[$useCaseSelection]
         $selectedKbs          = $kbMap[$useCaseSelection]
+        if ($null -eq $selectedVectorStores) { $selectedVectorStores = @() }
+        if ($null -eq $selectedKbs)          { $selectedKbs = @() }
+
+        # The store assistant's two knowledge bases are always seeded, for the
+        # same reason its pack is always uploaded. Its troubleshooting
+        # knowledge is deliberately its own knowledge base and not merged with
+        # anything: R6 shows an associate which platform answered, and a shared
+        # source makes that claim unprovable.
+        $selectedKbs = @($selectedKbs) + @("store-troubleshooting-kb", "store-operations-kb")
 
         # Vector stores — skip entirely if none for this use case
         if ($selectedVectorStores.Count -gt 0) {

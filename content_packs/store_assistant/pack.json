@@ -1,0 +1,18 @@
+{
+  "name": "store_assistant",
+  "description": "Circle K Frontline Store Assistant: the store's own troubleshooting runbooks and its operations reference, indexed separately so provenance stays visibly distinct from the Copilot Studio SOP corpus.",
+  "blob_indexes": [
+    {
+      "index_name": "store-troubleshooting-index",
+      "container": "store-troubleshooting-dataset",
+      "source": "datasets/troubleshooting",
+      "pattern": "*.md"
+    },
+    {
+      "index_name": "store-operations-index",
+      "container": "store-operations-dataset",
+      "source": "datasets/operations",
+      "pattern": "*.md"
+    }
+  ]
+}

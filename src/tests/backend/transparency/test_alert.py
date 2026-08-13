@@ -57,3 +57,51 @@ class TestPresenterAlert:
         source = inspect.getsource(alert_module)
         for forbidden in ("sleep", "Timer", "call_later", "create_task"):
             assert forbidden not in source
+
+
+class TestShiftTaskAlertRoster:
+    """The six-to-eight shift-task alerts (issue #19).
+
+    R8 asks for a roster rather than one line, because a presenter who fires
+    the same alert twice in a walkthrough has shown a string, not a behaviour.
+    """
+
+    def test_the_roster_holds_six_to_eight_shift_task_alerts(self):
+        assert 6 <= len(REHEARSED_ALERTS) <= 8
+
+    def test_every_alert_is_a_distinct_task(self):
+        titles = [alert.title for alert in REHEARSED_ALERTS.values()]
+        contents = [alert.content for alert in REHEARSED_ALERTS.values()]
+        assert len(set(titles)) == len(titles)
+        assert len(set(contents)) == len(contents)
+
+    def test_every_alert_names_a_procedure_that_exists(self):
+        """An alert that lands and leads nowhere is worse than no alert.
+
+        Each one names the document its steps are in, and the identifier is
+        checked against the **SOP corpus itself** rather than against a list
+        here — the corpus is authored by a different tool in a different
+        directory, so an alert pointing at a procedure that was renamed or
+        never written would otherwise be found on stage.
+        """
+        import re
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[4]
+        corpus = repo_root / "content" / "sop" / "src"
+        available = {
+            "SOP-" + path.name.split("-", 1)[0] for path in corpus.glob("*.md")
+        }
+        assert available, "the SOP corpus source directory is empty"
+
+        for name, alert in REHEARSED_ALERTS.items():
+            cited = re.findall(r"SOP-\d{3}", alert.content)
+            assert cited, f"{name} names no procedure"
+            for doc_id in cited:
+                assert doc_id in available, f"{name} names {doc_id}, which is not authored"
+
+    def test_the_default_alert_leads_into_the_procedure_hop(self):
+        """The empty chord fires this one, and it is the beat the walkthrough
+        is built around: the alert arrives unasked, and asking for the steps
+        sends the next question across to Copilot Studio."""
+        assert "SOP-104" in REHEARSED_ALERT.content

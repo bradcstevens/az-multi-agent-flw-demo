@@ -99,7 +99,8 @@ first, wins outright, and is the broader list; the default when nothing matches 
 **Fast-lane latency** — the measured end-to-end cost of a Fast lane request, against the sub-10s
 target. **Not yet measured.** ADR-013 makes the measurement the sole trigger for reopening the
 orchestrator-bypass question, so until there is a number, no bypass is built. The probe is
-`scripts/measure_fast_lane_latency.py`; it needs an agent roster to orchestrate, which is #19.
+`scripts/measure_fast_lane_latency.py`; the roster it needs is the **store assistant roster**,
+authored in #19.
 
 **Identity boundary gate** — the deterministic code gate in the request path that refuses
 personal, individual-identity questions from a shared store device, executed **before the lane
@@ -250,6 +251,49 @@ chose to send, and a single quiet poll can land between two of them, so returnin
 preamble and drops the citations with it. The answer timeout stays a failure even once the agent has
 spoken: a preamble returned because the clock ran out is a timeout dressed as an answer.
 
+**Store content pack** — `content_packs/store_assistant/`, the demo's own content, authored in #19.
+Two blob indexes: `store-troubleshooting-index` (the runbooks) and `store-operations-index` (the
+store profile and the ticket template), seeded as `store-troubleshooting-kb` and
+`store-operations-kb`. **Not** one of the six stock content packs #25 suppressed, which is why the
+use-case selection does not gate it — `none` means no *stock* pack. The documents are authored as
+the indexed artefact: `index_datasets.py` decodes anything that is not `.pdf`/`.docx` as UTF-8 and
+indexes it whole, so the markdown *is* the document and there is no build step. Deliberately unlike
+the **SOP corpus**, which must be built to `.docx` for Copilot Studio.
+_Avoid_: sample data, seed data
+
+**Troubleshooting runbook** — `RB-201` and up, the store's own equipment knowledge, indexed into
+Azure AI Search and reached through a **Foundry IQ Knowledge Base**. Each one branches, names what
+an associate has usually already tried, and says where to stop. Never merged with the **SOP
+corpus**: the two provenances have to be visibly separate for the **Grounding panel** to be able to
+say which platform answered. The runbooks are a different corpus reached by a different tool, so
+`content/sop/corpus.toml`'s `absent_terms` are asserted against them too — a car-wash runbook would
+answer the rehearsed **honest miss** and the SOP corpus' own verifier could not see it.
+
+**Store assistant roster** — the three Foundry participants in
+`content_packs/store_assistant/agent_teams/store_assistant.json`, uploaded under
+`00000000-0000-0000-0000-000000000223`, which is the identifier `selectStoreAssistant` looks for.
+`TroubleshootingAgent` (`gpt-5.4`, the runbook knowledge base, `user_responses: true`),
+`ShiftTasksAgent` (`gpt-5.4-mini`, the `sop` toolbox) and `EscalationAgent` (`gpt-5.4`, the
+operations knowledge base). The manager runs on `ORCHESTRATOR_MODEL_NAME` (ADR-003).
+
+**The SOP tool has one holder, and it has nothing else** — `ShiftTasksAgent` declares
+`toolbox_filter: "sop"` and **no** `knowledge_base_name`. An agent holding both a Foundry knowledge
+base and `search_store_procedures` chooses between them turn by turn, and the branch it does not
+take is the cross-platform hop the demonstration rests on. A hop that happens four runs in five is
+not a claim anybody can make on stage.
+
+**Silent agent skip** — `AgentFactory.get_agents` catches `UnsupportedModelError`, logs a warning
+and continues, so an agent whose `deployment_name` is not in the `SUPPORTED_MODELS` allowlist — or
+absent entirely — is dropped. The upload returned 200, the team is in Cosmos, the surface shows the
+assistant, and one member of the cast never speaks. There are **two** allowlists and they do not
+agree: `validate_team_models` at upload time hard-bypasses `gpt-5.4-mini`, `gpt-5.4`, `gpt-5` and
+`o3` by name and fails open on any exception, while `create_agent_from_config` at run time reads the
+environment variable. `python -m store_pack roster` closes the gap by reading the team back out of
+the deployment after upload; both post-deploy entry points run it.
+
+The pack, the roster and that check are recorded in
+[docs/store-content-pack.md](docs/store-content-pack.md).
+
 ## Surfaces
 
 **Store surface** — the branded chat surface the presenter opens: the **Circle K Frontline Store
@@ -382,6 +426,9 @@ a keyboard chord and pushed over the existing WebSocket. No wall-clock timer. Th
 `POST /api/v4/presenter/alert` with `include_in_schema=False` (#23) — hidden rather than
 authenticated, which is why the **words and the recipient are both the server's**: the body selects
 a name from a rehearsed roster in `transparency.alert` and there is no parameter that accepts prose.
+That roster is **seven alerts** since #19, each naming a real `SOP-NNN` from the **SOP corpus**, so
+whichever one the chord lands on leads straight into the cross-platform hop rather than stopping at
+a reminder. Rehearsed words, not a live signal, which is why `SimulatedBadge` goes on them.
 
 **Presenter chord** — the client half: **Ctrl + Alt + Shift + A**, matched on `event.code` and not
 `event.key` (with Alt held, several layouts compose a different character, and a chord that only

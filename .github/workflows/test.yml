@@ -30,6 +30,15 @@ on:
       # its predicate.
       - 'infra/scripts/post-provision/post_deploy.sh'
       - 'infra/scripts/post-provision/post_deploy.ps1'
+      # The store assistant's content pack and roster (#19). The pack is the
+      # only thing that makes the surface resolve to an assistant at all, and
+      # `test_store_pack.py` reads all three: the authored artefacts, the
+      # verification tooling, and the knowledge-base registrations they depend
+      # on. Named individually for the same reason as above.
+      - 'content_packs/store_assistant/**'
+      - 'tools/store_pack/**'
+      - 'infra/scripts/post-provision/seed_knowledge_bases.py'
+      - 'src/App/src/models/storeSurface.ts'
   pull_request:
     types:
       - opened
@@ -64,6 +73,15 @@ on:
       # its predicate.
       - 'infra/scripts/post-provision/post_deploy.sh'
       - 'infra/scripts/post-provision/post_deploy.ps1'
+      # The store assistant's content pack and roster (#19). The pack is the
+      # only thing that makes the surface resolve to an assistant at all, and
+      # `test_store_pack.py` reads all three: the authored artefacts, the
+      # verification tooling, and the knowledge-base registrations they depend
+      # on. Named individually for the same reason as above.
+      - 'content_packs/store_assistant/**'
+      - 'tools/store_pack/**'
+      - 'infra/scripts/post-provision/seed_knowledge_bases.py'
+      - 'src/App/src/models/storeSurface.ts'
 
 permissions:
   contents: read

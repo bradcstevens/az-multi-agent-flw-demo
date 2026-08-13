@@ -27,17 +27,22 @@ from transparency.payloads import PresenterAlert
 # The rehearsed roster. The words are the **server's**, never the caller's: the
 # route that fires these is hidden rather than authenticated, and it pushes to
 # the screen the audience is watching, so a caller may choose a line and may
-# not compose one. #19 authors the full six-to-eight shift-task alerts; these
-# are deliberately tasks an associate would recognise from a real shift rather
-# than demo strings.
+# not compose one.
+#
+# Seven of them (#19), and each is a task an associate would recognise from a
+# real shift rather than a demo string. Each also **names the document its
+# steps are in**, which is the difference between a proactive message and a
+# dead end: the alert lands, the associate asks for the steps, and the question
+# has somewhere to go. Those identifiers are asserted against the SOP corpus,
+# so an alert cannot come to point at a procedure that was never written.
 REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
     "shift-task": PresenterAlert(
         title="Shift task due",
         content=(
             "Heads up — the coffee station deep clean is due before the 15:00 "
             "handover at Store 223. That is the bean hopper, the grinder purge "
-            "and the drip trays. Ask me for the steps if you have not done it "
-            "before."
+            "and the drip trays. The steps are in SOP-104; ask me for them if "
+            "you have not done it before."
         ),
         timestamp="",
     ),
@@ -45,7 +50,54 @@ REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
         title="Delivery arriving",
         content=(
             "The chilled delivery is due at the Store 223 back dock in ten "
-            "minutes. Clear the receiving bay and have the handheld ready."
+            "minutes. Clear the receiving bay and have the handheld ready. "
+            "Receiving and put-away are in SOP-109."
+        ),
+        timestamp="",
+    ),
+    "temperature-log": PresenterAlert(
+        title="Temperature check due",
+        content=(
+            "The hot food case temperature check is due now at Store 223. "
+            "Probe the thickest item on the middle shelf and record it on the "
+            "daily log. SOP-107 has the holding rules and what to do if it "
+            "reads low."
+        ),
+        timestamp="",
+    ),
+    "safe-drop": PresenterAlert(
+        title="Safe drop due",
+        content=(
+            "The till at Store 223 is over its drop limit. Take a safe drop "
+            "before the next rush and record the drop number. SOP-106 has the "
+            "counting and witness rules."
+        ),
+        timestamp="",
+    ),
+    "restroom-check": PresenterAlert(
+        title="Restroom check due",
+        content=(
+            "The two-hourly restroom inspection is due at Store 223 and the "
+            "sheet has not been signed since 11:00. SOP-103 has the check "
+            "list and what to do if something needs closing off."
+        ),
+        timestamp="",
+    ),
+    "age-check": PresenterAlert(
+        title="Age-restricted sales reminder",
+        content=(
+            "A reminder for the late shift at Store 223: every age-restricted "
+            "sale is challenged, whatever the queue looks like. SOP-108 has "
+            "the accepted forms of identification and the refusal wording."
+        ),
+        timestamp="",
+    ),
+    "handover": PresenterAlert(
+        title="Handover in fifteen minutes",
+        content=(
+            "Handover at Store 223 is in fifteen minutes. The task board, the "
+            "temperature log and any equipment left out of service all go on "
+            "the handover sheet. SOP-110 has the order to work through."
         ),
         timestamp="",
     ),

@@ -126,6 +126,58 @@ KNOWLEDGE_BASES: dict = {
         ],
     },
 
+    # ── Circle K Frontline Store Assistant (issue #19) ──
+    # Two knowledge bases rather than one, and that is the point. The
+    # troubleshooting runbooks are the store's own knowledge and are grounded
+    # in Foundry; the store procedures are the Copilot Studio SOP agent's and
+    # are grounded in Dataverse. R6 shows an associate which of the two
+    # answered, so the two must not share a source.
+    "store-troubleshooting-kb": {
+        "description": "Store 223 equipment troubleshooting runbooks (RB-2xx)",
+        "model": {
+            "kind": "azureOpenAI",
+            "azureOpenAIParameters": {
+                "resourceUri": AI_SERVICES_ENDPOINT,
+                "deploymentId": "gpt-5.4-mini",
+                "modelName": "gpt-5.4-mini",
+            },
+        },
+        "sources": [
+            {
+                "name": "store-troubleshooting-ks",
+                "description": (
+                    "Branching runbooks for the equipment an associate can "
+                    "reach: coffee brewer, hot food case, fuel dispenser, "
+                    "walk-in cooler"
+                ),
+                "index_name": "store-troubleshooting-index",
+                "searchable_fields": ["content", "title"],
+            },
+        ],
+    },
+    "store-operations-kb": {
+        "description": "Store 223 site profile and the service-incident ticket template",
+        "model": {
+            "kind": "azureOpenAI",
+            "azureOpenAIParameters": {
+                "resourceUri": AI_SERVICES_ENDPOINT,
+                "deploymentId": "gpt-5.4-mini",
+                "modelName": "gpt-5.4-mini",
+            },
+        },
+        "sources": [
+            {
+                "name": "store-operations-ks",
+                "description": (
+                    "The store profile the ticket's site and asset fields are "
+                    "filled from, and the ticket template itself"
+                ),
+                "index_name": "store-operations-index",
+                "searchable_fields": ["content", "title"],
+            },
+        ],
+    },
+
     # ── Example Pack ──
     # ┌─────────────────────────────────────────────────────────────────────────┐
     # │ TEMPLATE: Copy this block when adding a new content pack KB.            │

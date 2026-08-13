@@ -848,3 +848,116 @@ class TestSearchIndexSummary:
             summary = await service.get_search_index_summary()
         assert "error" in summary
 
+
+# ---------------------------------------------------------------------------
+# The store assistant's own content pack (issue #19)
+# ---------------------------------------------------------------------------
+
+
+class TestStoreAssistantPackUploads:
+    """The authored pack, through the **real** upload validation.
+
+    The team definition is uploaded once, by a script, on a machine that is
+    about to be used for a rehearsal. A 400 there is discovered by reading a
+    deploy log; the rules that produce it live in this module and are not
+    written down anywhere the pack's author reads. So the pack is run through
+    the validator itself rather than checked against a description of it.
+
+    The four rules the issue names — a hex-only identifier, the ``status``
+    field, a per-agent ``type`` field, per-task creation metadata — are each
+    asserted twice: that the authored pack has them, and that removing one is
+    what makes the upload fail. A pack that passed for some other reason would
+    otherwise look identical from here.
+    """
+
+    @staticmethod
+    def _pack():
+        import copy
+        import json as _json
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[4]
+        path = (
+            repo_root
+            / "content_packs"
+            / "store_assistant"
+            / "agent_teams"
+            / "store_assistant.json"
+        )
+        return copy.deepcopy(_json.loads(path.read_text(encoding="utf-8")))
+
+    @pytest.mark.asyncio
+    async def test_authored_pack_validates(self):
+        service = TeamService()
+        team = await service.validate_and_parse_team_config(self._pack(), "user-1")
+
+        assert team.name == "Circle K Frontline Store Assistant"
+        assert team.status == "visible"
+        assert len(team.agents) == 3
+        assert len(team.starting_tasks) == 2
+
+    @pytest.mark.asyncio
+    async def test_authored_pack_keeps_its_declared_lanes(self):
+        service = TeamService()
+        team = await service.validate_and_parse_team_config(self._pack(), "user-1")
+
+        assert [task.lane for task in team.starting_tasks] == ["fast", "fast"]
+
+    @pytest.mark.asyncio
+    async def test_authored_pack_keeps_its_per_agent_models(self):
+        # The parse is where a per-agent model could be dropped on the floor;
+        # after this point the roster is what the agent factory reads.
+        service = TeamService()
+        team = await service.validate_and_parse_team_config(self._pack(), "user-1")
+
+        assert {agent.name: agent.deployment_name for agent in team.agents} == {
+            "TroubleshootingAgent": "gpt-5.4",
+            "ShiftTasksAgent": "gpt-5.4-mini",
+            "EscalationAgent": "gpt-5.4",
+        }
+
+    @pytest.mark.asyncio
+    async def test_authored_pack_keeps_the_sop_toolbox_wiring(self):
+        service = TeamService()
+        team = await service.validate_and_parse_team_config(self._pack(), "user-1")
+
+        shift_tasks = next(a for a in team.agents if a.name == "ShiftTasksAgent")
+        assert shift_tasks.use_toolbox is True
+        assert shift_tasks.toolbox_filter == "sop"
+
+    @pytest.mark.asyncio
+    async def test_authored_pack_keeps_the_troubleshooting_knowledge_base(self):
+        service = TeamService()
+        team = await service.validate_and_parse_team_config(self._pack(), "user-1")
+
+        troubleshooting = next(
+            a for a in team.agents if a.name == "TroubleshootingAgent"
+        )
+        assert troubleshooting.use_knowledge_base is True
+        assert troubleshooting.knowledge_base_name == "store-troubleshooting-kb"
+        assert troubleshooting.user_responses is True
+
+    @pytest.mark.asyncio
+    async def test_pack_without_status_is_refused(self):
+        data = self._pack()
+        del data["status"]
+        service = TeamService()
+        with pytest.raises(ValueError, match="status"):
+            await service.validate_and_parse_team_config(data, "user-1")
+
+    @pytest.mark.asyncio
+    async def test_pack_without_a_per_agent_type_is_refused(self):
+        data = self._pack()
+        del data["agents"][0]["type"]
+        service = TeamService()
+        with pytest.raises(ValueError, match="type"):
+            await service.validate_and_parse_team_config(data, "user-1")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("field", ["created", "creator", "logo"])
+    async def test_pack_without_per_task_creation_metadata_is_refused(self, field):
+        data = self._pack()
+        del data["starting_tasks"][0][field]
+        service = TeamService()
+        with pytest.raises(ValueError, match=field):
+            await service.validate_and_parse_team_config(data, "user-1")

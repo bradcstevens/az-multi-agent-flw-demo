@@ -6,6 +6,12 @@ core code**.
 
 The core solution works fine when this folder is empty or absent.
 
+**`store_assistant/` is this fork's own pack, not a stock one.** It carries the Circle K Frontline
+Store Assistant — the only team the surface will render — and the post-deploy scripts install it
+whatever use case is selected, including `none`. See
+[docs/store-content-pack.md](../docs/store-content-pack.md). The other six packs are the
+accelerator's, and `MACAE_USE_CASE=none` suppresses all of them.
+
 ---
 
 ## Folder Structure

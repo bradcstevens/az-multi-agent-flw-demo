@@ -4,6 +4,9 @@ IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# REPO_ROOT is `infra/` — the name is the accelerator's and `run_python` depends
+# on it, so it is left alone. The actual repository root is one level further up.
+PROJECT_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
 
 backend_url=""
 storage_account=""
@@ -535,6 +538,71 @@ upload_team_config() {
   return 0
 }
 
+# The store assistant's own content pack (issue #19). Not one of the six stock
+# content packs, which is why the use-case selection does not gate it: `none`
+# means no *stock* pack, and a deployment that seeded nothing at all leaves the
+# surface truthfully reporting that the assistant is not loaded — honest, and
+# an unusable demonstration.
+STORE_PACK_LABEL="Circle K Frontline Store Assistant"
+STORE_PACK_DIR="content_packs/store_assistant"
+STORE_PACK_TEAM_ID="00000000-0000-0000-0000-000000000223"
+STORE_PACK_KBS="store-troubleshooting-kb,store-operations-kb"
+
+# Every team configuration this selection uploads, in the order it uploads
+# them. One function, because "does `none` still install the store assistant?"
+# has to be a question something can be asked rather than seven guards that
+# agree by inspection — the same reason the six stock guards go through
+# `installs_use_case`.
+upload_all_team_configs() {
+  local failed=false
+
+  if installs_use_case 3; then
+    upload_team_config "HR Employee Onboarding" "content_packs/hr_onboarding/agent_teams" "00000000-0000-0000-0000-000000000001" || failed=true
+  fi
+  if installs_use_case 4; then
+    upload_team_config "Marketing Press Release" "content_packs/marketing_press_release/agent_teams" "00000000-0000-0000-0000-000000000002" || failed=true
+  fi
+  if installs_use_case 1; then
+    upload_team_config "RFP Evaluation" "content_packs/rfp_evaluation/agent_teams" "00000000-0000-0000-0000-000000000004" || failed=true
+  fi
+  if installs_use_case 5; then
+    upload_team_config "Contract Compliance Review" "content_packs/contract_compliance/agent_teams" "00000000-0000-0000-0000-000000000005" || failed=true
+  fi
+  if installs_use_case 2; then
+    upload_team_config "Retail Customer Satisfaction" "content_packs/retail_customer/agent_teams" "00000000-0000-0000-0000-000000000003" || failed=true
+  fi
+  if installs_use_case 6; then
+    upload_team_config "Content Generation" "content_packs/content_gen/agent_teams" "00000000-0000-0000-0000-000000000007" || failed=true
+  fi
+
+  # Last, and unconditional. Its own data was deployed before this point, so
+  # every search index the definition references exists before it is uploaded.
+  upload_team_config "$STORE_PACK_LABEL" "$STORE_PACK_DIR/agent_teams" "$STORE_PACK_TEAM_ID" || failed=true
+
+  [ "$failed" = false ]
+}
+
+# The roster, read back out of the deployment (issue #19).
+#
+# `AgentFactory.get_agents` skips an agent whose `deployment_name` is not in
+# SUPPORTED_MODELS with a `logger.warning` and nothing else. The upload
+# returned 200, the team is in Cosmos, the surface shows the assistant, and one
+# member of the cast never arrives. Nobody reads a container's warnings during
+# a rehearsal, so this asks.
+verify_store_roster() {
+  info ""
+  info "Verifying the $STORE_PACK_LABEL agent roster..."
+  if ! PYTHONPATH="$PROJECT_ROOT/tools" "$python_cmd" -m store_pack roster \
+      --backend-url "$backend_url" \
+      --user-principal-id "$user_principal_id"; then
+    error "The store assistant's roster is not what was authored. The surface will"
+    error "either report that the assistant is not loaded, or run one agent short."
+    has_errors=true
+    return 1
+  fi
+  return 0
+}
+
 select_use_case() {
   # The store assistant's own content pack is the only one this demonstration
   # wants seeded (issue #25, R1). `none` is therefore a first-class selection
@@ -793,10 +861,11 @@ main() {
     warn "AZURE_OPENAI_ENDPOINT is not set. Knowledge base reasoning may fall back to default or fail."
   fi
 
-  local uses_data=false
-  case "$selected_use_case" in
-    1|2|5|6|7) uses_data=true ;; 
-  esac
+  # Every deployment now deploys data: the store assistant's own pack always
+  # uploads blobs and creates two search indexes, whatever the stock selection
+  # is, so the WAF public-access window and the knowledge-base seeding below
+  # are no longer conditional on a stock pack having been chosen.
+  local uses_data=true
 
   if [ "$uses_data" = true ]; then
     enable_public_access_if_waf
@@ -805,22 +874,18 @@ main() {
   local is_team_config_failed=false
   local is_sample_data_failed=false
 
-  if installs_use_case 3; then
-    if ! upload_team_config "HR Employee Onboarding" "content_packs/hr_onboarding/agent_teams" "00000000-0000-0000-0000-000000000001"; then
-      is_team_config_failed=true
-    fi
-  fi
-
-  if installs_use_case 4; then
-    if ! upload_team_config "Marketing Press Release" "content_packs/marketing_press_release/agent_teams" "00000000-0000-0000-0000-000000000002"; then
-      is_team_config_failed=true
-    fi
+  # The store assistant's data first, and its team configuration afterwards
+  # (inside `upload_all_team_configs`). That ordering *is* the requirement that
+  # every search index a definition references already exists before the
+  # definition is uploaded: a knowledge base whose index is absent does not
+  # fail, it answers nothing, and an agent grounded on nothing improvises.
+  info "Deploying data for the $STORE_PACK_LABEL content pack..."
+  if ! deploy_content_pack "$STORE_PACK_DIR" "$storage_account" "$ai_search"; then
+    error "Data deployment for the $STORE_PACK_LABEL failed."
+    is_sample_data_failed=true
   fi
 
   if installs_use_case 1; then
-    if ! upload_team_config "RFP Evaluation" "content_packs/rfp_evaluation/agent_teams" "00000000-0000-0000-0000-000000000004"; then
-      is_team_config_failed=true
-    fi
     info "Deploying data for RFP Evaluation content pack..."
     if ! deploy_content_pack "content_packs/rfp_evaluation" "$storage_account" "$ai_search"; then
       error "Data deployment for RFP Evaluation failed."
@@ -829,9 +894,6 @@ main() {
   fi
 
   if installs_use_case 5; then
-    if ! upload_team_config "Contract Compliance Review" "content_packs/contract_compliance/agent_teams" "00000000-0000-0000-0000-000000000005"; then
-      is_team_config_failed=true
-    fi
     info "Deploying data for Contract Compliance content pack..."
     if ! deploy_content_pack "content_packs/contract_compliance" "$storage_account" "$ai_search"; then
       error "Data deployment for Contract Compliance failed."
@@ -840,9 +902,6 @@ main() {
   fi
 
   if installs_use_case 2; then
-    if ! upload_team_config "Retail Customer Satisfaction" "content_packs/retail_customer/agent_teams" "00000000-0000-0000-0000-000000000003"; then
-      is_team_config_failed=true
-    fi
     info "Deploying data for Retail Customer content pack..."
     if ! deploy_content_pack "content_packs/retail_customer" "$storage_account" "$ai_search"; then
       error "Data deployment for Retail Customer Satisfaction failed."
@@ -851,14 +910,19 @@ main() {
   fi
 
   if installs_use_case 6; then
-    if ! upload_team_config "Content Generation" "content_packs/content_gen/agent_teams" "00000000-0000-0000-0000-000000000007"; then
-      is_team_config_failed=true
-    fi
     info "Deploying data for Content Generation content pack..."
     if ! deploy_content_pack "content_packs/content_gen" "$storage_account" "$ai_search"; then
       error "Data deployment for Content Generation failed."
       is_sample_data_failed=true
     fi
+  fi
+
+  if ! upload_all_team_configs; then
+    is_team_config_failed=true
+  fi
+
+  if [ "$is_team_config_failed" = false ]; then
+    verify_store_roster || true
   fi
 
   if [ "$is_team_config_failed" = true ] || [ "$is_sample_data_failed" = true ]; then
@@ -881,8 +945,19 @@ main() {
     kb_map[6]="macae-content-gen-products-kb"
     kb_map[7]="macae-retail-customer-kb,macae-retail-orders-kb,macae-content-gen-products-kb,macae-contract-summary-kb,macae-contract-risk-kb,macae-contract-compliance-kb,macae-rfp-summary-kb,macae-rfp-risk-kb,macae-rfp-compliance-kb"
 
-    local selected_vector_stores="${vector_store_map[$selected_use_case]}"
-    local selected_kbs="${kb_map[$selected_use_case]}"
+    local selected_vector_stores="${vector_store_map[$selected_use_case]:-}"
+    local selected_kbs="${kb_map[$selected_use_case]:-}"
+
+    # The store assistant's two knowledge bases are always seeded, for the same
+    # reason its pack is always uploaded. Its troubleshooting knowledge is
+    # deliberately its own knowledge base and not merged with anything: R6
+    # shows an associate which platform answered, and a shared source makes
+    # that claim unprovable.
+    if [ -n "$selected_kbs" ]; then
+      selected_kbs="$selected_kbs,$STORE_PACK_KBS"
+    else
+      selected_kbs="$STORE_PACK_KBS"
+    fi
 
     if [ -n "$selected_vector_stores" ]; then
       info ""
