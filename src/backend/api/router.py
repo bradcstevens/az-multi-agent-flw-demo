@@ -28,6 +28,8 @@ from orchestration.orchestration_manager import OrchestrationManager
 from services.plan_service import PlanService
 from services.team_service import TeamService
 from session.store import SessionStateStore
+from sop.direct_line import DIRECT_LINE_FAILURE, DirectLineClient, SopAnswer
+from sop.provenance import SOP_PLATFORM, SOP_SOURCE
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -771,6 +773,68 @@ async def clarification_ask(request: Request):
         return {"answer": ""}
 
     return {"answer": answer}
+
+
+# ------------------------------------------------------------------
+# MCP bridge to the Copilot Studio SOP agent (issue #18, ADR-011)
+# ------------------------------------------------------------------
+
+# The Direct Line client is a backend module: the MCP container ships only its
+# own directory and `httpx`, so it cannot hold one. One client per process,
+# built lazily so a backend with no SOP agent configured still starts.
+_sop_client: Optional[DirectLineClient] = None
+
+
+def sop_client() -> DirectLineClient:
+    """The process's Direct Line client, built on first use."""
+    global _sop_client
+    if _sop_client is None:
+        _sop_client = DirectLineClient.from_app_config()
+    return _sop_client
+
+
+@app_router.post("/sop/ask")
+async def sop_ask(request: Request):
+    """Ask the Copilot Studio SOP agent a procedure question.
+
+    The MCP ``search_store_procedures`` tool POSTs ``{question}`` here. The
+    reply carries the answer and the citations parsed structurally out of the
+    Direct Line activity, plus which platform and source answered — the two
+    facts R6's Grounding panel is a claim about.
+
+    A SOP agent that cannot be reached, or is not configured at all, returns
+    the **fixed failure message** and says it failed. It never answers from
+    anywhere else: a hidden fallback would make the cross-platform claim
+    unfalsifiable.
+    """
+    body = await request.json()
+    question = (body.get("question") or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question is required")
+
+    try:
+        answer = await sop_client().ask(question)
+    except Exception as exc:
+        logger.error("sop/ask: no SOP agent to ask: %s", exc)
+        answer = SopAnswer(text=DIRECT_LINE_FAILURE, failed=True)
+
+    return {
+        "text": answer.text,
+        "failed": answer.failed,
+        "conversation_id": answer.conversation_id,
+        "platform": SOP_PLATFORM,
+        "source": SOP_SOURCE,
+        "agent": config.COPILOT_STUDIO_AGENT_NAME,
+        "citations": [
+            {
+                "position": citation.position,
+                "name": citation.name,
+                "snippet": citation.snippet(),
+                "url": citation.url,
+            }
+            for citation in answer.citations
+        ],
+    }
 
 
 @app_router.post("/user_clarification")

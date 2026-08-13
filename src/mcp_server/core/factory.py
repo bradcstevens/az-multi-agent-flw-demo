@@ -22,6 +22,10 @@ class Domain(Enum):
     DATA = "data"
     IMAGE = "image"
     USER_RESPONSES = "user_responses"
+    # The Copilot Studio SOP agent, reached over Direct Line (#18, ADR-011).
+    # Its own domain so a team definition can give an agent the store-procedure
+    # tool without also handing it every other domain's tools.
+    SOP = "sop"
 
 
 class MCPToolBase(ABC):

@@ -80,6 +80,12 @@ param gpt5_4ModelDeploymentType string = 'GlobalStandard'
 @description('Optional. Capacity of the larger GPT model deployment.')
 param gpt5_4ModelCapacity int = 150
 
+@description('Optional. Direct Line token endpoint of the published Copilot Studio SOP agent, as returned by PvaGetDirectLineEndpoint. Never assembled from a hostname (ADR-011); empty leaves the SOP tool reporting its fixed failure message rather than guessing.')
+param copilotStudioDirectLineTokenEndpoint string = ''
+
+@description('Optional. Display name of the published Copilot Studio SOP agent.')
+param copilotStudioAgentName string = 'Store SOP Assistant'
+
 @description('Optional. Name of the embedding model deployed for guardrail similarity checks.')
 param embeddingModelName string = 'text-embedding-3-small'
 
@@ -610,6 +616,18 @@ module backend_container_app './modules/compute/container-app.bicep' = {
           {
             name: 'ORCHESTRATOR_MODEL_NAME'
             value: gptModelName
+          }
+          {
+            // The published Copilot Studio SOP agent, reached over Direct Line
+            // (ADR-011). Tenant-specific and not creatable here, so it is a
+            // parameter; unset, the SOP tool answers with its fixed failure
+            // message rather than falling back to model knowledge.
+            name: 'COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT'
+            value: copilotStudioDirectLineTokenEndpoint
+          }
+          {
+            name: 'COPILOT_STUDIO_AGENT_NAME'
+            value: copilotStudioAgentName
           }
           {
             name: 'MCP_SERVER_ENDPOINT'

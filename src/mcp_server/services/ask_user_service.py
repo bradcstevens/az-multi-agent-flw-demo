@@ -8,20 +8,24 @@ to the browser and blocks until the user responds (or times out).
 
 The answer is returned as a plain string — the agent continues with it
 in context like any other tool result.
+
+The HTTP client is injected rather than built inline (issue #18): this service
+is the container's original backend caller, and giving it the same
+``BackendClient`` seam the SOP tool uses is what makes both testable without an
+outbound-HTTP mocking dependency.
 """
 
 import logging
 import os
+from typing import Optional
 
 import httpx
 from core.factory import MCPToolBase
+from services.backend_client import BackendClient
 
 logger = logging.getLogger(__name__)
 
-# The backend URL is needed so the MCP server can relay questions.
-# In local dev this is typically http://localhost:8000; in Azure it is
-# the App Service URL.  Falls back to localhost for convenience.
-BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+CLARIFICATION_ASK_PATH = "/api/v4/clarification/ask"
 
 # Timeout for the round-trip (user may take a while to respond).
 ASK_USER_TIMEOUT = float(os.environ.get("ASK_USER_TIMEOUT", "300"))
@@ -30,11 +34,12 @@ ASK_USER_TIMEOUT = float(os.environ.get("ASK_USER_TIMEOUT", "300"))
 class AskUserService(MCPToolBase):
     """Cross-domain tool that pauses the workflow to ask the user a question."""
 
-    def __init__(self):
+    def __init__(self, backend: Optional[BackendClient] = None):
         # Use a sentinel domain — this service is registered on every
         # domain server, not just one.
         from core.factory import Domain
         super().__init__(Domain.GENERAL)
+        self.backend = backend or BackendClient(timeout=ASK_USER_TIMEOUT)
 
     def register_tools(self, mcp) -> None:
         """Register the ask_user tool on the given FastMCP server."""
@@ -69,9 +74,6 @@ class AskUserService(MCPToolBase):
             Returns:
                 The user's answer as a plain string.
             """
-            url = f"{BACKEND_URL}/api/v4/clarification/ask"
-            payload = {"question": question, "user_id": user_id}
-
             logger.info(
                 "ask_user: relaying question to backend (user=%s): %.120s",
                 user_id,
@@ -79,17 +81,18 @@ class AskUserService(MCPToolBase):
             )
 
             try:
-                async with httpx.AsyncClient(timeout=ASK_USER_TIMEOUT) as client:
-                    resp = await client.post(url, json=payload)
-                    resp.raise_for_status()
-                    data = resp.json()
-                    answer = data.get("answer", "")
-                    logger.info(
-                        "ask_user: received answer (user=%s): %.120s",
-                        user_id,
-                        answer,
-                    )
-                    return answer or "The user did not provide an answer."
+                data = await self.backend.post_json(
+                    CLARIFICATION_ASK_PATH,
+                    {"question": question, "user_id": user_id},
+                    timeout=ASK_USER_TIMEOUT,
+                )
+                answer = data.get("answer", "")
+                logger.info(
+                    "ask_user: received answer (user=%s): %.120s",
+                    user_id,
+                    answer,
+                )
+                return answer or "The user did not provide an answer."
             except httpx.TimeoutException:
                 logger.warning("ask_user: timed out waiting for user response.")
                 return "The user did not respond in time. Proceed with sensible defaults."

@@ -21,12 +21,27 @@ HEADING = re.compile(r"^#{1,6} +(.+?)\s*$", re.MULTILINE)
 
 
 def _linking_docs() -> list[Path]:
-    """Every tracked document that links into the durable record."""
+    """Every tracked document that links into the durable record.
+
+    Every markdown file in the record this repository authors — the ADRs and
+    the ``agents``, ``copilot-studio`` and ``preflight`` folders — not just the
+    ADRs: the live tenant records and the preflight records cite ADRs by
+    relative path too, and ``docs/adr`` for ``docs/ADR`` resolves on a
+    developer's macOS checkout and 404s on github.com. The accelerator's
+    inherited documentation is deliberately out of scope; it is a one-way
+    baseline (ADR-006), so editing it to satisfy a guard here buys merge
+    friction rather than a working link.
+    """
+    authored = ("ADR", "agents", "copilot-studio", "preflight")
     return [
         REPO_ROOT / "CONTEXT.md",
         REPO_ROOT / ".reference" / "README.md",
         CORRECTIONS,
-        *sorted(ADR_DIR.glob("*.md")),
+        *sorted(
+            doc
+            for folder in authored
+            for doc in (REPO_ROOT / "docs" / folder).rglob("*.md")
+        ),
     ]
 
 

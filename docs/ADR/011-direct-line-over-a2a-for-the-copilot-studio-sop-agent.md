@@ -55,10 +55,22 @@ Client-side rules that fall out of the transport and are binding on the implemen
 - **Resolve the Direct Line endpoint from the regional channel settings service at runtime.
   Never hardcode the default Direct Line hostname.** This contradicts a snippet in the public
   web-security documentation but matches Microsoft's own working sample.
+  **Amended by #18:** this environment serves *no* regional channel settings — the endpoint
+  `PvaGetDirectLineEndpoint` returns is a legacy gateway that 404s on every settings path, and
+  the `<envid>.environment.api.powerplatform.com` host is NXDOMAIN. The second source is the
+  **`aud`/`iss` claim of the token the environment itself issued**, which is still the service
+  telling us rather than us assembling a hostname. Neither answering is a failure, not a
+  fallback to the default host. See [the client record](../copilot-studio/direct-line-client.md).
 - **Tokens live 3600 seconds**, not the 30 minutes the superseded document states
   ([correction 8](../superseded-requirements-corrections.md#8-direct-line-tokens-expire-in-3600-seconds)).
+  **Amended by #18:** a Copilot Studio Direct Line token is also **conversation-scoped** — it
+  carries a `conv` claim, so reusing one for a second conversation rejoins the first and replays
+  its transcript. The 3600 seconds bound one conversation's token, not a cache; fetch a token per
+  conversation.
 - **Parse citations structurally** from the entities collection where the entity type is the
-  schema.org `Message` type, reading position, name and abstract. The markdown reference-style
+  schema.org `Message` type, reading position, name and abstract. **Amended by #17:**
+  `abstract` is the *filename*, identical to `name`; the snippet is a truncation of
+  `appearance.text`. The markdown reference-style
   form in the activity text is a parallel representation, not the source of truth. **Expect the
   citation URL to be absent** for Dataverse-uploaded documents — render name plus snippet and
   do not make a link a requirement.

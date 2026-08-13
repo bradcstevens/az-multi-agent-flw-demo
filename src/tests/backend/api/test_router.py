@@ -89,6 +89,8 @@ from guardrail.corpus import (  # noqa: E402
 )
 from guardrail.gate import IdentityBoundaryGate  # noqa: E402
 from guardrail.refusal import IDENTITY_BOUNDARY_REFUSAL  # noqa: E402
+from sop.citation import Citation  # noqa: E402
+from sop.direct_line import SopAnswer  # noqa: E402
 
 
 class StubEmbedder:
@@ -199,6 +201,25 @@ def rt(monkeypatch):
     embedder = StubEmbedder()
     gate = IdentityBoundaryGate(embed=embedder)
 
+    # The Copilot Studio SOP agent, stood in for at the client's own seam
+    # (issue #18). Real `SopAnswer` and real `Citation` — only the network is
+    # absent, so the route is exercised against the genuine shapes.
+    sop = MagicMock()
+    sop.ask = AsyncMock(
+        return_value=SopAnswer(
+            text="1. Count the drawer.",
+            citations=[
+                Citation(
+                    position=1,
+                    name="SOP-102 Store Closing Procedure.docx",
+                    abstract="SOP-102 Store Closing Procedure.docx",
+                    text="<h1>Store Closing Procedure</h1> body",
+                )
+            ],
+            conversation_id="conv-1",
+        )
+    )
+
     monkeypatch.setattr(router_mod, "get_authenticated_user_details", get_user)
     monkeypatch.setattr(router_mod, "identity_boundary_gate", lambda: gate)
     monkeypatch.setattr(router_mod, "DatabaseFactory", database_factory)
@@ -236,6 +257,7 @@ def rt(monkeypatch):
         get_user=get_user,
         gate=gate,
         embedder=embedder,
+        sop=sop,
     )
 
 
@@ -1221,3 +1243,69 @@ class TestWebSocket:
         with contextlib.suppress(Exception):
             with rt.client.websocket_connect("/api/v4/socket/proc-2") as ws:
                 ws.close()
+
+
+# ---------------------------------------------------------------------------
+# /sop/ask — the bridge the SOP MCP tool calls back on (issue #18)
+# ---------------------------------------------------------------------------
+class TestSopAsk:
+    """The MCP container has no Direct Line client of its own.
+
+    It ships only its own directory and `httpx`, so the client lives in the
+    backend and the tool calls back over HTTP — the pattern `ask_user` already
+    uses. This route is that bridge, and it is where the citation crosses from
+    Copilot Studio into the shape the Grounding panel reads.
+    """
+
+    def _post(self, rt, question="How do I close the store?"):
+        return rt.client.post("/api/v4/sop/ask", json={"question": question})
+
+    def test_a_question_returns_the_agents_answer(self, rt, monkeypatch):
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        resp = self._post(rt)
+
+        assert resp.status_code == 200
+        assert resp.json()["text"] == "1. Count the drawer."
+
+    def test_an_empty_question_is_rejected(self, rt, monkeypatch):
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        assert self._post(rt, question="  ").status_code == 400
+
+    def test_the_citation_crosses_with_a_name_and_a_snippet(self, rt, monkeypatch):
+        """An absent URL is expected, not a fault — ADR-011's prediction,
+        confirmed live in #17. Name plus snippet is the whole rendering."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        (citation,) = self._post(rt).json()["citations"]
+
+        assert citation["name"] == "SOP-102 Store Closing Procedure.docx"
+        assert citation["snippet"] == "Store Closing Procedure body"
+        assert citation["url"] is None
+
+    def test_the_answer_names_the_platform_and_the_source(self, rt, monkeypatch):
+        """R6's claim is which *platform* answered, and the SOP corpus lives in
+        Dataverse — never SharePoint (ADR-012)."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        body = self._post(rt).json()
+
+        assert body["platform"] == "Copilot Studio"
+        assert body["source"] == "Dataverse"
+
+    def test_an_unconfigured_agent_is_the_fixed_failure_not_a_traceback(
+        self, rt, monkeypatch
+    ):
+        """No agent configured must never become an answer from somewhere
+        else: the tool gets the fixed failure message and says so."""
+        def _unconfigured():
+            raise ValueError("COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT is not configured")
+
+        monkeypatch.setattr(router_mod, "sop_client", _unconfigured)
+
+        body = self._post(rt).json()
+
+        assert body["failed"] is True
+        assert body["text"] == router_mod.DIRECT_LINE_FAILURE
+        assert body["citations"] == []

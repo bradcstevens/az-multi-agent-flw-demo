@@ -214,10 +214,30 @@ itself took 11.6–85 s across five measurements. Rehearsal rule: open a fresh c
 every publish, and freeze the agent before the demo.
 
 **Direct Line** — the GA transport between the orchestrator and the Copilot Studio SOP agent.
-Tokens live **3600 seconds**. Chosen over A2A on fit, **not** on availability — A2A reached GA in
-April 2026, and repeating the "A2A is Preview" line is repeating a known error (ADR-011). The token
-endpoint is resolved per environment from `PvaGetDirectLineEndpoint`, never assembled from the
-default hostname.
+Chosen over A2A on fit, **not** on availability — A2A reached GA in April 2026, and repeating the
+"A2A is Preview" line is repeating a known error (ADR-011). The token endpoint is resolved per
+environment from `PvaGetDirectLineEndpoint`, never assembled from the default hostname. The client
+lives in the **backend** (`src/backend/sop/`), not the MCP container, which ships `httpx` and only
+its own directory; the SOP tool relays to `POST /api/v4/sop/ask`.
+
+**Direct Line base URL** — resolved, never assembled, in two steps then a refusal: the regional
+channel settings service first, then the **`aud`/`iss` claim of the token the environment issued**,
+then an error that becomes the fixed failure message. The second step exists because this
+environment serves *no* channel settings — `PvaGetDirectLineEndpoint` returns a legacy
+`powervamg…gateway.prod.island.powerapps.com` host that 404s on every settings path, and the
+`<envid>.environment.api.powerplatform.com` host is NXDOMAIN.
+
+**Conversation-scoped token** — a Copilot Studio Direct Line token carries a `conv` claim, so it
+belongs to one conversation. Reusing it for a second `POST /conversations` **rejoins the first** and
+replays its transcript, which made the demo's honest miss answer with SOP-102's closing steps. A
+token is fetched per conversation and never cached across them; the **3600 seconds** it lives bound
+that one conversation, and the client refuses an answer timeout that would outlive it.
+
+**SOP tool** — `search_store_procedures`, the MCP tool on its own `sop` domain that puts the
+Copilot Studio agent in the orchestrator's hands. One fast retry, then a fixed failure message with
+no citations — never a fallback to model knowledge and never a local copy of the SOP corpus, because
+an answer arriving when the Direct Line path is broken is evidence against the cross-platform claim,
+not for it.
 
 ## Surfaces
 
@@ -226,7 +246,9 @@ combined**: a "source used" event emitted server-side over the existing WebSocke
 *which platform* answered, and citation data parsed from the SOP agent's response, which supplies
 the document detail. Neither alone satisfies the requirement. The citation arrives structurally in
 the activity's `entities`, with **no `url`** — and `appearance.abstract` is the *filename*, not a
-snippet, while `appearance.text` is the whole document (see **Citation appearance** below).
+snippet, while `appearance.text` is the whole document (see **Citation appearance** below). The
+panel renders `Citation.snippet()`, which truncates `text`; rendering `abstract` prints the filename
+twice.
 
 **Citation appearance** — the `appearance` object inside a Direct Line citation entity:
 `name` and `abstract` both carry the uploaded document's filename, and `text` carries the entire
@@ -473,6 +495,28 @@ identically: fifteen numbered steps citing `SOP-102 Store Closing Procedure.docx
 which is what makes the **Authored here** rule enforceable — an agent carrying eleven behaviours
 nobody wrote here cannot be reviewed here. Recorded in
 [docs/copilot-studio/sop-agent.md](docs/copilot-studio/sop-agent.md).
+
+### A Direct Line token is scoped to one conversation (confirmed 2026-08-13, issue #18)
+
+ADR-011 records that Direct Line tokens live 3600 seconds, which invites caching one for its life.
+A Copilot Studio token also carries a **`conv` claim**: reusing it for a second `POST /conversations`
+rejoins the *first* conversation, and the drain replays its transcript. Measured live, the demo's
+out-of-corpus probe came back with SOP-102's closing steps — the honest-miss beat answering as if the
+document existed, which is the worst available failure because it looks like success. A token is now
+fetched per conversation. Recorded in
+[docs/copilot-studio/direct-line-client.md](docs/copilot-studio/direct-line-client.md).
+
+### This environment serves no regional channel settings (confirmed 2026-08-13, issue #18)
+
+ADR-011 requires the Direct Line base URL be read from the regional channel settings service and
+never assembled. Here there is no such service to read: `PvaGetDirectLineEndpoint` returns a legacy
+`powervamg.us-il102.gateway.prod.island.powerapps.com` token endpoint that 404s on every
+`regionalchannelsettings` path, that gateway *is* the environment's own
+`runtimeEndpoints["microsoft.PowerVirtualAgents"]`, and the
+`<envid>.environment.api.powerplatform.com` host is NXDOMAIN. The rule survives via a second source
+that is still the service speaking: the **`aud`/`iss` claim of the token the environment issued**,
+which also confirms the 3600 seconds from `exp - nbf`. Neither source answering is an error, not a
+fall-through to the default host.
 
 ### A Direct Line citation's `abstract` is the filename, not a snippet (confirmed 2026-08-13, issue #17)
 

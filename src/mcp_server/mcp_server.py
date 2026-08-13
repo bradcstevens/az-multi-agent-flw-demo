@@ -26,6 +26,7 @@ from services.hr_service import HRService
 from services.image_service import ImageService
 from services.marketing_service import MarketingService
 from services.product_service import ProductService
+from services.sop_service import SopService
 from services.tech_support_service import TechSupportService
 
 # Setup logging
@@ -41,6 +42,8 @@ factory.register_service(TechSupportService())
 factory.register_service(MarketingService())
 factory.register_service(ProductService())
 factory.register_service(ImageService())
+# The Copilot Studio SOP agent, reached as a tool (#18, ADR-011).
+factory.register_service(SopService())
 
 # Shared services — registered on every domain server
 factory.register_shared_service(AskUserService())

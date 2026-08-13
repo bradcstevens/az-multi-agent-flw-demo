@@ -112,6 +112,19 @@ class AppConfig:
         )
         self.AZURE_AI_SEARCH_ENDPOINT = self._get_optional("AZURE_AI_SEARCH_ENDPOINT")
 
+        # The published Copilot Studio SOP agent, reached over Direct Line
+        # (issue #18, ADR-011). This is the token endpoint
+        # `PvaGetDirectLineEndpoint` returned for the published agent — it is
+        # never assembled from the default Direct Line hostname, and the
+        # Direct Line base URL itself is resolved at runtime from the regional
+        # channel settings service.
+        self.COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT = self._get_optional(
+            "COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT"
+        )
+        self.COPILOT_STUDIO_AGENT_NAME = self._get_optional(
+            "COPILOT_STUDIO_AGENT_NAME", "Store SOP Assistant"
+        )
+
         # Storage settings
         self.AZURE_STORAGE_BLOB_URL = self._get_optional("AZURE_STORAGE_BLOB_URL")
         self.AZURE_STORAGE_IMAGES_CONTAINER = self._get_optional(

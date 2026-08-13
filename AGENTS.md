@@ -42,6 +42,7 @@ under `docs/`, backed by a re-runnable check whose logic is unit-tested by the C
 | Record | Check |
 | --- | --- |
 | `docs/copilot-studio/sop-agent.md` | `scripts/copilot_studio/check-sop-agent.sh` |
+| `docs/copilot-studio/direct-line-client.md` | `scripts/copilot_studio/check-sop-agent.sh --probe` |
 
 The Copilot Studio SOP agent is authored **from this repository**, through the Dataverse Web API,
 because `pac` cannot authenticate unattended. Change the agent by editing
