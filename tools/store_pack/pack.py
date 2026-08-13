@@ -24,6 +24,7 @@ TEAM_FILE = PACK_DIR / "agent_teams" / "store_assistant.json"
 PACK_FILE = PACK_DIR / "pack.json"
 SEED_KB_FILE = Path("infra") / "scripts" / "post-provision" / "seed_knowledge_bases.py"
 SOP_CORPUS_MANIFEST = Path("content") / "sop" / "corpus.toml"
+SOP_CORPUS_SOURCES = Path("content") / "sop" / "src"
 
 _HEX_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
@@ -192,6 +193,23 @@ def seeded_knowledge_base_indexes(repo_root: Path) -> Dict[str, Set[str]]:
 # ---------------------------------------------------------------------------
 
 
+def sop_manifest(repo_root: Path) -> Dict[str, Any]:
+    """The SOP corpus' own manifest, ``content/sop/corpus.toml``.
+
+    Read rather than restated. The Quick Tasks are authored in
+    ``content_packs/`` and the corpus in ``content/sop/`` — different
+    directories, built by different tools — so a rehearsed question that
+    drifted from the corpus it was written against would go unnoticed on both
+    sides.
+    """
+    return tomllib.loads((repo_root / SOP_CORPUS_MANIFEST).read_text(encoding="utf-8"))
+
+
+def honest_miss(repo_root: Path) -> Dict[str, Any]:
+    """The rehearsed question the SOP corpus deliberately does not answer."""
+    return dict(sop_manifest(repo_root).get("honest_miss", {}))
+
+
 def honest_miss_absent_terms(repo_root: Path) -> List[str]:
     """The terms the SOP corpus keeps out, so its honest miss stays a miss.
 
@@ -201,7 +219,40 @@ def honest_miss_absent_terms(repo_root: Path) -> List[str]:
     different directories by different tools — so nothing but this would
     notice.
     """
-    manifest = tomllib.loads(
-        (repo_root / SOP_CORPUS_MANIFEST).read_text(encoding="utf-8")
-    )
-    return list(manifest.get("honest_miss", {}).get("absent_terms", []))
+    return list(honest_miss(repo_root).get("absent_terms", []))
+
+
+def rehearsed_hit(repo_root: Path) -> Dict[str, Any]:
+    """The rehearsed question the corpus **does** answer, and which document.
+
+    The mirror image of the honest miss, and the walkthrough's opening beat:
+    the cross-platform hop is what the whole architecture claim rests on, so
+    the first thing the presenter taps has to land on a document that is
+    actually in the library. A miss here does not fail — it answers, honestly,
+    that the procedure is not there, which looks exactly like the beat that
+    comes second.
+    """
+    return dict(sop_manifest(repo_root).get("rehearsed_hit", {}))
+
+
+def sop_doc_ids(repo_root: Path) -> Dict[str, Path]:
+    """Every ``SOP-NNN`` the corpus actually holds, and the file it came from.
+
+    Read out of each source's TOML front matter rather than from the filename,
+    because the identifier the corpus is cited by is the one in the front
+    matter and only that one reaches an answer.
+    """
+    found: Dict[str, Path] = {}
+    for path in sorted((repo_root / SOP_CORPUS_SOURCES).glob("*.md")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if not lines or lines[0].strip() != "+++":
+            continue
+        try:
+            closing = lines.index("+++", 1)
+        except ValueError:
+            continue
+        metadata = tomllib.loads("\n".join(lines[1:closing]))
+        doc_id = metadata.get("doc_id")
+        if isinstance(doc_id, str):
+            found[doc_id] = path
+    return found

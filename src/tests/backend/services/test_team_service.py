@@ -894,14 +894,24 @@ class TestStoreAssistantPackUploads:
         assert team.name == "Circle K Frontline Store Assistant"
         assert team.status == "visible"
         assert len(team.agents) == 3
-        assert len(team.starting_tasks) == 2
+        assert len(team.starting_tasks) == 6
 
     @pytest.mark.asyncio
     async def test_authored_pack_keeps_its_declared_lanes(self):
+        # Through the real validator, because the declared Lane is the thing
+        # the upload is most likely to drop silently: ``StartingTask.lane`` is
+        # an optional, unvalidated ``str``, so a lane that never arrives parses
+        # as no declaration at all and the lane router falls back to the
+        # keywords. The escalation task is the one that matters — its approval
+        # step is the associate confirming the ticket (#22, #26).
         service = TeamService()
         team = await service.validate_and_parse_team_config(self._pack(), "user-1")
 
-        assert [task.lane for task in team.starting_tasks] == ["fast", "fast"]
+        lanes = {task.id: task.lane for task in team.starting_tasks}
+        assert all(lane in ("fast", "deliberate") for lane in lanes.values()), lanes
+        assert [
+            task_id for task_id, lane in lanes.items() if lane == "deliberate"
+        ] == ["task-223-escalation"]
 
     @pytest.mark.asyncio
     async def test_authored_pack_keeps_its_per_agent_models(self):

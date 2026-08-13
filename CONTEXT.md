@@ -522,12 +522,34 @@ All three signals are recorded in full in
 [docs/transparency-panels.md](docs/transparency-panels.md). The rebrand that surrounds them is
 recorded in [docs/store-surface.md](docs/store-surface.md).
 
-**Quick Task** — a starting task the presenter taps instead of typing. Six of them, including one
-that deliberately routes to the **Deliberate lane** and one rehearsed out-of-corpus probe. Carries
-**Lane** metadata as `StartingTask.lane` (#16) — an unvalidated `str` rather than the `Lane` enum,
-so an unrecognised lane in an uploaded team definition fails open in the **Lane router** instead of
-rejecting the whole upload. Tapping one fills the box; typing over the prompt clears the declaration,
-because edited text is free-typed input and belongs to the **Lane keyword fallback**.
+**Quick Task** — a starting task the presenter taps instead of typing. **Six of them since #26**,
+one per beat of the walkthrough and rendered in the order it runs: the cross-platform hop, the
+rehearsed out-of-corpus probe, the troubleshooting fault, the escalation that declares the
+**Deliberate lane**, the boundary probe, and the shift-task query. Carries **Lane** metadata as
+`StartingTask.lane` (#16) — an unvalidated `str` rather than the `Lane` enum, so an unrecognised
+lane in an uploaded team definition fails open in the **Lane router** instead of rejecting the
+whole upload. That is the right failure mode and a silent one, so every declared lane is put
+through the real `parse_lane`. Tapping one fills the box; typing over the prompt clears the
+declaration, because edited text is free-typed input and belongs to the **Lane keyword fallback** —
+which is why each prompt is asserted to reach the lane it declares **through the fallback too**.
+Three of the six prompts are read out of the corpus they were written against rather than restated:
+the **rehearsed hit** and the **honest miss** from `content/sop/corpus.toml`, and the boundary
+probe from the **Guardrail corpus**' measured `POSITIVE_PROBES`.
+
+Recorded in [docs/quick-tasks.md](docs/quick-tasks.md).
+
+**Rehearsed hit** — the walkthrough's opening tap, and the mirror image of the honest miss:
+`corpus.toml`'s `[rehearsed_hit]` names the question *and the `SOP-NNN` that answers it*. The miss
+has always been guarded, because the corpus keeps its `absent_terms` out; nothing guarded the other
+direction, and a **hit decays into a miss**. Rename the document away and the tap still resolves —
+honestly — as *that procedure is not in the library*, nothing goes red, and the cross-platform beat
+the whole demonstration rests on has become the honest-miss beat played twice.
+
+**The Lane badge claims only what a Lane decides.** `LaneBadge` said *"Answered straight away — no
+approval step"*, and the boundary probe falsifies both halves: it is refused above the router and
+never answered at all, and **Fast-lane latency is unmeasured**, so a tooltip would have been the
+first place that number was asserted. It now reads *"No approval step — nothing is submitted for
+you to confirm."*
 
 **Simulated ticket** — the R4 service ticket (#22). `TKT-001`'s nineteen fields, everything unknown
 reading `not reported`; the number is a sha256 of the session rendered `SIM-223-NNNN`, **derived not

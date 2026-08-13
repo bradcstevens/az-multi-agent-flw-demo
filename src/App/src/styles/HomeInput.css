@@ -87,28 +87,31 @@
   margin-bottom: 12px;
 }
 
+/*
+ * The six Quick Tasks (issue #26). Three across, so the walkthrough's six
+ * beats sit as two rows the presenter can take in at a glance rather than one
+ * long strip. `auto-fit` rather than a fixed count: the column that would
+ * otherwise be 90px wide on a narrow window is what makes a card unreadable,
+ * and there is nothing here for a breakpoint to disagree with.
+ */
 .home-input-quick-tasks {
   display: grid !important;
-  grid-template-columns: 1fr 1fr 1fr 1fr !important;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 8px;
 }
 
 
 
-/* Responsive design for smaller screens */
-@media (max-width: 768px) {
+/*
+ * Phone. One column, at the same 640px the shell stacks at (issue #25) — a
+ * second breakpoint somewhere else is a surface that reflows twice, and the
+ * associate this is for is holding a phone in a store. Deliberately no
+ * `flex-wrap` or `flex` rules: the accelerator's had both, on an element
+ * declared `display: grid`, where neither property does anything at all.
+ */
+@media (max-width: 640px) {
   .home-input-quick-tasks {
-    flex-wrap: wrap !important;
-  }
-  
-  .home-input-quick-tasks .fui-Card {
-    flex: 1 1 calc(50% - 6px) !important; 
-  }
-}
-
-@media (max-width: 480px) {
-  .home-input-quick-tasks .fui-Card {
-    flex: 1 1 100% !important;
+    grid-template-columns: 1fr;
   }
 }
 

@@ -8,7 +8,7 @@ fictional roles and invented procedures. No customer content is used anywhere.
 
 | Path | What it is |
 | --- | --- |
-| `corpus.toml` | Corpus manifest: banner, store, and the rehearsed out-of-corpus question. |
+| `corpus.toml` | Corpus manifest: banner, store, the rehearsed out-of-corpus question and the rehearsed hit. |
 | `src/*.md` | The editable source of truth — TOML front matter fenced by `+++`, then markdown. |
 | `docx/*.docx` | The built, upload-ready files. Generated; never hand-edit. |
 
@@ -75,6 +75,17 @@ that the procedure is not in its library instead of improvising — that is the 
 `corpus.toml` lists the terms that must stay out of the corpus (`car wash`, `carwash`, `wash bay`,
 `wash tunnel`, `bay conveyor`). `verify` fails if a future document starts using one of them, so the
 beat cannot rot silently.
+
+## The rehearsed hit
+
+> **How do I close the store?** — answered by `SOP-102`.
+
+The mirror image, added by #26 as `[rehearsed_hit]` in `corpus.toml`, and the walkthrough's opening
+tap. The miss has always been guarded; the hit was not, and a **hit decays into a miss**. Rename or
+delete `SOP-102` and the tap still resolves — honestly — as *that procedure is not in the library*,
+nothing goes red, and the cross-platform beat the whole demonstration rests on becomes the
+honest-miss beat played twice. `src/tests/ci/test_store_pack.py` reads the section and asserts both
+that the identifier exists under `src/` and that the document it names is about closing the store.
 
 ## Uploading to Dataverse
 

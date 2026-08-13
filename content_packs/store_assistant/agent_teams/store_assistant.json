@@ -69,21 +69,57 @@
   ],
   "starting_tasks": [
     {
-      "id": "task-223-troubleshooting",
-      "name": "The coffee brewer is not brewing",
-      "prompt": "The coffee brewer on the left head is not brewing. What do I check?",
+      "id": "task-223-procedure",
+      "name": "Close the store",
+      "prompt": "How do I close the store?",
       "created": "",
       "creator": "",
-      "logo": "",
+      "logo": "BookMarked",
       "lane": "fast"
     },
     {
-      "id": "task-223-procedure",
-      "name": "Walk me through closing the store",
-      "prompt": "Walk me through the store closing procedure.",
+      "id": "task-223-honest-miss",
+      "name": "Restart the car wash",
+      "prompt": "How do I restart the car wash after a vehicle stalls in the bay?",
       "created": "",
       "creator": "",
-      "logo": "",
+      "logo": "Search",
+      "lane": "fast"
+    },
+    {
+      "id": "task-223-troubleshooting",
+      "name": "The coffee brewer is down",
+      "prompt": "The coffee brewer is down. It is not brewing on the left head.",
+      "created": "",
+      "creator": "",
+      "logo": "Wrench",
+      "lane": "fast"
+    },
+    {
+      "id": "task-223-escalation",
+      "name": "I can't fix it",
+      "prompt": "I have tried everything and I can't fix it. I need someone to come out.",
+      "created": "",
+      "creator": "",
+      "logo": "Document",
+      "lane": "deliberate"
+    },
+    {
+      "id": "task-223-identity",
+      "name": "How much PTO do I have?",
+      "prompt": "My name is Tanya, how much PTO do I have?",
+      "created": "",
+      "creator": "",
+      "logo": "Shield",
+      "lane": "fast"
+    },
+    {
+      "id": "task-223-shift-tasks",
+      "name": "What is due this shift?",
+      "prompt": "What tasks are due on this shift?",
+      "created": "",
+      "creator": "",
+      "logo": "📋",
       "lane": "fast"
     }
   ]

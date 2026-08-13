@@ -707,6 +707,10 @@ def test_a_change_to_the_pack_or_its_tooling_runs_these_tests():
         "tools/store_pack/**",
         "infra/scripts/post-provision/seed_knowledge_bases.py",
         "src/App/src/models/storeSurface.ts",
+        # The SOP corpus, since #26: two of the six Quick Tasks are read out of
+        # its manifest and one of them names a document under its sources.
+        "content/sop/corpus.toml",
+        "content/sop/src/**",
     ):
         assert text.count(f"'{path}'") >= 2, (
             f"a change to {path} does not run the CI-tooling tests on both "
@@ -884,3 +888,283 @@ def test_given_an_escalation_request_when_routed_then_it_takes_the_deliberate_la
         "log a service ticket for the coffee machine",
     ):
         assert module.select_lane(None, phrasing).value == "deliberate", phrasing
+
+
+# ---------------------------------------------------------------------------
+# The six Quick Tasks (issue #26)
+# ---------------------------------------------------------------------------
+
+
+def test_given_the_roster_when_read_then_there_are_six_quick_tasks(store_pack):
+    assert len(store_pack.starting_tasks) == 6
+
+
+def test_given_the_rehearsed_hit_when_read_then_it_names_a_document_that_exists():
+    # The mirror image of the honest miss, and the one this suite would not
+    # otherwise have. The opening beat is the cross-platform hop; a rehearsed
+    # question whose document was renamed away still resolves — as a *miss* —
+    # so nothing goes red and the centrepiece quietly becomes the honest-miss
+    # beat played twice.
+    hit = pack_mod.rehearsed_hit(REPO_ROOT)
+
+    assert hit["doc_id"] in pack_mod.sop_doc_ids(REPO_ROOT)
+
+
+def _backend_module(dotted: str):
+    """Import one backend module, without booting the application.
+
+    Imported by its real dotted name rather than loaded twice by path: the lane
+    router imports ``lane.lane`` itself, and two copies of the module produce
+    two ``Lane`` enums whose members are never the same object.
+
+    Every module reached this way is pure — the lane router, its keyword
+    fallback, the guardrail's keyword fast path and the Guardrail corpus all do
+    no I/O — and importing them is the whole point. A list of lanes or personal
+    terms restated in this file would agree with itself forever.
+    """
+    import importlib
+    import sys
+
+    backend = REPO_ROOT / "src" / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    return importlib.import_module(dotted)
+
+
+@pytest.fixture(scope="module")
+def lane_mod():
+    return _backend_module("lane")
+
+
+@pytest.fixture(scope="module")
+def gate_keywords():
+    return _backend_module("guardrail.keywords")
+
+
+@pytest.fixture(scope="module")
+def guardrail_corpus():
+    return _backend_module("guardrail.corpus")
+
+
+def _boundary_probe(store_pack, gate_keywords):
+    """The one task the Identity boundary gate is meant to refuse."""
+    refused = [
+        task
+        for task in store_pack.starting_tasks
+        if gate_keywords.matches_personal_keyword(task["prompt"])
+    ]
+    assert len(refused) == 1, [task["id"] for task in refused]
+    return refused[0]
+
+
+def test_given_each_quick_task_when_read_then_its_declared_lane_parses(
+    store_pack, lane_mod
+):
+    # Against the real parser, not a string comparison. `parse_lane` is total
+    # by design and `None` is its answer to anything it does not recognise —
+    # which the router then fails **open** to the Deliberate lane. So a typo
+    # here does not fail an upload and does not log an error: it puts an
+    # approval step in front of a procedure lookup, on stage, and the only
+    # visible symptom is a demo that got slower.
+    for task in store_pack.starting_tasks:
+        assert lane_mod.parse_lane(task.get("lane")) is not None, task["id"]
+
+
+def test_given_the_quick_tasks_when_read_then_exactly_one_declares_deliberate(
+    store_pack, lane_mod
+):
+    deliberate = [
+        task["id"]
+        for task in store_pack.starting_tasks
+        if lane_mod.parse_lane(task.get("lane")) is lane_mod.Lane.DELIBERATE
+    ]
+
+    assert len(deliberate) == 1, deliberate
+
+
+def test_given_the_deliberate_quick_task_when_routed_then_it_takes_that_lane(
+    store_pack, lane_mod
+):
+    # Through the real router, declaration and all: the approval step *is* the
+    # associate confirming the ticket (#22), so this is the one task whose lane
+    # is load-bearing rather than cosmetic.
+    task = next(
+        task
+        for task in store_pack.starting_tasks
+        if lane_mod.parse_lane(task.get("lane")) is lane_mod.Lane.DELIBERATE
+    )
+
+    assert lane_mod.select_lane(task["lane"], task["prompt"]) is lane_mod.Lane.DELIBERATE
+
+
+def test_given_the_deliberate_quick_task_when_its_prompt_is_typed_then_it_still_deliberates(
+    store_pack, lane_mod
+):
+    # The load-bearing one. Tapping a Quick Task fills the box; **editing that
+    # text clears the declaration**, because edited text is free-typed input.
+    # A presenter who taps the escalation task and adds a word has just handed
+    # the routing decision to the keyword fallback — and a ticket raised
+    # without an approval step is a ticket nobody confirmed.
+    task = next(
+        task
+        for task in store_pack.starting_tasks
+        if lane_mod.parse_lane(task.get("lane")) is lane_mod.Lane.DELIBERATE
+    )
+
+    assert lane_mod.select_lane(None, task["prompt"]) is lane_mod.Lane.DELIBERATE
+
+
+def test_given_a_fast_quick_task_when_its_prompt_is_typed_then_it_stays_fast(
+    store_pack, lane_mod, gate_keywords
+):
+    # The same seam from the other side, and what makes consecutive runs
+    # identical: the walkthrough behaves the same whether the presenter taps
+    # the task or types the words on it. The keyword fallback defaults to the
+    # **Deliberate** lane, so a prompt carrying no fast vocabulary at all is a
+    # procedure lookup that grows an approval step the moment anybody edits it.
+    #
+    # The boundary probe is excluded because it never reaches the router: the
+    # Identity boundary gate refuses it above the lane router and above
+    # orchestration, which is the next test.
+    probe = _boundary_probe(store_pack, gate_keywords)
+    for task in store_pack.starting_tasks:
+        if task["id"] == probe["id"]:
+            continue
+        if lane_mod.parse_lane(task.get("lane")) is lane_mod.Lane.DELIBERATE:
+            continue
+        assert lane_mod.select_lane(None, task["prompt"]) is lane_mod.Lane.FAST, (
+            task["id"]
+        )
+
+
+def test_given_the_boundary_probe_when_read_then_the_keyword_tier_catches_it(
+    store_pack, gate_keywords
+):
+    # R5's beat has to fire on every rehearsal, and the similarity tier is a
+    # live embedding call scored against a threshold — a network hiccup, and
+    # the gate's fail-closed behaviour still refuses, but the beat now depends
+    # on infrastructure. The keyword fast path is pure, so the one-tap probe
+    # is refused deterministically at zero cost, which is also what makes the
+    # Token meter's measured `0` (#24) true for this row every time.
+    probe = _boundary_probe(store_pack, gate_keywords)
+
+    assert gate_keywords.matches_personal_keyword(probe["prompt"])
+
+
+def test_given_the_boundary_probe_when_read_then_it_is_a_measured_probe(
+    store_pack, gate_keywords, guardrail_corpus
+):
+    # Not merely *a* personal question — one of the ten the Guardrail corpus
+    # measures R5's 10/10 acceptance criterion against. A rehearsed question
+    # the corpus has never scored is a beat whose behaviour is asserted
+    # nowhere, and the corpus is the only thing in this build that has run
+    # against the real embedding deployment.
+    probe = _boundary_probe(store_pack, gate_keywords)
+    measured = {
+        gate_keywords.normalise(text) for text in guardrail_corpus.POSITIVE_PROBES
+    }
+
+    assert gate_keywords.normalise(probe["prompt"]) in measured
+
+
+def test_given_the_other_quick_tasks_when_read_then_none_of_them_trips_the_gate(
+    store_pack, gate_keywords
+):
+    # The keyword fast path's requirement runs one way only: it may miss a
+    # personal question, but it may **never** trip on a store-level one. Five
+    # of the six taps are store-level, and a false positive here does not slow
+    # the demo down — it refuses the beat outright, with copy that says the
+    # assistant is store-scoped, which is the most convincing possible way to
+    # look broken.
+    probe = _boundary_probe(store_pack, gate_keywords)
+
+    for task in store_pack.starting_tasks:
+        if task["id"] == probe["id"]:
+            continue
+        assert not gate_keywords.matches_personal_keyword(task["prompt"]), task["id"]
+        assert not gate_keywords.matches_personal_keyword(task["name"]), task["id"]
+
+
+def test_given_the_honest_miss_task_when_read_then_it_is_the_corpus_own_question(
+    store_pack,
+):
+    # Read out of `content/sop/corpus.toml`, not restated. The corpus keeps its
+    # `absent_terms` out so this question stays a miss; a Quick Task that
+    # drifted a word away from it is a tap whose answer nobody guaranteed.
+    miss = pack_mod.honest_miss(REPO_ROOT)
+    prompts = {task["prompt"] for task in store_pack.starting_tasks}
+    names = {task["name"] for task in store_pack.starting_tasks}
+
+    assert miss["question"] in prompts
+    assert miss["quick_task"] in names
+
+
+def test_given_the_quick_tasks_when_read_then_exactly_one_is_the_honest_miss(
+    store_pack,
+):
+    # Two out-of-corpus taps is a library that looks thin; none is a beat the
+    # presenter has to type their way into.
+    absent = [term.lower() for term in pack_mod.honest_miss_absent_terms(REPO_ROOT)]
+    misses = [
+        task["id"]
+        for task in store_pack.starting_tasks
+        if any(term in task["prompt"].lower() for term in absent)
+    ]
+
+    assert len(misses) == 1, misses
+
+
+def test_given_the_opening_task_when_read_then_it_is_the_cross_platform_hop(
+    store_pack,
+):
+    # First, deliberately. The hop through Copilot Studio to Dataverse is the
+    # claim the whole demonstration exists to make, and the honest miss only
+    # reads as honesty once the audience has watched the same surface answer.
+    hit = pack_mod.rehearsed_hit(REPO_ROOT)
+    first = store_pack.starting_tasks[0]
+
+    assert first["prompt"] == hit["question"]
+    assert first["name"] == hit["quick_task"]
+
+
+def test_given_the_rehearsed_hit_when_read_then_its_document_answers_it(store_pack):
+    # The document exists (asserted above) *and* covers the question. A corpus
+    # holding an SOP-102 about something else entirely would keep this suite
+    # green while the opening tap came back as a miss.
+    hit = pack_mod.rehearsed_hit(REPO_ROOT)
+    document = pack_mod.sop_doc_ids(REPO_ROOT)[hit["doc_id"]].read_text(
+        encoding="utf-8"
+    ).lower()
+
+    for word in ("close", "closing", "store"):
+        assert word in document, word
+
+
+def test_given_the_troubleshooting_task_when_read_then_a_runbook_covers_it(
+    store_pack, runbooks
+):
+    # The equipment named in the one-tap fault report has to be the equipment
+    # a runbook branches on, or the multi-turn beat (#21) opens by admitting it
+    # has nothing to walk through.
+    prompts = " ".join(task["prompt"].lower() for task in store_pack.starting_tasks)
+    covered = [
+        doc.doc_id
+        for doc in runbooks
+        if sum(
+            1
+            for word in doc.path.stem.lower().split()
+            if len(word) > 3 and word in prompts
+        )
+        >= 2
+    ]
+
+    assert covered, "no runbook covers any equipment a Quick Task reports"
+
+
+def test_given_the_quick_tasks_when_read_then_each_carries_its_own_identifier(
+    store_pack,
+):
+    ids = [task["id"] for task in store_pack.starting_tasks]
+
+    assert len(set(ids)) == len(ids), ids
+    assert all(task_id.startswith("task-223-") for task_id in ids), ids

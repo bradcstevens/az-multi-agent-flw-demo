@@ -179,5 +179,6 @@ a live signal, which is why `SimulatedBadge` goes on them.
   created and the knowledge bases registered, not that retrieval returns.
 - The PowerShell entry point is asserted by reading the file. There is no pwsh
   in CI.
-- The two starting tasks are placeholders. #26 replaces them with the six Quick
-  Tasks.
+- The two placeholder starting tasks are gone: #26 replaced them with the six
+  Quick Tasks, one per beat of the walkthrough, recorded in
+  [docs/quick-tasks.md](quick-tasks.md).

@@ -6,6 +6,17 @@ banner = "Brightpath Convenience"
 store = "Store 223"
 locale = "en-US"
 
+[rehearsed_hit]
+# The mirror image of the honest miss, and the walkthrough's opening beat (issue #26). The
+# cross-platform hop is the demonstration's centrepiece, so the question the presenter taps first
+# must land on a document that exists. Named here rather than in the Quick Task alone, because the
+# task is authored in a different directory by a different tool: without this, deleting or renaming
+# the document below leaves a one-tap task whose answer is an honest miss, and the beat the whole
+# architecture claim rests on becomes the beat that says the library does not cover it.
+question = "How do I close the store?"
+quick_task = "Close the store"
+doc_id = "SOP-102"
+
 [honest_miss]
 # The rehearsed question the corpus deliberately does not answer, so the presenter can show an
 # honest miss on cue instead of stumbling into one. Keep every term below out of the corpus.

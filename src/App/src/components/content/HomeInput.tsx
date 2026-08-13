@@ -331,23 +331,21 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                 </div>
 
                 <div className="home-input-quick-tasks">
-                  <div>
-                    {tasksToDisplay.map((task) => (
-                      <PromptCard
-                        key={task.id}
-                        title={task.title}
-                        icon={task.icon}
-                        description={task.description}
-                        onClick={() => handleQuickTaskClick(task)}
-                        disabled={submitting}
-                        badge={
-                          isLane(task.lane) ? (
-                            <LaneBadge lane={task.lane} variant="declared" />
-                          ) : undefined
-                        }
-                      />
-                    ))}
-                  </div>
+                  {tasksToDisplay.map((task) => (
+                    <PromptCard
+                      key={task.id}
+                      title={task.title}
+                      icon={task.icon}
+                      description={task.description}
+                      onClick={() => handleQuickTaskClick(task)}
+                      disabled={submitting}
+                      badge={
+                        isLane(task.lane) ? (
+                          <LaneBadge lane={task.lane} variant="declared" />
+                        ) : undefined
+                      }
+                    />
+                  ))}
                 </div>
               </>
             )}
