@@ -26,6 +26,10 @@ class Domain(Enum):
     # Its own domain so a team definition can give an agent the store-procedure
     # tool without also handing it every other domain's tools.
     SOP = "sop"
+    # The memory of one shift — what an associate has already tried (#21).
+    # Its own domain for the same reason, and reached over HTTP because this
+    # container has no Cosmos access at all.
+    TROUBLESHOOTING = "troubleshooting"
 
 
 class MCPToolBase(ABC):

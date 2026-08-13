@@ -1011,6 +1011,12 @@ class OrchestrationManager:
                 request_id, answer[:120],
             )
 
+            # The associate's answer to *what have you already tried* is
+            # persisted where it is **received** (issue #21). Framework
+            # checkpoint state is in-memory and must not be relied on, and a
+            # model that is merely asked to remember will sometimes not.
+            answer = await self._remember_attempted_steps(user_id, answer)
+
             # Store the answer so the tool body can retrieve it after approval.
             # Store under request_id and also under a thread-local key that
             # the tool body uses as its primary lookup.
@@ -1023,6 +1029,66 @@ class OrchestrationManager:
             responses[request_id] = approval
 
         return responses
+
+    async def _troubleshooting_store(self, user_id: str):
+        """The attempted-steps store for the session this user has in flight.
+
+        Returns ``(store, session_id)``, or ``(None, None)`` when the session
+        cannot be resolved. The session is resolved **server-side** from the
+        note the request path left (``troubleshooting.turn``) rather than from
+        an identifier the model was asked to carry: a mis-copied one would
+        write this associate's attempted steps onto another associate's fault.
+        """
+        from common.database.database_factory import DatabaseFactory
+        from troubleshooting.store import TroubleshootingStore
+        from troubleshooting.turn import turn_for
+
+        session_id = turn_for(user_id)
+        if not session_id:
+            self.logger.info(
+                "[TROUBLESHOOTING] No session in flight for user '%s' — this "
+                "turn's attempted steps are not recorded",
+                user_id,
+            )
+            return None, None
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        return TroubleshootingStore(memory_store, user_id=user_id), session_id
+
+    async def _remember_attempted_steps(self, user_id: str, answer: str) -> str:
+        """Persist what the answer reports trying, and hand the record back.
+
+        Both halves ride this one seam deliberately. The **write** happens
+        here because this is where the associate's report actually arrives, so
+        it happens on every clarification turn rather than whenever a model
+        remembers to record it. The **read** rides back on the answer because
+        the tool body returns exactly what was stored, so the agent cannot
+        proceed without having been told what it must not repeat.
+
+        Failure is swallowed. The record is memory of one shift; the answer is
+        the associate's. An unreachable container costs a repeated step, and
+        raising here would cost the turn.
+        """
+        try:
+            from troubleshooting.steps import parse_attempted_steps
+
+            store, session_id = await self._troubleshooting_store(user_id)
+            if store is None:
+                return answer
+
+            steps = parse_attempted_steps(answer)
+            await store.record(session_id, steps)
+            self.logger.info(
+                "[TROUBLESHOOTING] Recorded %d attempted step(s) for session "
+                "'%s'", len(steps), session_id,
+            )
+            note = await store.note(session_id)
+            return f"{answer}\n\n{note}" if note else answer
+        except Exception as exc:
+            self.logger.warning(
+                "[TROUBLESHOOTING] Could not record the attempted steps for "
+                "user '%s': %s — the turn keeps its answer", user_id, exc,
+            )
+            return answer
 
     async def _emit_token_usage(
         self, executor_id: str, messages: list, user_id: str

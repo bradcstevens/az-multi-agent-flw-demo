@@ -274,6 +274,91 @@ def test_given_the_sop_tool_holder_when_read_then_it_has_no_foundry_knowledge_ba
 
 
 # ---------------------------------------------------------------------------
+# The memory of one shift (issue #21)
+# ---------------------------------------------------------------------------
+
+
+def test_given_the_roster_when_read_then_only_the_troubleshooter_holds_the_memory(
+    store_pack,
+):
+    # The record is the memory of *this fault*, and the agent that offers
+    # runbook steps is the one that must not offer a step twice. A second
+    # holder would record a step nobody attributed to a fault.
+    holders = [
+        agent["name"]
+        for agent in store_pack.agents
+        if agent.get("use_toolbox") and agent.get("toolbox_filter") == "troubleshooting"
+    ]
+    assert holders == ["TroubleshootingAgent"]
+
+
+def test_given_the_memory_holder_when_read_then_it_keeps_its_knowledge_base(
+    store_pack,
+):
+    # Deliberately unlike the SOP tool's holder, which has no knowledge base at
+    # all. That rule is about two *grounding* sources competing to answer one
+    # question — the branch not taken there is the cross-platform hop. The
+    # troubleshooting tools ground nothing: they answer "what has this
+    # associate already tried", which the runbook knowledge base cannot answer
+    # and which cannot answer an equipment question. There is no branch to take.
+    holder = store_pack.agent("TroubleshootingAgent")
+    assert holder["use_knowledge_base"] is True
+    assert holder["knowledge_base_name"]
+
+
+def test_given_the_memory_holder_when_read_then_it_can_still_ask_the_associate(
+    store_pack,
+):
+    # The clarification turn is where the record is written: the backend
+    # persists the answer at the seam it arrives on. An agent that cannot ask
+    # never produces one.
+    assert store_pack.agent("TroubleshootingAgent")["user_responses"] is True
+
+
+def test_given_the_troubleshooting_prompt_when_read_then_it_names_both_tools(
+    store_pack,
+):
+    # The tools are only reached if the agent is told to reach them, and the
+    # names have to be the ones the MCP container registers — a prompt naming a
+    # tool that does not exist is an agent that quietly answers from memory.
+    message = store_pack.agent("TroubleshootingAgent")["system_message"]
+    assert "list_attempted_steps" in message
+    assert "record_attempted_steps" in message
+
+
+def test_given_the_troubleshooting_prompt_when_read_then_it_offers_to_escalate(
+    store_pack,
+):
+    # The acceptance criterion in the agent's own words: when the runbook runs
+    # out, the next move is a ticket, not an invented repair step.
+    message = store_pack.agent("TroubleshootingAgent")["system_message"].lower()
+    assert "escalate" in message or "ticket" in message
+
+
+def test_given_the_troubleshooting_tools_when_named_then_the_container_registers_them(
+    store_pack,
+):
+    # Spans the seam between the authored prompt and the container that serves
+    # the tools. A rename on either side is an agent calling a tool that is not
+    # there, and the framework's answer to that is silence.
+    service = (
+        REPO_ROOT / "src" / "mcp_server" / "services" / "troubleshooting_service.py"
+    ).read_text(encoding="utf-8")
+    message = store_pack.agent("TroubleshootingAgent")["system_message"]
+
+    for tool in ("list_attempted_steps", "record_attempted_steps"):
+        assert f"async def {tool}(" in service, f"{tool} is not registered"
+        assert tool in message
+
+    domain = (
+        REPO_ROOT / "src" / "mcp_server" / "core" / "factory.py"
+    ).read_text(encoding="utf-8")
+    assert 'TROUBLESHOOTING = "troubleshooting"' in domain, (
+        "the roster's toolbox_filter names a domain the container does not serve"
+    )
+
+
+# ---------------------------------------------------------------------------
 # The authored content
 # ---------------------------------------------------------------------------
 

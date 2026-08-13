@@ -33,6 +33,9 @@ from sop.provenance import SOP_PLATFORM, SOP_SOURCE
 from transparency.alert import REHEARSED_ALERT, REHEARSED_ALERTS  # noqa: F401  (the rehearsed copy, asserted on in tests)
 from transparency.alert import presenter_alert as build_presenter_alert
 from transparency.source import source_used
+from troubleshooting.steps import parse_attempted_steps
+from troubleshooting.store import TroubleshootingStore
+from troubleshooting.turn import note_turn, sole_turn
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -381,6 +384,15 @@ async def process_request(
 
     if not input_task.session_id:
         input_task.session_id = str(uuid.uuid4())
+
+    # Which session this user's request in flight belongs to (issue #21). The
+    # MCP container calls back to the backend with no session of its own and
+    # the model has no session identifier in its instructions to pass one, so
+    # the backend resolves it from here rather than trusting a copied value —
+    # a mis-copied one writes this associate's attempted steps onto another's
+    # fault. Left above the plan so a tool call made anywhere in the turn can
+    # be attributed.
+    note_turn(user_id, input_task.session_id)
 
     # Attach session_id to current span for Application Insights
     span = trace.get_current_span()
@@ -1693,6 +1705,92 @@ async def patch_session_state(
         raise HTTPException(
             status_code=500, detail="Internal server error occurred"
         ) from e
+
+
+# ---------------------------------------------------------------------------
+# The troubleshooting record, reached by the MCP container (issue #21)
+#
+# The MCP container has **no Cosmos access at all** — no connection
+# configuration and no dependency — so it asks the backend over HTTP for the
+# record, the same pattern the clarification and SOP bridges use.
+#
+# Neither route takes a session or a user. Both resolve the turn in flight
+# server-side (``troubleshooting.turn``), the same refusal-to-guess
+# ``sole_user()`` applies to the transparency pushes: a session identifier
+# copied by a model would write one associate's attempted steps onto another
+# associate's fault, or read back steps nobody on this shift tried and skip a
+# real runbook branch. And neither route fails the agent's turn — the record is
+# the memory of one shift, and losing it costs a repeated step where raising
+# would cost the answer.
+# ---------------------------------------------------------------------------
+async def _troubleshooting_store():
+    """The store for the turn in flight, or ``(None, None)``."""
+    turn = sole_turn()
+    if turn is None:
+        return None, None
+    user_id, session_id = turn
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    return TroubleshootingStore(memory_store, user_id=user_id), session_id
+
+
+@app_router.get("/troubleshooting/attempted")
+async def get_attempted_steps():
+    """What the associate has already tried on the fault in flight.
+
+    Total: no turn in flight, an unreadable container and a session nobody has
+    written to all read back as an empty record, because the caller is about to
+    offer a runbook and the safe default is to offer all of it.
+    """
+    empty = {"session_id": None, "attempted": [], "equipment": None, "note": ""}
+    try:
+        store, session_id = await _troubleshooting_store()
+        if store is None:
+            return empty
+        record = await store.read(session_id)
+        return {
+            "session_id": session_id,
+            "attempted": record.attempted,
+            "equipment": record.equipment,
+            "note": TroubleshootingStore.note_for(record.attempted),
+        }
+    except Exception as e:
+        logger.warning("Could not read the troubleshooting record: %s", e)
+        return empty
+
+
+@app_router.post("/troubleshooting/attempted")
+async def record_attempted_steps(request: Request):
+    """Record what the associate reports having tried on the fault in flight.
+
+    ``steps`` arrives as the associate said it and is split into discrete steps
+    here rather than in the container, so the same parser decides "the same
+    step" wherever a report comes from. ``recorded`` reports honestly whether
+    anything was written — an agent told the write succeeded when it did not
+    would stop asking.
+    """
+    body = await request.json()
+    steps = body.get("steps") if isinstance(body, dict) else None
+    equipment = body.get("equipment") if isinstance(body, dict) else None
+    if isinstance(steps, list):
+        parsed = []
+        for item in steps:
+            parsed.extend(parse_attempted_steps(item))
+    else:
+        parsed = parse_attempted_steps(steps)
+
+    try:
+        store, session_id = await _troubleshooting_store()
+        if store is None:
+            return {"recorded": False, "attempted": [], "note": ""}
+        record = await store.record(session_id, parsed, equipment=equipment)
+        return {
+            "recorded": True,
+            "attempted": record.attempted,
+            "note": TroubleshootingStore.note_for(record.attempted),
+        }
+    except Exception as e:
+        logger.warning("Could not record the attempted steps: %s", e)
+        return {"recorded": False, "attempted": [], "note": ""}
 
 
 # Get plans is called in the initial side rendering of the frontend

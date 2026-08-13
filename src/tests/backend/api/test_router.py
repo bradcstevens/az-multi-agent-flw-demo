@@ -1496,3 +1496,139 @@ class TestPresenterAlert:
         source = inspect.getsource(router_mod.presenter_alert)
         for forbidden in ("sleep", "Timer", "call_later", "time()"):
             assert forbidden not in source
+
+
+# ---------------------------------------------------------------------------
+# /troubleshooting/attempted — the bridge the MCP container calls back on
+# (issue #21)
+# ---------------------------------------------------------------------------
+class TestAttemptedSteps:
+    """The MCP container has no Cosmos access at all — no connection
+    configuration and no dependency — so it reaches the troubleshooting record
+    the same way it reaches everything else it cannot do itself: over HTTP,
+    against the backend URL already configured for it.
+
+    Nothing on the wire names a session. The bridge resolves it from the note
+    the request path left, the same refusal-to-guess ``sole_user()`` applies to
+    the transparency pushes: a session identifier copied by a model would write
+    one associate's attempted steps onto another associate's fault.
+    """
+
+    @staticmethod
+    def _turn(name):
+        """A function out of the turn module *the router actually holds*.
+
+        ``_import_router`` restores ``sys.modules`` after importing the router,
+        so a plain ``import troubleshooting.turn`` here would build a second
+        module object with its own, empty, notes — and every assertion below
+        would pass against notes the route never reads. The router's own
+        function keeps its module namespace alive; that namespace is the one
+        under test.
+        """
+        return router_mod.sole_turn.__globals__[name]
+
+    @pytest.fixture(autouse=True)
+    def _clean_turns(self):
+        self._turn("forget_turns")()
+        yield
+        self._turn("forget_turns")()
+
+    def _in_flight(self, rt, session_id="sess-1", user_id="user-1"):
+        self._turn("note_turn")(user_id, session_id)
+
+    def _record(self, rt, **body):
+        return rt.client.post("/api/v4/troubleshooting/attempted", json=body)
+
+    def _read(self, rt):
+        return rt.client.get("/api/v4/troubleshooting/attempted")
+
+    def test_a_request_records_the_session_it_belongs_to(self, rt):
+        """The note is left by the request path itself, so the bridge never has
+        to be told which fault it is looking at."""
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.client.post(
+            "/api/v4/process_request",
+            json={"session_id": "sess-9", "description": "the brewer is down"},
+        )
+
+        assert self._read(rt).json()["session_id"] == "sess-9"
+
+    def test_what_the_tool_reports_reaches_the_container(self, rt):
+        self._in_flight(rt)
+
+        assert self._record(rt, steps="I power cycled the brewer").status_code == 200
+
+        assert self._read(rt).json()["attempted"] == ["power cycled the brewer"]
+
+    def test_a_later_turn_reads_back_what_an_earlier_one_recorded(self, rt):
+        """The whole requirement, observed through the bridge: the record
+        outlives the turn that wrote it."""
+        self._in_flight(rt)
+        self._record(rt, steps="I power cycled the brewer")
+
+        self._record(rt, steps="I checked the water line")
+
+        assert self._read(rt).json()["attempted"] == [
+            "power cycled the brewer",
+            "checked the water line",
+        ]
+
+    def test_the_read_carries_the_note_that_forbids_repeating_a_step(self, rt):
+        self._in_flight(rt)
+        self._record(rt, steps="I power cycled the brewer")
+
+        note = self._read(rt).json()["note"]
+
+        assert "power cycled the brewer" in note
+        assert "do not" in note.lower()
+
+    def test_the_equipment_is_carried_for_the_ticket_that_follows(self, rt):
+        self._in_flight(rt)
+
+        self._record(rt, steps="", equipment="coffee brewer, left head")
+
+        assert self._read(rt).json()["equipment"] == "coffee brewer, left head"
+
+    def test_the_record_is_discriminated_by_its_own_data_type(self, rt):
+        """One new enumeration member and one new model, in the schemaless
+        container the other records already live in — no migration."""
+        self._in_flight(rt)
+        self._record(rt, steps="I power cycled the brewer")
+
+        document = next(
+            d for d in rt.session_documents.values()
+            if d["data_type"] == "troubleshooting"
+        )
+        assert document["session_id"] == "sess-1"
+
+    def test_no_session_in_flight_reports_nothing_rather_than_guessing(self, rt):
+        assert self._read(rt).json()["attempted"] == []
+        assert self._read(rt).json()["note"] == ""
+
+    def test_a_write_with_no_session_in_flight_is_accepted_and_records_nothing(
+        self, rt
+    ):
+        """A tool call that cannot be attributed must not fail the agent's
+        turn — it reports that nothing was recorded and the agent carries on."""
+        response = self._record(rt, steps="I power cycled the brewer")
+
+        assert response.status_code == 200
+        assert response.json()["recorded"] is False
+
+    def test_two_users_in_flight_refuses_to_pick_one(self, rt):
+        """Exactly one or nothing, never a choice between two."""
+        self._in_flight(rt, "sess-1", "user-1")
+        self._in_flight(rt, "sess-2", "user-2")
+
+        assert self._record(rt, steps="I power cycled it").json()["recorded"] is False
+        assert self._read(rt).json()["attempted"] == []
+
+    def test_an_unreachable_container_does_not_fail_the_agents_turn(self, rt):
+        """The record is memory of one shift. Losing it costs a repeated step;
+        raising at the agent costs the answer."""
+        self._in_flight(rt)
+        rt.database_factory.get_database = AsyncMock(side_effect=Exception("boom"))
+
+        assert self._record(rt, steps="I power cycled it").status_code == 200
+        assert self._read(rt).status_code == 200
+        assert self._read(rt).json()["attempted"] == []

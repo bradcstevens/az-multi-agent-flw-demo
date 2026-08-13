@@ -63,3 +63,19 @@ class BackendClient:
         response = await self._request("POST", path, json=payload, timeout=timeout)
         response.raise_for_status()
         return response.json()
+
+    async def get_json(
+        self,
+        path: str,
+        *,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """GET `path` and return the decoded body, raising on an error status.
+
+        The read half of the troubleshooting bridge (#21). A GET because the
+        request carries nothing: the backend resolves which session the turn in
+        flight belongs to, so there is no body for the container to send.
+        """
+        response = await self._request("GET", path, timeout=timeout)
+        response.raise_for_status()
+        return response.json()

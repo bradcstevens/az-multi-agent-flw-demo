@@ -7,6 +7,7 @@ Tests OrchestrationManager:
 - _process_event_stream() — event dispatch
 """
 
+import json
 import logging
 import os
 import sys
@@ -247,6 +248,7 @@ class MockWebsocketMessageType:
     PLAN_APPROVAL_RESPONSE = "plan_approval_response"
     AGENT_MESSAGE_STREAMING = "agent_message_streaming"
     TOKEN_USAGE = "token_usage"
+    USER_CLARIFICATION_REQUEST = "user_clarification_request"
 
 
 class MockAgentMessageStreaming:
@@ -1302,3 +1304,152 @@ class TestAttributionWithoutAPlan:
         ]
         assert headers, "no agent header was sent"
         assert "Shift Tasks Agent" in headers[0].content
+
+
+# ---------------------------------------------------------------------------
+# Attempted-steps memory at the clarification seam (issue #21)
+# ---------------------------------------------------------------------------
+class MockToolApproval:
+    """A pending ``request_user_clarification`` approval, as the framework
+    hands it over: a function call whose arguments carry the questions."""
+
+    def __init__(self, questions="What have you already tried?"):
+        self.function_call = Mock()
+        self.function_call.name = "request_user_clarification"
+        self.function_call.arguments = json.dumps({"questions": questions})
+        self.approved = None
+
+    def to_function_approval_response(self, approved=True):
+        self.approved = approved
+        return Mock(approved=approved)
+
+
+class FakeTroubleshootingStore:
+    """The store's seam, in a list. Records what was persisted and what note
+    was handed back, without a container."""
+
+    def __init__(self, attempted=None, note=""):
+        self.attempted = list(attempted or [])
+        self.recorded = []
+        self._note = note
+
+    async def record(self, session_id, steps, equipment=None):
+        self.recorded.append((session_id, list(steps)))
+        self.attempted.extend(steps)
+        return Mock(attempted=self.attempted)
+
+    async def note(self, session_id):
+        return self._note
+
+
+class TestAttemptedStepsMemory:
+    """The associate's answer to *what have you already tried* is persisted
+    where it is **received**, not where a model remembers to record it.
+
+    ``_handle_tool_approvals`` is that place: the manager already intercepts
+    the answer there before approving the tool, so the record is written on
+    every clarification turn whether or not the agent calls anything. The same
+    seam hands the record back — the tool body returns exactly what was stored,
+    so the agent cannot miss it.
+    """
+
+    def setup_method(self):
+        connection_config.send_status_update_async.reset_mock()
+        orchestration_config.set_clarification_pending.reset_mock()
+
+    async def _approve(self, answer, store, session="s-1"):
+        from tools.clarification_tool import _pending_answers
+
+        _pending_answers.clear()
+        orchestration_config.wait_for_clarification = AsyncMock(return_value=answer)
+        manager = OrchestrationManager()
+        with patch.object(
+            OrchestrationManager, "_troubleshooting_store",
+            AsyncMock(return_value=(store, session) if store else (None, None)),
+        ):
+            await manager._handle_tool_approvals(
+                {"req-1": MockToolApproval()}, user_id="user-1"
+            )
+        return dict(_pending_answers)
+
+    @pytest.mark.asyncio
+    async def test_what_the_associate_says_they_tried_is_persisted(self):
+        store = FakeTroubleshootingStore()
+
+        await self._approve("I power cycled it and I checked the water line", store)
+
+        assert store.recorded == [
+            ("s-1", ["power cycled it", "checked the water line"])
+        ]
+
+    @pytest.mark.asyncio
+    async def test_the_record_rides_back_to_the_agent_on_its_own_answer(self):
+        """Not fetched by the agent: the tool body returns what was stored
+        here, so a turn cannot proceed without having been told."""
+        store = FakeTroubleshootingStore(
+            note="Do NOT walk them through these again:\n- Power cycled the brewer"
+        )
+
+        stored = await self._approve("I checked the water line", store)
+
+        assert any("Power cycled the brewer" in value for value in stored.values())
+
+    @pytest.mark.asyncio
+    async def test_the_associates_own_answer_is_still_what_the_agent_reads(self):
+        """The note is added to the answer, never instead of it."""
+        store = FakeTroubleshootingStore(note="- Power cycled the brewer")
+
+        stored = await self._approve("I checked the water line", store)
+
+        assert all("checked the water line" in value for value in stored.values())
+
+    @pytest.mark.asyncio
+    async def test_an_answer_reporting_nothing_records_no_step(self):
+        """'Nothing yet' is a reply to the question, not a step. A recorded
+        empty step would skip the whole runbook."""
+        store = FakeTroubleshootingStore()
+
+        await self._approve("nothing yet", store)
+
+        assert store.recorded == [("s-1", [])]
+
+    @pytest.mark.asyncio
+    async def test_no_session_in_flight_leaves_the_answer_exactly_as_given(self):
+        """The memory is resolved server-side and refuses to guess. When it
+        cannot, the turn still gets its answer."""
+        stored = await self._approve("I power cycled it", None)
+
+        assert set(stored.values()) == {"I power cycled it"}
+
+    @pytest.mark.asyncio
+    async def test_a_store_that_raises_does_not_cost_the_turn_its_answer(self):
+        """The record is memory of one shift; the answer is the associate's.
+        An unreachable container costs a repeated step, never the turn."""
+
+        class Broken:
+            async def record(self, *_args, **_kwargs):
+                raise RuntimeError("cosmos is down")
+
+            async def note(self, *_args, **_kwargs):
+                raise RuntimeError("cosmos is down")
+
+        stored = await self._approve("I power cycled it", Broken())
+
+        assert set(stored.values()) == {"I power cycled it"}
+
+    @pytest.mark.asyncio
+    async def test_the_tool_call_is_still_approved(self):
+        """Everything above rides an existing seam and none of it may change
+        what that seam was for."""
+        approval = MockToolApproval()
+        orchestration_config.wait_for_clarification = AsyncMock(return_value="nothing")
+        with patch.object(
+            OrchestrationManager, "_troubleshooting_store",
+            AsyncMock(return_value=(FakeTroubleshootingStore(), "s-1")),
+        ):
+            responses = await OrchestrationManager()._handle_tool_approvals(
+                {"req-1": approval}, user_id="user-1"
+            )
+
+        assert approval.approved is True
+        assert set(responses) == {"req-1"}

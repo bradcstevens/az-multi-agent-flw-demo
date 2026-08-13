@@ -47,3 +47,50 @@ def test_the_domain_the_allowlist_is_keyed_by_is_a_domain_the_server_mounts():
     procedure question.
     """
     assert 'SOP = "sop"' in FACTORY.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# The same agreement, for the attempted-steps memory (issue #21)
+# ---------------------------------------------------------------------------
+TROUBLESHOOTING_SERVICE = (
+    REPO_ROOT / "src" / "mcp_server" / "services" / "troubleshooting_service.py"
+)
+
+
+def _allowlisted_troubleshooting_tools() -> list[str]:
+    block = re.search(
+        r'"troubleshooting":\s*\[(.*?)\]',
+        MCP_CONFIG.read_text(encoding="utf-8"),
+        re.S,
+    )
+    assert block, "the troubleshooting domain has no entry in DOMAIN_ALLOWED_TOOLS"
+    return re.findall(r'"([^"]+)"', block.group(1))
+
+
+def _registered_troubleshooting_tools() -> list[str]:
+    source = TROUBLESHOOTING_SERVICE.read_text(encoding="utf-8")
+    return re.findall(r"async def (\w+)\(", source)
+
+
+def test_the_allowlisted_memory_tools_are_the_ones_the_container_registers():
+    assert sorted(_allowlisted_troubleshooting_tools()) == sorted(
+        _registered_troubleshooting_tools()
+    )
+
+
+def test_the_memory_domain_is_one_the_server_mounts():
+    assert 'TROUBLESHOOTING = "troubleshooting"' in FACTORY.read_text(encoding="utf-8")
+
+
+def test_the_memory_allowlist_does_not_readmit_the_retired_proxy_tool():
+    """``ask_user`` is registered on **every** domain server as a shared
+    service, and it still asks a model to copy ``SESSION_USER_ID`` out of its
+    instructions — a line nothing injects any more, since the approval-gated
+    ``request_user_clarification`` replaced the proxy-agent approach. An empty
+    allowlist is no filter at all, so the troubleshooting agent would be handed
+    a tool that cannot work beside the clarification tool that does.
+    """
+    assert "ask_user" not in _allowlisted_troubleshooting_tools()
+    assert _allowlisted_troubleshooting_tools(), (
+        "an empty allowlist applies no filter — every shared tool comes through"
+    )

@@ -294,6 +294,66 @@ the deployment after upload; both post-deploy entry points run it.
 The pack, the roster and that check are recorded in
 [docs/store-content-pack.md](docs/store-content-pack.md).
 
+## Memory of one shift
+
+**Attempted step** — something an associate has reported already trying on the fault in front of
+them. Read out of what they typed by `troubleshooting.steps`, which is pure and no I/O like
+`lane.keywords`, because *never walk them through the same failed step twice* is only mechanical if
+"the same step" is something code can decide. Its requirement runs **one way only**, like the **Lane
+keyword fallback**'s: it may miss and offer a step already tried — the associate says so again and
+the record grows — but it may never claim a step was attempted that was not, because that step is
+then silently skipped and the equipment stays broken. Hence containment on a single shared word is
+refused, a denial records nothing, and the words the clarification path substitutes on a timeout
+record nothing either.
+_Avoid_: tried step, history, checkpoint state
+
+**Troubleshooting record** — one session's attempted steps, and what broke, held in the Cosmos
+memory container (`src/backend/troubleshooting/store.py`). Framework checkpoint state is in-memory
+and must not be relied on, so this is persisted **explicitly**. An ordinary document like the
+**Session state** beside it: partitioned by session, discriminated by `data_type`, reached through
+the generic CRUD, so it cost one `DataType` member and one model and **no migration**. Two
+invariants, both inherited from that sibling: a read is **total** (a session nobody has written to
+reads back as *nothing tried*, which offers the whole runbook) and a write is a **merge** (the steps
+a first turn recorded are exactly the ones a later turn must not repeat). Every method swallows
+failure — the record is memory of one shift and the answer is the associate's, so an unreachable
+container costs a repeated step where raising would cost the turn.
+
+**The clarification seam** — `OrchestrationManager._handle_tool_approvals`, where the manager already
+intercepts the associate's answer before approving `request_user_clarification`. Both halves of the
+memory ride it: the **write**, because that is where the report actually arrives, so it happens on
+every clarification turn rather than whenever a model remembers; and the **read**, because the tool
+body returns exactly what was stored, so an agent cannot proceed without having been told what it
+must not repeat. Fetching would have been a tool call the model could skip.
+
+**Current turn** — the process-local note of which session a user's request in flight belongs to
+(`troubleshooting.turn`), left by `process_request` and read by the troubleshooting bridge. Nothing
+on the wire between the MCP container and the backend names a session or a user: `ask_user`'s pattern
+has a model copying a UUID out of its instructions, and a mis-copy here writes one associate's
+attempted steps onto another's fault. `sole_turn()` applies **the same rule as `sole_user()`** —
+exactly one, or nothing, never a choice between two — which is the third of #21's three named
+constraints, stated out loud rather than engineered around. A note expires after
+`TURN_TTL_SECONDS`, longer than the 300-second clarification wait a turn can contain, because
+without an expiry one stray second user would leave `sole_turn` refusing for the rest of the
+process's life.
+
+**Troubleshooting tools** — `list_attempted_steps` and `record_attempted_steps`, on their own
+`troubleshooting` MCP domain, held by `TroubleshootingAgent` alone. The MCP container has **no Cosmos
+access at all** — no connection configuration and no dependency — so they reach the record over HTTP
+through `BackendClient`, the pattern the **SOP tool** and the clarification bridge already use.
+`TroubleshootingAgent` therefore holds a Foundry knowledge base **and** a toolbox, which the SOP
+tool's holder deliberately does not: that rule is about two *grounding* sources competing to answer
+one question, and these tools ground nothing — they answer *what has this associate already tried*,
+which the runbook knowledge base cannot answer and which cannot answer an equipment question. There
+is no branch to take.
+
+**Escalation due** — three or more distinct attempted steps, at which point the note the agent reads
+asks it to offer a service ticket. A property of the record rather than of the model's mood; below
+the threshold, offering a ticket reads as the assistant giving up after one try. #22 picks the
+record up from there — `TKT-001`'s attempted-steps field is this list, in the associate's own words,
+never re-typed.
+
+Recorded in [docs/troubleshooting-memory.md](docs/troubleshooting-memory.md).
+
 ## Surfaces
 
 **Store surface** — the branded chat surface the presenter opens: the **Circle K Frontline Store

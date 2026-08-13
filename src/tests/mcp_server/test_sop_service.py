@@ -63,6 +63,17 @@ class TestBackendClient:
             == "https://backend.example.com/api/v4/x"
         )
 
+    @pytest.mark.asyncio
+    async def test_it_can_read_as_well_as_write(self):
+        """The troubleshooting record's read half (#21) carries no body: the
+        backend resolves which session the turn belongs to, so there is nothing
+        for the container to send."""
+        backend = client_with({"attempted": []})
+
+        assert await backend.get_json("/api/v4/x") == {"attempted": []}
+        assert backend._request.await_args.args == ("GET", "/api/v4/x")
+        assert backend._request.await_args.kwargs.get("json") is None
+
 
 class TestSopService:
     def test_the_sop_agent_has_its_own_domain(self):

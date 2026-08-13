@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 class DataType(str, Enum):
     session = "session"
     session_state = "session_state"
+    troubleshooting = "troubleshooting"
     plan = "plan"
     step = "step"
     agent_message = "agent_message"
@@ -137,6 +138,31 @@ class SessionState(BaseDataModel):
     # because it is the router's output and a reloaded plan page cannot
     # re-derive it: re-deriving would be a second router.
     lane: Optional[str] = None
+
+
+class TroubleshootingRecord(BaseDataModel):
+    """What one associate has already tried on this fault (issue #21).
+
+    Framework checkpoint state is in-memory and must not be relied on, so the
+    steps an associate reports trying are persisted here, explicitly. Like the
+    session state beside it this is an ordinary document in the schemaless
+    memory container — partitioned by ``session_id``, discriminated by
+    ``data_type``, reached through the generic CRUD — so it cost one
+    enumeration member and this one model and **no migration**. Its ``id`` is
+    derived from the session (``troubleshooting.store.troubleshooting_record_id``)
+    rather than a fresh uuid, which makes a read a point read and a second write
+    replace the first.
+    """
+    data_type: Literal[DataType.troubleshooting] = DataType.troubleshooting
+    # Who the record belongs to. Scoped like every other record in the
+    # container: one associate's fault is not another's.
+    user_id: Optional[str] = None
+    # The associate's own words, first wording kept, in the order reported —
+    # they are what #22's ticket quotes back rather than asking again.
+    attempted: List[str] = Field(default_factory=list)
+    # What broke. Carried because the turn that reports a step is rarely the
+    # turn that named the equipment, and the ticket needs both.
+    equipment: Optional[str] = None
 
 
 class UserCurrentTeam(BaseDataModel):

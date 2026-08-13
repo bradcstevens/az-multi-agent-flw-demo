@@ -55,6 +55,17 @@ DOMAIN_ALLOWED_TOOLS: dict[str, list[str]] = {
     "sop": [
         "search_store_procedures",
     ],
+    # The memory of one shift — what an associate has already tried (#21).
+    # Named explicitly rather than left empty: an empty allowlist applies no
+    # filter, and every domain server also carries the shared ``ask_user``,
+    # which still asks a model to copy a ``SESSION_USER_ID`` line that nothing
+    # injects since the approval-gated clarification tool replaced the proxy
+    # agent. The troubleshooting agent already has that tool; it must not also
+    # be offered the one that cannot work.
+    "troubleshooting": [
+        "list_attempted_steps",
+        "record_attempted_steps",
+    ],
 }
 
 
