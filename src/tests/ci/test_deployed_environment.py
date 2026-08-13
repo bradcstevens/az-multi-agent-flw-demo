@@ -24,6 +24,7 @@ from preflight.deployed_environment import (
     project_endpoint,
     reachability_check,
     retrieval_check,
+    retrieval_topics,
     search_endpoint,
     summarise_retrieval,
 )
@@ -47,7 +48,7 @@ EXPECTED = Expected(
 _DEFAULT = object()
 
 
-def knowledge_base(name, source=None, index=_DEFAULT, documents=1):
+def knowledge_base(name, source=None, index=_DEFAULT, documents=1, sample=_DEFAULT):
     stem = name[: -len("-kb")] if name.endswith("-kb") else name
     return {
         "name": name,
@@ -56,6 +57,7 @@ def knowledge_base(name, source=None, index=_DEFAULT, documents=1):
                 "name": source or f"{stem}-ks",
                 "index": f"{stem}-index" if index is _DEFAULT else index,
                 "documents": documents,
+                "sample": f"{stem} sample document" if sample is _DEFAULT else sample,
             }
         ],
     }
@@ -866,9 +868,9 @@ def test_given_probe_is_the_default_when_main_runs_then_the_knowledge_bases_prob
 ):
     asked = {}
 
-    def retrieve(project, search_endpoint, knowledge_bases):
-        asked["kbs"] = knowledge_bases
-        return {name: grounded() for name in knowledge_bases}
+    def retrieve(project, search_endpoint, topics):
+        asked["topics"] = topics
+        return {name: grounded() for name in topics}
 
     exit_code = main(
         argv=[],
@@ -878,8 +880,32 @@ def test_given_probe_is_the_default_when_main_runs_then_the_knowledge_bases_prob
     )
 
     assert exit_code == 0
-    assert "store-troubleshooting-kb" in asked["kbs"]
+    assert "store-troubleshooting-kb" in asked["topics"]
     assert "PASS  knowledge-base-retrieval" in capsys.readouterr().out
+
+
+def test_retrieval_topics_asks_about_a_document_the_corpus_actually_holds():
+    """An open question leaves the model to invent search terms, and an
+    invented term matches nothing often enough to fail a healthy deployment.
+    The question is derived from a title the read already found instead."""
+    topics = retrieval_topics(deployment()["knowledgeBases"], EXPECTED)
+
+    assert topics["store-troubleshooting-kb"] == "store-troubleshooting sample document"
+    assert topics["store-operations-kb"] == "store-operations sample document"
+
+
+def test_retrieval_topics_still_names_a_knowledge_base_it_found_nothing_for():
+    """A knowledge base with no title to offer has already failed
+    `knowledge-bases`. The probe must still run against it rather than skip it,
+    because a skipped probe would leave the retrieval check passing."""
+    topics = retrieval_topics(
+        [knowledge_base("store-troubleshooting-kb", sample=None)], EXPECTED
+    )
+
+    assert topics == {
+        "store-troubleshooting-kb": None,
+        "store-operations-kb": None,
+    }
 
 
 def test_given_an_agent_that_answers_ungrounded_when_main_runs_then_it_exits_nonzero(
@@ -889,8 +915,8 @@ def test_given_an_agent_that_answers_ungrounded_when_main_runs_then_it_exits_non
         argv=[],
         read=lambda *_: deployment(),
         probe=lambda foundry, models: {name: 200 for name in models},
-        retrieve=lambda project, endpoint, kbs: {
-            name: grounded(called=False, retrieved=0) for name in kbs
+        retrieve=lambda project, endpoint, topics: {
+            name: grounded(called=False, retrieved=0) for name in topics
         },
     )
 

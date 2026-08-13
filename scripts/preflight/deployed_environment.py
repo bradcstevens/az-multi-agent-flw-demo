@@ -732,6 +732,7 @@ def read_knowledge_bases(search_endpoint):
         index.get("name") for index in (_search_get(search_endpoint, "indexes") or [])
     }
     counts = {}
+    samples = {}
     observed = []
     for base in bases:
         resolved = []
@@ -739,12 +740,13 @@ def read_knowledge_bases(search_endpoint):
             name = reference.get("name")
             index = sources.get(name)
             if index and index not in counts:
-                counts[index] = _index_document_count(search_endpoint, index)
+                counts[index], samples[index] = _index_sample(search_endpoint, index)
             resolved.append(
                 {
                     "name": name,
                     "index": index if index in indexes else None,
                     "documents": counts.get(index, 0),
+                    "sample": samples.get(index),
                 }
             )
         observed.append({"name": base.get("name"), "sources": resolved})
@@ -762,21 +764,25 @@ def _search_get(search_endpoint, collection):
     )
 
 
-def _index_document_count(search_endpoint, index):
-    """Return how many documents an index holds.
+def _index_sample(search_endpoint, index):
+    """Return (document count, one document title) for an index.
 
-    `$count` answers `text/plain`, which `az rest` will not parse, so the count
-    is asked for as part of an empty search instead.
+    One read answers both, because the same empty search that counts an index
+    can return a document from it. `$count` would answer `text/plain`, which
+    `az rest` will not parse, so the count is asked for as part of the search
+    rather than on its own path.
     """
-    return _az(
+    result = _az(
         "rest", "--method", "POST",
         "--resource", SEARCH_SCOPE,
         "--url",
         f"{search_endpoint}/indexes/{index}/docs/search"
         f"?api-version={SEARCH_API_VERSION}",
-        "--body", json.dumps({"search": "*", "count": True, "top": 0}),
-        "--query", '"@odata.count"',
-    ) or 0
+        "--body",
+        json.dumps({"search": "*", "count": True, "top": 1, "select": "title"}),
+    ) or {}
+    documents = result.get("value") or []
+    return result.get("@odata.count") or 0, (documents[0].get("title") if documents else None)
 
 
 def read_kb_connections(project_id):
@@ -851,7 +857,7 @@ def _access_token(resource):
     ).stdout.strip()
 
 
-def probe_knowledge_bases(project_endpoint, search_endpoint, knowledge_bases):
+def probe_knowledge_bases(project_endpoint, search_endpoint, topics):
     """Run one real agent against each knowledge base; return {name: probe}.
 
     This is the end-to-end fact and nothing smaller stands in for it. The agent
@@ -861,10 +867,9 @@ def probe_knowledge_bases(project_endpoint, search_endpoint, knowledge_bases):
     per-KB RemoteTool connection. Every link in ADR-008's split-region topology
     is exercised by one request, and a failure anywhere in it shows up here.
 
-    The prompt asks for a quotation rather than a fact from any particular
-    corpus, so the probe is not coupled to which content pack is installed —
-    what is being proven is that retrieval happened, and `summarise_retrieval`
-    reads that off the run rather than off the prose.
+    `topics` maps each knowledge base to the title of a document that is in it,
+    so the question names something real rather than leaving the model to
+    invent search terms — see `retrieval_topics`.
     """
     import urllib.error
     import urllib.request
@@ -872,17 +877,19 @@ def probe_knowledge_bases(project_endpoint, search_endpoint, knowledge_bases):
     token = _access_token("https://ai.azure.com")
 
     probes = {}
-    for name in knowledge_bases:
+    for name, topic in topics.items():
+        question = (
+            f'What does the document titled "{topic}" say? Quote one line from it.'
+            if topic
+            else "Name one document in this knowledge base and quote a line from it."
+        )
         body = {
             "model": "gpt-5.4-mini",
             "instructions": (
                 "Answer only from the attached knowledge base. Never answer "
                 "from your own knowledge."
             ),
-            "input": (
-                "Name one document in this knowledge base and quote a single "
-                "line from it."
-            ),
+            "input": question,
             "tools": [
                 {
                     "type": "mcp",
@@ -985,7 +992,11 @@ def main(argv=None, read=None, probe=None, retrieve=None):
         # `own-foundry-project` already report why.
         verdict.checks.append(
             retrieval_check(
-                retriever(project, search, expected.knowledge_bases)
+                retriever(
+                    project,
+                    search,
+                    retrieval_topics(observed.get("knowledgeBases"), expected),
+                )
                 if project and search
                 else {}
             )
