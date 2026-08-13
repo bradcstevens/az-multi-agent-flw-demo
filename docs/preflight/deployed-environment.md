@@ -33,6 +33,12 @@ unless the knowledge bases resolve.
 Observed 2026-08-13, all thirteen green, with `text-embedding-3-small` returning 1536 dimensions and
 both store knowledge bases returning grounded, cited documents.
 
+The consequence line the check prints — `feature work (#13, #14, #19, #20)` — names the tickets
+whose **preconditions** these checks prove, not tickets this check finishes. #19 is on that list
+because its store assistant is grounded in the two knowledge bases above and had nothing to retrieve
+until they were seeded; whether its orchestration answers end to end through the deployed surface is
+a different fact, and is **not** verified here. See *Scope*.
+
 ## Ten checks passed against an empty Search service
 
 This is the finding that justifies the three checks #30 added, and it is uncomfortable: on
@@ -135,9 +141,15 @@ That is RB-201's Branch B, quoted from the indexed document with a citation — 
 in this deployment only because it was indexed into Central US, reached from East US 2. The split
 region topology works.
 
-The probe's prompt asks for *any* document and a quoted line rather than for a fact from a
-particular corpus, so `--knowledge-base` can point the check at a different content pack's knowledge
-bases without rewriting the question. What is being proven is that retrieval happened.
+The probe's question is **derived from the corpus that is there**, not hard-coded and not open-ended.
+The first version asked openly — *name one document in this knowledge base and quote a line from
+it* — and failed intermittently against a completely healthy deployment, because an open question
+leaves the model to invent the search terms and an invented term (`"runbook document sample line"`)
+sometimes matches nothing. A probe that fails when nothing is wrong is worse than no probe. So the
+read that counts an index also returns one document **title** from it, and the question names that
+title. That stays independent of which content pack is installed — `--knowledge-base` points the
+check at another pack's knowledge bases without rewriting the question — while asking about
+something that certainly exists.
 
 ## The MCP Container App is the head of the chain, and the placeholder image cannot satisfy it
 

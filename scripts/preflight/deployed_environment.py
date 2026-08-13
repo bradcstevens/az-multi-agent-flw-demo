@@ -6,7 +6,7 @@ leans on — the embedding deployment the Identity boundary gate needs is presen
 and finished, Azure AI Search provisioned in its own region, the application
 hosts run exactly one replica, and nothing anywhere fell back to key auth. #30
 added the one that closes the loop: an agent in the primary region resolves a
-Foundry IQ knowledge base served by that out-of-region Search service. Those
+Foundry IQ Knowledge Base served by that out-of-region Search service. Those
 are point-in-time facts about a subscription, so they are recorded as a
 preflight and re-checked rather than re-derived; see
 docs/preflight/deployed-environment.md.
@@ -381,8 +381,8 @@ def _knowledge_bases_check(knowledge_bases, expected):
     `search-service` proves the service is in the right region on the right
     tier and keyless. It does not prove anything is *on* it — the service
     passed all of that while holding zero indexes, zero knowledge sources and
-    zero knowledge bases, which is the state that made the Foundry IQ path
-    (ADR-007) unusable without failing a single check.
+    zero knowledge bases, which is the state that made the Foundry IQ Knowledge
+    Base path (ADR-007) unusable without failing a single check.
 
     The chain is KB → knowledge source → index → documents, and every link
     breaks quietly: `PUT /knowledgebases/{kb}` accepts an empty source list, a
