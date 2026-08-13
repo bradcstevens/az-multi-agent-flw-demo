@@ -538,6 +538,23 @@ probe from the **Guardrail corpus**' measured `POSITIVE_PROBES`.
 
 Recorded in [docs/quick-tasks.md](docs/quick-tasks.md).
 
+**Rehearsed reply** — a one-tap answer to a **Clarification**, authored on the **Quick Task** that
+provokes one (`StartingTask.rehearsed_replies`, #26). Only the troubleshooting beat asks a question
+back — `TroubleshootingAgent` is instructed to ask what has already been tried — and answering it
+was the last place in the walkthrough the presenter had to type. A tap submits through the ordinary
+chat submit, so the clarification seam records the same **Attempted steps** a typed answer would
+and the **Simulated ticket** carries them; the chips are a faster way to say the words, not a
+second route around the seam. Every reply is put through the **real matcher**: each must record at
+least one step (a denial records nothing, and a tap that records nothing looks exactly like one
+that worked), together they must reach `ESCALATION_AFTER` (or nobody is ever offered the ticket R4
+raises), each must be anchored in a runbook (or the memory changes no behaviour), and none may trip
+the **Identity boundary gate**. Resolved from the plan's own `initial_goal` rather than router
+state, which does not survive a reload; a goal matching no prompt resolves to none, exactly as an
+edit gives up the declared **Lane**. The pending-clarification gate belongs to the component, not
+its caller, for the reason the approval seam owns submission in #22.
+
+_Avoid_: suggested reply, quick reply
+
 **Rehearsed hit** — the walkthrough's opening tap, and the mirror image of the honest miss:
 `corpus.toml`'s `[rehearsed_hit]` names the question *and the `SOP-NNN` that answers it*. The miss
 has always been guarded, because the corpus keeps its `absent_terms` out; nothing guarded the other

@@ -164,6 +164,11 @@ class TeamService:
             # Deliberate lane in the lane router, where that rule is written
             # down, rather than being enforced twice in two places.
             lane=task_data.get("lane"),
+            # The Rehearsed replies (issue #26). Optional in the same way and
+            # dropped just as silently: the tap still works, the agent still
+            # asks what has been tried, and the only symptom is a presenter
+            # typing the answer on stage.
+            rehearsed_replies=list(task_data.get("rehearsed_replies") or []),
         )
 
     async def save_team_configuration(self, team_config: TeamConfiguration) -> str:

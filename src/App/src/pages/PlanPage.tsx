@@ -56,6 +56,7 @@ import {
 } from '../store/slices/streamingSlice';
 import { selectWsConnected } from '../store/slices/appSlice';
 import { selectSelectedTeam } from '../store/slices/teamSlice';
+import { rehearsedRepliesFor } from '../models/rehearsedReply';
 
 /* ── Custom Hooks ────────────────────────────────────────────── */
 import { usePlanWebSocket } from '../hooks/usePlanWebSocket';
@@ -160,6 +161,20 @@ const PlanPage: React.FC = () => {
     const [pendingNavigation, setPendingNavigation] = React.useState<(() => void) | null>(null);
     const [processingElapsedSeconds, setProcessingElapsedSeconds] = React.useState<number>(0);
     const processingStatusMessage = getPlanProcessingStatusMessage(processingElapsedSeconds);
+
+    /* ── The Rehearsed replies for this plan (issue #26) ─────── */
+    /*
+      Resolved from the plan's own initial goal rather than carried in router
+      state, for the same reason the lane taken is read back from session
+      state: a reloaded or bookmarked plan has no router state, and a presenter
+      who reloads mid-beat is exactly the presenter who needs the tap. A goal
+      that matches no Quick Task prompt — which is what an edited prompt is —
+      resolves to none, and the surface says nothing.
+    */
+    const rehearsedReplies = React.useMemo(
+        () => rehearsedRepliesFor(selectedTeam, planData?.plan?.initial_goal),
+        [selectedTeam, planData?.plan?.initial_goal],
+    );
 
     /* ── The lane taken, recovered after a reload (issue #20) ─── */
     const [laneFromSessionState, setLaneFromSessionState] = React.useState<string | undefined>(undefined);
@@ -493,6 +508,7 @@ const PlanPage: React.FC = () => {
                                 processingApproval={processingApproval}
                                 handleApprovePlan={handleApprovePlan}
                                 handleRejectPlan={handleRejectPlan}
+                                rehearsedReplies={rehearsedReplies}
                             />
                         </>
                     )}

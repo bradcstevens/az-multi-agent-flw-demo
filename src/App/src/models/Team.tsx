@@ -31,6 +31,13 @@ export interface StartingTask {
      * lane router rather than be assumed valid here.
      */
     lane?: string;
+    /**
+     * The Rehearsed replies (issue #26) — one-tap answers to the Clarification
+     * this task provokes. Only the troubleshooting beat asks a question back,
+     * so this is absent on every other task, and its content is unvalidated
+     * for the same reason `lane` is.
+     */
+    rehearsed_replies?: string[];
 }
 
 export interface Team {

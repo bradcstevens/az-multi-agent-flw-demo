@@ -93,7 +93,12 @@
       "created": "",
       "creator": "",
       "logo": "Wrench",
-      "lane": "fast"
+      "lane": "fast",
+      "rehearsed_replies": [
+        "I switched it off at the wall and back on again.",
+        "I put a fresh paper filter in and rinsed the brew head.",
+        "I reseated the brew basket in its rails."
+      ]
     },
     {
       "id": "task-223-escalation",

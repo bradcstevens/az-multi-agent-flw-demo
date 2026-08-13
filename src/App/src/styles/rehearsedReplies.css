@@ -1,0 +1,40 @@
+/*
+ * The Rehearsed replies (issue #26) — one-tap answers to a Clarification.
+ *
+ * They sit directly above the chat box, because they are an alternative to
+ * typing in it and not a message in the conversation. Wrapping rather than
+ * scrolling: the associate this is for is holding a phone in a store, and a
+ * chip that is half off the edge of the screen is a chip nobody taps.
+ */
+
+.rehearsed-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto 8px auto;
+  width: 100%;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.rehearsed-replies-chip {
+  border-radius: 16px;
+  text-align: left;
+  white-space: normal;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 12px;
+}
+
+/*
+ * Phone. The same 640px the shell stacks at (#25) and the Quick Tasks collapse
+ * at (#26) — a third breakpoint is a surface that reflows three times. Full
+ * width, so each rehearsed answer is one readable line rather than three
+ * slivers.
+ */
+@media (max-width: 640px) {
+  .rehearsed-replies-chip {
+    width: 100%;
+  }
+}

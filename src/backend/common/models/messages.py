@@ -281,6 +281,15 @@ class StartingTask(BaseModel):
     # rejected here, loudly, at upload time.
     lane: Optional[str] = None
 
+    # The Rehearsed replies (issue #26) — one-tap answers to a Clarification,
+    # authored on the Quick Task that provokes one. Content is deliberately
+    # unvalidated for the same reason ``lane`` is: a reply that reads oddly is
+    # a beat that reads oddly, not a team definition worth rejecting. Empty
+    # rather than ``None`` when absent, because only one beat asks a question
+    # back and every other task would otherwise have to be asked twice whether
+    # it has any.
+    rehearsed_replies: List[str] = Field(default_factory=list)
+
 
 class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""

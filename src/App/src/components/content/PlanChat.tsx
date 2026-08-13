@@ -10,6 +10,7 @@ import PlanChatBody from "./PlanChatBody";
 import renderAgentMessages from "./streaming/StreamingAgentMessage";
 import StreamingBufferMessage from "./streaming/StreamingBufferMessage";
 import PresenterAlertCard from "../transparency/PresenterAlertCard";
+import RehearsedReplies from "./RehearsedReplies";
 import { useAppSelector } from "@/store/hooks";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
 
@@ -30,6 +31,8 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   handleApprovePlan: () => Promise<void>;
   handleRejectPlan: () => Promise<void>;
   processingApproval: boolean;
+  /** The Rehearsed replies for this plan (issue #26), if it began as a tap. */
+  rehearsedReplies: string[];
 
 }
 
@@ -55,7 +58,8 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   showApprovalButtons,
   handleApprovePlan,
   handleRejectPlan,
-  processingApproval
+  processingApproval,
+  rehearsedReplies
 }) => {
   // Read before the early return: hooks may not sit behind a condition.
   const presenterAlerts = useAppSelector(selectPresenterAlerts);
@@ -115,6 +119,18 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           />
         )}
       </div>
+
+      {/*
+        The Rehearsed replies (issue #26). Above the box, because they are an
+        alternative to typing in it — the last place the scripted walkthrough
+        still required a keyboard. The pending-clarification gate is the
+        component's own, so it cannot be forgotten here.
+      */}
+      <RehearsedReplies
+        replies={rehearsedReplies}
+        onReply={OnChatSubmit}
+        disabled={submittingChatDisableInput}
+      />
 
       {/* Chat Input - only show if no plan is waiting for approval */}
       <PlanChatBody

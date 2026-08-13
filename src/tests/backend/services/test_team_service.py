@@ -96,6 +96,7 @@ class MockStartingTask:
     creator: str = ""
     logo: str = ""
     lane: str = None
+    rehearsed_replies: List[str] = field(default_factory=list)
 
 @dataclass
 class MockTeamConfiguration:
@@ -336,6 +337,34 @@ class TestTeamConfigurationValidation:
         task_data = _valid_task_data(lane="fast")
 
         assert service._validate_and_parse_task(task_data).lane == "fast"
+
+    def test_rehearsed_replies_survive_the_upload(self):
+        """The one-tap answers to a Clarification (issue #26).
+
+        Parsing is field-by-field and this field is dropped exactly as silently
+        as the lane was: the Quick Task still taps, the agent still asks what
+        the associate has tried, and the only visible symptom is a presenter
+        typing the answer on stage — which is the thing the six taps exist to
+        remove.
+        """
+        service = TeamService()
+        task_data = _valid_task_data(
+            rehearsed_replies=["I switched it off at the wall and back on again."]
+        )
+
+        assert service._validate_and_parse_task(task_data).rehearsed_replies == [
+            "I switched it off at the wall and back on again."
+        ]
+
+    def test_a_task_with_no_rehearsed_replies_parses_without_any(self):
+        """No replies is the ordinary case: only one beat asks a question back.
+
+        An empty list rather than ``None``, so the surface renders nothing
+        without having to ask whether the field arrived.
+        """
+        service = TeamService()
+
+        assert service._validate_and_parse_task(_valid_task_data()).rehearsed_replies == []
 
     def test_a_task_declaring_no_lane_parses_without_one(self):
         """Lane is optional, so pre-#16 team definitions still upload.
@@ -912,6 +941,23 @@ class TestStoreAssistantPackUploads:
         assert [
             task_id for task_id, lane in lanes.items() if lane == "deliberate"
         ] == ["task-223-escalation"]
+
+    @pytest.mark.asyncio
+    async def test_authored_pack_keeps_its_rehearsed_replies(self):
+        # The troubleshooting beat is the only multi-turn one, and its replies
+        # are what keep the walkthrough tap-only. They are also what #21's
+        # clarification seam records as Attempted steps and what #22's ticket
+        # then carries, so a dropped field is an empty ticket two beats later.
+        service = TeamService()
+        team = await service.validate_and_parse_team_config(self._pack(), "user-1")
+
+        replies = {
+            task.id: task.rehearsed_replies
+            for task in team.starting_tasks
+            if task.rehearsed_replies
+        }
+        assert list(replies) == ["task-223-troubleshooting"]
+        assert len(replies["task-223-troubleshooting"]) == 3
 
     @pytest.mark.asyncio
     async def test_authored_pack_keeps_its_per_agent_models(self):

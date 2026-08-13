@@ -104,6 +104,42 @@ for the first time.
 The badge now says only what a Lane decides: *"No approval step — nothing is
 submitted for you to confirm."*
 
+## The one place the presenter would still have had to type
+
+`TroubleshootingAgent` is instructed to *ask the associate what they have
+already tried*, so R3 is multi-turn by design and answering a Clarification is
+free text in the chat box. Six taps on the home screen do not reach it, and a
+walkthrough that is tap-only up to the third beat is a walkthrough with a
+keyboard in it.
+
+So the Quick Task that provokes a question authors the answers: **Rehearsed
+replies**, rendered as one-tap chips above the box while a clarification is
+pending, submitted through the same `OnChatSubmit` a typed answer takes.
+
+They are load-bearing beyond the typing. The clarification seam records what
+arrives there as **Attempted steps** (#21), and the **Simulated ticket** R4
+raises carries them (#22). Three replies, each naming a step RB-201 branches on,
+and the suite puts every one of them through the **real matcher**:
+
+| Asserted | Why |
+| --- | --- |
+| Each reply parses to at least one Attempted step | A denial, a substituted answer or a single shared word records **nothing**, and a tap that records nothing looks exactly like a tap that worked. |
+| Together they reach `ESCALATION_AFTER` | The escalation offer is what leads into R4. Replies that merge down to two steps leave a walkthrough where nobody is ever offered a ticket. |
+| Two anchor words of each reply appear in a runbook | The skip rule is the beat. A reply naming something no runbook asks for is answered by a runbook that skips nothing, and the memory changed no behaviour. |
+| None of them trips the **Identity boundary gate** | Same one-way requirement as the taps themselves: a refusal mid-repair ends the beat with copy about the assistant being store-scoped. |
+
+**The pending-clarification gate is the component's own, not the call site's.**
+Outside a clarification the chips are a second way to start a turn, competing
+with the box — and a gate the caller owns is a gate the second caller forgets.
+That is #22's move at a smaller seam.
+
+**And they are resolved from the plan's own `initial_goal`, not carried in
+router state.** State does not survive a reload, and a presenter who reloads
+mid-beat is exactly the presenter who needs the tap — the same reason the lane
+*taken* is read back from server-side session state (#20). A goal matching no
+Quick Task prompt resolves to none, which is what an edited prompt is and what
+the declared Lane already does with one.
+
 ## Six cards on a phone
 
 Two findings that only six tasks expose, both of the shape #25 found in
@@ -128,6 +164,14 @@ column at 640px, the same breakpoint as everything else on the surface.
 * **Fast-lane latency is still unmeasured**, so "a few seconds with no approval
   prompt" is proven only in its second half — the approval step's absence is
   the Lane, and the Lane is asserted end to end.
+* **The rehearsed replies are written against the question the system message
+  tells the agent to ask, not against one a live model has been seen to ask.**
+  If a turn asks for an observation instead — RB-201's branches want one — the
+  chips answer a question nobody asked, and the presenter is back in the box.
+  The failure is visible and recoverable, which is why the replies were written
+  as attempted steps rather than as observations: an observation submitted to
+  the clarification seam is **recorded as a step**, and a recorded step is one
+  the assistant will skip.
 * **`content/sop/corpus.toml`'s new section is read by `store_pack`, not by
   `tools/sop_corpus`.** That tooling's own tests are not in any declared
   feedback loop, so extending its verifier would have added an unrun

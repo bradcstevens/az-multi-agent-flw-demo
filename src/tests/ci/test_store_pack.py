@@ -24,9 +24,11 @@ that nothing else spans:
 """
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import List
 
 import pytest
 
@@ -1168,3 +1170,122 @@ def test_given_the_quick_tasks_when_read_then_each_carries_its_own_identifier(
 
     assert len(set(ids)) == len(ids), ids
     assert all(task_id.startswith("task-223-") for task_id in ids), ids
+
+
+# ---------------------------------------------------------------------------
+# The rehearsed replies (issue #26)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def steps_mod():
+    return _backend_module("troubleshooting.steps")
+
+
+def test_given_the_troubleshooting_task_when_read_then_it_carries_rehearsed_replies(
+    store_pack,
+):
+    # The one beat that asks the associate a question back.
+    # `TroubleshootingAgent` is instructed to ask what they have already tried,
+    # and answering a Clarification is the only place in the walkthrough the
+    # presenter would otherwise have to type — which is the thing a typo or an
+    # autocorrect derails in a stakeholder meeting.
+    task = next(
+        task
+        for task in store_pack.starting_tasks
+        if task["id"] == "task-223-troubleshooting"
+    )
+
+    assert task["rehearsed_replies"]
+
+
+def _rehearsed_replies(store_pack) -> List[str]:
+    """Every rehearsed reply the pack authors, in the order they render."""
+    return [
+        reply
+        for task in store_pack.starting_tasks
+        for reply in task.get("rehearsed_replies", [])
+    ]
+
+
+def test_given_each_rehearsed_reply_when_answered_then_it_records_a_step(
+    store_pack, steps_mod
+):
+    # Through the real matcher, because a reply that records nothing is a tap
+    # that looks like it worked and leaves the record empty. `#21`'s matcher is
+    # deliberately conservative in one direction — a denial, a substituted
+    # answer and a single shared word all record nothing — so a rehearsed reply
+    # is a claim that has to be put through it rather than read.
+    for reply in _rehearsed_replies(store_pack):
+        assert steps_mod.parse_attempted_steps(reply), reply
+
+
+def test_given_the_rehearsed_replies_when_all_answered_then_escalation_is_due(
+    store_pack, steps_mod
+):
+    # What hands R3 to R4. The escalation offer arrives after
+    # `ESCALATION_AFTER` distinct attempts, and the Simulated ticket (#22)
+    # carries the same record as its `steps_attempted`. Replies that merge down
+    # to two steps leave a walkthrough where nobody is ever offered a ticket and
+    # the one that #26's deliberate task raises reads `not reported`.
+    recorded: List[str] = []
+    for reply in _rehearsed_replies(store_pack):
+        recorded = steps_mod.merge_attempted(
+            recorded, steps_mod.parse_attempted_steps(reply)
+        )
+
+    assert len(recorded) >= steps_mod.ESCALATION_AFTER, recorded
+    assert steps_mod.escalation_due(recorded)
+
+
+def test_given_a_rehearsed_reply_when_read_then_a_runbook_branches_on_it(
+    store_pack, runbooks
+):
+    # The skip rule is the point of the beat: an associate who is told to do the
+    # thing they just said they did stops trusting the assistant. A reply naming
+    # something no runbook asks for would be answered by a runbook that skips
+    # nothing, and the beat would show a memory that changed no behaviour.
+    covered = " ".join(doc.path.read_text(encoding="utf-8").lower() for doc in runbooks)
+
+    for reply in _rehearsed_replies(store_pack):
+        anchors = [
+            word
+            for word in re.findall(r"[a-z]+", reply.lower())
+            if len(word) > 4 and word in covered
+        ]
+        assert len(anchors) >= 2, (reply, anchors)
+
+
+def test_given_the_rehearsed_replies_when_read_then_none_of_them_trips_the_gate(
+    store_pack, gate_keywords
+):
+    # The same one-way requirement as the Quick Tasks themselves. A reply the
+    # Identity boundary gate refuses is a tap that ends the troubleshooting beat
+    # with copy about the assistant being store-scoped, mid-repair.
+    for reply in _rehearsed_replies(store_pack):
+        assert not gate_keywords.matches_personal_keyword(reply), reply
+
+
+REHEARSED_REPLY_TS = REPO_ROOT / "src" / "App" / "src" / "models" / "rehearsedReply.ts"
+TEAM_TS = REPO_ROOT / "src" / "App" / "src" / "models" / "Team.tsx"
+
+
+def test_given_the_rehearsed_replies_when_read_then_the_browser_reads_that_field(
+    store_pack,
+):
+    # The seam #24 found, at a third place. `rehearsedReply.test.ts` hand-writes
+    # its own tasks, so renaming the field in the pack and the backend model
+    # leaves the vitest suite green and the chips silently absent — a presenter
+    # back to typing the one answer these six taps exist to remove, with nothing
+    # red anywhere. This is a CI-tooling test because it is the only thing that
+    # reads both files.
+    field = "rehearsed_replies"
+    task = next(
+        task
+        for task in store_pack.starting_tasks
+        if task["id"] == "task-223-troubleshooting"
+    )
+
+    assert field in task
+    assert field in REHEARSED_REPLY_TS.read_text(encoding="utf-8")
+    assert field in TEAM_TS.read_text(encoding="utf-8")
