@@ -163,12 +163,21 @@ _Avoid_: message meter, Copilot Studio billing
 **Dataverse System Administrator** — the Dataverse security role, held *inside* an environment, that
 lets environment-level settings (notably Dataverse search, #3) be changed. Distinct from Power
 Platform admin centre membership: a Global Administrator is not automatically granted it in the
-Default environment, and Dataverse itself refuses to assign it (`prvAssignRole`). The only route is
-**self-elevation** — `POST https://api.powerplatform.com/usermanagement/environments/{id}/user/applyAdminRole`
-— which elevates the *calling user* and so needs a user token carrying
-`UserManagement.Users.Apply`. Recorded in `docs/preflight/dataverse-admin-role.md`; checked by
+Default environment, and Dataverse refuses to let an account assign it to itself (`prvAssignRole`).
+Granted instead by a **Bootstrap application user**. Recorded in
+`docs/preflight/dataverse-admin-role.md`; checked by
 `scripts/preflight/check-dataverse-admin-role.sh`.
 _Avoid_: environment admin, Power Platform admin (a different, tenant-level thing)
+
+**Bootstrap application user** — a throwaway Entra app registration that the BAP admin API's
+`addAppUser` registers as a Dataverse **application user**, which that endpoint grants System
+Administrator outright. Because it *has* `prvAssignRole`, it can assign the role to the build
+account; because it authenticates by client credentials, the whole sequence runs with no user, no
+MFA and no browser. It is deleted afterwards, and its Dataverse user disabled — deleting the app
+registration alone leaves an enabled System Administrator with no credential behind it. This is the
+elevation route for #2, in place of Microsoft's documented `applyAdminRole`, which the Azure CLI
+cannot reach at all.
+_Avoid_: service principal admin, app user (ambiguous — Dataverse also calls ordinary users "users")
 
 ## Build and test
 
@@ -277,20 +286,28 @@ it distinguishes "gate could not run" and "publish failed" from an actually-fail
 
 ### Tenant admin does not imply Dataverse System Administrator (confirmed 2026-08-12, issue #2)
 
-The build account is a **Global Administrator** and still holds only `Basic User` and
+The build account is a **Global Administrator** and still held only `Basic User` and
 `Environment Maker` in the Default environment's Dataverse. Power Platform admins are no longer
 automatically granted System Administrator there, so admin centre membership is not evidence — the
-environment's own security-role list is, and it is a different API. Assigning the role from the
-Dataverse side is refused outright (`0x80040220`, missing `prvAssignRole`).
+environment's own security-role list is, and it is a different API. Assigning the role to yourself
+from the Dataverse side is refused outright (`0x80040220`, missing `prvAssignRole`).
 
-The only route is Microsoft's self-elevation POST, `applyAdminRole` on the Power Platform API, which
-elevates the **calling user** and therefore needs a user token carrying
-`UserManagement.Users.Apply`. The Azure CLI is not pre-authorised for that scope, so the one-time
-consent is an interactive sign-in — the one step in this build an unattended run cannot complete.
+Microsoft's documented route — the `applyAdminRole` self-elevation POST — is **unreachable from the
+Azure CLI, and consent is not the obstacle**. It needs a user token carrying
+`UserManagement.Users.Apply`, and consent between two Microsoft first-party applications is
+configured by the API owner, not by a tenant admin: admin consent was granted as Global
+Administrator and the token request still fails with `AADSTS65002`. (The `az` CLI reports a stale-MFA
+error instead, which masks it; `azd`, sharing the same client id, surfaces the real one.) No
+sign-in obtains that scope, so **an earlier reading of this finding — "one interactive consent
+remains" — was wrong.**
 
-Consequence: **#3 (Dataverse search) is blocked until the consent is given**, and with it the
-#3 → #17 → #18 chain. The verification is re-runnable and the elevation is one command behind the
-consent; see `docs/preflight/dataverse-admin-role.md`.
+The role is instead granted by a **Bootstrap application user**, which needs nothing beyond the
+tenant-admin access the Azure CLI already has on the BAP admin API, and therefore runs unattended.
+The build account now holds System Administrator, observed in the environment's security roles.
+
+Consequence: **#3 (Dataverse search) is unblocked**, and with it the #3 → #17 → #18 chain. Verified
+by revoking the role and letting `scripts/preflight/check-dataverse-admin-role.sh --elevate` grant it
+back in 27 seconds; see `docs/preflight/dataverse-admin-role.md`.
 
 ### Pay-as-you-go works on a Default environment, and the meter now covers it (confirmed 2026-08-12, issue #6)
 
