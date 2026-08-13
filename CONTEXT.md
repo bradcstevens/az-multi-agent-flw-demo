@@ -230,8 +230,20 @@ deployment under the `integration` marker and is deselected in CI — by `-m "no
 both `scripts/backend-tests.sh` and `.github/workflows/test.yml`, guarded by
 `src/tests/ci/test_integration_marker.py` — because a mocked embedder would only prove plumbing.
 It must exist **before** the threshold is chosen, and it earned that: the first scoring rule tried
-did not separate it, and the corpus is what said so (ADR-015).
+did not separate it, and the corpus is what said so (ADR-015). Scored at **two seams**: the
+**Two-class margin**, which is how the threshold was set, and `IdentityBoundaryGate.evaluate`,
+which is what the request path actually calls — the composition can only *add* refusals, so the
+gate is where the 0/10 false-positive criterion is genuinely at risk.
 _Avoid_: guardrail test set, probe set (the probes are one half of it)
+
+**Improvised paraphrases** — five personal questions phrased the way a presenter improvises them,
+**held out of the threshold measurement** and asserted to miss the Keyword fast path
+(`corpus.IMPROVISED_PARAPHRASES`). They exist because of what the gate-level corpus run showed: the
+fast path claims all ten positive probes, so the Guardrail corpus never reaches the similarity tier
+*through the gate*, and without a held-out set the tier's whole reason for existing would be
+untested end to end. A refusal of one is therefore evidence about the similarity tier and nothing
+else. Measured 5/5 refused at margins +0.05 to +0.48.
+_Avoid_: extra probes (they are deliberately not part of the corpus that set the threshold)
 
 **Personal-intent anchors** / **Store-scope anchors** — the two sets of exemplar phrasings the
 similarity tier scores an incoming request against. **Production data, not test data**: the gate

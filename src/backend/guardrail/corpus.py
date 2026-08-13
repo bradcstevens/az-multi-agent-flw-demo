@@ -82,3 +82,25 @@ NEGATIVE_CONTROLS: Tuple[str, ...] = (
     "What is the refund policy on a damaged pack of cigarettes?",
     "Which cleaning checklist runs on the night shift?",
 )
+
+# Personal questions phrased the way a presenter improvises them on stage, and
+# **held out of the threshold measurement on purpose**: they are not scored by
+# the sweep, so the recorded threshold has never seen them.
+#
+# They exist because of what the gate-level corpus run showed — the Keyword
+# fast path catches all ten positive probes, so the corpus alone never
+# exercises the similarity tier *through the gate*. Every phrasing here is
+# asserted to miss the fast path (`src/tests/backend/guardrail/test_keywords.py`),
+# which makes a refusal of one of them evidence about the similarity tier and
+# nothing else — the live test ADR-014's "the presenter will improvise a
+# paraphrase" claim actually needs.
+#
+# Keeping them out of the anchors is the same discipline ADR-015 applied: an
+# anchor that paraphrased these would be fitting the anchors to the evidence.
+IMPROVISED_PARAPHRASES: Tuple[str, ...] = (
+    "Am I working tomorrow evening?",
+    "When do I get paid next?",
+    "How many days off have I got left this year?",
+    "Did Tanya Reyes get her bonus yet?",
+    "Do I have enough banked to take Friday off?",
+)

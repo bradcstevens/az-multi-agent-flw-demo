@@ -9,7 +9,11 @@ which ADR-014 names as worse than a miss.
 
 import pytest
 
-from guardrail.corpus import NEGATIVE_CONTROLS, POSITIVE_PROBES
+from guardrail.corpus import (
+    IMPROVISED_PARAPHRASES,
+    NEGATIVE_CONTROLS,
+    POSITIVE_PROBES,
+)
 from guardrail.keywords import matches_personal_keyword
 
 
@@ -36,3 +40,18 @@ class TestTheObviousCases:
         caught = [probe for probe in POSITIVE_PROBES if matches_personal_keyword(probe)]
 
         assert len(caught) >= 7
+
+
+class TestWhatTheFastPathDeliberatelyMisses:
+    """The precondition that makes the improvised paraphrases evidence.
+
+    Measured on the deployment, the fast path catches all ten positive probes,
+    so the Guardrail corpus never reaches the similarity tier *through the
+    gate*. The held-out paraphrases are the corpus's replacement for that, and
+    they only mean anything if the fast path provably cannot claim them — so
+    the miss is asserted here rather than assumed there.
+    """
+
+    @pytest.mark.parametrize("paraphrase", IMPROVISED_PARAPHRASES)
+    def test_an_improvised_paraphrase_reaches_the_similarity_tier(self, paraphrase):
+        assert matches_personal_keyword(paraphrase) is False
