@@ -12,3 +12,5 @@
 *.pdf binary
 *.png binary
 *.webp binary
+*.docx binary
+*.pptx binary
