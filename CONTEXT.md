@@ -74,8 +74,9 @@ ticket before it is raised.
 **Quick Task** and carried on the wire as `InputTask.lane` — the **only** lane declaration on a
 request, because two ways to say the same thing on one message is how a request ends up in a lane
 nobody chose. A Lane decides exactly one thing: **Plan review**. The lane *taken* comes back on the
-`/process_request` response and is **surfaced in the UI as a feature** (`LaneBadge`) — on a Quick
-Task as the lane declared, on a plan as the lane taken.
+`/process_request` response, is recorded into **Session state** so it survives a reload, and is
+**surfaced in the UI as a feature** (`LaneBadge`) — on a Quick Task as the lane declared, on a plan
+as the lane taken.
 
 **Lane router** — `lane.router.select_lane`: declared Lane wins, no declaration falls back to the
 **Lane keyword fallback**, and an **unparseable declaration goes straight to the Deliberate lane**
@@ -124,7 +125,25 @@ on a store-level one.
 (`src/backend/guardrail/identity.py`). Defaults to **anonymous**, and anonymous is the *refusing*
 state, so absent, empty, half-written and malformed records all resolve to it. The gate checks it
 first and admits a named identity outright — the **Mocked unlock** is a parameter of the gate, not
-a second gate. #20 supplies the session-state record; #27 writes a name into it.
+a second gate. It is read out of **Session state**; #27 writes a name into it.
+
+**Session state** — one session's server-side state (`src/backend/session/store.py`, route
+`/api/v4/session_state/{session_id}`). Held in the Cosmos memory container rather than in browser
+storage so a mid-demo reload does not lose it, and it carries exactly the two things the client
+cannot re-derive: the **Session identity** the gate reads, and the **Lane** taken — re-deriving a
+lane in the browser would be a second **Lane router** with its own opinion. An ordinary record in
+the schemaless container: partitioned by session, discriminated by `data_type`, reached through the
+generic CRUD, so it cost one `DataType` member and one model and **no migration**. Like the
+container's other records it carries its `user_id` and reads are scoped by it, so one user's
+session record cannot unlock another user's gate. Two invariants carry the design: a read is
+**total** (a session nobody has written to reads back as the state the demo opens in, never `None`)
+and a write is a **merge** (the sign-in beat owns the identity, the
+request path owns the lane taken, and neither may erase the other; a field present and null is an
+explicit clear, which is what signing out is). Acquiring it is the one thing above the Identity
+boundary gate in `process_request`, because the gate's identity is its *input* — a Cosmos read
+instantiates no agent — and a container that cannot be reached leaves the identity anonymous, so an
+infrastructure failure refuses rather than admits.
+_Avoid_: session storage, browser state, conversation state
 
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
 **retrieval miss** — an honest "that procedure is not in the library" — because conflating the two
@@ -136,7 +155,8 @@ as an answer.
 
 **Mocked unlock** — the post-"sign-in" state in which the Identity boundary gate admits the
 previously refused question and answers it from mocked data. A parameter of the gate, not a
-second gate. No real identity provider is involved.
+second gate. Mechanically it is a name written into **Session state**; the gate reads it back on
+the next request. No real identity provider is involved.
 
 ## Retrieval
 

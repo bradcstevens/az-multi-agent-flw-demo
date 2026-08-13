@@ -12,14 +12,14 @@ from auth.auth_utils import get_authenticated_user_details
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
 from common.models.messages import (InputTask, Plan, PlanStatus,
-                                    TeamSelectionRequest)
+                                    SessionStatePatch, TeamSelectionRequest)
 from common.utils.event_utils import track_event_if_configured
 from common.utils.team_utils import (find_first_available_team, rai_success,
                                      rai_validate_team_config)
 from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
                      Request, UploadFile, WebSocket, WebSocketDisconnect)
 from guardrail.gate import identity_boundary_gate
-from guardrail.identity import resolve_session_identity
+from guardrail.identity import ANONYMOUS
 from guardrail.refusal import policy_block_detail
 from lane.router import select_lane
 from orchestration.connection_config import (connection_config,
@@ -27,6 +27,7 @@ from orchestration.connection_config import (connection_config,
 from orchestration.orchestration_manager import OrchestrationManager
 from services.plan_service import PlanService
 from services.team_service import TeamService
+from session.store import SessionStateStore
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -304,9 +305,28 @@ async def process_request(
     # happens after the caller is known and before *anything* costs money: the
     # team lookup, the RAI agent and the orchestration manager are all below
     # it, so a refused request short-circuits with no agent invoked and no
-    # tokens spent. Identity is anonymous until #20 stores session state and
-    # #27 writes a name into it; the gate admits a named one outright.
-    identity = resolve_session_identity(None)
+    # tokens spent. Its Session identity comes from server-side session state
+    # (issue #20) — acquiring the container is the one thing above the gate,
+    # because the gate's identity is its *input* and a Cosmos read instantiates
+    # no agent. A container that cannot be reached leaves the identity
+    # anonymous, which is the refusing state.
+    memory_store = None
+    session_state = None
+    try:
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        session_state = SessionStateStore(memory_store, user_id=user_id)
+    except Exception:
+        logger.warning(
+            "Session state unavailable for session '%s' — the Identity boundary "
+            "gate resolves the anonymous identity, which refuses",
+            input_task.session_id,
+            exc_info=True,
+        )
+
+    if session_state is not None and input_task.session_id:
+        identity = await session_state.resolve_identity(input_task.session_id)
+    else:
+        identity = ANONYMOUS
     verdict = await identity_boundary_gate().evaluate(
         input_task.description, identity
     )
@@ -322,7 +342,8 @@ async def process_request(
         raise HTTPException(status_code=403, detail=policy_block_detail())
 
     try:
-        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        if memory_store is None:
+            memory_store = await DatabaseFactory.get_database(user_id=user_id)
         user_current_team = await memory_store.get_current_team(user_id=user_id)
         team_id = None
         if user_current_team:
@@ -414,6 +435,22 @@ async def process_request(
     # request must never have paid for routing. This is the one place a Lane
     # becomes a Plan review value.
     lane = select_lane(input_task.lane, input_task.description)
+
+    # The lane taken, recorded into server-side session state (issue #20). The
+    # plan page is handed it through router state, which a reload throws away —
+    # and the browser cannot re-derive it, because re-deriving it would be a
+    # second lane router with its own opinion. Best-effort on purpose: a badge
+    # that cannot be restored after a reload is no reason to refuse to start
+    # the request.
+    if session_state is not None:
+        try:
+            await session_state.write(input_task.session_id, lane=lane.value)
+        except Exception:
+            logger.warning(
+                "Could not record the lane taken for session '%s'",
+                input_task.session_id,
+                exc_info=True,
+            )
 
     # The cache-invalidation predicate's lane term (ADR-013). /init_team eagerly
     # builds a workflow before any task is submitted, so without this the first
@@ -1434,6 +1471,76 @@ async def select_team(selection: TeamSelectionRequest, request: Request):
             },
         )
         raise HTTPException(status_code=500, detail="Internal server error occurred")
+
+
+# ---------------------------------------------------------------------------
+# Server-side session state (issue #20)
+#
+# The state of a session lives here rather than in browser storage so a mid-demo
+# reload does not lose it. Two things are held today and neither can be
+# re-derived by the client: the **Session identity** the Identity boundary gate
+# reads (ADR-014), and the **Lane taken** as the lane router decided it
+# (ADR-013).
+# ---------------------------------------------------------------------------
+@app_router.get("/session_state/{session_id}")
+async def get_session_state(session_id: str, request: Request):
+    """Read a session's server-side state.
+
+    A session nobody has written to is not a 404 — it reads back as the state
+    the demo opens in: anonymous, no lane taken yet.
+    """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(status_code=400, detail="no user found")
+
+    try:
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        return await SessionStateStore(memory_store, user_id=user_id).read(session_id)
+    except Exception as e:
+        logger.error("Error reading session state for '%s': %s", session_id, e)
+        raise HTTPException(
+            status_code=500, detail="Internal server error occurred"
+        ) from e
+
+
+@app_router.patch("/session_state/{session_id}")
+async def patch_session_state(
+    session_id: str, patch: SessionStatePatch, request: Request
+):
+    """Merge a partial write into a session's server-side state.
+
+    A merge rather than a replace: the mocked sign-in owns the identity and the
+    request path owns the lane taken, and whichever wrote last must not erase
+    the other. Only the fields the body actually names are written, so a
+    present-but-null field is an explicit clear — that is what signing out is.
+    """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(status_code=400, detail="no user found")
+
+    # The body's fields are handed to the store as plain data rather than as
+    # request models: the store's contract is "a mapping or nothing", which
+    # keeps it from depending on the identity of a class defined in the API
+    # layer.
+    updates = {}
+    if "identity" in patch.model_fields_set:
+        updates["identity"] = (
+            patch.identity.model_dump() if patch.identity is not None else None
+        )
+    if "lane" in patch.model_fields_set:
+        updates["lane"] = patch.lane
+
+    try:
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        store = SessionStateStore(memory_store, user_id=user_id)
+        return await store.write(session_id, **updates)
+    except Exception as e:
+        logger.error("Error writing session state for '%s': %s", session_id, e)
+        raise HTTPException(
+            status_code=500, detail="Internal server error occurred"
+        ) from e
 
 
 # Get plans is called in the initial side rendering of the frontend

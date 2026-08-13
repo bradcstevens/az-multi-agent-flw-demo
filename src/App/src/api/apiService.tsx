@@ -13,6 +13,7 @@ import {
     PlanFromAPI,
     AgentMessageResponse
 } from '../models';
+import { SessionState } from '../models/sessionState';
 
 // Constants for endpoints
 const API_ENDPOINTS = {
@@ -23,6 +24,7 @@ const API_ENDPOINTS = {
     HUMAN_CLARIFICATION: '/v4/user_clarification',
     USER_BROWSER_LANGUAGE: '/user_browser_language',
     AGENT_MESSAGE: '/v4/agent_message',
+    SESSION_STATE: '/v4/session_state',
 };
 
 // Simple cache implementation
@@ -177,6 +179,22 @@ export class APIService {
         }
 
         return fetcher();
+    }
+
+    /**
+     * Read a session's server-side state (issue #20).
+     *
+     * Deliberately uncached: this is what a page reloaded mid-conversation
+     * reads to recover state the browser threw away, so a copy cached from
+     * before the reload would defeat the point.
+     *
+     * @param sessionId Session ID
+     * @returns Promise with the session's state
+     */
+    async getSessionState(sessionId: string): Promise<SessionState> {
+        return apiClient.get(
+            `${API_ENDPOINTS.SESSION_STATE}/${encodeURIComponent(sessionId)}`
+        );
     }
 
 

@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 class DataType(str, Enum):
     session = "session"
+    session_state = "session_state"
     plan = "plan"
     step = "step"
     agent_message = "agent_message"
@@ -104,6 +105,38 @@ class Session(BaseDataModel):
     user_id: str
     current_status: str
     message_to_user: Optional[str] = None
+
+
+class SessionIdentityState(BaseModel):
+    """Who, if anyone, is signed in on the shared store device (issue #20).
+
+    Mocked end to end — no real identity provider writes this. Absent means
+    anonymous, and anonymous is the *refusing* state at the Identity boundary
+    gate, so a half-written record degrades towards a refusal.
+    """
+    display_name: Optional[str] = None
+
+
+class SessionState(BaseDataModel):
+    """The state of one session, held server-side so a reload does not lose it.
+
+    A record in the schemaless memory container like every other: partitioned
+    by ``session_id`` and discriminated by ``data_type``, so it needed one new
+    enumeration member and this one model and no migration. Its ``id`` is
+    derived from the session (``session.store.session_state_id``) rather than a
+    fresh uuid, which is what makes a session's state a point read and makes a
+    second write replace the first rather than accumulate.
+    """
+    data_type: Literal[DataType.session_state] = DataType.session_state
+    # Who the record belongs to. The container's records carry their owner and
+    # its reads are scoped by it; this one is no exception, so one user's
+    # session record can never unlock another user's Identity boundary gate.
+    user_id: Optional[str] = None
+    identity: SessionIdentityState = Field(default_factory=SessionIdentityState)
+    # The Lane taken, as the lane router decided it (ADR-013) — recorded here
+    # because it is the router's output and a reloaded plan page cannot
+    # re-derive it: re-deriving would be a second router.
+    lane: Optional[str] = None
 
 
 class UserCurrentTeam(BaseDataModel):
@@ -271,6 +304,19 @@ class InputTask(BaseModel):
 
 class UserLanguage(BaseModel):
     language: str
+
+
+class SessionStatePatch(BaseModel):
+    """A partial write to a session's state (issue #20).
+
+    Partial on purpose: two surfaces write this record — the mocked sign-in
+    writes an identity, the request path writes the Lane taken — so a write
+    names only the fields it owns. A field that is present and null is an
+    explicit clear (signing out is a write, not the absence of one), which is
+    why the route reads ``model_fields_set`` rather than the values alone.
+    """
+    identity: Optional[SessionIdentityState] = None
+    lane: Optional[str] = None
 
 
 class AgentMessageData(BaseDataModel):

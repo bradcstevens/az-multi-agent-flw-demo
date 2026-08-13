@@ -88,7 +88,6 @@ from guardrail.corpus import (  # noqa: E402
     STORE_SCOPE_ANCHORS,
 )
 from guardrail.gate import IdentityBoundaryGate  # noqa: E402
-from guardrail.identity import SessionIdentity  # noqa: E402
 from guardrail.refusal import IDENTITY_BOUNDARY_REFUSAL  # noqa: E402
 
 
@@ -131,6 +130,24 @@ def rt(monkeypatch):
     store.get_all_plans_by_team_id_status = AsyncMock(return_value=[])
     store.delete_current_team = AsyncMock()
     store.add_plan = AsyncMock()
+
+    # The generic CRUD the memory container exposes, faked well enough that a
+    # session-state record genuinely round-trips (issue #20). Keyed by
+    # ``(id, partition key)`` the way Cosmos keys it, so a record written under
+    # the wrong partition is invisible to a read.
+    session_documents = {}
+
+    async def _get_item_by_id(item_id, partition_key, model_class):
+        document = session_documents.get((item_id, partition_key))
+        if document is None:
+            return None
+        return model_class.model_validate(document)
+
+    async def _update_item(item):
+        session_documents[(item.id, item.session_id)] = item.model_dump(mode="json")
+
+    store.get_item_by_id = AsyncMock(side_effect=_get_item_by_id)
+    store.update_item = AsyncMock(side_effect=_update_item)
 
     database_factory = MagicMock()
     database_factory.get_database = AsyncMock(return_value=store)
@@ -204,6 +221,7 @@ def rt(monkeypatch):
     return SimpleNamespace(
         client=client,
         store=store,
+        session_documents=session_documents,
         database_factory=database_factory,
         team_service=team_service,
         team_service_cls=team_service_cls,
@@ -403,16 +421,17 @@ class TestTheIdentityBoundaryGate:
 
         assert self._post(rt, paraphrase).status_code == 403
 
-    def test_a_signed_in_identity_is_admitted(self, rt, monkeypatch):
+    def test_a_signed_in_identity_is_admitted(self, rt):
         """The mocked unlock: same question, same gate, different identity.
 
-        #20 supplies the session-state record and #27 writes a name into it;
-        the router resolves through this one seam either way.
+        The name is written into server-side session state (#20) exactly as the
+        sign-in beat (#27) will write it, and the gate reads it back through
+        that one seam — which is ADR-014's claim that the unlock is a
+        *parameter* of the gate and not a second gate.
         """
-        monkeypatch.setattr(
-            router_mod,
-            "resolve_session_identity",
-            lambda _state: SessionIdentity(display_name="Tanya Reyes"),
+        rt.client.patch(
+            "/api/v4/session_state/sess-1",
+            json={"identity": {"display_name": "Tanya Reyes"}},
         )
 
         resp = self._post(rt, self.PERSONAL)
@@ -578,6 +597,155 @@ class TestPerRequestPlanReview:
 
         rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
         assert cache["current"] is cached
+
+
+# ---------------------------------------------------------------------------
+# /session_state — server-side session state (issue #20)
+# ---------------------------------------------------------------------------
+class TestSessionState:
+    """The route, driven through real HTTP against the faked memory container.
+
+    Session state is held server-side precisely so a mid-demo browser reload
+    does not lose it, so every assertion here is a second request standing in
+    for the reload: nothing about the first request's client survives it.
+    """
+
+    def _get(self, rt, session_id="sess-1"):
+        return rt.client.get(f"/api/v4/session_state/{session_id}")
+
+    def _patch(self, rt, body, session_id="sess-1"):
+        return rt.client.patch(f"/api/v4/session_state/{session_id}", json=body)
+
+    def test_no_user(self, rt):
+        _no_user(rt)
+        assert self._get(rt).status_code == 400
+
+    def test_no_user_cannot_write_either(self, rt):
+        _no_user(rt)
+        assert self._patch(rt, {"lane": "fast"}).status_code == 400
+
+    def test_a_session_with_no_record_reads_back_the_opening_state(self, rt):
+        """Absent is not an error — it is the state the demo opens in."""
+        resp = self._get(rt)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["session_id"] == "sess-1"
+        assert body["identity"]["display_name"] is None
+        assert body["lane"] is None
+
+    def test_a_written_identity_survives_the_reload(self, rt):
+        assert self._patch(rt, {"identity": {"display_name": "Tanya"}}).status_code == 200
+
+        assert self._get(rt).json()["identity"]["display_name"] == "Tanya"
+
+    def test_a_written_lane_survives_the_reload(self, rt):
+        self._patch(rt, {"lane": "fast"})
+
+        assert self._get(rt).json()["lane"] == "fast"
+
+    def test_writing_one_field_leaves_the_other_alone(self, rt):
+        """Two surfaces write this record and neither may erase the other."""
+        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"lane": "fast"})
+
+        body = self._get(rt).json()
+        assert body["identity"]["display_name"] == "Tanya"
+        assert body["lane"] == "fast"
+
+    def test_signing_out_returns_to_the_anonymous_state(self, rt):
+        """An explicit null clears; it is a write, not the absence of one."""
+        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": None})
+
+        assert self._get(rt).json()["identity"]["display_name"] is None
+
+    def test_one_session_cannot_read_another_sessions_state(self, rt):
+        """The record is partitioned by session, observed through the route."""
+        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+
+        other = self._get(rt, session_id="sess-2").json()
+        assert other["identity"]["display_name"] is None
+
+    def test_one_user_cannot_read_another_users_session_state(self, rt):
+        """Records in this container carry their owner and reads are scoped by
+        it, so a session identifier alone does not unlock somebody else's
+        session — the gate would otherwise admit on a borrowed record."""
+        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        rt.get_user.return_value = {"user_principal_id": "user-2"}
+
+        assert self._get(rt).json()["identity"]["display_name"] is None
+
+    def test_the_record_is_discriminated_by_data_type(self, rt):
+        self._patch(rt, {"lane": "fast"})
+
+        document = next(iter(rt.session_documents.values()))
+        assert document["data_type"] == "session_state"
+
+    def test_an_unreachable_container_is_an_error_on_this_route(self, rt):
+        """Unlike the gate, a read that failed has no safe answer to fall back
+        on here — the caller asked for the state, so say it could not be had."""
+        rt.database_factory.get_database = AsyncMock(side_effect=Exception("boom"))
+
+        assert self._get(rt).status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# /process_request — reading and writing session state (issue #20)
+# ---------------------------------------------------------------------------
+class TestProcessRequestUsesSessionState:
+    PERSONAL = "my name is Tanya, how much PTO do I have?"
+
+    def _post(self, rt, description="how do I close the store?", **body):
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        payload = {"session_id": "sess-1", "description": description}
+        payload.update(body)
+        return rt.client.post("/api/v4/process_request", json=payload)
+
+    def test_the_lane_taken_is_recorded_for_a_reloaded_page(self, rt):
+        """The lane taken is the router's output, so a reloaded plan page can
+        only get it from the server. Recording it here is what makes the badge
+        survive a reload rather than vanish with the router state."""
+        assert self._post(rt, lane="deliberate").status_code == 200
+
+        assert rt.client.get("/api/v4/session_state/sess-1").json()["lane"] == "deliberate"
+
+    def test_an_anonymous_session_still_refuses_a_personal_question(self, rt):
+        """The record exists now, and its default must still be the refusing
+        state — nobody has signed in."""
+        assert self._post(rt, description=self.PERSONAL).status_code == 403
+
+    def test_a_name_in_another_session_does_not_unlock_this_one(self, rt):
+        """Signing in on one device is not signing in on the shared one."""
+        rt.client.patch(
+            "/api/v4/session_state/sess-other",
+            json={"identity": {"display_name": "Tanya Reyes"}},
+        )
+
+        assert self._post(rt, description=self.PERSONAL).status_code == 403
+
+    def test_an_unreadable_record_refuses_rather_than_admits(self, rt):
+        """Fail-closed, at the seam where the gate meets the container.
+
+        A read that raises must resolve to the anonymous identity — the
+        refusing one. Admitting on a Cosmos outage would turn an infrastructure
+        failure into a governance failure on stage.
+        """
+        rt.client.patch(
+            "/api/v4/session_state/sess-1",
+            json={"identity": {"display_name": "Tanya Reyes"}},
+        )
+        rt.store.get_item_by_id = AsyncMock(side_effect=Exception("cosmos is down"))
+
+        assert self._post(rt, description=self.PERSONAL).status_code == 403
+
+    def test_a_failed_lane_recording_does_not_fail_the_request(self, rt):
+        """Recording the lane is best-effort: a badge that cannot be restored
+        after a reload is not a reason to refuse to start the request."""
+        rt.store.update_item = AsyncMock(side_effect=Exception("cosmos is down"))
+
+        assert self._post(rt, lane="fast").status_code == 200
 
 
 # ---------------------------------------------------------------------------

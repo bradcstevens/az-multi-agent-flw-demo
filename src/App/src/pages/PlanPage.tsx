@@ -116,11 +116,11 @@ const PlanPage: React.FC = () => {
     const location = useLocation();
     /**
      * The Lane this plan was routed into, handed over by the surface that
-     * submitted the request (issue #16, ADR-013). Absent on a page reloaded
-     * from a bookmark — #20's server-side session state is what will survive
-     * that, so this deliberately renders nothing rather than guessing.
+     * submitted the request (issue #16, ADR-013). Router state is thrown away
+     * by a reload, so it is only the first of two sources — see
+     * `laneFromSessionState` below.
      */
-    const laneTaken = (location.state as { lane?: string } | null)?.lane;
+    const laneFromRouterState = (location.state as { lane?: string } | null)?.lane;
     const dispatch = useAppDispatch();
     const { showToast, dismissToast } = useInlineToaster();
     const { messagesContainerRef, finalResultRef, scrollToBottom, scrollToFinalResult } = useAutoScroll();
@@ -155,6 +155,35 @@ const PlanPage: React.FC = () => {
     const [pendingNavigation, setPendingNavigation] = React.useState<(() => void) | null>(null);
     const [processingElapsedSeconds, setProcessingElapsedSeconds] = React.useState<number>(0);
     const processingStatusMessage = getPlanProcessingStatusMessage(processingElapsedSeconds);
+
+    /* ── The lane taken, recovered after a reload (issue #20) ─── */
+    const [laneFromSessionState, setLaneFromSessionState] = React.useState<string | undefined>(undefined);
+    const planSessionId = planData?.plan?.session_id;
+
+    useEffect(() => {
+        /*
+          A reloaded or bookmarked plan has no router state, so the lane taken
+          is read back from server-side session state — the browser cannot
+          re-derive it, and re-deriving it here would be a second lane router
+          with its own opinion. A failed read leaves the badge unrendered
+          rather than guessing a lane.
+        */
+        if (laneFromRouterState || !planSessionId) return;
+        let cancelled = false;
+        apiService
+            .getSessionState(planSessionId)
+            .then((state) => {
+                if (!cancelled && typeof state?.lane === 'string') {
+                    setLaneFromSessionState(state.lane);
+                }
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [laneFromRouterState, planSessionId]);
+
+    const laneTaken = laneFromRouterState ?? laneFromSessionState;
 
     const { isPlanActive } = usePlanCancellationAlert({
         planData,
@@ -411,11 +440,12 @@ const PlanPage: React.FC = () => {
                         <>
                             <ContentToolbar panelTitle="Multi-Agent Planner">
                                 {/*
-                                  The Lane this plan was routed into (ADR-013),
-                                  handed over by the surface that submitted it.
+                                  The Lane this plan was routed into (ADR-013).
                                   It is the lane *taken*, which is why it sits
                                   beside the plan rather than beside the Quick
-                                  Task that declared one.
+                                  Task that declared one — and why a reload
+                                  reads it back from server-side session state
+                                  rather than re-deriving it here.
                                 */}
                                 {isLane(laneTaken) && (
                                     <LaneBadge lane={laneTaken} variant="taken" />
