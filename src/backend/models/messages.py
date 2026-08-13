@@ -135,6 +135,13 @@ class TimeoutNotification:
         }
 
 
+# The three transparency payloads (issue #23) — SourceUsed, TokenUsage and
+# PresenterAlert — live in ``transparency/payloads.py``, with the package that
+# decides what each may claim, the way ``Citation`` lives in ``sop/``. Only
+# their ``WebsocketMessageType`` members are here, because the transport is
+# this file's business.
+
+
 class WebsocketMessageType(str, Enum):
     """Types of WebSocket messages sent over the WebSocket connection."""
     SYSTEM_MESSAGE = "system_message"
@@ -153,6 +160,13 @@ class WebsocketMessageType(str, Enum):
     TIMEOUT_NOTIFICATION = "timeout_notification"
     ERROR_MESSAGE = "error_message"
     PING = "ping"
+    # The three transparency signals (issue #23). They share this enum and this
+    # socket rather than a channel of their own — the frontend already
+    # subscribes here, and a second transport is a second thing to fail on
+    # stage.
+    SOURCE_USED = "source_used"
+    TOKEN_USAGE = "token_usage"
+    PRESENTER_ALERT = "presenter_alert"
 
 
 @dataclass(slots=True)

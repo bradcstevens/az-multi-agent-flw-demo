@@ -261,16 +261,51 @@ snippet, while `appearance.text` is the whole document (see **Citation appearanc
 panel renders `Citation.snippet()`, which truncates `text`; rendering `abstract` prints the filename
 twice.
 
+**Source used** — the server-side half of that pair, emitted as `WebsocketMessageType.SOURCE_USED`
+from the `/sop/ask` bridge once the Direct Line reply is in hand (#23). Built by
+`transparency.source.source_used`, which carries `platform`, `source`, `agent_name`,
+`conversation_id` and the citations. A **failed** reply emits nothing: the fixed failure message is
+the backend's own words, so lighting the panel for it would credit Copilot Studio with an answer it
+never gave — the lie #18's deadline rule exists to refuse. A **successful answer with no citations
+does** emit, because that is the rehearsed out-of-corpus honest miss, and the panel showing the
+route with nothing retrieved is exactly the beat.
+
 **Citation appearance** — the `appearance` object inside a Direct Line citation entity:
 `name` and `abstract` both carry the uploaded document's filename, and `text` carries the entire
 document as HTML. ADR-011 was written expecting `abstract` to be the snippet; it is not, so the
 Grounding panel truncates `text` itself or shows the name alone.
 
 **Token meter** — the R7 per-agent call and token counter. Net-new: the accelerator emits no token
-telemetry. Its emission point is the executor-completed branch of the event stream.
+telemetry. Its emission point is the executor-completed branch of the event stream, as
+`WebsocketMessageType.TOKEN_USAGE` (#23). The counts are read by **duck typing** in
+`transparency.tokens` — `agent_framework` is stubbed in the backend suite, so a reader written
+against `isinstance` would be testing the stub. Three levels are searched, and the **first that has
+a number wins**: the item's `contents` (where a `"usage"` content sits), an `AgentExecutorResponse`'s
+wrapped `agent_response` (where streaming accumulates usage after stripping it out of contents), and
+the item itself. Reading all three double-counts the same cost, which is as wrong as reporting
+none. When no usage was reported the event is **not sent** — a zero would read on the meter as *this
+agent was free*, and R7's guardrail column (a refused request adds nothing) depends on nothing being
+the only thing that looks like nothing. That absence is logged at debug: whether the framework
+reports the orchestrator's own usage is **not verified live**, because
+`StandardMagenticManager._complete` returns `response.messages[-1]` and drops
+`AgentResponse.usage_details` on the way.
 
 **Presenter alert** — the R8 proactive shift-task message, triggered by a hidden backend route plus
-a keyboard chord and pushed over the existing WebSocket. No wall-clock timer.
+a keyboard chord and pushed over the existing WebSocket. No wall-clock timer. The route is
+`POST /api/v4/presenter/alert` with `include_in_schema=False` (#23) — hidden rather than
+authenticated, which is why the **words and the recipient are both the server's**: the body selects
+a name from a rehearsed roster in `transparency.alert` and there is no parameter that accepts prose.
+
+**Out-of-band recipient** — how a push that no WebSocket asked for finds its socket.
+`ConnectionConfig.sole_user()` returns the connected user when there is **exactly one**, and `None`
+otherwise; it never guesses between two. Deliberately not the LLM-supplied `user_id` that `ask_user`
+takes: a model mis-copying a UUID must not be able to make the Grounding panel go dark.
+`send_status_update_async` reports whether it reached a socket, which every streaming caller ignores
+and the alert route does not — the presenter pressed a key, and being told nothing happened is the
+difference between a bug and a chord that missed.
+
+All three signals are recorded in full in
+[docs/transparency-signals.md](docs/transparency-signals.md).
 
 **Quick Task** — a starting task the presenter taps instead of typing. Six of them, including one
 that deliberately routes to the **Deliberate lane** and one rehearsed out-of-corpus probe. Carries

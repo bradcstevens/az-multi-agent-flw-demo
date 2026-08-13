@@ -249,6 +249,79 @@ class TestConnectionRegistry:
         assert "proc1" not in cc.connections
 
 
+class TestSoleUser:
+    """Who an out-of-band push goes to (issue #23).
+
+    The Grounding panel's signal is emitted from the ``/sop/ask`` bridge, which
+    the MCP container calls with no user of its own, and the Presenter alert is
+    fired by a hidden route. Neither asks the model for a ``user_id`` the way
+    ``ask_user`` does: a model mis-copying a UUID must not be able to make the
+    demo's centrepiece panel go dark. This is the same sole-connection rule
+    ``send_status_update_async`` already applies, named so a caller can ask for
+    it deliberately.
+    """
+
+    def test_one_connected_user_is_the_recipient(self):
+        cc = ConnectionConfig()
+        cc.user_to_process["u1"] = "proc1"
+
+        assert cc.sole_user() == "u1"
+
+    def test_nobody_connected_is_nobody_to_tell(self):
+        assert ConnectionConfig().sole_user() is None
+
+    def test_two_connected_users_is_a_guess_and_it_refuses(self):
+        """The demo runs single-replica with one presenter. If that ever stops
+        being true, a panel that guessed would attribute one associate's answer
+        to another's screen."""
+        cc = ConnectionConfig()
+        cc.user_to_process["u1"] = "proc1"
+        cc.user_to_process["u2"] = "proc2"
+
+        assert cc.sole_user() is None
+
+
+class TestDeliveryIsReported:
+    """Whether a push reached a socket (issue #23).
+
+    Every pre-existing caller ignores the answer, which is right for them — a
+    lost streaming chunk is not worth a branch. The Presenter alert is the one
+    caller that needs it, because the presenter pressed a key and being told
+    nothing happened is the difference between a bug and a chord that missed.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_push_that_reached_a_socket_says_so(self):
+        cc = ConnectionConfig()
+        cc.connections["proc1"] = AsyncMock()
+        cc.user_to_process["u1"] = "proc1"
+
+        assert await cc.send_status_update_async({"k": "v"}, user_id="u1") is True
+
+    @pytest.mark.asyncio
+    async def test_nobody_connected_is_not_delivered(self):
+        cc = ConnectionConfig()
+
+        assert await cc.send_status_update_async({"k": "v"}, user_id="u1") is False
+
+    @pytest.mark.asyncio
+    async def test_a_socket_that_refused_the_write_is_not_delivered(self):
+        cc = ConnectionConfig()
+        ws = AsyncMock()
+        ws.send_text.side_effect = RuntimeError("socket gone")
+        cc.connections["proc1"] = ws
+        cc.user_to_process["u1"] = "proc1"
+
+        assert await cc.send_status_update_async({"k": "v"}, user_id="u1") is False
+
+    @pytest.mark.asyncio
+    async def test_a_mapping_with_no_socket_behind_it_is_not_delivered(self):
+        cc = ConnectionConfig()
+        cc.user_to_process["u1"] = "proc-gone"
+
+        assert await cc.send_status_update_async({"k": "v"}, user_id="u1") is False
+
+
 class TestSendStatusUpdateAsync:
     @pytest.mark.asyncio
     async def test_no_user_id(self):

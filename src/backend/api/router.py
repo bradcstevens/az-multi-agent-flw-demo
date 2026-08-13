@@ -30,6 +30,9 @@ from services.team_service import TeamService
 from session.store import SessionStateStore
 from sop.direct_line import DIRECT_LINE_FAILURE, DirectLineClient, SopAnswer
 from sop.provenance import SOP_PLATFORM, SOP_SOURCE
+from transparency.alert import REHEARSED_ALERT, REHEARSED_ALERTS  # noqa: F401  (the rehearsed copy, asserted on in tests)
+from transparency.alert import presenter_alert as build_presenter_alert
+from transparency.source import source_used
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -818,7 +821,7 @@ async def sop_ask(request: Request):
         logger.error("sop/ask: no SOP agent to ask: %s", exc)
         answer = SopAnswer(text=DIRECT_LINE_FAILURE, failed=True)
 
-    return {
+    reply = {
         "text": answer.text,
         "failed": answer.failed,
         "conversation_id": answer.conversation_id,
@@ -835,6 +838,91 @@ async def sop_ask(request: Request):
             for citation in answer.citations
         ],
     }
+
+    # The Grounding panel's first signal (#23), emitted where the hop actually
+    # happened rather than inferred later from the transcript. `source_used`
+    # returns nothing for a failed reply.
+    await _push_source_used(reply)
+
+    return reply
+
+
+async def _push_source_used(reply: dict) -> None:
+    """Tell the Grounding panel which platform answered (issue #23).
+
+    The recipient is resolved **server-side and nowhere else**. The MCP
+    container calls this bridge with no user of its own and is deliberately not
+    asked for one the way ``ask_user`` asks: a model mis-copying a UUID must
+    not be able to darken the demo's centrepiece panel, and a bridge reachable
+    without credentials must not be able to push one associate's provenance
+    onto another's screen.
+
+    Every failure here is swallowed. R6 is a presentation surface; no answer
+    may ever be lost because its provenance could not be reported.
+    """
+    try:
+        signal = source_used(reply)
+        if signal is None:
+            return
+        recipient = connection_config.sole_user()
+        if not recipient:
+            logger.debug("sop/ask: nobody connected to tell about the source used")
+            return
+        await connection_config.send_status_update_async(
+            signal,
+            user_id=recipient,
+            message_type=WebsocketMessageType.SOURCE_USED,
+        )
+    except Exception as exc:
+        logger.error("sop/ask: could not report the source used: %s", exc)
+
+
+# ------------------------------------------------------------------
+# The Presenter alert's hidden route (issue #23)
+# ------------------------------------------------------------------
+
+@app_router.post("/presenter/alert", include_in_schema=False)
+async def presenter_alert(request: Request):
+    """Fire R8's proactive shift-task alert over the existing WebSocket.
+
+    Hidden — kept out of the published schema — because the audience is looking
+    at the same screen and the beat only works if the control is invisible and
+    unguessable. The frontend's keyboard chord (#24) POSTs here with an empty
+    body, which fires the rehearsed alert.
+
+    Hidden is not authenticated, so the route is built so that being found
+    costs little: the **words are the server's** and the **recipient is the
+    server's**. A caller names one of the rehearsed alerts and can neither
+    compose a message nor choose whose screen it lands on. The worst an
+    uninvited caller achieves is a rehearsed shift-task alert appearing early.
+
+    There is deliberately **no wall-clock timer** anywhere on this path. The
+    beat has to land when the presenter is talking about it; a timer would land
+    it whenever the timer said so, and on stage that is an interruption rather
+    than a demonstration.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+
+    recipient = connection_config.sole_user()
+    if not recipient:
+        # Unlike the Grounding panel's push, this one has no answer to protect.
+        # The presenter pressed a key and nothing happened; saying so is the
+        # difference between a bug and a chord that missed.
+        raise HTTPException(status_code=404, detail="no connected client to alert")
+
+    delivered = await connection_config.send_status_update_async(
+        build_presenter_alert(body.get("alert")),
+        user_id=recipient,
+        message_type=WebsocketMessageType.PRESENTER_ALERT,
+    )
+    if not delivered:
+        raise HTTPException(status_code=502, detail="the alert was not delivered")
+    return {"status": "alerted"}
 
 
 @app_router.post("/user_clarification")

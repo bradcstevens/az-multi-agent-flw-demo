@@ -89,6 +89,7 @@ from guardrail.corpus import (  # noqa: E402
 )
 from guardrail.gate import IdentityBoundaryGate  # noqa: E402
 from guardrail.refusal import IDENTITY_BOUNDARY_REFUSAL  # noqa: E402
+from models.messages import WebsocketMessageType  # noqa: E402
 from sop.citation import Citation  # noqa: E402
 from sop.direct_line import SopAnswer  # noqa: E402
 
@@ -175,10 +176,16 @@ def rt(monkeypatch):
     orchestration_manager.return_value.run_orchestration = AsyncMock()
 
     connection_config = MagicMock()
-    connection_config.send_status_update_async = AsyncMock()
+    # Truthy by default: the transport reports whether a push was delivered
+    # (issue #23), and every pre-existing caller ignores the answer.
+    connection_config.send_status_update_async = AsyncMock(return_value=True)
     connection_config.close_connection = AsyncMock()
     connection_config.add_connection = MagicMock()
     connection_config.wait_for_clarification = AsyncMock(return_value="the answer")
+    # The recipient an out-of-band push resolves to when the caller names none
+    # (issue #23) — the MCP container has no user, and the presenter's chord
+    # need not carry one.
+    connection_config.sole_user = MagicMock(return_value="user-1")
 
     orchestration_config = MagicMock()
     orchestration_config.wait_for_clarification = AsyncMock(return_value="the answer")
@@ -1309,3 +1316,183 @@ class TestSopAsk:
         assert body["failed"] is True
         assert body["text"] == router_mod.DIRECT_LINE_FAILURE
         assert body["citations"] == []
+
+
+# ---------------------------------------------------------------------------
+# The three transparency signals (issue #23)
+# ---------------------------------------------------------------------------
+def _pushes(rt, message_type):
+    """Every WebSocket push of one message type, in order."""
+    return [
+        call for call in rt.connection_config.send_status_update_async.call_args_list
+        if call.kwargs.get("message_type") == message_type
+    ]
+
+
+class TestSourceUsedSignal:
+    """The Grounding panel's first signal, emitted where the hop happened.
+
+    R6 is driven by **two signals combined** — this event, which proves which
+    *platform* answered, and the citations on the reply, which supply the
+    document detail. Neither alone satisfies the requirement, so both leave the
+    backend from the same place: the `/sop/ask` bridge.
+    """
+
+    def _post(self, rt, question="How do I close the store?", **body):
+        return rt.client.post("/api/v4/sop/ask", json={"question": question, **body})
+
+    def test_an_answer_pushes_the_platform_that_produced_it(self, rt, monkeypatch):
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        self._post(rt)
+
+        (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
+        assert push[0][0].platform == "Copilot Studio"
+        assert push[0][0].source == "Dataverse"
+
+    def test_the_documents_travel_on_the_same_push(self, rt, monkeypatch):
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        self._post(rt)
+
+        (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
+        (citation,) = push[0][0].citations
+        assert citation["name"] == "SOP-102 Store Closing Procedure.docx"
+
+    def test_a_failure_lights_nothing(self, rt, monkeypatch):
+        """The fixed failure message is the backend's own words. A panel lit
+        over it would claim the cross-platform hop happened on the one occasion
+        it did not — the same lie as a fallback to model knowledge."""
+        def _unconfigured():
+            raise ValueError("not configured")
+
+        monkeypatch.setattr(router_mod, "sop_client", _unconfigured)
+
+        self._post(rt)
+
+        assert _pushes(rt, WebsocketMessageType.SOURCE_USED) == []
+
+    def test_the_recipient_is_the_sole_connected_user(self, rt, monkeypatch):
+        """The MCP container calls this bridge with no user of its own, and it
+        is never asked to invent one: a model mis-copying a UUID must not be
+        able to make the demo's centrepiece panel go dark."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        self._post(rt)
+
+        (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
+        assert push.kwargs["user_id"] == "user-1"
+
+    def test_a_caller_cannot_choose_whose_panel_lights_up(self, rt, monkeypatch):
+        """The recipient is resolved server-side and nowhere else. A bridge the
+        MCP container reaches without credentials must not be able to push one
+        associate's provenance onto another's screen."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        self._post(rt, user_id="somebody-else")
+
+        (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
+        assert push.kwargs["user_id"] == "user-1"
+
+    def test_nobody_connected_does_not_cost_the_answer(self, rt, monkeypatch):
+        """The panel is a presentation surface. An answer must never be lost
+        because there was no screen to report its provenance to."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        rt.connection_config.sole_user.return_value = None
+
+        response = self._post(rt)
+
+        assert response.status_code == 200
+        assert response.json()["text"] == "1. Count the drawer."
+        assert _pushes(rt, WebsocketMessageType.SOURCE_USED) == []
+
+
+class TestPresenterAlert:
+    """R8's beat, fired on demand and never on a clock.
+
+    A wall-clock timer would land the proactive message when the timer said so
+    rather than when the presenter was talking about it — which on stage is the
+    difference between a demonstration and an interruption.
+    """
+
+    ROUTE = "/api/v4/presenter/alert"
+
+    def test_the_route_pushes_an_alert(self, rt):
+        rt.connection_config.send_status_update_async.return_value = True
+        rt.client.post(self.ROUTE, json={})
+
+        (push,) = _pushes(rt, WebsocketMessageType.PRESENTER_ALERT)
+        assert push[0][0].title
+        assert push[0][0].content
+
+    def test_an_empty_body_fires_the_rehearsed_alert(self, rt):
+        """The chord (#24) fires with nothing to say. The rehearsed shift-task
+        alert is what it means."""
+        rt.client.post(self.ROUTE, json={})
+
+        (push,) = _pushes(rt, WebsocketMessageType.PRESENTER_ALERT)
+        assert push[0][0].title == router_mod.REHEARSED_ALERT.title
+
+    def test_the_caller_names_an_alert_but_never_writes_one(self, rt):
+        """The route is hidden, not authenticated, and it pushes to the screen
+        the audience is watching. So the words are the server's: a caller may
+        choose from the rehearsed roster and may not compose anything."""
+        rt.client.post(
+            self.ROUTE,
+            json={"alert": "delivery", "title": "PWNED", "content": "anything at all"},
+        )
+
+        (push,) = _pushes(rt, WebsocketMessageType.PRESENTER_ALERT)
+        assert push[0][0].title == router_mod.REHEARSED_ALERTS["delivery"].title
+        assert "PWNED" not in push[0][0].title
+        assert "anything at all" not in push[0][0].content
+
+    def test_an_unknown_name_is_the_rehearsed_alert_not_an_error(self, rt):
+        """A mistyped chord on stage should still produce the beat."""
+        rt.client.post(self.ROUTE, json={"alert": "no-such-alert"})
+
+        (push,) = _pushes(rt, WebsocketMessageType.PRESENTER_ALERT)
+        assert push[0][0].title == router_mod.REHEARSED_ALERT.title
+
+    def test_the_recipient_is_resolved_server_side_only(self, rt):
+        rt.client.post(self.ROUTE, json={"user_id": "somebody-else"})
+
+        (push,) = _pushes(rt, WebsocketMessageType.PRESENTER_ALERT)
+        assert push.kwargs["user_id"] == "user-1"
+
+    def test_an_undelivered_alert_is_not_reported_as_delivered(self, rt):
+        """The socket can accept the push and drop it. The presenter pressed a
+        key; being told it did not land is the difference between a bug and a
+        chord that missed."""
+        rt.connection_config.send_status_update_async.return_value = False
+
+        assert rt.client.post(self.ROUTE, json={}).status_code == 502
+
+    def test_nobody_connected_is_a_404_not_a_silent_success(self, rt):
+        """Unlike the Grounding panel's push, this one has no answer to
+        protect: the presenter pressed a key and nothing happened, and being
+        told so is the difference between a bug and a chord that missed."""
+        rt.connection_config.sole_user.return_value = None
+
+        response = rt.client.post(self.ROUTE, json={})
+
+        assert response.status_code == 404
+        assert _pushes(rt, WebsocketMessageType.PRESENTER_ALERT) == []
+
+    def test_the_route_is_absent_from_the_published_schema(self, rt):
+        """Hidden means hidden. The audience is looking at the same screen, and
+        a route listed in the docs is a control they can find."""
+        route = next(
+            r for r in router_mod.app_router.routes
+            if getattr(r, "path", None) == self.ROUTE
+        )
+        assert route.include_in_schema is False
+
+    def test_no_wall_clock_timer_anywhere_on_the_path(self):
+        """The one thing the acceptance criteria forbid outright, pinned as a
+        property of the module rather than as a promise in a review."""
+        import inspect
+
+        source = inspect.getsource(router_mod.presenter_alert)
+        for forbidden in ("sleep", "Timer", "call_later", "time()"):
+            assert forbidden not in source

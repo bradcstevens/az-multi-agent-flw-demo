@@ -62,8 +62,9 @@ sys.modules['azure.cosmos'] = Mock(CosmosClient=Mock)
 # ---------------------------------------------------------------------------
 class MockMessage:
     """Mock Message returned by executor_completed events."""
-    def __init__(self, text="Mock message"):
+    def __init__(self, text="Mock message", contents=None):
         self.text = text
+        self.contents = contents or []
 
 
 class MockAgentResponseUpdate:
@@ -218,6 +219,9 @@ sys.modules['services.team_service'] = Mock(TeamService=MockTeamService)
 sys.modules['callbacks.response_handlers'] = Mock(
     agent_response_callback=Mock(),
     streaming_agent_response_callback=AsyncMock(),
+    # Real, because the Token meter's attribution is this function's output and
+    # a Mock display name would let a broken attribution pass (issue #23).
+    format_agent_display_name=lambda raw: raw.replace("_", " ").title(),
 )
 
 # ---- Mock orchestration.connection_config ----
@@ -242,6 +246,7 @@ class MockWebsocketMessageType:
     PLAN_APPROVAL_REQUEST = "plan_approval_request"
     PLAN_APPROVAL_RESPONSE = "plan_approval_response"
     AGENT_MESSAGE_STREAMING = "agent_message_streaming"
+    TOKEN_USAGE = "token_usage"
 
 
 class MockAgentMessageStreaming:
@@ -1157,3 +1162,143 @@ class TestNormalizeMarkdownTables:
     def test_given_non_table_pipe_line_when_reflowed_then_returns_none(self):
         assert _reflow_collapsed_table_line("a | b | c") is None
 
+
+# ---------------------------------------------------------------------------
+# The Token meter's signal (issue #23)
+# ---------------------------------------------------------------------------
+class TestTokenUsageEmission:
+    """Token accounting is net-new — the MACAE baseline emits none at all.
+
+    Its insertion point is the **executor-completed** branch, which is the one
+    place a turn is over and its cost is final.
+    """
+
+    def setup_method(self):
+        connection_config.send_status_update_async.reset_mock()
+        orchestration_config.get_current_orchestration.return_value = None
+
+    def _run(self, events):
+        workflow = Mock()
+        workflow.run = Mock(return_value=_async_iter(events))
+        workflow._executors = {}
+        workflow.executors = {}
+        workflow.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = workflow
+        return OrchestrationManager().run_orchestration(
+            user_id="user-1", input_task="task"
+        )
+
+    @staticmethod
+    def _usage(**counts):
+        return Mock(type="usage", usage_details=dict(counts))
+
+    def _token_calls(self):
+        return [
+            call for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == MockWebsocketMessageType.TOKEN_USAGE
+        ]
+
+    @pytest.mark.asyncio
+    async def test_a_completed_executor_reports_what_its_turn_cost(self):
+        message = MockMessage(
+            text="Here are the steps.",
+            contents=[self._usage(input_token_count=120, output_token_count=45)],
+        )
+
+        await self._run([
+            _make_event("executor_completed", data=[message], executor_id="shift_tasks_agent"),
+        ])
+
+        (call,) = self._token_calls()
+        payload = call[0][0]
+        assert (payload.input_tokens, payload.output_tokens, payload.total_tokens) == (120, 45, 165)
+
+    @pytest.mark.asyncio
+    async def test_the_cost_is_attributed_by_executor_identifier(self):
+        """Not by the plan — in the Fast lane plan review is off, so there is no
+        plan to read an agent name out of and the meter would go blank on the
+        lane the demo spends most of its time in."""
+        message = MockMessage(contents=[self._usage(total_token_count=7)])
+
+        await self._run([
+            _make_event("executor_completed", data=[message], executor_id="shift_tasks_agent"),
+        ])
+
+        (call,) = self._token_calls()
+        assert call[0][0].executor_id == "shift_tasks_agent"
+        assert call[0][0].agent_name == "Shift Tasks Agent"
+
+    @pytest.mark.asyncio
+    async def test_the_orchestrator_is_metered_like_any_other_executor(self):
+        """The branch treats the manager no differently: the R7 claim is
+        per-agent cost, and a meter that excluded the orchestrator would
+        understate the architecture's price to the audience.
+
+        Whether the framework *reports* the manager's usage is a separate
+        question and is not verified live — `StandardMagenticManager._complete`
+        returns `response.messages[-1]` and drops `AgentResponse.usage_details`
+        on the way. The debug line in `_emit_token_usage` is how the first real
+        run answers it."""
+        message = MockMessage(
+            text="Final answer",
+            contents=[self._usage(input_token_count=900, output_token_count=100)],
+        )
+
+        await self._run([
+            _make_event("executor_completed", data=[message], executor_id="magentic_orchestrator"),
+        ])
+
+        (call,) = self._token_calls()
+        assert call[0][0].executor_id == "magentic_orchestrator"
+        assert call[0][0].total_tokens == 1000
+
+    @pytest.mark.asyncio
+    async def test_an_event_reporting_no_usage_emits_nothing(self):
+        """A zero on the meter says the agent was free. Silence says the
+        framework did not report — and only one of those is true."""
+        await self._run([
+            _make_event("executor_completed", data=[MockMessage()], executor_id="hr_agent"),
+        ])
+
+        assert self._token_calls() == []
+
+
+# ---------------------------------------------------------------------------
+# Agent attribution with plan review off (issue #23)
+# ---------------------------------------------------------------------------
+class TestAttributionWithoutAPlan:
+    """The Fast lane runs with **Plan review** off, so there is no plan object.
+
+    Attribution has to come from somewhere that still exists on that lane, and
+    the executor identifier is that place — the same place the Token meter
+    reads. A panel that read the plan would be blank on the lane the demo
+    spends most of its time in.
+    """
+
+    def setup_method(self):
+        connection_config.send_status_update_async.reset_mock()
+
+    @pytest.mark.asyncio
+    async def test_a_streaming_agent_is_named_with_no_plan_in_sight(self):
+        workflow = Mock()
+        workflow.run = Mock(return_value=_async_iter([
+            _make_event("output", data=MockAgentResponseUpdate(text="chunk"),
+                        executor_id="shift_tasks_agent"),
+        ]))
+        workflow._executors = {}
+        workflow.executors = {}
+        workflow.get_executors_list.return_value = []
+        # No plan review request is ever emitted on this stream, and no plan is
+        # cached — the Fast lane's actual shape.
+        orchestration_config.get_current_orchestration.return_value = workflow
+
+        await OrchestrationManager().run_orchestration(
+            user_id="user-1", input_task="what are my shift tasks?"
+        )
+
+        headers = [
+            call[0][0] for call in connection_config.send_status_update_async.call_args_list
+            if isinstance(call[0][0], MockAgentMessageStreaming)
+        ]
+        assert headers, "no agent header was sent"
+        assert "Shift Tasks Agent" in headers[0].content

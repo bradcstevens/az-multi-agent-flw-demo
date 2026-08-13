@@ -32,6 +32,7 @@ from orchestration.plan_review_helpers import (convert_plan_review_to_mplan,
                                                wait_for_plan_approval)
 from patches.tool_history_leak import apply_tool_history_leak_patch
 from services.team_service import TeamService
+from transparency.tokens import token_usage
 
 # Apply patch: MAF bug causes tool_call/tool_result messages to leak across
 # participants in GroupChat, triggering "No tool call found for call_id" 400 errors.
@@ -1023,6 +1024,41 @@ class OrchestrationManager:
 
         return responses
 
+    async def _emit_token_usage(
+        self, executor_id: str, messages: list, user_id: str
+    ) -> None:
+        """Report what one executor's completed turn cost (issue #23).
+
+        Silent when the framework reported no usage: ``token_usage`` returns
+        ``None`` rather than a zero, because a zero on the Token meter is the
+        claim *this agent was free*.
+
+        Failure here is swallowed. The meter is a presentation surface; an
+        answer must never be lost because its price could not be reported.
+        """
+        try:
+            usage = token_usage(
+                executor_id, format_agent_display_name(executor_id), messages
+            )
+            if usage is None:
+                # Deliberately observable. Whether the framework reports the
+                # manager's own usage on this event is not verified live, and
+                # this line is how the first real run says so rather than the
+                # meter simply being short an agent.
+                self.logger.debug(
+                    "[TOKENS] %s completed with no usage reported", executor_id
+                )
+                return
+            await connection_config.send_status_update_async(
+                usage,
+                user_id,
+                message_type=WebsocketMessageType.TOKEN_USAGE,
+            )
+        except Exception as usage_err:
+            self.logger.error(
+                "Error emitting token usage for %s: %s", executor_id, usage_err
+            )
+
     async def _process_event_stream(
         self,
         stream,
@@ -1157,6 +1193,11 @@ class OrchestrationManager:
                     and event.executor_id
                 ):
                     agent_id = event.executor_id
+                    # The Token meter's one insertion point (#23). A turn is
+                    # over here and its cost is final, and every executor is
+                    # metered — including the orchestrator, whose tokens are
+                    # the architecture's own price.
+                    await self._emit_token_usage(agent_id, event.data, user_id)
                     if agent_id == "magentic_orchestrator":
                         for msg in event.data:
                             if isinstance(msg, Message) and msg.text:

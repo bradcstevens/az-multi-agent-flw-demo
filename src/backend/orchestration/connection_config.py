@@ -214,6 +214,26 @@ class ConnectionConfig:
         """Fetch a connection by process_id."""
         return self.connections.get(process_id)
 
+    def sole_user(self) -> Optional[str]:
+        """The one connected user, when there is exactly one — else ``None``.
+
+        The recipient for a push that originates outside a request the user
+        made: the Grounding panel's source-used signal, emitted from the
+        ``/sop/ask`` bridge that the MCP container calls with no user of its
+        own, and the Presenter alert. Deliberately **not** a ``user_id`` copied
+        by the model the way ``ask_user`` asks for one — a mis-copied UUID
+        would make the demo's centrepiece panel go dark, and the panel is a
+        presentation signal that must never be able to cost an answer.
+
+        Refuses to guess with two users connected. That is the same rule
+        ``send_status_update_async`` already applies below, named here so a
+        caller can ask for it deliberately rather than by passing a wrong id
+        and relying on the fallback.
+        """
+        if len(self.user_to_process) == 1:
+            return next(iter(self.user_to_process))
+        return None
+
     async def close_connection(self, process_id: str) -> None:
         """Close and remove a connection by process_id."""
         connection = self.get_connection(process_id)
@@ -233,11 +253,18 @@ class ConnectionConfig:
         message: Any,
         user_id: str,
         message_type: WebsocketMessageType = WebsocketMessageType.SYSTEM_MESSAGE,
-    ) -> None:
-        """Send a status update to a user via its mapped process connection."""
+    ) -> bool:
+        """Send a status update to a user via its mapped process connection.
+
+        Returns whether the message reached a socket. Every pre-existing caller
+        ignores the answer, which is right for them — a lost streaming chunk is
+        not worth a branch. The Presenter alert (#23) is the one caller that
+        needs it: the presenter pressed a key, and being told nothing happened
+        is the difference between a bug and a chord that missed.
+        """
         if not user_id:
             logger.warning("No user_id provided for WebSocket message")
-            return
+            return False
 
         process_id = self.user_to_process.get(user_id)
         if not process_id:
@@ -258,7 +285,7 @@ class ConnectionConfig:
                 logger.debug(
                     "No active WebSocket process found for user ID: %s", user_id
                 )
-                return
+                return False
 
         try:
             if hasattr(message, "to_dict"):
@@ -279,14 +306,17 @@ class ConnectionConfig:
                 logger.debug(
                     "Message sent to user %s via process %s", user_id, process_id
                 )
+                return True
             except Exception as e:
                 logger.error("Failed to send message to user %s: %s", user_id, e)
                 self.remove_connection(process_id)
+                return False
         else:
             logger.warning(
                 "No connection found for process ID: %s (user: %s)", process_id, user_id
             )
             self.user_to_process.pop(user_id, None)
+        return False
 
     def send_status_update(self, message: str, process_id: str) -> None:
         """Sync helper to send a message by process_id."""
