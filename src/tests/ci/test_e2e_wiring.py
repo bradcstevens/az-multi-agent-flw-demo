@@ -162,6 +162,10 @@ def test_each_claimed_beat_has_a_spec_and_every_spec_is_reachable():
         assert spec.suffixes == [".spec", ".ts"], (
             f"{spec.name} is not a Playwright default spec filename"
         )
+    for exclusion in ("testMatch", "testIgnore", "grep:", "grepInvert"):
+        assert exclusion not in config, (
+            f"the validator config can exclude authored specs with {exclusion!r}"
+        )
 
 
 def test_every_rebased_spec_leaves_rehearsal_evidence():

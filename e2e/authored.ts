@@ -37,6 +37,14 @@ const SURFACE_MODULE = join(
     'models',
     'storeSurface.ts',
 );
+const TICKET_MODULE = join(
+    REPO_ROOT,
+    'src',
+    'backend',
+    'escalation',
+    'ticket.py',
+);
+const LANE_MODULE = join(REPO_ROOT, 'src', 'backend', 'lane', 'lane.py');
 
 export interface QuickTask {
     id: string;
@@ -133,6 +141,19 @@ export function followOnTaskFor(task: QuickTask): QuickTask {
     );
 }
 
+/** The Deliberate lane's value, from the router that defines it. */
+export function deliberateLane(): string {
+    return pythonString(LANE_MODULE, 'DELIBERATE');
+}
+
+/** The shape a simulated ticket's number has, from the ticket module. */
+export function ticketNumberPattern(): RegExp {
+    const prefix = pythonString(TICKET_MODULE, 'TICKET_ID_PREFIX');
+    return new RegExp(
+        `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\d{4}$`,
+    );
+}
+
 function requiredTaskString(task: Record<string, unknown>, key: string): string {
     const value = optionalTaskString(task, key);
     if (!value) {
@@ -147,6 +168,18 @@ function optionalTaskString(
 ): string | undefined {
     const value = task[key];
     return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+/** A module-level `NAME = "value"` read from its authored definition. */
+function pythonString(path: string, name: string): string {
+    const source = readFileSync(path, 'utf-8');
+    const match = source.match(
+        new RegExp(`^\\s*${name}\\s*=\\s*"([^"]*)"`, 'm'),
+    );
+    if (!match) {
+        throw new Error(`${name} is not declared by ${path}`);
+    }
+    return match[1];
 }
 
 /** Exactly one authored task, or a failure that names the ambiguous roster. */

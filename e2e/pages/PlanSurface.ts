@@ -129,9 +129,24 @@ export class PlanSurface {
         return this.page.getByRole('button', { name: 'Approve Task Plan' });
     }
 
+    /** The other half of the approval gate. */
+    get rejectButton(): Locator {
+        return this.page.getByRole('button', { name: 'Cancel', exact: true });
+    }
+
     /** The **Simulated ticket** an approved escalation raises (#50's beat). */
     get simulatedTicket(): Locator {
         return this.page.getByTestId('simulated-ticket');
+    }
+
+    /** The simulated identifier an associate can read from the ticket card. */
+    get ticketNumber(): Locator {
+        return this.page.getByTestId('simulated-ticket-id');
+    }
+
+    /** The badge that makes the ticket's simulated nature explicit. */
+    get ticketSimulatedBadge(): Locator {
+        return this.simulatedTicket.getByTestId('simulated-badge');
     }
 
     /** The authored choices for the clarification that is currently pending. */
