@@ -84,13 +84,6 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
   /** The signed-in associate's record, once the unlock has answered (#27). */
   const [personalAnswer, setPersonalAnswer] = useState<PersonalAnswer | null>(null);
   const [signingIn, setSigningIn] = useState<boolean>(false);
-  /**
-   * The Lane declared by the Quick Task that was tapped, if the text in the
-   * box is still that task's prompt. Editing the text clears it — edited text
-   * is free-typed input, and free-typed input is the keyword fallback's job.
-   */
-  const [declaredLane, setDeclaredLane] = useState<string | undefined>(undefined);
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
   const location = useLocation(); // ✅ location.state used to control focus
@@ -133,7 +126,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
    * between the presenter and the payoff, which is the thing the Rehearsed
    * replies exist to prevent (#26).
    */
-  const submitQuestion = async (question: string) => {
+  const submitQuestion = async (question: string, declaredLane?: string) => {
     if (!question) return;
 
     setSubmitting(true);
@@ -268,21 +261,11 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
 
 
   const handleQuickTaskClick = (task: ExtendedQuickTask) => {
-    setInput(task.fullDescription);
-    setDeclaredLane(task.lane);
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
+    void submitQuestion(task.fullDescription, task.lane);
   };
 
-  /**
-   * Typing over a Quick Task's prompt makes it free-typed input, so the
-   * declared Lane goes with it — the backend's keyword fallback is what routes
-   * text the presenter wrote, and a stale declaration would outrank it.
-   */
   const handleInputChange = (value: string) => {
     setInput(value);
-    setDeclaredLane(undefined);
   };
 
   useEffect(() => {

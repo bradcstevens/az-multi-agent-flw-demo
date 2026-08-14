@@ -1,7 +1,6 @@
 // PromptCard.tsx
 import React from "react";
-import { Card } from "@fluentui/react-components";
-import { Body1, Body1Strong } from "@fluentui/react-components";
+import { Body1, Body1Strong, Button } from "@fluentui/react-components";
 
 type PromptCardProps = {
   title: string;
@@ -22,13 +21,16 @@ const PromptCard: React.FC<PromptCardProps> = ({
   badge,
 }) => {
   return (
-    <Card
-      onClick={!disabled ? onClick : undefined} 
+    <Button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
       style={{
         flex: "1",
         display: "flex",
         flexDirection: "column",
         padding: "16px",
+        margin: 0,
         backgroundColor: disabled
           ? "var(--colorNeutralBackgroundDisabled)"
           : "var(--colorNeutralBackground3)",
@@ -40,14 +42,14 @@ const PromptCard: React.FC<PromptCardProps> = ({
         transition: "background-color 0.2s ease-in-out",
       }}
       // 🧠 Only apply hover if not disabled
-      onMouseOver={(e: React.MouseEvent<HTMLDivElement>) => {
+      onMouseOver={(e: React.MouseEvent<HTMLElement>) => {
         if (!disabled) {
           e.currentTarget.style.backgroundColor =
             "var(--colorNeutralBackground3Hover)";
             e.currentTarget.style.border = "1px solid var(--colorNeutralStroke1)"; // subtle shadow on hover
         }
       }}
-      onMouseOut={(e: React.MouseEvent<HTMLDivElement>) => {
+      onMouseOut={(e: React.MouseEvent<HTMLElement>) => {
         if (!disabled) {
           e.currentTarget.style.backgroundColor =
             "var(--colorNeutralBackground3)";
@@ -78,7 +80,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
           </Body1>
         </div>
       </div>
-    </Card>
+    </Button>
   );
 };
 
