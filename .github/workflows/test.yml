@@ -35,6 +35,15 @@ on:
       # its predicate.
       - 'infra/scripts/post-provision/post_deploy.sh'
       - 'infra/scripts/post-provision/post_deploy.ps1'
+      # The deploy path itself (ADR-020). `test_deploy_workflow.py` is the only
+      # thing that asserts the registry is filled before provisioning, that the
+      # image tag is the commit rather than `latest`, and that every parameter
+      # `main.parameters.json` reads without a default has a value in the
+      # repository. Three of those default to the Placeholder image, so an
+      # edit here that drops one does not fail loudly — it reinstates it.
+      - '.github/workflows/deploy-main.yml'
+      - 'infra/environments/**'
+      - 'infra/main.parameters.json'
       # The store assistant's content pack and roster (#19). The pack is the
       # only thing that makes the surface resolve to an assistant at all, and
       # `test_store_pack.py` reads all three: the authored artefacts, the
@@ -103,6 +112,15 @@ on:
       # its predicate.
       - 'infra/scripts/post-provision/post_deploy.sh'
       - 'infra/scripts/post-provision/post_deploy.ps1'
+      # The deploy path itself (ADR-020). `test_deploy_workflow.py` is the only
+      # thing that asserts the registry is filled before provisioning, that the
+      # image tag is the commit rather than `latest`, and that every parameter
+      # `main.parameters.json` reads without a default has a value in the
+      # repository. Three of those default to the Placeholder image, so an
+      # edit here that drops one does not fail loudly — it reinstates it.
+      - '.github/workflows/deploy-main.yml'
+      - 'infra/environments/**'
+      - 'infra/main.parameters.json'
       # The store assistant's content pack and roster (#19). The pack is the
       # only thing that makes the surface resolve to an assistant at all, and
       # `test_store_pack.py` reads all three: the authored artefacts, the

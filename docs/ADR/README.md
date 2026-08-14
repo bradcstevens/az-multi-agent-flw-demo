@@ -30,6 +30,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [017](./017-workforce-agent-answers-process-never-record.md) | The Workforce agent answers HR process, and never an individual's record | Accepted |
 | [018](./018-deployed-build-provenance-check.md) | Check that the deployed build is the build we think it is | Accepted |
 | [019](./019-rebrand-the-sop-corpus-to-circle-k.md) | Rebrand the SOP corpus to Circle K, reversing the Brightpath position | Accepted |
+| [020](./020-deploy-main-on-every-commit.md) | Deploy `main` on every commit, and make the deploy prove its own result | Accepted |
 
 ## Writing a new one
 
