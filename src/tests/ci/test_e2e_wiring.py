@@ -95,7 +95,14 @@ def test_the_recording_is_unconditional():
     # the only run that leaves a recording is the one that went red.
     config = _code(CONFIG)
 
-    assert "video: 'on'" in config, "video is not recorded on passing runs"
+    assert "mode: 'on'" in config or "video: 'on'" in config, (
+        "video is not recorded on passing runs"
+    )
+    for conditional in ("retain-on-failure", "on-first-retry", "off"):
+        assert conditional not in config, (
+            f"video or trace is conditional ('{conditional}'): the only run "
+            "that would leave a recording is one that went red"
+        )
     assert "trace: 'on'" in config, "the trace is not recorded on passing runs"
     assert "'html'" in config, "no HTML report is produced"
 

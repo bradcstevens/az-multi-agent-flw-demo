@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["*.ts", "pages/**/*.ts", "specs/**/*.ts"]
+  "include": ["*.ts", "pages/**/*.ts", "reporters/**/*.ts", "specs/**/*.ts"]
 }
