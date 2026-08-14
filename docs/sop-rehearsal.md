@@ -470,6 +470,67 @@ So AC3 is unmet, and it is unmet for a reason the record can now name precisely 
 reason it was opened about. Ten distinct rephrasings reached the SOP tool over the ten runs and every
 one of them retrieved — the rephrasing question (AC1) stays answered.
 
+## The deploy gate asked once, and once is a coin flip
+
+The last thing measuring the fault changed is the check that had been green throughout it.
+
+`check-deployed-surface.sh`'s `direct-sop-answer` row is the gate `deploy-main.yml` goes green on:
+`azd` exiting zero is not the deployment working, so the workflow asks the running surface a real
+procedure question before it goes green. It asked **one**. Against a fault that fires about 6% of
+the time per Direct Line conversation, one asking is clean nineteen times in twenty, and against a
+beat that was failing one browser run in four it was clean on every attempt across the afternoon
+the browser watched it fail twice in eight. Renaming it from `grounded-answer` fixed the *claim* —
+the row now says out loud that it asks the easier question — and left the *sample size* saying
+nothing at all.
+
+That is the same arithmetic the Fallback topic was found by, and `check-sop-agent.sh` had already
+learned it: `--samples N` asks N times in N fresh conversations, and it took 69 of them to see a
+fault that ten had made look like a difference of path (`0.94¹⁰ ≈ 0.54`). The gate had not.
+
+So `--samples N` is on this check too, and the deploy gate passes `--samples 12`. Twelve Copilot
+Studio messages against a step that already costs twenty minutes and a provision is the right price
+for not approving a deploy on a coin landing heads.
+
+**Twelve is derived, not picked.** A fault firing on a fraction `p` of conversations survives `n`
+independent askings with probability `(1 − p)ⁿ`, and `0.94ⁿ ≤ ½` first holds at `n = 12`. Five
+askings — the first number written here — would have let a 6% regression through about **three
+deploys in four**, which is better than the 94% a single asking allowed and reads far stronger than
+it is. `src/tests/ci/test_deploy_workflow.py` holds the gate to the arithmetic rather than to the
+number, so a future edit that lowers the count fails with the odds it would be accepting.
+
+And the row itself says by how much sampling is not proof:
+
+```
+  PASS  direct-sop-answers-every-time: 12 of 12 askings answered from the corpus, each in a
+        fresh Direct Line conversation. Sampling is not proof: a fault firing on fewer than
+        5.6% of conversations is likelier than not to survive 12 askings, and the one #54
+        measured fires on about 6%
+```
+
+That sentence is in the check's output rather than only here because the operator reads the output.
+A green row saying only *12 of 12* is exactly the shape of evidence that let `grounded-answer` be
+believed across an afternoon the browser watched the same beat fail twice in eight.
+
+Three more properties, each a mistake this repository has already paid for once:
+
+- **One grading rule, two rows.** `direct_sop_fault` grades the first asking for `direct-sop-answer`
+  and every asking for `direct-sop-answers-every-time`. A repeat held to a laxer bar than the first
+  asking is a green row that means less than the row above it.
+- **Broken is not intermittent.** A run in which *nothing* answered says so. They want different
+  next moves: intermittent is a rate to measure, broken is a state to fix, and an operator reading
+  "intermittent" of a beat that never worked goes looking for a rate that is not there.
+- **A hop that did not happen is not the honest miss.** An asking the backend never answered carries
+  no citations, and so does an agent that searched and found nothing; only one of them means the
+  corpus is wrong. This is the distinction `/sop/ask`'s own reply log was given, one layer out.
+
+A single asking still passes — the default is one, and a `--no-probe` run still fails both rows
+rather than omitting them — but a green single sample now ends with what it is not evidence of.
+
+Measured against `rg-macae-flw-v1` the afternoon it was written: `12 of 12 askings answered from
+the corpus, each in a fresh Direct Line conversation`, the whole check in 2m05s. That is AC5. It
+does not close AC3, and it is not meant to: this check asks the corpus's own wording with no
+orchestrator in front of it, and the residual above is the orchestrator.
+
 ## Running the proof
 
 ```bash

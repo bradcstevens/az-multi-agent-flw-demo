@@ -258,8 +258,78 @@ def _direct_line_endpoint_check(endpoint):
     )
 
 
+def smallest_fault_caught(askings):
+    """The smallest per-conversation fault rate `askings` is likelier than not
+    to catch, as a percentage. Pure.
+
+    Sampling is not proof, and this is the number that says by how much. A
+    fault that fires on a fraction `p` of conversations survives `n`
+    independent askings with probability `(1 - p)ⁿ`, so the rate at which that
+    reaches an even chance is `1 - ½^(1/n)`: **50% at one asking, 12.9% at
+    five, 5.6% at twelve**.
+
+    It is reported on the green row for the reason this issue exists. The fault
+    #54 was named after fires on about **6%** of conversations, and five
+    askings catch it barely a quarter of the time — a green row saying only
+    "5 of 5" reads as far stronger evidence than it is, which is the mistake
+    that let `grounded-answer` be green across an afternoon the browser watched
+    the same beat fail twice in eight.
+    """
+    return (1.0 - 0.5 ** (1.0 / max(1, askings))) * 100.0
+
+
+def direct_sop_fault(reply, expected):
+    """Why one asking of the procedure question is not an answer from the corpus.
+
+    `None` when it is one. **The single grading rule**, and both checks that
+    read a procedure reply are held to it — `direct-sop-answer`, which grades
+    the first asking, and `direct-sop-answers-every-time`, which grades all of
+    them. Sharing it is the point, and it is the lesson
+    `scripts/copilot_studio/sop_agent.py` already learned: a repeat graded on a
+    laxer bar than the first asking is a green row that means less than the row
+    above it.
+
+    Every fault is reported, not just the first, because the two halves of a
+    bad reply — the provenance and the citations — send a reader to different
+    layers and a run that reported one of them would send them to one layer.
+
+    A reply of `None` here is an asking the **backend did not answer at all**,
+    which is not the honest miss and must never be reported as one: both carry
+    no citations, and only one of them means the corpus is wrong.
+    """
+    if reply is None:
+        return (
+            "the deployed backend did not answer the procedure question at all "
+            "— the hop did not happen, which is not the honest miss"
+        )
+    problems = []
+    if reply.get("failed"):
+        problems.append(
+            "the backend returned the fixed Direct Line failure message"
+        )
+    if not reply.get("citations"):
+        problems.append("the answer carried no citations")
+    if reply.get("platform") != SOP_PLATFORM or reply.get("source") != SOP_SOURCE:
+        problems.append(
+            f"the answer claims {reply.get('platform')!r}/{reply.get('source')!r}, "
+            f"not {SOP_PLATFORM!r}/{SOP_SOURCE!r}"
+        )
+    # The token endpoint check accepts any endpoint that is not the assembled
+    # Direct Line hostname, so a second Dataverse-grounded agent in the same
+    # tenant would answer and cite something. The citation naming a document
+    # out of `content/sop/` is what ties the answer back to the corpus this
+    # repository uploaded.
+    for name in reply.get("citations") or []:
+        if expected.documents and name not in expected.documents:
+            problems.append(
+                f"the answer cites {name!r}, which this repository did not "
+                "author — the agent that answered is grounded in another corpus"
+            )
+    return "; ".join(problems) or None
+
+
 def direct_sop_answer_check(reply, expected):
-    """Return the `Check` for one real procedure question. Pure.
+    """Return the `Check` for the **first** procedure question. Pure.
 
     **Named for what it asks, because it asks the easier question** (#54). This
     probe puts the corpus's *own wording* to `/api/v4/sop/ask` directly, with no
@@ -289,31 +359,9 @@ def direct_sop_answer_check(reply, expected):
             "no procedure question was asked — an unprobed SOP agent is not a "
             "reachable one (drop --no-probe)",
         )
-    problems = []
-    if reply.get("failed"):
-        problems.append(
-            "the backend returned the fixed Direct Line failure message"
-        )
-    if not reply.get("citations"):
-        problems.append("the answer carried no citations")
-    if reply.get("platform") != SOP_PLATFORM or reply.get("source") != SOP_SOURCE:
-        problems.append(
-            f"the answer claims {reply.get('platform')!r}/{reply.get('source')!r}, "
-            f"not {SOP_PLATFORM!r}/{SOP_SOURCE!r}"
-        )
-    # The token endpoint check accepts any endpoint that is not the assembled
-    # Direct Line hostname, so a second Dataverse-grounded agent in the same
-    # tenant would answer and cite something. The citation naming a document
-    # out of `content/sop/` is what ties the answer back to the corpus this
-    # repository uploaded.
-    for name in reply.get("citations") or []:
-        if expected.documents and name not in expected.documents:
-            problems.append(
-                f"the answer cites {name!r}, which this repository did not "
-                "author — the agent that answered is grounded in another corpus"
-            )
-    if problems:
-        return Check("direct-sop-answer", False, "; ".join(problems))
+    fault = direct_sop_fault(reply, expected)
+    if fault:
+        return Check("direct-sop-answer", False, fault)
     return Check(
         "direct-sop-answer",
         True,
@@ -323,6 +371,74 @@ def direct_sop_answer_check(reply, expected):
         f"{', '.join(reply['citations'])}. This is the easier question: the "
         "orchestrator rephrases it, and the rehearsed beat is proved by "
         "scripts/sop-rehearsal.sh, not here (#54)",
+    )
+
+
+def direct_sop_repeats_check(replies, expected):
+    """Return the `Check` for **every** asking of the procedure question. Pure.
+
+    `direct-sop-answer` grades one reply, which answers *can it* and was the
+    whole of this gate's evidence until now. The fault this issue is named
+    after turned out to be intermittent at about 6% per conversation
+    (`bf7792a7`): one sample comes back clean nineteen times in twenty and ten
+    samples about half the time, so a green row said nothing about the beat the
+    presenter was about to stand in front of — and this is the gate
+    `deploy-main.yml` goes green on.
+
+    A run in which *nothing* answered is reported as broken rather than
+    intermittent. They want different next moves: intermittent is a rate to
+    measure, broken is a state to fix, and the words are how the operator knows
+    which one they are looking at.
+    """
+    if not replies:
+        return Check(
+            "direct-sop-answers-every-time",
+            False,
+            "no procedure question was asked — one asking cannot see an "
+            "intermittent fault and none cannot see any (drop --no-probe)",
+        )
+    faults = [direct_sop_fault(reply, expected) for reply in replies]
+    clean = [fault for fault in faults if fault is None]
+    # Every *distinct* fault, not the first one. The first is usually the one
+    # `direct-sop-answer` already reported, and printing it again here is how a
+    # repeat that failed differently goes unread.
+    spoken = "; ".join(dict.fromkeys(fault for fault in faults if fault))
+    if not clean:
+        return Check(
+            "direct-sop-answers-every-time",
+            False,
+            f"no asking of the procedure question answered from the corpus "
+            f"({len(replies)} asked) — the rehearsed hit is broken rather than "
+            f"intermittent: {spoken}",
+        )
+    if len(clean) < len(replies):
+        return Check(
+            "direct-sop-answers-every-time",
+            False,
+            f"only {len(clean)} of {len(replies)} askings of the procedure "
+            "question answered from the corpus — the rehearsed hit is "
+            "intermittent, which is exactly what the walkthrough cannot be: "
+            f"{spoken}",
+        )
+    if len(replies) == 1:
+        return Check(
+            "direct-sop-answers-every-time",
+            True,
+            "1 of 1 asking answered from the corpus — one sample, so this says "
+            "the beat can work and not that it always does; --samples N asks N "
+            "times in N fresh conversations. A fault firing on fewer than "
+            f"{smallest_fault_caught(1):.1f}% of conversations is likelier "
+            "than not to survive one asking, and the one #54 measured fires on "
+            "about 6%",
+        )
+    return Check(
+        "direct-sop-answers-every-time",
+        True,
+        f"{len(replies)} of {len(replies)} askings answered from the corpus, "
+        "each in a fresh Direct Line conversation. Sampling is not proof: a "
+        f"fault firing on fewer than {smallest_fault_caught(len(replies)):.1f}%"
+        f" of conversations is likelier than not to survive {len(replies)} "
+        "askings, and the one #54 measured fires on about 6%",
     )
 
 
@@ -344,6 +460,8 @@ def format_report(verdict, expected):
     checks = list(verdict.checks)
     if not any(check.name == "direct-sop-answer" for check in checks):
         checks.append(direct_sop_answer_check(None, expected))
+    if not any(check.name == "direct-sop-answers-every-time" for check in checks):
+        checks.append(direct_sop_repeats_check(None, expected))
     lines = [
         f"  {'PASS' if c.ok else 'FAIL'}  {c.name}: {c.detail}" for c in checks
     ]
@@ -544,6 +662,15 @@ def main(argv=None, read=None, ask=None):
              "easier question, which the orchestrator does not ask (#54).",
     )
     parser.add_argument(
+        "--samples",
+        type=int,
+        default=1,
+        help="how many times to ask the procedure question, each in its own "
+             "Direct Line conversation. One asking of a fault that fires 6%% "
+             "of the time comes back clean nineteen times in twenty (#54), so "
+             "a single-sample gate goes green on a coin flip.",
+    )
+    parser.add_argument(
         "--no-probe",
         action="store_true",
         help="skip the one live procedure question. It is then reported as "
@@ -561,12 +688,16 @@ def main(argv=None, read=None, ask=None):
     verdict = evaluate(observed, expected)
     if args.no_probe:
         verdict.checks.append(direct_sop_answer_check(None, expected))
+        verdict.checks.append(direct_sop_repeats_check(None, expected))
     else:
         asker = ask or ask_procedure_question
-        verdict.checks.append(
-            direct_sop_answer_check(
-                asker(observed.get("backendUrl"),
-                      args.question or rehearsed_question()), expected))
+        question = args.question or rehearsed_question()
+        replies = [
+            asker(observed.get("backendUrl"), question)
+            for _ in range(max(1, args.samples))
+        ]
+        verdict.checks.append(direct_sop_answer_check(replies[0], expected))
+        verdict.checks.append(direct_sop_repeats_check(replies, expected))
 
     print(f"Deployed surface: {args.resource_group}")
     print(format_report(verdict, expected))

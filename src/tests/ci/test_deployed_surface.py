@@ -15,11 +15,13 @@ HTTP and `az` reads sit outside it.
 """
 
 import json
+from pathlib import Path
 
 from preflight.deployed_surface import (
     Expected,
     authored_expectation,
     direct_sop_answer_check,
+    direct_sop_repeats_check,
     evaluate,
     main,
     rehearsed_question,
@@ -325,6 +327,128 @@ class TestGroundedAnswer:
         assert "Copilot Studio" in check.detail
 
 
+class TestEveryAsking:
+    """The gate asks more than once, because one asking is a coin flip.
+
+    `direct-sop-answer` grades one reply and was the whole of this gate's
+    evidence until #54 measured the fault it is named after at about 6% per
+    conversation (`bf7792a7`). One asking of that comes back clean nineteen
+    times in twenty, and `deploy-main.yml` goes green on this check — so a
+    deploy could be gated on a coin landing heads.
+    """
+
+    def test_every_asking_answering_from_the_corpus_passes(self):
+        check = direct_sop_repeats_check([answer(), answer(), answer()], EXPECTED)
+
+        assert check.ok
+        assert "3 of 3" in check.detail
+
+    def test_a_green_row_names_the_fault_size_it_would_still_have_missed(self):
+        # The reason to state it in the row rather than in a doc: the operator
+        # reads the row. `--samples 5` catches a 6%-per-conversation fault about
+        # a quarter of the time, so "5 of 5" on its own reads as far stronger
+        # evidence than it is. The rate quoted is the smallest fault this many
+        # askings is likelier than not to catch — 50% at one asking, 12.9% at
+        # five, 5.6% at twelve.
+        assert "50.0%" in direct_sop_repeats_check([answer()], EXPECTED).detail
+        assert "12.9%" in direct_sop_repeats_check(
+            [answer()] * 5, EXPECTED).detail
+        assert "5.6%" in direct_sop_repeats_check(
+            [answer()] * 12, EXPECTED).detail
+
+    def test_one_missed_asking_is_reported_as_intermittent(self):
+        check = direct_sop_repeats_check(
+            [answer(), answer(citations=[]), answer()], EXPECTED)
+
+        assert not check.ok
+        assert "2 of 3" in check.detail
+        assert "intermittent" in check.detail
+
+    def test_nothing_answering_is_broken_rather_than_intermittent(self):
+        # They want different next moves. Intermittent is a rate to measure;
+        # broken is a state to fix, and an operator reading "intermittent" of a
+        # beat that never worked goes looking for a rate that is not there.
+        check = direct_sop_repeats_check(
+            [answer(citations=[]), answer(citations=[])], EXPECTED)
+
+        assert not check.ok
+        assert "broken rather than intermittent" in check.detail
+
+    def test_a_repeat_that_failed_differently_is_reported_too(self):
+        # The first fault is usually the one `direct-sop-answer` already
+        # printed. A repeats row that echoed it would hide the asking that
+        # failed for another reason — and the reason is which layer to go to.
+        check = direct_sop_repeats_check(
+            [answer(), answer(citations=[]), answer(platform="Azure AI Foundry")],
+            EXPECTED,
+        )
+
+        assert not check.ok
+        assert "no citations" in check.detail
+        assert "Azure AI Foundry" in check.detail
+
+    def test_a_repeat_is_graded_by_the_same_rule_as_the_first_asking(self):
+        # One grading rule, two checks. A repeat held to a laxer bar than the
+        # first asking is a green row that means less than the row above it.
+        for reply in (
+            answer(failed=True, citations=[]),
+            answer(citations=[]),
+            answer(citations=["HR-201 Benefits Enrolment.docx"]),
+            answer(platform="Azure AI Foundry"),
+        ):
+            assert not direct_sop_answer_check(reply, EXPECTED).ok
+            assert not direct_sop_repeats_check([reply], EXPECTED).ok
+
+    def test_an_asking_the_backend_never_answered_is_not_the_honest_miss(self):
+        # Both carry no citations and only one of them means the corpus is
+        # wrong — the distinction `/sop/ask`'s own reply log was given for the
+        # same reason (#54).
+        check = direct_sop_repeats_check([answer(), None], EXPECTED)
+
+        assert not check.ok
+        assert "did not answer" in check.detail
+        assert "not the honest miss" in check.detail
+
+    def test_an_unasked_question_is_unproven_rather_than_passed(self):
+        check = direct_sop_repeats_check(None, EXPECTED)
+
+        assert not check.ok
+        assert "--no-probe" in check.detail
+
+
+class TestTheRecordAndTheCheck:
+    """`docs/preflight/deployed-surface.md` is the record this check backs.
+
+    AGENTS.md's contract is one record per verified precondition, each backed by
+    a re-runnable check. A row the check prints and the record does not explain
+    is drift in the direction that costs the most: an operator reading a FAIL
+    with nowhere to go.
+    """
+
+    def test_the_record_explains_every_row_the_check_prints(self, capsys):
+        main(
+            argv=["--samples", "2"],
+            read=lambda *_: observed(),
+            ask=lambda backend, question: answer(question=question),
+        )
+        printed = [
+            line.split(":", 1)[0].split()[-1]
+            for line in capsys.readouterr().out.splitlines()
+            if line.startswith(("  PASS", "  FAIL"))
+        ]
+        record = (
+            Path(__file__).resolve().parents[3]
+            / "docs" / "preflight" / "deployed-surface.md"
+        ).read_text(encoding="utf-8")
+
+        assert printed, "the report printed no check rows to compare"
+        for name in printed:
+            assert f"`{name}`" in record, (
+                f"the check prints a {name!r} row that its own record does not "
+                "explain"
+            )
+
+
 class TestTheReport:
     """What the operator is told, and what the exit code says."""
 
@@ -374,6 +498,56 @@ class TestTheReport:
         )
 
         assert asked == [rehearsed_question()]
+
+    def test_samples_asks_the_question_that_many_times(self, capsys):
+        # One sample of a fault that fires 6% of the time comes back clean
+        # nineteen times in twenty, and this check is the gate `deploy-main.yml`
+        # goes green on (#54, `bf7792a7`). Each asking is its own request, so
+        # each is its own Direct Line conversation.
+        asked = []
+        main(
+            argv=["--samples", "3"],
+            read=lambda *_: observed(),
+            ask=lambda backend, question: (
+                asked.append(question) or answer(question=question)),
+        )
+
+        assert asked == [rehearsed_question()] * 3
+
+    def test_one_missed_asking_in_three_fails_the_gate(self, capsys):
+        # The whole of AC5. Before this, the gate asked once: a beat that misses
+        # one asking in three passed it two runs in three, which is how this
+        # check stayed green across the afternoon the browser saw the beat fail
+        # twice in eight.
+        replies = iter([answer(), answer(citations=[]), answer()])
+        exit_code = main(
+            argv=["--samples", "3"],
+            read=lambda *_: observed(),
+            ask=lambda backend, question: next(replies),
+        )
+        out = capsys.readouterr().out
+
+        assert exit_code == 1
+        assert "FAIL  direct-sop-answers-every-time" in out
+        assert "2 of 3" in out
+
+    def test_a_single_sample_green_says_it_is_not_evidence_the_beat_always_works(
+        self, capsys
+    ):
+        # AC5's rule applied to the sample count. The default is one asking,
+        # and one asking of a 6% fault is clean nineteen times in twenty — so
+        # the row that reports it names what it did not prove and how to prove
+        # more of it, rather than reading as "the grounded answer works".
+        main(
+            argv=[],
+            read=lambda *_: observed(),
+            ask=lambda backend, question: answer(question=question),
+        )
+        out = capsys.readouterr().out
+
+        assert "PASS  direct-sop-answers-every-time" in out
+        assert "1 of 1" in out
+        assert "--samples" in out
 
     def test_no_probe_reports_the_grounded_answer_as_unproven_and_exits_nonzero(
         self, capsys

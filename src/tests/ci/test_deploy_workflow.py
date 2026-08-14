@@ -40,6 +40,12 @@ import re
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "deploy-main.yml"
+
+# How often the fault #54 is named after fired, per Direct Line conversation:
+# 4 of 69 fresh conversations, measured 2026-08-14 (`bf7792a7`,
+# `docs/sop-rehearsal.md`). Not a guess and not a target — the observed rate the
+# surface gate's sample count has to be enough to see.
+MEASURED_FAULT_RATE = 0.06
 BASELINE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "azure-dev.yml"
 INPUTS = REPO_ROOT / "infra" / "environments" / "macae-flw-v1.env"
 PARAMETERS = REPO_ROOT / "infra" / "main.parameters.json"
@@ -259,6 +265,33 @@ def test_the_deploy_proves_its_own_result():
         source, "check-deployed-surface.sh"
     ), "the surface is checked before it is deployed"
     assert steps, "the workflow has no named steps to order"
+
+
+def test_the_surface_gate_asks_the_procedure_question_often_enough():
+    # The fault this deployment's centrepiece beat kept failing on is
+    # intermittent at about 6% per Direct Line conversation (#54, `bf7792a7`).
+    # A gate that asks once is clean nineteen times in twenty whatever the beat
+    # is doing, so a single-sample gate is a deploy approved by a coin landing
+    # heads — and `--samples 5` still lets a 6% regression through about three
+    # deploys in four, which reads far stronger than it is.
+    #
+    # The bar is derived, not picked: enough askings that a fault of the size
+    # this repository actually measured is likelier than not to trip one of
+    # them. `(1 - 0.06)^n <= 0.5` first holds at n = 12.
+    source = _uncommented(WORKFLOW)
+    asked = re.search(
+        r"check-deployed-surface\.sh\s+--samples\s+(\d+)", source)
+
+    assert asked, (
+        "the surface gate asks the deployed SOP agent once; one asking cannot "
+        "see an intermittent fault"
+    )
+    survives = (1 - MEASURED_FAULT_RATE) ** int(asked.group(1))
+    assert survives <= 0.5, (
+        f"--samples {asked.group(1)} lets the {MEASURED_FAULT_RATE:.0%} fault "
+        f"#54 measured through {survives:.0%} of the time — the gate would go "
+        "green on a coin flip it is meant to have replaced"
+    )
 
 
 def test_the_job_declares_no_environment():

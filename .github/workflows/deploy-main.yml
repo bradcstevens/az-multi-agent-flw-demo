@@ -237,7 +237,16 @@ jobs:
       # green repository sat on top of a deployment that could not have run its
       # own centrepiece beat.
       - name: Prove the deployed surface is the demonstration
-        run: bash scripts/preflight/check-deployed-surface.sh
+        # `--samples 12`, not one asking. The fault the centrepiece beat kept
+        # failing on is intermittent at about 6% per Direct Line conversation
+        # (#54), and one asking of that is clean nineteen times in twenty
+        # whatever the beat is doing — a deploy approved by a coin landing
+        # heads. Twelve is where an even chance sits for a fault that size, and
+        # the row says so out loud: this raises the odds of catching a 6%
+        # regression from 6% to about half, it does not make them certain.
+        # Twelve Copilot Studio messages against a step that already costs
+        # twenty minutes and a provision is the right price for that.
+        run: bash scripts/preflight/check-deployed-surface.sh --samples 12
 
       - name: Prove the deployed environment still matches its record
         # No `--no-probe`. The check refuses to call an unprobed roster

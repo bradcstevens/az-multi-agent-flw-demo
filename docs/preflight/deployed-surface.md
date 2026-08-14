@@ -64,16 +64,23 @@ it: it reads the running surface the way the presenter will.
 | `mandatory-agents` | The store team is `is_default`, and `delete_team` **refuses to delete a default team**. The post-provision upload warns and uploads anyway, writing a second document with the same `team_id` under a new partition key — so every deploy since the pack was authored has left another one behind. Six were live when this row was added, and five of them predated `require_all_agents`, which the backend defaults to on. That flag is what decides whether the opening question may be answered by one agent or is put through all three store specialists, one of whose job is to ask what you already tried; with it on, the rehearsed beat comes back as a clarifying question. `get_team` now orders newest-first so the pack's value wins, and this row is what notices if that ever stops being true. It is a separate check from `quick-tasks` because every task can be present and correct while the beat still fails this way. |
 | `direct-line-endpoint` | `COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT` had **never been set** on this deployment. The bicep plumbs it through unconditionally from a `main.parameters.json` substitution, so this was never an infrastructure gap; the value was simply missing, and unset the SOP tool answers with its fixed failure message. The check also rejects a value assembled from the default Direct Line hostname, which [ADR-011](../ADR/011-direct-line-over-a2a-for-the-copilot-studio-sop-agent.md) rules out — the token endpoint is whatever `PvaGetDirectLineEndpoint` returned for *this* environment's region, and a hand-built URL is a plausible-looking one that issues no token. |
 | `direct-sop-answer` | The three above are all readable without asking the deployment a question, and all three were true of environments whose centrepiece beat could not have worked. One real procedure question goes through `/api/v4/sop/ask` — the exact path the MCP tool takes — and what is graded is the **provenance and the citations**, never the prose: a fluent answer is precisely what an ungrounded fallback produces. The citation must name a document out of `content/sop/docx`: `direct-line-endpoint` accepts any endpoint that is not the assembled hostname, so a second Dataverse-grounded agent in the same tenant would answer and cite *something*, and the filename is what ties the answer back to the corpus this repository uploaded. Probed by default. `--no-probe` does not quietly omit it: it reports the cross-platform hop as unproven and exits non-zero, because a run that asked nothing must not claim the SOP agent is reachable. It is named for what it asks rather than for what it establishes: it asks the corpus's own wording, straight at the backend, with **no orchestrator in front of it**, and the presenter's tap goes through one that rephrases. Under its old name, `grounded-answer`, it was green on every attempt across the afternoon the browser watched the same question fail twice in eight runs (#54) — a check reading as *the grounded answer works* while the grounded answer did not. |
+| `direct-sop-answers-every-time` | The row above grades **one** reply, which answers *can it* and was the whole of this gate's evidence until the fault the walkthrough kept failing on was finally measured: about **6% per Direct Line conversation**, inside Copilot Studio, with no orchestrator anywhere near it (#54, `bf7792a7`). One asking of a 6% fault comes back clean nineteen times in twenty and ten askings about half the time — so a single-sample row was green whatever the beat was doing, and `deploy-main.yml` gates on it. `--samples N` asks N times in N fresh conversations and grades every one of them **by the same rule as the first**, because a repeat held to a laxer bar is a green row that means less than the row above it. **Sampling is not proof, and the green row says by how much**: it names the smallest per-conversation fault that many askings is likelier than not to catch — 50% at one asking, 12.9% at five, 5.6% at twelve — so nobody reads "N of N" as "it cannot miss". The deploy gate asks **twelve**, which is where an even chance sits for the fault actually measured; `src/tests/ci/test_deploy_workflow.py` derives that bar from the rate rather than pinning the number. What the words say matters too: a run in which nothing answered is reported as **broken** rather than intermittent — a state to fix rather than a rate to measure — and an asking the backend never answered at all is reported as the hop not happening, never as the honest miss. A single asking still passes, and says out loud that it is one sample. |
 
-Observed 2026-08-13, all four green, `'How do I close the store?'` answered from Dataverse through
-Copilot Studio citing `SOP-102 Store Closing Procedure.docx`.
+Observed 2026-08-13, all four checks then green, `'How do I close the store?'` answered from
+Dataverse through Copilot Studio citing `SOP-102 Store Closing Procedure.docx` — **once**, which
+is the sample size `direct-sop-answers-every-time` was later added to say out loud.
+
+Re-observed 2026-08-14 (issue #54) with that row live: **12 of 12 askings** answered from the
+corpus, each in a fresh Direct Line conversation, the whole check in 2m05s — which is what the
+`--samples 12` on the deploy gate costs, against a step that already spends twenty minutes and a
+provision.
 
 The question is read from `content/sop/corpus.toml`'s `[rehearsed_hit]` rather than pinned here, for
 the same reason the rest of the expectation is (below) — and section-scoped, because `question` is a
 key under `[honest_miss]` too, and a probe that picked up *that* one would ask the deployment the
 question the corpus deliberately cannot answer and report a working SOP agent as a broken one.
 
-**A row of four PASSes is not a working walkthrough, and the report now says so.** Every check here
+**A row of PASSes is not a working walkthrough, and the report now says so.** Every check here
 asks the deployment something the presenter never asks, and the closest one asks it past the layer
 that breaks. What the presenter asks is asked by the **Demo validator**, through a browser, and
 proven repeatable by `scripts/sop-rehearsal.sh` — which is the last line of every green run.
@@ -139,7 +146,8 @@ published state are [../copilot-studio/sop-agent.md](../copilot-studio/sop-agent
 
 Verified: the served page title, the six Quick Tasks and the lane each declares, the SOP agent's
 token endpoint on the backend Container App, and one procedure question answered from Dataverse
-through Copilot Studio citing a document this repository authored.
+through Copilot Studio citing a document this repository authored — asked as many times as
+`--samples` said, each in a fresh Direct Line conversation, and every asking graded.
 
 **Not** verified here: that the Container Apps are running the **current commit** — the tag says
 so, and a tag is a claim rather than a stamp (#48); nor any of the seven beats end to end through a
