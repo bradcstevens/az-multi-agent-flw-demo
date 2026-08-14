@@ -258,12 +258,6 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       setSigningIn(false);
     }
   };
-
-
-  const handleQuickTaskClick = (task: ExtendedQuickTask) => {
-    void submitQuestion(task.fullDescription, task.lane);
-  };
-
   const handleInputChange = (value: string) => {
     setInput(value);
   };
@@ -436,7 +430,9 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                       title={task.title}
                       icon={task.icon}
                       description={task.description}
-                      onClick={() => handleQuickTaskClick(task)}
+                      onClick={() => {
+                        void submitQuestion(task.fullDescription, task.lane);
+                      }}
                       disabled={submitting}
                       badge={
                         isLane(task.lane) ? (

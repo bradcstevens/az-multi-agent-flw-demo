@@ -147,6 +147,12 @@ describe('tapping a Quick Task', () => {
 });
 
 describe('six Quick Tasks on a phone-sized screen', () => {
+    it('shows a focus indicator when a Quick Task is reached by keyboard', () => {
+        const css = readFileSync(STYLESHEET, 'utf8');
+
+        expect(css).toContain('.home-input-quick-tasks .fui-Button:focus-visible');
+    });
+
     it('collapses the task grid at the same breakpoint the shell stacks at', () => {
         // 640px, as #25 fixed it. A second breakpoint somewhere else is a
         // surface that reflows twice, and the associate this is for is holding

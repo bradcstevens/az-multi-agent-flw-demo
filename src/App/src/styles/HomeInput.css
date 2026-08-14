@@ -116,7 +116,7 @@
 }
 
 /* Focus visible for accessibility */
-.home-input-quick-tasks .fui-Card:focus-visible {
+.home-input-quick-tasks .fui-Button:focus-visible {
   outline: 2px solid var(--colorStrokeFocus2) !important;
   outline-offset: 2px !important;
 }
