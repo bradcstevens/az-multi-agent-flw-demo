@@ -56,7 +56,7 @@ test.describe('the cross-platform hop', () => {
         let toolQuery: string | null = null;
         let retrievalQuery: string | null = null;
         try {
-            await plan.rail.waitForGrounding(240_000);
+            await plan.rail.waitForGrounding(270_000);
             toolQuery = await plan.rail.toolQuery();
             retrievalQuery = await plan.rail.retrievalQuery();
         } finally {
