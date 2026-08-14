@@ -17,6 +17,11 @@ export interface InputTask {
      * fails open to the Deliberate lane when nothing matches.
      */
     lane?: string;
+    /**
+     * The authored Quick Task that initiated this request. The backend uses
+     * the active team definition to determine its behavior.
+     */
+    starting_task_id?: string;
 }
 
 /**

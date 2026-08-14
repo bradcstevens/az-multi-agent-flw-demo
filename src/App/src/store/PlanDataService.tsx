@@ -119,6 +119,7 @@ export class PlanDataService {
         logo: taskBE.logo,
         lane: taskBE.lane,
         follow_on: taskBE.follow_on,
+        ticket_on_approval: taskBE.ticket_on_approval,
       }))
     };
   }

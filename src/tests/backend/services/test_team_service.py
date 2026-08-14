@@ -98,6 +98,7 @@ class MockStartingTask:
     lane: str = None
     rehearsed_replies: List[str] = field(default_factory=list)
     follow_on: str = None
+    ticket_on_approval: bool = False
 
 @dataclass
 class MockTeamConfiguration:
@@ -378,6 +379,18 @@ class TestTeamConfigurationValidation:
                 _valid_task_data(follow_on="task-223-escalation")
             ).follow_on
             == "task-223-escalation"
+        )
+
+    def test_a_ticket_on_approval_task_survives_the_upload(self):
+        """The approval seam can only act on the authored task if this flag
+        reaches the stored team definition unchanged."""
+        service = TeamService()
+
+        assert (
+            service._validate_and_parse_task(
+                _valid_task_data(ticket_on_approval=True)
+            ).ticket_on_approval
+            is True
         )
 
     def test_rehearsed_replies_survive_the_upload(self):

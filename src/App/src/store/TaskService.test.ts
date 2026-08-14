@@ -125,4 +125,22 @@ describe('creating a plan on a signed-in device', () => {
             lane: 'deliberate',
         });
     });
+
+    it('carries the authored ticket requirement into the escalation request', async () => {
+        await TaskService.createPlan(
+            'I have tried everything and I need someone to come out.',
+            'team-223',
+            'deliberate',
+            'session-223-troubleshooting',
+            'task-223-escalation',
+        );
+
+        expect(createPlan).toHaveBeenCalledWith({
+            session_id: 'session-223-troubleshooting',
+            description: 'I have tried everything and I need someone to come out.',
+            team_id: 'team-223',
+            lane: 'deliberate',
+            starting_task_id: 'task-223-escalation',
+        });
+    });
 });

@@ -351,6 +351,7 @@ const PlanPage: React.FC = () => {
                 planTeam?.team_id,
                 task.lane,
                 sessionId,
+                task.id,
             );
             if (!response.plan_id) {
                 throw new Error('The follow-on task did not create a plan');

@@ -340,9 +340,9 @@ def test_given_the_troubleshooting_prompt_when_read_then_it_offers_to_escalate(
 def test_given_the_troubleshooting_tools_when_named_then_the_container_registers_them(
     store_pack,
 ):
-    # Spans the seam between the authored prompt and the container that serves
-    # the tools. A rename on either side is an agent calling a tool that is not
-    # there, and the framework's answer to that is silence.
+    # The container still exposes the tool for correction flows outside this
+    # authored task, but #62's escalation prompt makes it unreachable so the
+    # approval seam, not a model choice, creates the record.
     service = (
         REPO_ROOT / "src" / "mcp_server" / "services" / "troubleshooting_service.py"
     ).read_text(encoding="utf-8")
@@ -764,11 +764,27 @@ def test_given_the_escalation_agent_when_read_then_it_cannot_ask_the_associate(
     assert store_pack.agent("EscalationAgent").get("user_responses", False) is False
 
 
-def test_given_the_escalation_prompt_when_read_then_it_names_the_drafting_tool(
+def test_given_the_escalation_task_when_approved_then_it_requires_a_ticket_without_questions(
     store_pack,
 ):
-    message = store_pack.agent("EscalationAgent")["system_message"]
-    assert "draft_service_ticket" in message
+    """The joined troubleshooting record is complete before escalation starts,
+    so the approved turn has no unbounded interview left to conduct."""
+    task = next(
+        task
+        for task in store_pack.team["starting_tasks"]
+        if task["id"] == "task-223-escalation"
+    )
+    message = store_pack.agent("EscalationAgent")["system_message"].lower()
+
+    assert task["ticket_on_approval"] is True
+    assert "do not ask the associate any questions" in message
+
+
+def test_given_the_escalation_prompt_when_read_then_it_does_not_call_the_drafting_tool(
+    store_pack,
+):
+    message = store_pack.agent("EscalationAgent")["system_message"].lower()
+    assert "do not call draft_service_ticket" in message
 
 
 def test_given_the_escalation_prompt_when_read_then_it_never_asks_for_the_steps(
@@ -778,8 +794,8 @@ def test_given_the_escalation_prompt_when_read_then_it_never_asks_for_the_steps(
     # value anyway — this is the half that stops the agent *asking*, which is
     # the half the associate would notice.
     message = store_pack.agent("EscalationAgent")["system_message"].lower()
-    assert "steps_attempted" in message
-    assert "never" in message or "not" in message
+    assert "attempted steps" in message
+    assert "do not ask" in message
 
 
 def test_given_the_escalation_prompt_when_read_then_the_approval_is_the_confirmation(
@@ -809,7 +825,7 @@ def test_given_the_ticket_tool_when_named_then_the_container_registers_it(
     message = store_pack.agent("EscalationAgent")["system_message"]
 
     assert "async def draft_service_ticket(" in service
-    assert "draft_service_ticket" in message
+    assert "do not call draft_service_ticket" in message.lower()
 
     domain = (
         REPO_ROOT / "src" / "mcp_server" / "core" / "factory.py"

@@ -417,6 +417,9 @@ class OrchestrationManager:
 
         # Build task from input
         task_text = getattr(input_task, "description", str(input_task))
+        ticket_on_approval = self._task_requires_ticket_on_approval(
+            workflow, input_task
+        )
         self.logger.debug("Task: %s", task_text)
 
         # ---- Team-scope gate (generic, team-agnostic) -------------------
@@ -489,6 +492,7 @@ class OrchestrationManager:
                             participant_names=participant_names,
                             task_text=task_text,
                             user_id=user_id,
+                            ticket_on_approval=ticket_on_approval,
                         )
                         if plan_responses is None:
                             raise RuntimeError("Plan execution cancelled by user")
@@ -887,6 +891,7 @@ class OrchestrationManager:
         participant_names: list[str],
         task_text: str,
         user_id: str,
+        ticket_on_approval: bool = False,
     ) -> dict | None:
         """Present collected plan review requests to the user and gather responses.
 
@@ -940,7 +945,10 @@ class OrchestrationManager:
                 # the model *can* call is the second confirmation step the
                 # template says there is not. Most approved plans are not
                 # escalations, and those raise nothing — see ``_ticket_store``.
-                await self._raise_confirmed_ticket(user_id)
+                await self._raise_confirmed_ticket(
+                    user_id,
+                    draft_from_record=ticket_on_approval,
+                )
             else:
                 self.logger.info("Plan rejected (request_id=%s)", request_id)
                 await connection_config.send_status_update_async(
@@ -954,6 +962,30 @@ class OrchestrationManager:
                 return None
 
         return responses if responses else None
+
+    def _task_requires_ticket_on_approval(self, workflow, input_task) -> bool:
+        """Whether this request names the active team's ticketing task.
+
+        The browser may carry a task identifier, but its behavior remains
+        server-owned: only a matching task in the workflow's attached team
+        configuration can request deterministic ticket drafting.
+        """
+        task_id = getattr(input_task, "starting_task_id", None)
+        team_config = getattr(workflow, "_team_config", None)
+        tasks = getattr(team_config, "starting_tasks", None)
+        if not isinstance(task_id, str) or not task_id or not isinstance(tasks, list):
+            return False
+
+        for task in tasks:
+            if getattr(task, "id", None) == task_id:
+                return bool(getattr(task, "ticket_on_approval", False))
+
+        self.logger.warning(
+            "[TICKET] Request named unknown starting task '%s' — no ticket "
+            "will be drafted",
+            task_id,
+        )
+        return False
 
     async def _handle_tool_approvals(
         self,
@@ -1073,7 +1105,12 @@ class OrchestrationManager:
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
         return TicketStore(memory_store, user_id=user_id), session_id
 
-    async def _raise_confirmed_ticket(self, user_id: str):
+    async def _raise_confirmed_ticket(
+        self,
+        user_id: str,
+        *,
+        draft_from_record: bool = False,
+    ):
         """Submit this conversation's drafted ticket, if there is one, and put
         it on the surface.
 
@@ -1089,6 +1126,28 @@ class OrchestrationManager:
             store, session_id = await self._ticket_store(user_id)
             if store is None:
                 return None
+
+            if draft_from_record:
+                record_store, record_session_id = await self._troubleshooting_store(
+                    user_id
+                )
+                if record_store is None or record_session_id != session_id:
+                    self.logger.warning(
+                        "[TICKET] Could not resolve the troubleshooting record "
+                        "for session '%s' — no ticket was raised",
+                        session_id,
+                    )
+                    return None
+
+                record = await record_store.read(record_session_id)
+                ticket = await store.draft(
+                    session_id,
+                    {},
+                    attempted=record.attempted,
+                    equipment=record.equipment,
+                )
+                if ticket is None:
+                    return None
 
             ticket = await store.submit(session_id)
             if ticket is None:

@@ -189,6 +189,7 @@ export class TaskService {
    *   routes by its keyword fallback (issue #16, ADR-013).
    * @param sessionId An existing conversation to continue. Omitted when a
    *   task starts a new conversation.
+   * @param startingTaskId The authored Quick Task initiating this request.
    * @returns Promise with the response containing plan ID, status and the
    *   lane actually taken
    */
@@ -197,6 +198,7 @@ export class TaskService {
     teamId?: string,
     lane?: string,
     sessionId?: string,
+    startingTaskId?: string,
   ): Promise<InputTaskResponse> {
     const requestSessionId = sessionId ?? this.generateSessionId();
 
@@ -227,6 +229,7 @@ export class TaskService {
       description: description,
       team_id: teamId,
       lane: lane,
+      starting_task_id: startingTaskId,
     };
 
     try {

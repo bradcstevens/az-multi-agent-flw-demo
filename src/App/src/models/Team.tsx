@@ -43,6 +43,11 @@ export interface StartingTask {
      * ADR-024). A follow-on is not offered from the home grid.
      */
     follow_on?: string;
+    /**
+     * The approval must persist a Simulated ticket from this conversation's
+     * record, regardless of whether the model drafted a preview.
+     */
+    ticket_on_approval?: boolean;
 }
 
 export interface Team {

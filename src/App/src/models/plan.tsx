@@ -69,6 +69,8 @@ export interface StartingTaskBE {
     lane?: string;
     /** The Quick Task to offer inside this task's conversation (issue #61). */
     follow_on?: string;
+    /** Whether approval must persist this task's Simulated ticket (issue #62). */
+    ticket_on_approval?: boolean;
 }
 
 /**

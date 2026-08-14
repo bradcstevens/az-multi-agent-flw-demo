@@ -179,6 +179,7 @@ class TeamService:
             # it is silently lost during upload and the escalation returns to
             # the home grid with a fresh session.
             follow_on=task_data.get("follow_on"),
+            ticket_on_approval=task_data.get("ticket_on_approval", False),
         )
 
     async def save_team_configuration(self, team_config: TeamConfiguration) -> str:

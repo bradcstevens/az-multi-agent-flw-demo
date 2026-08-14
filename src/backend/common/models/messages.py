@@ -295,6 +295,11 @@ class StartingTask(BaseModel):
     # task simply produces no follow-on affordance in the surface.
     follow_on: Optional[str] = None
 
+    # The escalation task's explicit completion behavior (issue #62). This is
+    # authored on the task rather than inferred from its wording so a content
+    # edit cannot silently stop the approval seam from storing its ticket.
+    ticket_on_approval: bool = False
+
 
 class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""
@@ -371,6 +376,10 @@ class InputTask(BaseModel):
     # maps it onto, and two ways to say the same thing on one message is how a
     # request ends up in a lane nobody chose.
     lane: Optional[str] = None
+    # The authored task that produced this request. The server resolves its
+    # behavior from the active team's configuration rather than trusting a
+    # browser-supplied behavior flag.
+    starting_task_id: Optional[str] = None
 
 
 class UserLanguage(BaseModel):

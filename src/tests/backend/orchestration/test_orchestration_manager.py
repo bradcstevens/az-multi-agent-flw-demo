@@ -1507,7 +1507,23 @@ class FakeTicketStore:
 
     def __init__(self, ticket=None):
         self.ticket = ticket
+        self.drafts = []
         self.submitted = []
+
+    async def draft(self, session_id, supplied, *, attempted, equipment=None):
+        self.drafts.append(
+            {
+                "session_id": session_id,
+                "supplied": supplied,
+                "attempted": attempted,
+                "equipment": equipment,
+            }
+        )
+        self.ticket = _submitted_ticket(
+            steps_attempted="; ".join(attempted),
+            asset=equipment or "not reported",
+        )
+        return self.ticket
 
     async def submit(self, session_id):
         self.submitted.append(session_id)
@@ -1538,7 +1554,52 @@ class TestTheApprovalIsTheTicketConfirmation:
             approved=True, m_plan_id="test-plan-id"
         )
 
-    async def _review(self, store, *, approved=True, session="s-1"):
+    def test_an_authored_task_not_a_browser_flag_requires_the_ticket(self):
+        """The request can name a task, but only the running team's authored
+        configuration decides whether its approval must draft a ticket."""
+        workflow = Mock()
+        workflow._team_config = Mock(
+            starting_tasks=[
+                Mock(id="task-223-escalation", ticket_on_approval=True),
+            ]
+        )
+        task = Mock(
+            starting_task_id="task-223-escalation",
+            ticket_on_approval=False,
+        )
+
+        assert (
+            OrchestrationManager()._task_requires_ticket_on_approval(
+                workflow, task
+            )
+            is True
+        )
+
+    def test_an_unknown_task_cannot_request_a_ticket_with_a_browser_flag(self):
+        workflow = Mock()
+        workflow._team_config = Mock(
+            starting_tasks=[
+                Mock(id="task-223-escalation", ticket_on_approval=True),
+            ]
+        )
+        task = Mock(starting_task_id="not-an-authored-task", ticket_on_approval=True)
+
+        assert (
+            OrchestrationManager()._task_requires_ticket_on_approval(
+                workflow, task
+            )
+            is False
+        )
+
+    async def _review(
+        self,
+        store,
+        *,
+        approved=True,
+        session="s-1",
+        ticket_on_approval=False,
+        record=None,
+    ):
         mock_wait_approval.return_value = MockPlanApprovalResponse(
             approved=approved, m_plan_id="test-plan-id"
         )
@@ -1547,14 +1608,59 @@ class TestTheApprovalIsTheTicketConfirmation:
         with patch.object(
             OrchestrationManager, "_ticket_store",
             AsyncMock(return_value=(store, session) if store else (None, None)),
+        ), patch.object(
+            OrchestrationManager,
+            "_troubleshooting_store",
+            AsyncMock(return_value=(record, session) if record else (None, None)),
         ):
             responses = await manager._handle_plan_reviews(
                 {"req-1": review},
                 participant_names=["EscalationAgent"],
                 task_text="I can't fix it, raise a ticket",
                 user_id="user-1",
+                ticket_on_approval=ticket_on_approval,
             )
         return review, responses
+
+    @pytest.mark.asyncio
+    async def test_approving_an_escalation_drafts_from_the_carried_record(self):
+        """The ticket is stored even when the model did not call the draft tool.
+
+        This is the composed join that #61 made possible: the escalation turn
+        resolves the troubleshooting conversation's record and writes those
+        exact attempted steps before it submits the approval.
+        """
+        store = FakeTicketStore()
+        record = Mock()
+        record.read = AsyncMock(
+            return_value=Mock(
+                attempted=["Fitted a fresh paper filter"],
+                equipment="front counter coffee brewer, left head",
+            )
+        )
+
+        await self._review(
+            store,
+            ticket_on_approval=True,
+            record=record,
+        )
+
+        assert store.drafts == [
+            {
+                "session_id": "s-1",
+                "supplied": {},
+                "attempted": ["Fitted a fresh paper filter"],
+                "equipment": "front counter coffee brewer, left head",
+            }
+        ]
+        assert store.submitted == ["s-1"]
+        pushed = [
+            call
+            for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "ticket_raised"
+        ]
+        rows = {row["name"]: row["value"] for row in pushed[0].args[0]["fields"]}
+        assert rows["steps_attempted"] == "Fitted a fresh paper filter"
 
     @pytest.mark.asyncio
     async def test_approving_the_plan_submits_the_drafted_ticket(self):

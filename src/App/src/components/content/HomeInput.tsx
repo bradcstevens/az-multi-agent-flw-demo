@@ -71,6 +71,8 @@ const truncateDescription = (
 interface ExtendedQuickTask extends QuickTask {
   fullDescription: string; // Store the full, untruncated description
   lane?: string; // The Lane this Quick Task declares (issue #16, ADR-013)
+  startingTaskId?: string;
+  ticketOnApproval?: boolean;
 }
 
 const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
@@ -128,7 +130,12 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
    * between the presenter and the payoff, which is the thing the Rehearsed
    * replies exist to prevent (#26).
    */
-  const submitQuestion = async (question: string, declaredLane?: string) => {
+  const submitQuestion = async (
+    question: string,
+    declaredLane?: string,
+    startingTaskId?: string,
+    ticketOnApproval?: boolean,
+  ) => {
     if (!question) return;
 
     setSubmitting(true);
@@ -143,11 +150,19 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
     let id = showToast("Creating a plan", "progress");
 
     try {
-      const response = await TaskService.createPlan(
-        question,
-        selectedTeam?.team_id,
-        declaredLane
-      );
+      const response = ticketOnApproval
+        ? await TaskService.createPlan(
+            question,
+            selectedTeam?.team_id,
+            declaredLane,
+            undefined,
+            startingTaskId,
+          )
+        : await TaskService.createPlan(
+            question,
+            selectedTeam?.team_id,
+            declaredLane,
+          );
       setInput("");
 
       if (textareaRef.current) {
@@ -320,6 +335,8 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
               fullDescription: taskDescription, // Store the full description
               icon: getIconFromString(startingTask.logo || "📋"),
               lane: startingTask.lane,
+              startingTaskId: startingTask.id,
+              ticketOnApproval: startingTask.ticket_on_approval,
             };
           }
           })
@@ -466,7 +483,12 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                       icon={task.icon}
                       description={task.description}
                       onClick={() => {
-                        void submitQuestion(task.fullDescription, task.lane);
+                        void submitQuestion(
+                          task.fullDescription,
+                          task.lane,
+                          task.startingTaskId,
+                          task.ticketOnApproval,
+                        );
                       }}
                       disabled={submitting}
                       badge={

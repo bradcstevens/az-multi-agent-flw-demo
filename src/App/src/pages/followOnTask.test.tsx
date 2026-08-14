@@ -90,6 +90,7 @@ const TEAM = {
             creator: '',
             logo: 'Document',
             lane: 'deliberate',
+            ticket_on_approval: true,
         },
     ],
 } satisfies TeamConfig;
@@ -167,6 +168,7 @@ describe('the troubleshooting follow-on task', () => {
                 'team-223',
                 'deliberate',
                 'session-223-troubleshooting',
+                'task-223-escalation',
             ),
         );
     });

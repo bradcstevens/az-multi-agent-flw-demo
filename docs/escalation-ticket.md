@@ -20,7 +20,7 @@ finds out.
 | Ticket rules | `escalation/ticket.py` | Pure. `TKT-001`'s field order, the ticket number, what a confirmation may change, what may never be typed. |
 | Service ticket | `common/models/messages.py`, `escalation/store.py` | One `DataType` member and one model in the schemaless memory container. No migration. |
 | The wire shape | `escalation/payloads.py` | `TicketRaised` — the ordered rows the browser renders. |
-| The seam | `orchestration_manager._handle_plan_reviews` | The approved branch submits the draft and pushes the card. The rejected branch does not. |
+| The seam | `orchestration_manager._handle_plan_reviews` | An approved escalation drafts from the session record, submits it and pushes the card. The rejected branch does none of those things. |
 | The bridge | `GET`/`POST /api/v4/escalation/ticket` | What the MCP container calls. |
 | The tool | `src/mcp_server/services/escalation_service.py` | `draft_service_ticket`, on the `escalation` domain. One tool. |
 | The card | `src/App/src/components/escalation/SimulatedTicketCard.tsx` | Every row, and the `SimulatedBadge`. |
@@ -30,10 +30,11 @@ finds out.
 The acceptance criterion is that the plan-approval step *is* the ticket confirmation — one
 confirmation, not two. A system message saying *do not ask again* is a thing a model can improvise
 past on the turn that matters, so the confirmation is taken at the seam instead.
-`_handle_plan_reviews` already intercepts every approval before it reaches the framework.
-`_raise_confirmed_ticket` runs in the **approved** branch, submits whatever draft the session holds
-and pushes the card. The rejected branch calls nothing: a rejected plan is an unraised ticket, which
-is the entire point of routing this to the **Deliberate lane** in the first place.
+`_handle_plan_reviews` already intercepts every approval before it reaches the framework. For an
+authored escalation task, `_raise_confirmed_ticket` first drafts from the session's troubleshooting
+record, then submits that stored ticket and pushes the card. The rejected branch calls nothing: a
+rejected plan is an unraised ticket, which is the entire point of routing this to the **Deliberate
+lane** in the first place.
 
 That is #21's move at a different seam, and for the same reason. It happens on every approved plan
 whether or not the model remembers anything.
