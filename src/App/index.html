@@ -3,12 +3,26 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="/storeAssistantLogo.svg" type="image/svg+xml" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!--
+      The brand petrol, not `#000000`. This is the colour the browser paints its
+      own chrome with on a phone, and the surface is presented on one — a pure
+      black bar above a light surface reads as a rendering fault.
+    -->
+    <meta name="theme-color" content="#207e85" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#011a1c" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
       content="Circle K Frontline Store Assistant — a store-scoped multi-agent demonstration"
     />
+    <meta property="og:title" content="Circle K Frontline Store Assistant" />
+    <meta
+      property="og:description"
+      content="A store-scoped multi-agent demonstration: grounded store procedures, a visible cost meter, and a governed identity boundary."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/storeAssistantLogo.svg" />
+    <meta name="twitter:card" content="summary" />
     <link rel="apple-touch-icon" href="/storeAssistantLogo.svg" />
     <!-- <link rel="manifest" href="/manifest.json" /> -->
     <title>Circle K Frontline Store Assistant</title>

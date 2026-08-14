@@ -80,7 +80,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100vh',
+      // `dvh`, not `vh`, for the reason the shell uses it: on iOS Safari
+      // `100vh` counts the viewport as though the browser chrome were not
+      // there, so the reply stream stood a toolbar taller than the screen.
+      height: '100dvh',
 
     }}>
       {/* Messages Container */}

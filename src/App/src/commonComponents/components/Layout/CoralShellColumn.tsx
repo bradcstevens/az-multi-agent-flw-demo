@@ -18,6 +18,15 @@ const CoralShellColumn: React.FC<{ children: React.ReactNode }> = ({ children })
         backgroundColor: "var(--colorNeutralBackground3)",
       }}
     >
+      {/*
+        Both surfaces open with the task-history panel, so a keyboard user
+        reached the question box only after tabbing through every task in it.
+        The link is the first focusable thing in the shell and is visible only
+        while it holds focus.
+      */}
+      <a className="skip-to-content" href="#conversation">
+        Skip to the conversation
+      </a>
       {children}
     </div>
   );

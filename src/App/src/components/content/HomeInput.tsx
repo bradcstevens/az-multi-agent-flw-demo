@@ -484,7 +484,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                 style={{
                   textAlign: "center",
                   padding: "32px 16px",
-                  color: "#666",
+                  color: "var(--colorNeutralForeground3)",
                 }}
               >
                 <Caption1>No quick tasks are configured yet</Caption1>

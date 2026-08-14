@@ -46,57 +46,12 @@
 }
 
 /*
- * The question box — the one thing on this surface the associate is meant to
- * touch, so it is the one thing given elevation.
- *
- * `focus-within` rather than `focus`: the control that actually takes focus is
- * the textarea inside, so focusing it used to light a ring around a transparent
- * child in the middle of an undifferentiated slab. The whole box now answers,
- * which is what makes it read as a single control rather than as a border with
- * a text field loose inside it.
+ * There was a `.home-input-input-wrapper` and a `.home-input-input-field` here,
+ * and neither had ever styled anything: the question box is `ChatInput`, which
+ * carries its own inline styles and no class at all, so both rules matched
+ * nothing in the app (#66). The box's edge and its focus ring are declared
+ * where the box actually is.
  */
-.home-input-input-wrapper {
-  position: relative;
-  width: 100%;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 12px 12px 12px 16px;
-  background-color: var(--colorNeutralBackground1);
-  border: 1px solid var(--colorNeutralStroke1);
-  border-radius: var(--borderRadiusXLarge);
-  box-shadow: var(--shadow4);
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.home-input-input-wrapper:hover {
-  border-color: var(--colorNeutralStroke1Hover);
-}
-
-.home-input-input-wrapper:focus-within {
-  border-color: var(--colorBrandStroke1);
-  box-shadow:
-    var(--shadow8),
-    0 0 0 3px color-mix(in srgb, var(--colorBrandBackground) 18%, transparent);
-}
-
-.home-input-input-field {
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 0;
-  border: none;
-  outline: none;
-  background-color: transparent;
-  font-size: var(--fontSizeBase300);
-  color: var(--colorNeutralForeground1);
-  resize: none;
-}
-
-.home-input-input-field::placeholder {
-  color: var(--colorNeutralForeground3);
-}
 
 /*
  * There is deliberately no rule for the send control here. It is an icon-only

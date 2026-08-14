@@ -24,6 +24,12 @@ const ContentToolbar: React.FC<ContentToolbarProps> = ({
         padding: "16px",
         boxSizing: "border-box",
         height: "56px",
+        // A header needs an edge. Without one the assistant's name and the
+        // store identity floated on the same plane as the conversation
+        // beneath them, so nothing said where the chrome stopped and the
+        // answer began.
+        borderBottom: "1px solid var(--colorNeutralStroke2)",
+        flexShrink: 0,
       }}
     >
       {(panelIcon || panelTitle) && (

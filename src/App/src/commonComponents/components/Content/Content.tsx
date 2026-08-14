@@ -21,14 +21,19 @@ const Content: React.FC<ContentProps> = ({ children }) => {
     // `min-width` beats a media query, so the stacking breakpoint could say the
     // stacked columns do not shrink while this one — the column the shell
     // crushed first — shrank anyway.
+    //
+    // `main`, because it is: the rail beside it is already an `aside` and the
+    // task history is a `nav`, so the conversation was the one landmark on the
+    // surface that a screen reader could not jump to. It is also what the skip
+    // link in `CoralShellColumn` targets.
     return (
-        <div className="content">
+        <main className="content" id="conversation" tabIndex={-1}>
             {toolbar && <div style={{ flexShrink: 0 }}>{toolbar}</div>}
 
             <div className="panelContent">
                 {content}
             </div>
-        </div>
+        </main>
     );
 };
 

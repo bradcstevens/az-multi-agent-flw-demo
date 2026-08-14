@@ -14,6 +14,7 @@ import {
     SHELL_STYLESHEET,
     sourceFiles,
     stackedBody,
+    stackingRules,
     stackingSelectors,
     STACKING_BREAKPOINT,
 } from '@/testing/stylesheets';
@@ -106,6 +107,54 @@ describe('the store surface on a phone-sized screen', () => {
         const block = css.slice(css.indexOf(STACKING_BREAKPOINT));
 
         expect(block).toMatch(/\.panel-left-container\s*\{\s*display:\s*none/);
+    });
+
+    it('outranks every unconditional rule it has to overrule', () => {
+        // The escape the assertion above cannot see, and the one that shipped
+        // (#66): a breakpoint rule can be present, correct and still lose.
+        //
+        // A media query adds no specificity. So a single-class rule inside the
+        // breakpoint ties with a single-class rule for the same property
+        // outside it, and the tie goes to whichever stylesheet the bundler
+        // imported second — which is decided by an import order in a component,
+        // nowhere near either stylesheet. `.panel-left-container` was declared
+        // `display: none` here and `display: flex` in `PlanPanelLeft.css`, and
+        // the phone kept a 240px task-history panel it was supposed to drop.
+        //
+        // Read out of the stylesheets rather than listed, for #58's reason: a
+        // list agrees with itself forever.
+        const unconditional = allRules();
+
+        for (const stacked of stackingRules()) {
+            const classes = classesIn(stacked.selector);
+            // A selector naming more than one class already outranks any
+            // single-class rule, which is how the rail's own width survives.
+            if (classes.length > 1) continue;
+
+            const properties = Array.from(
+                stacked.body.matchAll(/(?:^|[;{\s])([a-z-]+)\s*:/g),
+                (match) => match[1],
+            );
+
+            for (const className of classes) {
+                for (const property of properties) {
+                    const contested = unconditional.filter(
+                        (rule) =>
+                            classesIn(rule.selector).length === 1 &&
+                            classesIn(rule.selector)[0] === className &&
+                            new RegExp(`(?:^|[;{\\s])${property}\\s*:`).test(rule.body),
+                    );
+
+                    expect(
+                        contested.map((rule) => rule.file),
+                        `.${className} { ${property} } is declared unconditionally in ` +
+                            `${contested.map((r) => r.file).join(', ')}, at the same ` +
+                            `specificity as the stacking breakpoint — the breakpoint ` +
+                            `only wins if that stylesheet happens to load first`,
+                    ).toEqual([]);
+                }
+            }
+        }
     });
 
     it('releases every side column when the shell stacks', () => {

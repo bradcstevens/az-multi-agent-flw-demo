@@ -7,7 +7,7 @@ import '@fontsource-variable/geist-mono';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { FluentProvider } from "@fluentui/react-components";
+import { FluentProvider, Spinner } from "@fluentui/react-components";
 import { storeLightTheme, storeDarkTheme } from './theme/storeTheme';
 import { setEnvData, setApiUrl, config as defaultConfig, toBoolean, getUserInfo, setUserInfoGlobal } from './api/config';
 import { apiService } from './api';
@@ -70,7 +70,39 @@ const AppWrapper = () => {
     mediaQuery.addEventListener("change", handleThemeChange);
     return () => mediaQuery.removeEventListener("change", handleThemeChange);
   }, []);
-  if (!isConfigLoaded || !isUserInfoLoaded) return <div>Loading...</div>;
+  /*
+   * The bootstrap state, which the audience does see: it is on screen for as
+   * long as `/config` takes to answer, at the top of the walkthrough, on a
+   * projector. It used to be an unstyled `Loading...` in the browser's default
+   * serif — outside the FluentProvider, so it inherited none of the theme — and
+   * it read as a page that had failed to start.
+   *
+   * Inside the provider now, so it is the surface's own type and palette, and
+   * it says what is being waited for rather than that something is happening.
+   */
+  if (!isConfigLoaded || !isUserInfoLoaded) {
+    return (
+      <FluentProvider
+        theme={isDarkMode ? storeDarkTheme : storeLightTheme}
+        style={{ height: "100dvh" }}
+      >
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            display: "flex",
+            height: "100%",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "var(--colorNeutralBackground3)",
+          }}
+        >
+          <Spinner size="large" label="Starting the store assistant" />
+        </div>
+      </FluentProvider>
+    );
+  }
+
   return (
     <StrictMode>
       <ReduxProvider store={store}>

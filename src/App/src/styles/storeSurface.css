@@ -143,7 +143,24 @@
         min-width: 0;
     }
 
-    .panel-left-container {
+    /*
+     * The task history goes away, rather than being squeezed.
+     *
+     * Scoped under the shell, like every other column released here, and that
+     * is load-bearing rather than tidiness (#66). Unscoped, this rule is a
+     * single class — exactly the specificity of `.panel-left-container`'s own
+     * `display: flex` in `PlanPanelLeft.css` — and a media query adds none. The
+     * tie was broken by import order, `PlanPanelLeft.css` happened to load
+     * second, and so the one rule the phone layout most depends on lost every
+     * time: the associate got 240px of presenter furniture above the
+     * conversation on a 390px screen, while this stylesheet, the test that
+     * reads it and the comment above it all said otherwise.
+     *
+     * This is the trap #60 recorded in the other direction — a breakpoint
+     * present, correct and completely inert — and the reason the rules below
+     * were already written this way.
+     */
+    .coral-shell-row .panel-left-container {
         display: none;
     }
 

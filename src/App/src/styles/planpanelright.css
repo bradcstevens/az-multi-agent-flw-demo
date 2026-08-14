@@ -12,7 +12,12 @@
  */
 .plan-panel-right {
   width: min-content;
-  height: 100vh;
+  /*
+   * `dvh`, not `vh`, for the reason the shell uses it: on iOS Safari `100vh`
+   * counts the viewport as though the browser chrome were not there, so this
+   * column stood a toolbar taller than the screen.
+   */
+  height: 100dvh;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
