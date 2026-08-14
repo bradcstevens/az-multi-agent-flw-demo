@@ -99,6 +99,42 @@ export class WireLog {
         }
     }
 
+    /**
+     * Wait until the recording answers a question, and return that answer.
+     *
+     * The escalation beat needs it because "what happens next" has more than
+     * one legitimate answer: the approved plan may stop to ask the associate
+     * something, or go straight to the ticket, and the walkthrough has to do a
+     * different thing in each case. Waiting for one frame type alone would sit
+     * through the framework's 300-second clarification wait and then report the
+     * wrong finding — a missing ticket, on a turn that was waiting for an
+     * answer nobody gave.
+     */
+    async waitUntil<T>(
+        question: (log: WireLog) => T | null,
+        {
+            timeout = 240_000,
+            from = 0,
+            expecting,
+        }: { timeout?: number; from?: number; expecting: string },
+    ): Promise<T> {
+        const deadline = Date.now() + timeout;
+        for (;;) {
+            const answer = question(this);
+            if (answer !== null) {
+                return answer;
+            }
+            if (Date.now() >= deadline) {
+                throw new Error(
+                    `${expecting} did not happen within ${Math.round(
+                        timeout / 1000,
+                    )}s. The socket carried: ${this.summary(from)}`,
+                );
+            }
+            await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+    }
+
     /** What the socket carried, as counts by type — the failure diagnostic. */
     summary(from = 0): string {
         const counts = new Map<string, number>();

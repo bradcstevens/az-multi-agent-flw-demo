@@ -120,7 +120,22 @@ is deliberately non-total, so the seam found nothing, said nothing, and the card
 approved run now submits again when it finishes; it is the same single confirmation, the rejected
 plan never reaches it, and a Fast-lane turn nobody approved never reaches it either. Every unit test
 around that seam passed, because each handed it a store that already held a draft — the same lesson
-as #47's mock-at-the-wrong-seam, one layer in.
+as #47's mock-at-the-wrong-seam, one layer in. **That fix has never been observed live**, for the
+reason immediately below: no draft has ever existed to submit.
+
+**The escalation never drafts the ticket at all — #62, and the beat is red on it.** An approved
+escalation turn ran to completion against `rg-macae-flw-v1` — `final_result_message` on the wire,
+2810 characters of answer — and `GET /api/v4/escalation/ticket` answered `{"drafted": false}`. The
+**EscalationAgent** never called `draft_service_ticket`. `docs/escalation-ticket.md` had already
+named the risk out loud: that a live turn calls the drafting tool is *instructed, not measured*. It
+is now measured, and it is not happening, so the Simulated ticket exists only in the model's prose
+and no submission seam anywhere can raise it. The same run showed the shape of the drift: after the
+approval the plan asks twice in one pause — the `list_attempted_steps` tool-approval, rendered as
+*"The agent needs clarification."*, and a `request_user_clarification` — and the Troubleshooting
+Agent then improvises diagnostics until the turn ends in advice rather than an escalation. The
+walkthrough answers up to four questions and grades the ticket; it fails naming what the socket
+carried instead. That red is the product's, not the validator's, and it is the finding: the
+demonstration's fourth beat does not currently work.
 
 **Beats 3 and 4 are two conversations, so the memory does not cross them.** The escalation Quick Task
 starts a new session; the troubleshooting record is the memory of *one* conversation

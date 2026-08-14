@@ -138,9 +138,14 @@ for the same reason — asking a question does not unraise a ticket.
 
 ## What is not proven here
 
-- **Nothing has run against a deployment.** That a live `gpt-5.4` turn calls `draft_service_ticket`
-  before presenting a ticket is *instructed*, not measured. The deterministic half — submission at
-  the approval seam — does not depend on it, which is why it is the half that raises.
+- **The live turn does not call `draft_service_ticket` — measured, 2026-08-14, issue #62.** The
+  **Demo validator**'s escalation beat approved a plan against `rg-macae-flw-v1` and let it run to
+  completion; `GET /api/v4/escalation/ticket` then answered `{"drafted": false}`. This was always
+  *instructed*, not measured; the browser measured it, and the instruction is not being followed.
+  With no draft, the deterministic half has nothing to raise, so the **Simulated ticket** exists on
+  that deployment only in the model's prose.
+- **The submission-at-completion seam has never been observed live**, for the same reason. An
+  approved run submits when it finishes (issue #50); every proof of that is a unit test.
 - **A failed submit is silent.** If the write fails the plan is still approved and no card is
   pushed, but the model's own words on that turn are outside this code's reach and may still say a
   ticket was raised.

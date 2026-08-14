@@ -103,6 +103,24 @@ export class PlanSurface {
         await this.rehearsedReplies.getByRole('button', { name: reply, exact: true }).click();
     }
 
+    /** The plan page's chat box — where a Clarification is answered by typing. */
+    get answerBox(): Locator {
+        return this.page.getByRole('textbox');
+    }
+
+    /**
+     * Answer a pending Clarification in words.
+     *
+     * The Quick Task that escalates authors no rehearsed replies, so the beat
+     * that reports what was already tried types it. The box is disabled while
+     * the surface is submitting, so this waits for it rather than racing it.
+     */
+    async answerClarification(answer: string): Promise<void> {
+        await expect(this.answerBox).toBeEnabled({ timeout: 60_000 });
+        await this.answerBox.fill(answer);
+        await this.answerBox.press('Enter');
+    }
+
     /**
      * The approval gate the Deliberate lane opens.
      *

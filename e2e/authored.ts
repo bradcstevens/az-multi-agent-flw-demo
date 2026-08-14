@@ -124,6 +124,23 @@ export function escalationTask(): QuickTask {
     );
 }
 
+/**
+ * What the associate reports having already tried, when the escalation asks.
+ *
+ * The escalation Quick Task authors no **Rehearsed replies** of its own, so the
+ * beat types one — and it types the pack's *own* first rehearsed reply rather
+ * than a sentence invented here, for ADR-019's reason: an answer this file
+ * carried a copy of would survive a rewrite of the runbook it is supposed to be
+ * an answer to.
+ */
+export function attemptedStepAnswer(): string {
+    const replies = troubleshootingTask().rehearsedReplies;
+    if (replies.length === 0) {
+        throw new Error('the troubleshooting Quick Task authors no rehearsed replies');
+    }
+    return replies[0];
+}
+
 /** The Quick Task carrying a given card title. */
 export function quickTaskNamed(name: string): QuickTask {
     const found = quickTasks().find((task) => task.name === name);

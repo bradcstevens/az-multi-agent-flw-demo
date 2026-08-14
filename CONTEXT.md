@@ -916,6 +916,18 @@ service-incident ticket"*, so at the moment of the approval there is no draft, `
 returns `None` exactly as designed, and the seam correctly does nothing. Every path was behaving as
 written; the order was wrong. An approved run now submits again when it finishes.
 
+That fix is proven by tests and **has never been observed live**, because a deeper fault sits
+underneath it: on the deployed system the **EscalationAgent never drafts at all**. A completed
+approved escalation turn — `final_result_message` on the wire, 2810 characters of answer — leaves
+`GET /api/v4/escalation/ticket` answering `{"drafted": false}`. `draft_service_ticket` is never
+called, so there is nothing for any submission seam to raise and the **Simulated ticket** remains
+prose. That a live turn calls the drafting tool was always *instructed, not measured*
+(`docs/escalation-ticket.md` said so); measuring it is what the browser added. The approved plan
+also asks twice in one pause — the `list_attempted_steps` tool-approval and a
+`request_user_clarification` — and the **Troubleshooting Agent** then improvises diagnostics until
+the turn ends in advice rather than an escalation. The beat is red on the deployment for that
+reason, and the red is the product's, not the validator's. It is #62.
+
 The tests around the seam — eight of them, specific and well-named — all passed, because each handed
 the seam a fake store that already held a draft. That is #47's mock lesson one layer in: a fake
 supplying what the real collaborator *cannot yet have* at that point in the turn agrees with the
