@@ -11,7 +11,8 @@ import renderAgentMessages from "./streaming/StreamingAgentMessage";
 import StreamingBufferMessage from "./streaming/StreamingBufferMessage";
 import PresenterAlertCard from "../transparency/PresenterAlertCard";
 import RehearsedReplies from "./RehearsedReplies";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { clarificationAnswered } from "@/store/slices/chatSlice";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
@@ -63,6 +64,30 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 }) => {
   // Read before the early return: hooks may not sit behind a condition.
   const presenterAlerts = useAppSelector(selectPresenterAlerts);
+  const dispatch = useAppDispatch();
+
+  /*
+    Answering the clarification, whichever way the associate answered it
+    (issue #50).
+
+    A question stops being pending when it is answered, and this is the one
+    seam both answers pass through — the box below and the chips above are two
+    ways to say the same words to the same `request_id`. Clearing it at the
+    call site instead would be a clear the second caller forgets, which is the
+    reason #26 put the pending-clarification gate inside `RehearsedReplies`
+    rather than at its call site.
+
+    Optimistic, and restored by `PlanPage` if the submit fails: a question that
+    could not be answered is a question still standing, and the one-tap answers
+    are the presenter's way out of it.
+  */
+  const answerClarification = React.useCallback(
+    (answer: string) => {
+      dispatch(clarificationAnswered());
+      OnChatSubmit(answer);
+    },
+    [dispatch, OnChatSubmit],
+  );
 
   if (!planData)
     return (
@@ -128,7 +153,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
       */}
       <RehearsedReplies
         replies={rehearsedReplies}
-        onReply={OnChatSubmit}
+        onReply={answerClarification}
         disabled={submittingChatDisableInput}
       />
 
@@ -138,7 +163,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         input={input}
         setInput={setInput}
         submittingChatDisableInput={submittingChatDisableInput}
-        OnChatSubmit={OnChatSubmit}
+        OnChatSubmit={answerClarification}
         waitingForPlan={waitingForPlan}
         loading={false} />
 

@@ -38,6 +38,26 @@ is the entire point of routing this to the **Deliberate lane** in the first plac
 That is #21's move at a different seam, and for the same reason. It happens on every approved plan
 whether or not the model remembers anything.
 
+### The approval comes before the draft, so the submission is taken twice
+
+Issue #50, found by a browser: the card never appeared. The plan review is presented **before** the
+plan runs, and the plan whose last step is *"draft a simulated service-incident ticket"* has not
+drafted one yet — so `_raise_confirmed_ticket` at the approval seam finds nothing, correctly says
+nothing, and the associate reads a ticket in the prose with no card beside it.
+
+So `run_orchestration` calls the same seam again when an **approved** run finishes, once the draft
+exists. Both calls are the same single confirmation: nothing further is presented, the associate is
+asked nothing, and the two ways this could have become a second confirmation are closed —
+`TicketStore.submit` is idempotent, so a re-submission returns the ticket rather than reissuing the
+number, and the manager remembers which ticket it has already put on the surface, so one approval
+raises one card. A run with no plan review never reaches the call, which matters because the
+EscalationAgent is in the pool on **every** turn: a ticket raised at the end of an unapproved Fast-lane
+turn is the unconfirmed submission the gate exists to prevent. A rejected plan cancels the run
+before it.
+
+Every unit test around the seam passed throughout, because each handed it a store that already held
+a draft. A fake that supplies what the collaborator cannot yet have is the #47 lesson one layer in.
+
 ## There is no submit tool
 
 The second confirmation is not forbidden, it is **unreachable**. `EscalationService` exposes exactly

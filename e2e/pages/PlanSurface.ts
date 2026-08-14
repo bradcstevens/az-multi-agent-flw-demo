@@ -89,8 +89,68 @@ export class PlanSurface {
         return this.page.getByTestId('rehearsed-replies');
     }
 
+    /** The chips as the associate reads them, in the order they are offered. */
+    async rehearsedReplyLabels(): Promise<string[]> {
+        if ((await this.rehearsedReplies.count()) === 0) {
+            return [];
+        }
+        const labels = await this.rehearsedReplies.getByRole('button').allInnerTexts();
+        return labels.map((label) => label.trim()).filter(Boolean);
+    }
+
+    /** Tap one, which is the whole of the troubleshooting beat's interaction. */
+    async tapRehearsedReply(reply: string): Promise<void> {
+        await this.rehearsedReplies.getByRole('button', { name: reply, exact: true }).click();
+    }
+
+    /**
+     * The approval gate the Deliberate lane opens.
+     *
+     * Located by the label the presenter reads, because the deployed image
+     * carries no testid here and adding one makes the deployed target red until
+     * the next roll — the confusion #48 exists to remove. The label is authored
+     * in `StreamingPlanResponse.tsx` and is not anything a model wrote, so it is
+     * as deterministic as an attribute would be; it is simply also visible.
+     */
+    get approveButton(): Locator {
+        return this.page.getByRole('button', { name: 'Approve Task Plan' });
+    }
+
+    /** The other half of the same gate. Rejecting is a beat, not a cleanup. */
+    get rejectButton(): Locator {
+        return this.page.getByRole('button', { name: 'Cancel', exact: true });
+    }
+
     /** The **Simulated ticket** an approved escalation raises (#50's beat). */
     get simulatedTicket(): Locator {
         return this.page.getByTestId('simulated-ticket');
+    }
+
+    /** The number an associate could read down a telephone. */
+    get ticketNumber(): Locator {
+        return this.page.getByTestId('simulated-ticket-id');
+    }
+
+    /** The label that says the ticket is invented, on the card that carries it. */
+    get ticketSimulatedBadge(): Locator {
+        return this.simulatedTicket.getByTestId('simulated-badge');
+    }
+
+    /**
+     * The ticket's rows, keyed by TKT-001's own field names.
+     *
+     * Read off the card rather than out of the payload on purpose: what this
+     * beat grades is what the associate was shown before they approved it, and
+     * a payload carrying a field the card drops is a ticket nobody read.
+     */
+    async ticketFields(): Promise<Record<string, string>> {
+        const rows = this.simulatedTicket.locator('.simulated-ticket__row');
+        const fields: Record<string, string> = {};
+        for (const row of await rows.all()) {
+            const name = (await row.locator('dt').innerText()).trim();
+            const value = (await row.locator('dd').innerText()).trim();
+            fields[name] = value;
+        }
+        return fields;
     }
 }

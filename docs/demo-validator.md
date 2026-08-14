@@ -71,7 +71,67 @@ failure.
 The suite also asserts the Grounding panel is **empty before the question is asked**. Without it, a
 panel left lit by a previous conversation satisfies every other assertion in the spec.
 
-## Selectors
+## The troubleshooting and escalation beats
+
+Issue #50. The two hardest beats, and together the demonstration's strongest single claim: that the
+assistant remembers what you tried and does not make you repeat it.
+
+**Beat 3 — the clarification and the rehearsed replies.** The fault is asserted to provoke a
+`user_clarification_request`, the chips are asserted to carry the pack's own authored labels, and the
+tap is asserted to *record* — `GET /api/v4/troubleshooting/attempted` gains a step. A tap that
+records nothing looks exactly like a tap that worked, right up to the moment the runbook walks the
+associate through the step they already tried. The chips are then asserted to be **gone**: they are
+one-tap answers carrying a `request_id`, and a chip offered after its question was answered submits
+an answer to a question nobody is waiting for.
+
+**Beat 4 — the approval is the ticket.** The Lane is read back from server-side session state, never
+off the badge; the badge is the browser's recollection of what the router said, and a surface
+rendering `Deliberate` over a request the router sent down the Fast lane is exactly the failure it
+cannot see. Then the approval, the ticket, and two claims about things that must **not** happen — no
+second `plan_approval_request`, no `user_clarification_request` between the approval and the card.
+The rejected branch gets its own spec, because it is where the requirement fails silently: nothing on
+the wire, no card, and no submitted ticket in the container.
+
+Nothing is asserted about anything a model wrote. The ticket's number is a sha256 of the session
+against the prefix `ticket.py` defines, its rows are the template's, and its `Simulated` labelling is
+a property of the card.
+
+### Both halves are graded on the wire
+
+`e2e/wire.ts` records every frame the page received (`page.on('websocket')`). The absence claims —
+*asked only while a question is pending*, *one confirmation not two*, *never asked twice* — are
+claims that something did not happen, and a locator that is not on screen is equally a surface that
+has not rendered yet. Counting frames between two marks distinguishes them, and a failure names what
+the socket **did** carry instead of reporting a 30-second timeout.
+
+### What these two beats found
+
+**The chips outlived their question.** `clarificationMessage` was set by the incoming request and
+cleared only by `resetChat` on a new plan, so after answering — by chip or by typing — the rehearsed
+replies stayed on screen offering one-tap answers to a resolved `request_id`. Fixed at
+`PlanChat`, the single seam both answers pass through, with `PlanPage` putting the question back if
+the submit failed. Every panel test passed throughout, because each fed the component the state it
+expected rather than the state a conversation produces.
+
+**The ticket was never raised, because the draft did not exist yet.** The confirmation seam ran
+inside `_handle_plan_reviews` — at plan-review time, which is *before* the plan runs, and the plan
+whose last step is *"draft a simulated service-incident ticket"* has not drafted one. `TicketStore.read`
+is deliberately non-total, so the seam found nothing, said nothing, and the card never appeared. The
+approved run now submits again when it finishes; it is the same single confirmation, the rejected
+plan never reaches it, and a Fast-lane turn nobody approved never reaches it either. Every unit test
+around that seam passed, because each handed it a store that already held a draft — the same lesson
+as #47's mock-at-the-wrong-seam, one layer in.
+
+**Beats 3 and 4 are two conversations, so the memory does not cross them.** The escalation Quick Task
+starts a new session; the troubleshooting record is the memory of *one* conversation
+(`docs/troubleshooting-memory.md`); and the plan page's chat box submits clarifications only, so
+there is no way to continue the previous conversation with a new request. The ticket therefore reads
+`steps_attempted: not reported` on the walkthrough as authored. The spec asserts the total claim —
+every recorded step is carried, and a conversation with no record says exactly `not reported` — so a
+ticket that *invented* steps fails as loudly as one that dropped them. Closing the gap is a change to
+the surface, not to the validator, and is #61.
+
+
 
 Only `data-testid`s that the **currently deployed image** carries. Adding an attribute to the
 frontend makes the deployed target red until the next roll, which turns "the beat is broken" and
@@ -80,19 +140,23 @@ therefore located through `.content .panelContent` and the authored "AI Agent" t
 testid of its own; `data-testid="agent-message"` on `StreamingAgentMessage` is worth adding the next
 time images are rebuilt.
 
-Page objects live in `e2e/pages/` and hold no assertions, so the headed **Stage driver** (#51) can
-reuse them without a second description of the walkthrough.
+Page objects live in `e2e/pages/` and describe the surface, not the walkthrough, so the headed
+**Stage driver** (#51) can reuse them without a second description of the beats. They do carry
+`expect`, but only as *waits* — "the surface has arrived" — never as a claim the walkthrough makes.
+Every claim on the issue's acceptance criteria is in a spec.
 
 ## The seam that stays runnable in CI
 
 The browser suite needs a deployment, so it is declared as a loop and wired into **no workflow**.
 What runs in CI is `src/tests/ci/test_e2e_wiring.py`, which reads the harness off disk as text and
 asserts the wiring the suite's usefulness depends on: that the script exists and is executable, that
-artefacts are unconditional, that there is exactly one `testDir`, that the target parameter selects
-between the two surfaces, that the expectation is read from the repository, that page objects carry
-no assertions, and that the accelerator's suite is gone. It is the same shape as
-`test_frontend_ci_wiring.py`, and like it, it strips comments before scanning — a rule named only in
-prose otherwise satisfies the check.
+artefacts are unconditional, that the walkthrough is never retried, that there is exactly one
+`testDir`, that the target parameter selects between the two surfaces, that the expectation is read
+from the repository — including the ticket prefix and the lane's name, out of the backend modules
+that define them — that both hard beats have a spec, that their absence claims are graded on the
+wire, that the lane and the troubleshooting record are read server-side, and that the accelerator's
+suite is gone. It is the same shape as `test_frontend_ci_wiring.py`, and like it, it strips comments
+before scanning — a rule named only in prose otherwise satisfies the check.
 
 ## Known non-determinism
 

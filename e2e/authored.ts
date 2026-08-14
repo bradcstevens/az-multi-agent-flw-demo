@@ -37,12 +37,16 @@ const SURFACE_MODULE = join(
     'models',
     'storeSurface.ts',
 );
+const TICKET_MODULE = join(REPO_ROOT, 'src', 'backend', 'escalation', 'ticket.py');
+const LANE_MODULE = join(REPO_ROOT, 'src', 'backend', 'lane', 'lane.py');
 
 export interface QuickTask {
     id: string;
     name: string;
     prompt: string;
     lane?: string;
+    /** The one-tap answers this task authors, if it provokes a Clarification. */
+    rehearsedReplies: string[];
 }
 
 export interface RehearsedHit {
@@ -77,12 +81,47 @@ export function rehearsedHit(): RehearsedHit {
 /** The Quick Tasks the store pack authors, in the order they render. */
 export function quickTasks(): QuickTask[] {
     const pack = JSON.parse(readFileSync(STORE_PACK, 'utf-8'));
-    return (pack.starting_tasks || []).map((task: Record<string, string>) => ({
-        id: task.id,
-        name: task.name,
-        prompt: task.prompt,
-        lane: task.lane,
+    return (pack.starting_tasks || []).map((task: Record<string, unknown>) => ({
+        id: task.id as string,
+        name: task.name as string,
+        prompt: task.prompt as string,
+        lane: task.lane as string | undefined,
+        rehearsedReplies: Array.isArray(task.rehearsed_replies)
+            ? (task.rehearsed_replies as string[])
+            : [],
     }));
+}
+
+/**
+ * The troubleshooting beat's Quick Task — the one that asks a question back.
+ *
+ * Found by the property that *makes* it that beat rather than by its title.
+ * Only the task that provokes a **Clarification** authors **Rehearsed
+ * replies**, because there is nothing else for a one-tap answer to answer; a
+ * suite naming the card instead would go green on a pack that renamed the beat
+ * away and red on a pack that merely retitled the card.
+ */
+export function troubleshootingTask(): QuickTask {
+    return sole(
+        quickTasks().filter((task) => task.rehearsedReplies.length > 0),
+        'Quick Task authoring Rehearsed replies',
+    );
+}
+
+/**
+ * The escalation beat's Quick Task — the one that declares the Deliberate lane.
+ *
+ * Same rule, and the same reason it is the *declaration* that identifies it:
+ * the beat exists to show the approval step, and the approval step is the
+ * Lane's one mechanical consequence (`lane.py`). A second task declaring
+ * `deliberate` would make "the escalation" ambiguous, which is a pack that
+ * needs reading rather than a test that needs a tie-break.
+ */
+export function escalationTask(): QuickTask {
+    return sole(
+        quickTasks().filter((task) => task.lane === deliberateLane()),
+        `Quick Task declaring the ${deliberateLane()} lane`,
+    );
 }
 
 /** The Quick Task carrying a given card title. */
@@ -95,6 +134,58 @@ export function quickTaskNamed(name: string): QuickTask {
         );
     }
     return found;
+}
+
+/** The Deliberate lane's value on the wire, from the enum that defines it. */
+export function deliberateLane(): string {
+    const source = readFileSync(LANE_MODULE, 'utf-8');
+    const match = source.match(/DELIBERATE\s*=\s*"([^"]*)"/);
+    if (!match) {
+        throw new Error(`Lane.DELIBERATE is not declared in ${LANE_MODULE}`);
+    }
+    return match[1];
+}
+
+/**
+ * The shape a **Simulated ticket**'s number must have, from the module that
+ * mints it.
+ *
+ * `SIM-` is not decoration: the number outlives the card it was rendered on —
+ * an associate can read it down a telephone a week later — so it carries the
+ * simulation with it. Read from `ticket.py` rather than pinned here, because a
+ * prefix quietly changed to something that reads like a real service desk's is
+ * exactly the change this assertion exists to catch.
+ */
+export function ticketNumberPattern(): RegExp {
+    const prefix = pythonString(TICKET_MODULE, 'TICKET_ID_PREFIX');
+    return new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\d{4}$`);
+}
+
+/** TKT-001's answer for a field nothing answered, from the module that fills it. */
+export function notReported(): string {
+    return pythonString(TICKET_MODULE, 'NOT_REPORTED');
+}
+
+/** A module-level `NAME = "value"` out of a Python module. */
+function pythonString(path: string, name: string): string {
+    const source = readFileSync(path, 'utf-8');
+    const match = source.match(new RegExp(`^${name}\\s*=\\s*"([^"]*)"`, 'm'));
+    if (!match) {
+        throw new Error(`no ${name} in ${path}`);
+    }
+    return match[1];
+}
+
+/** Exactly one, or a failure that names what was ambiguous. */
+function sole(found: QuickTask[], what: string): QuickTask {
+    if (found.length !== 1) {
+        throw new Error(
+            `the store pack has ${found.length} of: ${what}. The walkthrough ` +
+                'has one of each beat, so a beat this suite cannot identify ' +
+                'is a pack that needs reading, not a test that needs a tie-break',
+        );
+    }
+    return found[0];
 }
 
 /**

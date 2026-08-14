@@ -74,6 +74,12 @@ class OrchestrationManager:
     def __init__(self):
         self.user_id: Optional[str] = None
         self.logger = self.__class__.logger
+        # Tickets this run has already put on the surface. One manager per turn
+        # (``router.process_request``), and the confirmation seam is now
+        # reached twice — at the approval and again when the approved plan
+        # finishes, because the draft is made in between. One approval, one
+        # card.
+        self._raised_ticket_ids: set[str] = set()
 
     # ---------------------------
     # Orchestration construction
@@ -506,6 +512,19 @@ class OrchestrationManager:
                     orchestrator_chunks=orchestrator_chunks,
                     current_streaming_agent_ref=current_streaming_agent_ref,
                 )
+
+            # The approval the associate already gave, applied to the draft the
+            # approved plan made while it ran (#50). The seam inside
+            # ``_handle_plan_reviews`` runs at plan-review time, which is
+            # *before* the plan executes — and the plan whose last step is
+            # "draft a simulated service-incident ticket" has not drafted one
+            # yet, so that call finds nothing and the card never appears. This
+            # is the same single confirmation, not a second gate: nothing is
+            # presented here, and a run nobody approved never reaches it.
+            # ``submit`` is idempotent, so an approval that did find a draft
+            # raises the same ticket rather than a second number.
+            if plan_already_approved:
+                await self._raise_confirmed_ticket(user_id)
 
             # Use executor_completed Message if available; otherwise fall back to
             # accumulated orchestrator streaming chunks.
@@ -1078,6 +1097,11 @@ class OrchestrationManager:
             ticket = await store.submit(session_id)
             if ticket is None:
                 return None
+
+            ticket_id = str(ticket.fields.get("ticket_id") or "")
+            if ticket_id and ticket_id in self._raised_ticket_ids:
+                return ticket
+            self._raised_ticket_ids.add(ticket_id)
 
             from escalation.payloads import TicketRaised
 

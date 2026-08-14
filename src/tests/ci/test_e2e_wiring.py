@@ -115,3 +115,78 @@ def test_the_inherited_accelerator_suite_is_gone():
         "tests/e2e-test/ is back: it drives an identity-provider login against "
         "the pre-rebrand surface and is wired into no workflow"
     )
+
+# ---------------------------------------------------------------------------
+# The two hardest beats (#50)
+# ---------------------------------------------------------------------------
+TROUBLESHOOTING = E2E / "specs" / "troubleshooting.spec.ts"
+ESCALATION = E2E / "specs" / "escalation.spec.ts"
+WIRE = E2E / "wire.ts"
+BACKEND_READS = E2E / "backend.ts"
+
+
+def test_the_two_hardest_beats_are_under_test():
+    # The demonstration's strongest single claim — that the assistant remembers
+    # what you tried — is the pair most worth having a browser assert.
+    assert TROUBLESHOOTING.exists(), "the troubleshooting beat has no spec"
+    assert ESCALATION.exists(), "the escalation beat has no spec"
+
+
+def test_the_absence_claims_are_graded_on_the_wire():
+    # "Asked only while a question is pending", "one confirmation, not two",
+    # "never asked a second time" are all claims about things that do *not*
+    # happen. A locator that is not there is equally the surface not having
+    # rendered yet, so the frames are recorded and counted instead.
+    assert WIRE.exists(), "nothing records the frames the browser received"
+    for spec in (TROUBLESHOOTING, ESCALATION):
+        assert "recordWire" in _code(spec), (
+            f"{spec.name} makes its absence claims without reading the wire"
+        )
+
+
+def test_the_lane_and_the_record_are_read_server_side():
+    # The badge is the browser's own recollection of what the router said, and
+    # the chat is the associate's own words read back to them. A surface
+    # rendering `Deliberate` over a request that went down the Fast lane is
+    # exactly the failure neither can see.
+    assert BACKEND_READS.exists(), "the suite has no server-side reads"
+    escalation = _code(ESCALATION)
+
+    assert "laneTaken" in escalation, (
+        "the escalation beat does not read the lane from server-side state"
+    )
+    assert "attemptedSteps" in escalation, (
+        "the ticket's attempted steps are not compared against the record the "
+        "container holds"
+    )
+
+
+def test_the_ticket_and_the_lane_are_read_out_of_the_backend():
+    # ADR-019's lesson again: the ticket prefix and the lane's name live in the
+    # backend's own modules, and a validator repeating either passes a rename
+    # it never saw.
+    authored = _code(AUTHORED)
+
+    assert "'escalation', 'ticket.py'" in authored, (
+        "the ticket's number and its 'not reported' are not read out of the "
+        "module that renders them"
+    )
+    assert "'lane', 'lane.py'" in authored, (
+        "the Deliberate lane's name is not read out of the module that routes "
+        "to it"
+    )
+
+
+def test_the_rejected_branch_is_asserted():
+    # Where this requirement fails silently: a ticket raised from a plan the
+    # associate declined dispatches an engineer against a repair nobody
+    # authorised, and the surface has already navigated away.
+    escalation = _code(ESCALATION)
+
+    assert "rejected" in escalation, "nothing asserts what a rejected plan raises"
+
+
+def test_the_walkthrough_is_never_retried():
+    # A retry turns an intermittently-working demonstration into a green run,
+    # and the presenter finds out in the room.
+    assert "retries: 0" in _code(CONFIG), "the validator retries its walkthrough"
