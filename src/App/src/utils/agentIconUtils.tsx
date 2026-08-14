@@ -21,7 +21,11 @@ import {
     Shield20Regular
 } from '@fluentui/react-icons';
 import { TeamService } from '@/store/TeamService';
-import { TaskService } from '@/store';
+// Directly, not through the `@/store` barrel: that barrel re-exports `store`,
+// and this module is reached from `progressNarration` — so the barrel made the
+// Progress narration slice import its own store and be dropped from it. See
+// `store/store.test.ts`.
+import { TaskService } from '@/store/TaskService';
 import { iconMap } from '@/models/homeInput';
 
 // Extended icon mapping for user-uploaded string icons

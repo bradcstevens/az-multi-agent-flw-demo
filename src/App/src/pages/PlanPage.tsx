@@ -80,7 +80,7 @@ import LaneBadge from '../components/lane/LaneBadge';
 import { isLane, LANE_LABELS } from '../models/lane';
 import { LOADING_PLAN, SENDING } from '../models/progressNarration';
 import {
-    laneRouted,
+    requestRouted,
     planOpened,
     requestSent,
     requestSettled,
@@ -324,7 +324,9 @@ const PlanPage: React.FC = () => {
         followOnSubmissionRef.current = true;
         setFollowOnSubmitting(true);
         dispatch(requestStarted());
-        dispatch(requestSent(sessionId ? planData?.plan?.id : undefined));
+        // No plan id yet — the follow-on creates one, and `requestRouted` records
+        // it off the response before the navigation, exactly as `HomeInput` does.
+        dispatch(requestSent());
         const id = showToast(SENDING, 'progress');
         try {
             const response = await TaskService.createPlan(
@@ -338,9 +340,12 @@ const PlanPage: React.FC = () => {
                 throw new Error('The follow-on task did not create a plan');
             }
 
-            if (isLane(response.lane)) {
-                dispatch(laneRouted({ lane: response.lane, planId: response.plan_id }));
-            }
+            dispatch(
+                requestRouted({
+                    lane: isLane(response.lane) ? response.lane : null,
+                    planId: response.plan_id,
+                }),
+            );
             webSocketService.connect(response.plan_id).catch(() => {
                 // The plan page retries, and the surface degrades to polling.
             });

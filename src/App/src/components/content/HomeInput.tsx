@@ -21,7 +21,7 @@ import PersonalAnswerCard from "../identity/PersonalAnswerCard";
 import { isLane, LANE_LABELS } from "../../models/lane";
 import { SENDING } from "../../models/progressNarration";
 import {
-  laneRouted,
+  requestRouted,
   requestSent,
   requestSettled,
 } from "../../store/slices/progressSlice";
@@ -205,10 +205,15 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       if (response.plan_id && response.plan_id !== null) {
         // The lane the router decided, read from the same `response.lane` the
         // `LaneBadge` reads. Recorded before the navigation, because the phase
-        // outliving that navigation is the whole reason it lives in a slice.
-        if (isLane(response.lane)) {
-          dispatch(laneRouted({ lane: response.lane, planId: response.plan_id }));
-        }
+        // outliving that navigation is the whole reason it lives in a slice —
+        // and dispatched even when the response named no lane, because the plan
+        // it names is what carries the narration across that navigation.
+        dispatch(
+          requestRouted({
+            lane: isLane(response.lane) ? response.lane : null,
+            planId: response.plan_id,
+          }),
+        );
 
         // The socket opens here, on the response, and not on the plan page
         // (ADR-021). `process_request` schedules the orchestration *before* it

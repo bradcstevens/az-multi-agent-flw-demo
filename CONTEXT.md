@@ -906,7 +906,11 @@ then ran for the rest of the conversation. Its guard drives raw wire text throug
 `WebSocketService` into the real `PlanChat` and asserts no `progressbar` remains — by role, not by
 copy, so that rewriting these strings did not delete it. It is pointed at the phase now, and
 `waitingForPlan` is gone: nothing on the surface reads a second boolean about whether a request is
-in flight. See
+in flight. **And the slice has to actually be in the store**: `progressSlice` reaches
+`agentIconUtils` to name an executor, and that module imported the `@/store` barrel, so the running
+store dropped the `progress` key while all 407 tests — each building its own store — stayed green.
+`store/store.test.ts` imports a slice before the store and asserts the store carries every reducer
+it claims. See
 [ADR-023](docs/ADR/023-progress-narration-claims-only-what-a-signal-reports.md).
 _Avoid_: loading message, progress indicator, spinner copy
 

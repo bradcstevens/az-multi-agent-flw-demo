@@ -54,9 +54,20 @@ const progressSlice = createSlice({
             state.lane = null;
             state.executor = null;
         },
-        /** The `createPlan` response reported the lane it was routed into. */
-        laneRouted(state, action: PayloadAction<{ lane: Lane; planId?: string | null }>) {
-            state.lane = action.payload.lane;
+        /**
+         * The `createPlan` response came back, naming the plan and — usually —
+         * the lane it was routed into.
+         *
+         * The lane is optional because the router failing to report one is not
+         * the router reporting `fast`. The plan is recorded either way: without
+         * it the narration is reset by the very navigation it caused, and the
+         * surface falls silent on a request that is still in flight.
+         */
+        requestRouted(
+            state,
+            action: PayloadAction<{ lane?: Lane | null; planId?: string | null }>,
+        ) {
+            if (action.payload.lane) state.lane = action.payload.lane;
             if (action.payload.planId) state.planId = action.payload.planId;
             if (advancesTo(state.phase, 'routed')) state.phase = 'routed';
         },
@@ -109,7 +120,7 @@ const progressSlice = createSlice({
 
 export const {
     requestSent,
-    laneRouted,
+    requestRouted,
     socketConnected,
     agentResponding,
     requestSettled,

@@ -13,7 +13,7 @@ import planReducer, {
     selectShowProcessingPlanSpinner,
     setContinueWithWebsocketFlow,
 } from '@/store/slices/planSlice';
-import progressReducer, { laneRouted, requestSent } from '@/store/slices/progressSlice';
+import progressReducer, { requestRouted, requestSent } from '@/store/slices/progressSlice';
 import chatReducer from '@/store/slices/chatSlice';
 import appReducer from '@/store/slices/appSlice';
 import teamReducer from '@/store/slices/teamSlice';
@@ -221,7 +221,7 @@ const inFlightIndicators = () => screen.queryAllByRole('progressbar');
 const askAQuestion = (store: ReturnType<typeof makeStore>, planId: string) => {
     act(() => {
         store.dispatch(requestSent());
-        store.dispatch(laneRouted({ lane: 'fast', planId }));
+        store.dispatch(requestRouted({ lane: 'fast', planId }));
     });
 };
 

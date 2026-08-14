@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import progressReducer, {
     agentResponding,
-    laneRouted,
+    requestRouted,
     planOpened,
     requestSent,
     requestSettled,
@@ -32,14 +32,14 @@ describe('the phase a request is in', () => {
     });
 
     it('announces the lane the router decided', () => {
-        const state = after(requestSent(), laneRouted({ lane: 'fast', planId: 'plan-1' }));
+        const state = after(requestSent(), requestRouted({ lane: 'fast', planId: 'plan-1' }));
         expect(selectProgressNarration(asRoot(state))).toBe('Routed — Fast lane');
     });
 
     it('says nothing new when the socket connects, because connecting is plumbing', () => {
         const state = after(
             requestSent(),
-            laneRouted({ lane: 'fast', planId: 'plan-1' }),
+            requestRouted({ lane: 'fast', planId: 'plan-1' }),
             socketConnected(),
         );
         expect(selectRequestPhase(asRoot(state))).toBe('connected');
@@ -64,7 +64,7 @@ describe('the phase only ever advances', () => {
     it('does not run back to Routed when a reconnect reports the socket again', () => {
         const state = after(
             requestSent(),
-            laneRouted({ lane: 'fast', planId: 'plan-1' }),
+            requestRouted({ lane: 'fast', planId: 'plan-1' }),
             agentResponding('Shift Tasks Agent'),
             socketConnected(),
         );
@@ -116,7 +116,7 @@ describe('the phase only ever advances', () => {
         // your plan..." would be a stage nothing emits.
         const state = after(
             requestSent(),
-            laneRouted({ lane: 'deliberate', planId: 'plan-1' }),
+            requestRouted({ lane: 'deliberate', planId: 'plan-1' }),
             requestSettled(),
             planApprovalAccepted(),
         );
@@ -127,7 +127,7 @@ describe('the phase only ever advances', () => {
     it('keeps the plan an approved request belongs to', () => {
         const state = after(
             requestSent(),
-            laneRouted({ lane: 'deliberate', planId: 'plan-1' }),
+            requestRouted({ lane: 'deliberate', planId: 'plan-1' }),
             requestSettled(),
             planApprovalAccepted(),
             planOpened('plan-1'),
@@ -140,7 +140,7 @@ describe('the plan the narration belongs to', () => {
     it('survives the navigation the request itself made', () => {
         const state = after(
             requestSent(),
-            laneRouted({ lane: 'deliberate', planId: 'plan-1' }),
+            requestRouted({ lane: 'deliberate', planId: 'plan-1' }),
             planOpened('plan-1'),
         );
         expect(selectProgressNarration(asRoot(state))).toBe('Routed — Needs approval');
@@ -152,7 +152,7 @@ describe('the plan the narration belongs to', () => {
         // finished last week is the surface saying something that is not so.
         const state = after(
             requestSent(),
-            laneRouted({ lane: 'fast', planId: 'plan-1' }),
+            requestRouted({ lane: 'fast', planId: 'plan-1' }),
             agentResponding('Shift Tasks Agent'),
             planOpened('plan-2'),
         );
@@ -162,5 +162,19 @@ describe('the plan the narration belongs to', () => {
 
     it('says nothing on a reload, which has no signal of its own to report', () => {
         expect(selectProgressNarration(asRoot(after(planOpened('plan-1'))))).toBeNull();
+    });
+
+    it('survives the navigation even though the response reported no lane', () => {
+        // The router failing to name a lane must not also lose the plan the
+        // request is for: the narration would then be reset by the very
+        // navigation it caused, and the surface would fall silent on a request
+        // that is still in flight.
+        const state = after(
+            requestSent(),
+            requestRouted({ lane: null, planId: 'plan-1' }),
+            planOpened('plan-1'),
+        );
+        expect(selectRequestPhase(asRoot(state))).toBe('routed');
+        expect(selectProgressNarration(asRoot(state))).toBe('Sending your question...');
     });
 });

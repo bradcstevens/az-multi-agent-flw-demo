@@ -140,6 +140,13 @@ with it — see **Available vs participating** in `CONTEXT.md`.
   `agent_message_streaming` frame, because no signal has reported anything to that browser. That is
   the honest amount, and it is what "holds the last true statement" costs when there is no last true
   statement.
+- **Negative:** A slice that resolves an agent's display name reaches `agentIconUtils`, which
+  reached the `@/store` barrel — a cycle in which `store.ts` is evaluated while `progressSlice` is
+  still mid-evaluation, so `combineReducers` silently dropped the `progress` key and the running
+  store had no narration at all. Every suite on this surface builds its own store, so all 407 tests
+  passed against a store the application does not use. `store/store.test.ts` is the guard: it
+  imports a slice before the store, the order the application's own module graph takes, and asserts
+  the store carries every reducer key it claims.
 - **Risk accepted:** Someone will later want to make the loading screen "nicer" and re-add authored
   copy. This ADR is the answer to that, and the rule itself is in `CONTEXT.md` as **Progress
   narration** so it is reachable without finding this file.
