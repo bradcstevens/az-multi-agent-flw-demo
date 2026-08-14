@@ -76,9 +76,36 @@ is not the build you think it is"* before they are told the beats are green.
   detached or stale checkout. The check reports which commit it compared against, so the reader can
   see when that has happened.
 
+## Amendment — 2026-08-14 (#48), as built
+
+Two of the consequences above were overtaken by [ADR-020](./020-deploy-main-on-every-commit.md)
+before the check was written, and one failure mode was added to it.
+
+- **The stamp is the image tag, and no build script changed.** ADR-020 made
+  `deploy-main.yml` tag every image `<image>:<git rev-parse --short=12 HEAD>` — for its own reason,
+  that a re-pushed `latest` rolls one app in three — and made that workflow the only way images
+  reach this environment. So the commit was already stamped at build time, the first run had
+  something to compare against, and it went red on its first attempt with a true finding. A tag
+  remains a **claim** rather than a stamp inside the image, which is stated as the check's limit in
+  [docs/preflight/deployed-build.md](../preflight/deployed-build.md) rather than left silent; an
+  OCI `org.opencontainers.image.revision` label is the follow-up that closes it.
+- **Unknown survived, and is load-bearing for a different reason.** Not "the first run has nothing
+  to compare against" but "an image on `:latest`, pinned by digest, or built from a commit this
+  checkout never saw". The check exits `3` for it, distinct from `1` for drift, because *we could
+  not tell* and *it is nine commits old* send the reader to different places.
+- **A fourth check was added: the hosts must agree with each other.** Three hosts on two commits is
+  ADR-020's second failure mode observed from outside — a deploy that looked successful and updated
+  one app in three — and it passes a per-app currency check whenever the newest app happens to be
+  `HEAD`.
+- **"The validator's first assertion" is `globalSetup`, not a spec or a project.** Both of the
+  obvious shapes make the walkthrough reporter refuse to replace the **Recorded fallback**: it
+  refuses a multi-project run, and refuses one in which any beat produced no video — which a check
+  that drives no browser never does.
+
 ## References
 
 - `CONTEXT.md` — **Deployment drift**, **Placeholder image**, and the confirmed finding of
   2026-08-13
 - [docs/preflight/deployed-environment.md](../preflight/deployed-environment.md)
+- [docs/preflight/deployed-build.md](../preflight/deployed-build.md) — the check as built
 - [ADR-016: TypeScript `@playwright/test` for the Demo validator](./016-typescript-playwright-for-the-demo-validator.md)

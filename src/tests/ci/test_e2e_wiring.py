@@ -342,3 +342,116 @@ def test_the_proof_runs_the_loop_repeatedly_rather_than_repeat_each():
     assert "e2e-tests.sh" in _text(REPO_ROOT / "scripts" / "sop_rehearsal.py"), (
         "the proof does not run the Demo validator itself"
     )
+
+
+# ---------------------------------------------------------------------------
+# The deployed build is the validator's first assertion (#48, ADR-018).
+# ---------------------------------------------------------------------------
+
+PROVENANCE = E2E / "deployedBuild.ts"
+BUILD_CHECK = REPO_ROOT / "scripts" / "preflight" / "check-deployed-build.sh"
+
+
+def test_the_build_is_checked_before_any_beat_runs():
+    """ADR-018: "It is also the Demo validator's first assertion."
+
+    A validator that proves seven beats against last month's code proves
+    nothing, and the presenter needs to be told *"this is not the build you
+    think it is"* before being told the beats are green. It cost a day once
+    already: an integration branch was gated while the deployment served an
+    image nine commits behind, the troubleshooting beat went red for the image,
+    and the red was indistinguishable from a regression in the code.
+
+    `globalSetup` rather than a spec, and this is not incidental. Playwright
+    orders spec files by name, so "first" would rest on a filename; and a
+    provenance beat inside the suite is a beat with no video and — if it were
+    given its own project so it could be depended on — a second project. The
+    **walkthrough reporter** refuses to replace the **Recorded fallback** for
+    either, so the obvious shapes silently cost the presenter their fallback.
+    """
+    config = _code(CONFIG)
+
+    assert PROVENANCE.exists(), (
+        "nothing checks the deployed build before the beats run"
+    )
+    assert "globalSetup" in config, (
+        "the build check is not wired as globalSetup, so the beats can run "
+        "against an image nobody dated"
+    )
+    assert "deployedBuild" in config, (
+        f"playwright.config.ts does not reach {PROVENANCE.name}"
+    )
+
+
+def test_the_build_check_is_not_a_second_project_or_a_beat():
+    # The two shapes that would work and quietly delete the Recorded fallback.
+    # `whyNotRecorded` refuses a run with more than one project, and refuses
+    # one where any beat produced no video — and a provenance check drives no
+    # browser.
+    config = _code(CONFIG)
+
+    assert config.count("name: '") == 2, (
+        "a third project ran: the walkthrough reporter refuses a "
+        "multi-project run, so the Recorded fallback stops being replaced"
+    )
+    assert not list(E2E.joinpath("specs").glob("*build*.spec.ts")), (
+        "the build check is a spec: it produces a videoless beat, and the "
+        "walkthrough reporter refuses to record a run containing one"
+    )
+
+
+def test_the_build_check_asks_the_preflight_rather_than_restating_it():
+    # One description of the verdict. The preflight's decision logic is unit
+    # tested without a tenant (`src/tests/ci/test_deployed_build.py`); a second
+    # implementation in TypeScript is a second thing to disagree with it, which
+    # is what `storeSurface.ts` and `authored.ts` both exist to prevent.
+    provenance = _code(PROVENANCE)
+
+    assert BUILD_CHECK.exists(), "the preflight check the validator calls is gone"
+    assert BUILD_CHECK.name in provenance, (
+        "the validator does not run the deployed-build preflight; it has its "
+        "own copy of the verdict"
+    )
+
+
+def test_an_unproved_build_stops_the_run_as_firmly_as_a_drifted_one():
+    # ADR-018's consequence, at this seam: "treating that as a pass would
+    # rebuild the exact hole this closes". The check exits 3 for unknown and 1
+    # for drift, and a setup that only refuses on 1 passes a deployment whose
+    # images nobody could date.
+    provenance = _flat(PROVENANCE)
+
+    assert "!== 0" in provenance or "!= 0" in provenance, (
+        "the setup grades the preflight's exit code selectively; only a zero "
+        "exit is a proved build"
+    )
+
+
+def test_the_build_check_is_skipped_against_a_local_target():
+    # `--target local` runs the same specs against a `npm run dev`. There is no
+    # deployment to date, so a check that ran would refuse every local run.
+    provenance = _code(PROVENANCE)
+
+    assert "local" in provenance, (
+        "the build check does not know about the local target, so "
+        "`--target local` cannot run"
+    )
+
+
+def test_the_opt_out_is_a_deliberate_act_and_says_what_was_not_proved():
+    # The Stage driver is presenter-facing, and it is what the presenter falls
+    # back to when clicking through the walkthrough by hand goes wrong. A
+    # refusal to start, mid-demonstration, over a one-commit drift is the check
+    # doing more harm than the drift. So there is a way past it — an
+    # environment variable nobody sets by accident, which prints what it did
+    # not prove rather than pretending it did.
+    provenance = _code(PROVENANCE)
+
+    assert "E2E_SKIP_BUILD_CHECK" in provenance, (
+        "there is no way past the build check; a one-commit drift stops a "
+        "presenter mid-demonstration"
+    )
+    assert "NOT verified" in provenance or "not verified" in provenance, (
+        "the opt-out is silent: a run that skipped the check looks exactly "
+        "like one that passed it"
+    )

@@ -24,6 +24,28 @@ use, a no-op afterwards — so it runs from a clean checkout with nothing but `n
 the resource group and app name out of `scripts/preflight/deployed_surface.py` rather than carrying
 a second copy. `E2E_BASE_URL` overrides the lookup and skips the `az` call.
 
+## The first assertion: the deployed build is this commit
+
+Before a browser opens, `e2e/deployedBuild.ts` runs
+[`check-deployed-build.sh`](preflight/deployed-build.md) and stops the run if the Container Apps are
+not serving `HEAD`. **Deployment drift** makes every beat below it a statement about another
+commit, and the shape that failure takes is the worst one available: on 2026-08-14 an integration
+branch was gated by this suite against a frontend nine commits behind, and the beat that went red
+for the image reported `expect(locator).toBeHidden() failed` — indistinguishable from a regression
+in the code under review. It cost a day. ADR-018 is explicit that this is the suite's *first*
+assertion, because a suite that runs its beats and then explains itself in the failure of one of
+them has already cost the reader the diagnosis.
+
+It is `globalSetup` rather than a spec or a `setup` project on purpose. Both of those work and both
+quietly delete the **Recorded fallback**: the walkthrough reporter refuses to replace the recording
+for a multi-project run, and refuses one in which any beat produced no video — which a check that
+drives no browser never does.
+
+`--target local` skips it: there is no deployment to date. `E2E_SKIP_BUILD_CHECK=1` goes past a red
+verdict and says out loud that the build was **not verified**; it exists for the **Stage driver**,
+where refusing to start over a one-commit drift mid-demonstration is the check doing more harm than
+the drift.
+
 ## Why TypeScript, in a repository whose loops are Python
 
 ADR-016. The suite's real user is a **presenter who does not know agent orchestration** and who will

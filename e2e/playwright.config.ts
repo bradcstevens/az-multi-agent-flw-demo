@@ -37,6 +37,11 @@ const BEAT_TIMEOUT = 5 * 60 * 1000;
 export default defineConfig({
     testDir: './specs',
     outputDir: './artifacts/runs',
+    // The first assertion (#48, ADR-018): the deployed build is *this* commit,
+    // dated before a browser opens. Not a spec and not a project — either
+    // would make the walkthrough reporter refuse to replace the Recorded
+    // fallback. See `deployedBuild.ts` for why.
+    globalSetup: './deployedBuild.ts',
     timeout: BEAT_TIMEOUT,
     expect: { timeout: 60_000 },
     fullyParallel: false,

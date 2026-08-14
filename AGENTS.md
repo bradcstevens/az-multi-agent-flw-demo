@@ -32,6 +32,7 @@ capability — and re-run its script rather than re-deriving the finding by hand
 | `docs/preflight/azure-subscription-rights-and-policy.md` | `scripts/preflight/check-azure-subscription.sh` |
 | `docs/preflight/deployed-environment.md` | `scripts/preflight/check-deployed-environment.sh` |
 | `docs/preflight/deployed-surface.md` | `scripts/preflight/check-deployed-surface.sh` |
+| `docs/preflight/deployed-build.md` | `scripts/preflight/check-deployed-build.sh` |
 
 Each check keeps its decision logic in a pure, importable Python module beside the shell entry
 point, so the CI-tooling loop can unit-test the verdict without a live tenant.

@@ -1098,14 +1098,20 @@ finds out what is on it in front of the customer.
 _Avoid_: demo video, screen recording (it is not made by hand, and it is not a marketing asset)
 
 **Deployment drift** — the distance between the images the Container Apps are running and the commit
-they were built from. Nothing measures it yet. `check-deployed-environment.sh` asserts the image is
-not the **Placeholder image** and that it came from the expected registry, and never that it is
-*current*; every declared loop runs against fakes and stubs, so all of them stay green while the
-deployment is arbitrarily old. `check-deployed-surface.sh` (#44) catches the drift that has already
-changed something visible — the served page title, the Quick Tasks, the SOP agent's token endpoint,
-a grounded answer — which is a symptom rather than a measurement: it cannot tell a deployment one
-commit behind from a current one. The measurement needs a commit stamped into the image at build
-time, which is #48 and [ADR-018](docs/ADR/018-deployed-build-provenance-check.md).
+they were built from. Measured by `check-deployed-build.sh` (#48,
+[ADR-018](docs/ADR/018-deployed-build-provenance-check.md)), which reads the commit off every
+Container App's image tag and asks `git` how far it is from `HEAD`, reporting the distance and the
+subject line of everything not deployed. The two older checks each miss it in their own way.
+`check-deployed-environment.sh` asserts the image is not the **Placeholder image** and that it came
+from the expected registry, and never that it is *current*; every declared loop runs against fakes
+and stubs, so all of them stay green while the deployment is arbitrarily old.
+`check-deployed-surface.sh` (#44) catches the drift that has already changed something visible — the
+served page title, the Quick Tasks, the SOP agent's token endpoint, a grounded answer — which is a
+symptom rather than a measurement: it cannot tell a deployment one commit behind from a current one.
+The measurement is three-state rather than two: an image whose tag names no commit is **unknown**,
+never a pass, because rounding it to a pass rebuilds the hole. It is also the **Demo validator**'s
+first assertion, so a drifted deployment stops the run rather than producing seven beats about
+another commit. See [docs/preflight/deployed-build.md](docs/preflight/deployed-build.md).
 _Avoid_: stale deployment, drift
 
 ## Confirmed findings
