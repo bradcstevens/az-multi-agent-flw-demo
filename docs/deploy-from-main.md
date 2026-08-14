@@ -37,11 +37,43 @@ through an ARM deployment leaves the environment in a state no commit describes.
 | Client id | `7fdce93d-379a-4fe3-a7c8-eed4d41a03f3` |
 | Object id (service principal) | `cccafdbe-b3d9-4517-8e0c-04e0c8c2e4c2` |
 | Credential | Federated (OIDC) — **no client secret exists** |
-| Subject | `repo:bradcstevens/az-multi-agent-flw-demo:ref:refs/heads/main` |
+| Subject | `repo:bradcstevens@10226195/az-multi-agent-flw-demo@1318906748:ref:refs/heads/main` |
 
-The subject is why the job declares no GitHub Environment: declaring one changes the OIDC subject
-to `...:environment:<name>` and the token exchange stops matching. Adding an approval gate means
-adding a second federated credential as well as the `environment:` line.
+### The subject is not the documented one, and that is not a typo
+
+Every guide — including Microsoft's — says the subject is
+`repo:<owner>/<repo>:ref:refs/heads/main`. The token this repository actually presents is
+
+```
+repo:bradcstevens@10226195/az-multi-agent-flw-demo@1318906748:ref:refs/heads/main
+```
+
+with the owner and repository **numeric ids** appended. A credential built to the documented shape
+is rejected with `AADSTS700213: No matching federated identity record found for presented
+assertion subject`, and it is rejected at the *first real push* — there is no earlier signal,
+because the subject only exists inside a token GitHub mints at run time.
+
+This was found by pushing a throwaway workflow to a throwaway branch with a matching throwaway
+credential, reading the subject out of the failure, and deleting all three. Do the same before
+believing any change to the trigger, the branch or the repository name still authenticates. In
+particular: **renaming or transferring the repository changes the id, and the deploy stops
+authenticating.** Read the presented subject out of the run log and update the credential:
+
+```bash
+az ad app federated-credential update \
+  --id 7fdce93d-379a-4fe3-a7c8-eed4d41a03f3 \
+  --federated-credential-id github-main \
+  --parameters '{
+    "name": "github-main",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "<the subject the run log printed>",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+```
+
+The subject is also why the job declares no GitHub Environment: declaring one changes the OIDC
+subject to `...:environment:<name>` and the token exchange stops matching. Adding an approval gate
+means adding a second federated credential as well as the `environment:` line.
 `test_deploy_workflow.py` asserts the job has none, so the two cannot drift apart silently.
 
 ### What it is allowed to do
@@ -108,7 +140,7 @@ Read which step failed before doing anything else — they fail for very differe
 
 | Step | What it means |
 | --- | --- |
-| **Log in to Azure / azd** | The federated credential no longer matches. Check the subject is still `ref:refs/heads/main`, and that nobody added `environment:` to the job. |
+| **Log in to Azure / azd** | The federated credential no longer matches. Read the `subject claim` the run log prints and compare it to the credential — it carries numeric owner and repo ids, and a rename or transfer changes them. Check nobody added `environment:` to the job. |
 | **Fill the registry** | A Dockerfile or a build. Nothing has been deployed yet; the running environment is untouched. |
 | **Restore the azd environment** | Usually the token endpoint secret is missing. Nothing has been deployed yet. |
 | **Provision** | ARM. The environment is now *partly* changed — read the deployment in the portal before re-running. |

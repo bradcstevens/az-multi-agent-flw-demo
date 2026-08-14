@@ -121,6 +121,12 @@ wiring it to `push` would create a new environment, and a new bill, on every com
   `rg-macae-flw-v1`. `User Access Administrator` is not gratuitous — `post_deploy.sh` grants the
   Foundry User role needed for the knowledge-base MCP connection — but it is the broadest right
   here and it is worth revisiting if that grant ever moves into Bicep.
+- **Negative:** The federated credential's subject is not the shape every guide documents. GitHub
+  presents `repo:<owner>@<owner_id>/<repo>@<repo_id>:ref:refs/heads/main`, and a credential built to
+  the documented `repo:<owner>/<repo>:...` form is rejected with `AADSTS700213` at the first real
+  push and at no point earlier. A rename or transfer of the repository changes the ids and breaks
+  authentication. [docs/deploy-from-main.md](../deploy-from-main.md) records the presented subject
+  and how to re-read it.
 - **Negative:** The Direct Line token endpoint is now remembered in a secret rather than re-read,
   which is a step down from the manual sequence. If the environment ever moves region the secret
   goes stale, and the failure would be an unreachable SOP agent. `check-deployed-surface.sh` runs as
