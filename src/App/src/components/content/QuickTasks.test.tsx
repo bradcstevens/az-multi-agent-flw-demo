@@ -122,12 +122,19 @@ describe('the walkthrough as one-tap tasks', () => {
         // and the loop rots by being run — which it did, on a strict-mode
         // violation against twenty completed tasks, while the demonstration
         // itself was working.
-        renderInput(walkthrough());
+        //
+        // The region is named by its layout class rather than a testid because
+        // the validator's target is a *running image*, and this class has been
+        // in every one of them since #26. Pinned here so that renaming it is a
+        // failing test rather than a red beat on the morning of a walkthrough.
+        const { container } = renderInput(walkthrough());
 
-        const region = screen.getByTestId('quick-tasks');
-
+        const region = container.querySelector('.home-input-quick-tasks');
+        expect(region).not.toBeNull();
         expect(
-            within(region).getAllByRole('button', { name: /Close the store/ }),
+            within(region as HTMLElement).getAllByRole('button', {
+                name: /Close the store/,
+            }),
         ).toHaveLength(1);
     });
 });

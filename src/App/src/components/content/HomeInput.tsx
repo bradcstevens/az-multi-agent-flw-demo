@@ -423,7 +423,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                   <Body1Strong>Quick tasks</Body1Strong>
                 </div>
 
-                <div className="home-input-quick-tasks" data-testid="quick-tasks">
+                <div className="home-input-quick-tasks">
                   {tasksToDisplay.map((task) => (
                     <PromptCard
                       key={task.id}

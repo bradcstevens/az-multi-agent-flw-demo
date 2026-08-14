@@ -40,9 +40,17 @@ export class StoreSurface {
      * deployment and to twenty-one elements after twenty runs. The loop would
      * rot by being run, and it did: the beat went red on a strict-mode
      * violation while the demonstration itself was working.
+     *
+     * Anchored on the surface's own layout class rather than a new
+     * `data-testid`, for the reason `docs/demo-validator.md` states under
+     * *Selectors*: an attribute this repository has just authored is not in the
+     * image that is running, so it turns "the beat is broken" into "the image
+     * is old". This class has named the region since the Quick Tasks landed
+     * (#26), it is plain CSS in this repository rather than a Griffel hash, and
+     * `test_e2e_wiring.py` fails if the surface stops using it.
      */
     get quickTasks(): Locator {
-        return this.page.getByTestId('quick-tasks');
+        return this.page.locator('.home-input-quick-tasks');
     }
 
     /** The Quick Task card carrying a given title, by its authored name. */

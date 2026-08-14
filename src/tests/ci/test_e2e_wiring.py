@@ -38,7 +38,7 @@ HOME_INPUT = (
 )
 
 #: The Quick Tasks region, named once and asserted on both sides of the tap.
-QUICK_TASKS_TESTID = "quick-tasks"
+QUICK_TASKS_REGION = "home-input-quick-tasks"
 
 
 def _text(path: Path) -> str:
@@ -135,18 +135,22 @@ def test_the_quick_task_tap_is_aimed_at_the_quick_tasks_region():
     # loop must not have.
     #
     # The region is named on both sides and checked from both sides, the way
-    # `authored.ts` reads the corpus rather than restating it: a `data-testid`
-    # renamed in the surface and not in the page object goes red here, in a
-    # loop that runs without a tenant, rather than on the morning of a
-    # demonstration.
+    # `authored.ts` reads the corpus rather than restating it: a hook renamed
+    # in the surface and not in the page object goes red here, in a loop that
+    # runs without a tenant, rather than on the morning of a demonstration.
+    #
+    # It is the surface's own layout class rather than a `data-testid`, because
+    # the validator's target is a *running image*: an attribute this repository
+    # authored this morning is not in it, and a locator that misses for that
+    # reason reports "the image is old" as "the beat is broken".
     surface = _text(HOME_INPUT)
     page_object = _code(STORE_SURFACE)
 
-    assert f'data-testid="{QUICK_TASKS_TESTID}"' in surface, (
-        f"the Quick Tasks region no longer carries data-testid="
-        f"{QUICK_TASKS_TESTID!r}; the validator has nothing to aim its tap at"
+    assert f'className="{QUICK_TASKS_REGION}"' in surface, (
+        f"the Quick Tasks region no longer carries {QUICK_TASKS_REGION!r}; "
+        "the validator has nothing to aim its tap at"
     )
-    assert f"getByTestId('{QUICK_TASKS_TESTID}')" in page_object, (
+    assert f"locator('.{QUICK_TASKS_REGION}')" in page_object, (
         "StoreSurface looks a Quick Task up across the whole page; the task "
         "rail carries the same words and the tap is ambiguous"
     )

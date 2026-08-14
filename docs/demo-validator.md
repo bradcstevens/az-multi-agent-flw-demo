@@ -80,16 +80,19 @@ therefore located through `.content .panelContent` and the authored "AI Agent" t
 testid of its own; `data-testid="agent-message"` on `StreamingAgentMessage` is worth adding the next
 time images are rebuilt.
 
-`data-testid="quick-tasks"` is the one attribute added *and* rolled in the same act, because the
-alternative was worse. A Quick Task is tapped by the card title the store pack authors, and an
-accessible-name lookup matches by **substring**: every title is inside the question it asks — "Close
-the store" inside *"How do I close the store?"* — which is what the task rail calls every plan the
-walkthrough has ever raised. A page-wide lookup is therefore unambiguous only on a store nobody has
-ever asked anything, and this one went red on a strict-mode violation against twenty completed
-tasks while the demonstration itself was working. **A loop that rots by being run is worse than a
-loop that is red until the next roll.** The tap is aimed at the region; the region is named on both
-sides; `test_e2e_wiring.py` reads the name out of `HomeInput.tsx` and out of `StoreSurface.ts` and
-fails if they drift.
+`.home-input-quick-tasks` is what the Quick Task tap is aimed at, and the rule above is why it is a
+layout class rather than a testid of its own. A Quick Task is tapped by the card title the store
+pack authors, and an accessible-name lookup matches by **substring**: every title is inside the
+question it asks — "Close the store" inside *"How do I close the store?"* — which is what the task
+rail calls every plan the walkthrough has ever raised. A page-wide lookup is therefore unambiguous
+only on a store nobody has ever asked anything, and this one went red on a strict-mode violation
+against twenty completed tasks while the demonstration itself was working. **A loop that rots by
+being run is the one failure mode a loop must not have.** A `data-testid` was the first fix and was
+withdrawn: it made the beat depend on an image built the same morning, and on a deployment two
+integration branches were rolling minutes apart it went red for a reason that had nothing to do
+with the walkthrough. The class has named the region since #26, it is plain CSS in this repository
+rather than a Griffel hash, and `test_e2e_wiring.py` reads it out of `HomeInput.tsx` and out of
+`StoreSurface.ts` and fails if they drift.
 
 Page objects live in `e2e/pages/` and hold no assertions, so the headed **Stage driver** (#51) can
 reuse them without a second description of the walkthrough.
