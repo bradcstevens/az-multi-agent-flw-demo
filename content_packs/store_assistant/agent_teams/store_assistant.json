@@ -8,6 +8,7 @@
   "deployment_name": "gpt-5.4-mini",
   "is_default": true,
   "protected": false,
+  "require_all_agents": false,
   "description": "The one assistant on the shared store device at Store 223. Troubleshooting from the store's own runbooks, shift work and store procedures through the Store SOP Assistant on Copilot Studio, and escalation into a service ticket.",
   "logo": "",
   "plan": "",

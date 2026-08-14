@@ -115,6 +115,7 @@ class MockTeamConfiguration:
     starting_tasks: List[Any] = field(default_factory=list)
     user_id: str = ""
     is_default: bool = False
+    require_all_agents: bool = True
 
 @dataclass
 class MockUserCurrentTeam:
@@ -325,6 +326,35 @@ class TestTeamConfigurationValidation:
         assert isinstance(result, MockStartingTask)
         assert result.name == "Test Task"
         assert result.prompt == "Do something"
+
+    @pytest.mark.asyncio
+    async def test_the_mandatory_agent_opt_out_survives_the_upload(self):
+        """`require_all_agents` (issue #54), dropped exactly as silently.
+
+        The third field on this list. Parsing is field-by-field, and this one
+        decides whether the orchestrator is told every agent on the team must
+        appear in every plan. Dropped, the store team keeps forcing the
+        Troubleshooting Agent into a plan for *"How do I close the store?"* —
+        which asks the presenter what they have already tried — and the flag
+        sits in the repository looking like a fix.
+        """
+        service = TeamService()
+
+        result = await service.validate_and_parse_team_config(
+            _valid_team_data(require_all_agents=False), "user")
+
+        assert result.require_all_agents is False
+
+    @pytest.mark.asyncio
+    async def test_a_team_that_says_nothing_still_requires_every_agent(self):
+        # The accelerator's own teams say nothing, and the clause is why their
+        # ComplianceAgent is not silently dropped. Absent must not mean off.
+        service = TeamService()
+
+        result = await service.validate_and_parse_team_config(
+            _valid_team_data(), "user")
+
+        assert result.require_all_agents is True
 
     def test_a_declared_lane_survives_the_upload(self):
         """The Quick Task's Lane metadata (issue #16, ADR-013).
@@ -992,6 +1022,23 @@ class TestStoreAssistantPackUploads:
         assert troubleshooting.use_knowledge_base is True
         assert troubleshooting.knowledge_base_name == "store-troubleshooting-kb"
         assert troubleshooting.user_responses is True
+
+    @pytest.mark.asyncio
+    async def test_authored_pack_frees_the_manager_to_plan_one_step(self):
+        """The whole chain for #54, in one assertion.
+
+        The flag is authored in the pack, carried by the upload validator, and
+        read by `mandatory_participants` when the workflow is built. Each link
+        has its own test; this is the one that goes red if any of the three
+        renames the field out from under the other two — which is the only way
+        a green suite could still ship a store team that answers "How do I
+        close the store?" by asking what is stopping you from closing it.
+        """
+        service = TeamService()
+
+        team = await service.validate_and_parse_team_config(self._pack(), "u")
+
+        assert team.require_all_agents is False
 
     @pytest.mark.asyncio
     async def test_pack_without_status_is_refused(self):

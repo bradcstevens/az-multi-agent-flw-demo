@@ -31,6 +31,31 @@ logger = logging.getLogger(__name__)
 # Prompt kwargs builder
 # ---------------------------------------------------------------------------
 
+def mandatory_participants(team_config, agent_names) -> list:
+    """Which of a team's agents every plan must include. Pure.
+
+    The MANDATORY AGENTS clause below is inherited, and it earns its keep on
+    the accelerator's coordinator/compliance teams: a plan that quietly dropped
+    the TriageAgent or the ComplianceAgent was the bug it was written for.
+
+    On a team whose agents are *alternatives* rather than a pipeline it is the
+    bug (#54). The store team's three specialists are three different jobs, and
+    forcing all of them into a plan for *"How do I close the store?"* makes the
+    Troubleshooting Agent a required step — whose job is to ask what you have
+    already tried. So it asks, and the presenter who asked how to close the
+    store is asked back what is stopping them from closing it, while the answer
+    sits retrieved and cited in the Grounding panel. Measured 2026-08-14; see
+    `docs/sop-rehearsal.md`.
+
+    Opt-**out**, not opt-in: every team that predates the flag keeps the
+    behaviour it was configured under, and only a team that says
+    ``require_all_agents: false`` gets a manager free to plan a single step.
+    """
+    if getattr(team_config, "require_all_agents", True) is False:
+        return []
+    return list(agent_names)
+
+
 def get_magentic_prompt_kwargs(
     *,
     has_user_responses: bool = False,

@@ -19,7 +19,8 @@ criteria made executable rather than written down:
 
 import json
 
-from sop_rehearsal import (GROUNDED, HONEST_MISS, NO_TOOL_CALL, UNKNOWN,
+from sop_rehearsal import (CLARIFIED, GROUNDED, HONEST_MISS, INDEX,
+                           NO_TOOL_CALL, REPHRASING, ROUTING, UNKNOWN,
                            WANTED_RUNS, attribution, format_report, main,
                            read_evidence, rephrasings, summarise)
 
@@ -308,3 +309,61 @@ def test_given_an_earlier_rehearsal_when_main_then_its_rows_are_not_counted(
         return False
 
     assert main(["--runs", "10", "--ledger", str(path)], run=fake_run) == 1
+
+
+class TestTheClarificationIsRouting:
+    """The outcome that hid inside a success (#54).
+
+    Measured 2026-08-14 against `rg-macae-flw-v1`: a run whose Grounding panel
+    named Copilot Studio, reported Dataverse and cited `SOP-102 Store Closing
+    Procedure.docx` — and which was **red**, because the conversation showed
+    the Group Chat Manager asking *"What is stopping Store 223 from closing
+    right now?"* The answer was on the page. The presenter was still looking at
+    a question.
+
+    Attributed to `unknown` at the time, correctly: nothing in the ledger could
+    tell that run from a broken selector. That is what this outcome is for.
+    """
+
+    def test_a_grounded_run_that_asked_back_is_the_routing(self):
+        blame = attribution({
+            "passed": False,
+            "outcome": CLARIFIED,
+            "toolQuery": "the closing procedure for store 223",
+            "retrievalQuery": "How do I close the store?",
+            "citations": ["SOP-102 Store Closing Procedure.docx"],
+        })
+
+        assert blame.layer == ROUTING
+
+    def test_it_is_not_blamed_on_the_index_that_answered_correctly(self):
+        # The trap. The retrieval query differs from the tool query on this run
+        # -- the marker fired -- which is the shape `honest-miss` reads as an
+        # index failure. Reindexing a corpus that returned the right document
+        # is a day spent on the wrong layer.
+        blame = attribution({
+            "passed": False,
+            "outcome": CLARIFIED,
+            "toolQuery": "the closing procedure for store 223",
+            "retrievalQuery": "How do I close the store?",
+            "citations": ["SOP-102 Store Closing Procedure.docx"],
+        })
+
+        assert blame.layer != INDEX
+        assert blame.layer != REPHRASING
+
+    def test_a_green_run_is_still_attributed_to_nothing(self):
+        assert attribution({"passed": True, "outcome": CLARIFIED}) is None
+
+    def test_the_report_names_the_layer_for_it(self):
+        summary = summarise([{
+            "passed": False,
+            "outcome": CLARIFIED,
+            "toolQuery": "the closing procedure",
+            "retrievalQuery": "How do I close the store?",
+        }], wanted=10)
+
+        report = format_report(summary)
+
+        assert ROUTING in report
+        assert "NOT proved" in report

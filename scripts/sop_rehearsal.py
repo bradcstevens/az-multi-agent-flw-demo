@@ -45,6 +45,7 @@ WANTED_RUNS = 10
 GROUNDED = "grounded"
 HONEST_MISS = "honest-miss"
 NO_TOOL_CALL = "no-tool-call"
+CLARIFIED = "clarified"
 UNKNOWN = "unknown"
 
 #: The three layers the issue names, plus the refusal to name one.
@@ -131,6 +132,12 @@ def attribution(row) -> Optional[Attribution]:
        the one attribution that means the demonstration's *content* is wrong
        rather than its plumbing, and it is the expensive one to guess at.
 
+    A grounded, cited run that still went red because the surface asked a
+    question back is the **routing** too, and it is the reason this list has a
+    fourth entry rather than three. It was `unknown` for a day: every signal
+    this module had said the hop worked, and it did — the answer was on the
+    page, behind a clarification the orchestrator was required to plan.
+
     Anything else is `unknown`, deliberately. A beat that went red while the
     answer was grounded and cited is a selector, a timeout or an assertion this
     module knows nothing about, and naming a layer for it would be exactly the
@@ -149,6 +156,14 @@ def attribution(row) -> Optional[Attribution]:
             "the SOP tool was never called: no Grounding panel arrived, so "
             "the orchestrator answered from context or gave the turn to a "
             "specialist that has no procedure knowledge",
+        )
+
+    if outcome == CLARIFIED:
+        return Attribution(
+            ROUTING,
+            "the answer was retrieved and cited, and the surface asked the "
+            "presenter a question back instead of showing it — a procedure "
+            "lookup routed into a troubleshooting clarification",
         )
 
     if outcome == HONEST_MISS:

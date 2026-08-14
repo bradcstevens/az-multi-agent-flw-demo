@@ -106,6 +106,11 @@ class TeamService:
                 starting_tasks=starting_tasks,
                 user_id=user_id,
                 is_default=json_data.get("is_default", False),
+                # Carried explicitly, because every field on this model is:
+                # anything not named here is dropped on upload, and a routing
+                # flag that reaches the repository but not Cosmos is a fix that
+                # passes its own tests and changes nothing (#54).
+                require_all_agents=json_data.get("require_all_agents", True),
             )
 
             self.logger.info(

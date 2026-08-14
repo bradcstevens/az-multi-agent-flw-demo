@@ -143,14 +143,19 @@ no `source_used`, the Grounding panel is honestly empty, and this suite is hones
 **The retrieval previously missed on a question the corpus rehearses.** The hop completed — the panel
 named Copilot Studio and Dataverse — and the answer was the **honest miss**: *"Searched Dataverse and
 found no matching procedure."* Two runs in eight ended this way while
-`check-deployed-surface.sh`'s `grounded-answer` check, which asks the backend directly, passed every
-time. The difference was the question: the check asked the corpus's own words, and the orchestrator
-handed the SOP tool whatever the model rephrased them into. The validator now records both values;
-the alias normalises the rephrasings it recognises, and what the spec *grades* is the honest miss
-itself, which is the symptom. Grading the retrieved wording instead was tried and withdrawn — the
-orchestrator promptly produced a seventh phrasing and the beat went red on a run that named Copilot
-Studio, reported Dataverse and cited SOP-102. The ten-run rehearsal is the proof that the fix has
-reached the deployment; do not replace it with a direct SOP probe.
+`check-deployed-surface.sh`'s `direct-sop-answer` check, which asks the backend directly, passed
+every time. The difference was the question: the check asked the corpus's own words, and the
+orchestrator handed the SOP tool whatever the model rephrased them into.
+
+Every validator run now records **both** strings — what the orchestrator asked and what the backend
+retrieved against — to `e2e/artifacts/sop-evidence.jsonl`, passing runs included, and
+`scripts/sop-rehearsal.sh` reads them back. That ledger is what settled it: the rephrasings are
+**unbounded**. See [sop-rehearsal.md](sop-rehearsal.md) for the measurement and what it ruled out.
+The fix is a one-shot session-scoped marker, not a list of phrasings, and what the spec *grades* is
+still the honest miss itself, which is the symptom. Grading the retrieved wording instead was tried
+and withdrawn — the orchestrator promptly produced a seventh phrasing and the beat went red on a run
+that named Copilot Studio, reported Dataverse and cited SOP-102. The ten-run rehearsal is the proof
+that the fix has reached the deployment; do not replace it with a direct SOP probe.
 
 The spec checks for the honest miss **before** it checks the citation, and fails with a message
 saying which of the two happened. Asserting only on the citation reports a miss as an empty string,

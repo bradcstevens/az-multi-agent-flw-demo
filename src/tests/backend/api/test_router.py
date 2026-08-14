@@ -393,6 +393,43 @@ class TestProcessRequest:
         assert response.status_code == 200
         note_rehearsal.assert_called_once_with("sess-1")
 
+    def test_any_other_request_disarms_the_marker_rather_than_leaving_it_set(
+        self, rt, monkeypatch
+    ):
+        """#54's fourth acceptance criterion, at the seam that could break it.
+
+        The honest miss is a **beat**, not a bug: the presenter taps "Restart
+        the car wash" and the agent says plainly that the library does not
+        cover it. That beat runs in the same session, seconds after the
+        rehearsed hit, and the marker that rescues the hit from the
+        orchestrator's rephrasing would canonicalise the car wash question into
+        the closing procedure if it were still armed — answering a question
+        about a car wash with the store closing checklist, and making the one
+        honest thing in the walkthrough dishonest.
+
+        One-shot is not sufficient on its own: the hit's own turn may never
+        reach the SOP tool (that is the other half of #54), leaving the marker
+        set for whatever comes next.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        forget_rehearsal = MagicMock()
+        monkeypatch.setattr(router_mod, "forget_rehearsal", forget_rehearsal)
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-1",
+                "description": (
+                    "How do I restart the car wash after a vehicle stalls in "
+                    "the bay?"
+                ),
+            },
+        )
+
+        assert response.status_code == 200
+        forget_rehearsal.assert_called_once_with("sess-1")
+
 
 # ---------------------------------------------------------------------------
 # /process_request — the Identity boundary gate (issue #14, ADR-014)

@@ -1018,11 +1018,12 @@ red. Both failures were the rehearsed hit — *"How do I close the store?"*, the
 The hop itself completed: the **Grounding panel** named Copilot Studio and Dataverse. What it also
 said was *"Searched Dataverse and found no matching procedure."*
 
-`check-deployed-surface.sh`'s `grounded-answer` check passed on every attempt across the same
-period, because it asks `POST /api/v4/sop/ask` **the corpus's own words**. The orchestrator does
-not: it hands the SOP tool whatever the model rephrased the question into, and some rephrasings
-miss. The check and the browser are asking different questions of the same agent, and only one of
-them is asking the presenter's.
+`check-deployed-surface.sh`'s check passed on every attempt across the same period, because it asks
+`POST /api/v4/sop/ask` **the corpus's own words**. The orchestrator does not: it hands the SOP tool
+whatever the model rephrased the question into, and some rephrasings miss. The check and the browser
+are asking different questions of the same agent, and only one of them is asking the presenter's. It
+is now named `direct-sop-answer` for that reason, and a green report names the rehearsal that proves
+the beat rather than implying one.
 
 There is a second, coarser variant: the orchestrator sometimes does not call the SOP tool at all —
 the **Group Chat Manager** answers from context, or the **Shift Tasks Agent** answers and the
@@ -1033,6 +1034,18 @@ The validator keeps `retries: 0`. A retry converts an intermittently-working dem
 green run, and the presenter finds out in the room instead. This is #54, it is the walkthrough
 observation (#46) and the presenter runbook (#53)'s most important input, and it is the first thing
 the browser suite found that no API-level check could have.
+
+**Measured and closed 2026-08-14 (#54)** — see [docs/sop-rehearsal.md](docs/sop-rehearsal.md). Every
+validator run now records what the orchestrator actually asked, and the ledger settled two things a
+description could not. The rephrasings are **unbounded** — two runs produced two wordings never seen
+before — so the alias list was replaced by a one-shot session-scoped marker that is
+phrasing-independent. And the failure that survived was not retrieval at all: a run whose panel named
+Copilot Studio, reported Dataverse and cited SOP-102 was **red**, because the visible turn was the
+Troubleshooting Agent asking *"What is stopping Store 223 from closing right now?"* while the answer
+sat cited behind it. The cause is the inherited `MANDATORY AGENTS` clause forcing all three
+specialists into a plan for a one-lookup question; the store team now opts out with
+`require_all_agents: false`, and mandatory inclusion stays the default for every team that predates
+the flag.
 
 ### Every transparency signal was dropped in the browser, and 223 frontend tests were green (confirmed 2026-08-13, issue #47)
 

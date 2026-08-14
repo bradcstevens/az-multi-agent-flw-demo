@@ -29,6 +29,7 @@ from orchestration.connection_config import (connection_config,
                                              orchestration_config)
 from orchestration.plan_review_helpers import (convert_plan_review_to_mplan,
                                                get_magentic_prompt_kwargs,
+                                               mandatory_participants,
                                                wait_for_plan_approval)
 from patches.tool_history_leak import apply_tool_history_leak_patch
 from services.team_service import TeamService
@@ -152,17 +153,28 @@ class OrchestrationManager:
 
         # Collect participant agent names so the orchestrator plan prompt can
         # enforce mandatory inclusion of every team agent (e.g. TriageAgent,
-        # ComplianceAgent) — otherwise the manager silently drops them.
+        # ComplianceAgent) — otherwise the manager silently drops them. A team
+        # whose agents are alternatives rather than a pipeline opts out with
+        # `require_all_agents: false`; see `mandatory_participants` (#54).
         participant_agent_names = []
         for ag in agents:
             nm = getattr(ag, "agent_name", None) or getattr(ag, "name", None)
             if nm:
                 participant_agent_names.append(nm)
 
+        required_agent_names = mandatory_participants(
+            team_config, participant_agent_names)
+        if not required_agent_names and participant_agent_names:
+            cls.logger.info(
+                "Team '%s' opts out of mandatory agent inclusion: the manager "
+                "may plan a single step for %s",
+                getattr(team_config, "name", "?"), participant_agent_names,
+            )
+
         # Get prompt customization kwargs
         prompt_kwargs = get_magentic_prompt_kwargs(
             has_user_responses=has_user_responses,
-            participant_names=participant_agent_names,
+            participant_names=required_agent_names,
         )
 
         cls.logger.info(

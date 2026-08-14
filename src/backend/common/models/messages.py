@@ -308,6 +308,11 @@ class TeamConfiguration(BaseDataModel):
     starting_tasks: List[StartingTask] = Field(default_factory=list)
     user_id: str  # who uploaded this configuration
     is_default: bool = False  # default teams are visible to all users
+    # Whether every agent on this team must appear in every plan (#54). True is
+    # the inherited behaviour and the default, so a team that predates the flag
+    # keeps it. A team whose agents are alternatives rather than a pipeline
+    # sets it False: see `orchestration.plan_review_helpers`.
+    require_all_agents: bool = True
 
 
 class PlanWithSteps(Plan):

@@ -73,6 +73,36 @@ export class PlanSurface {
         return texts.map((text) => text.trim()).filter(Boolean);
     }
 
+    /**
+     * What one turn holds: what the agent **said**, and what it **asked**.
+     *
+     * `spokenIn` waits for a paragraph, which is right when a paragraph is
+     * coming. A clarification is not: it renders as a list, so waiting for a
+     * paragraph waits out the full timeout and then reports "no paragraph
+     * rendered" — a slow-surface story for a turn that arrived promptly and
+     * asked a question (#54). This waits for **either**, and says which came.
+     *
+     * Still returned rather than asserted, for `spokenIn`'s reason: the words
+     * are model prose, and what a spec may say about them is narrow.
+     */
+    async saidIn(
+        turn: Locator,
+        timeout = 60_000,
+    ): Promise<{ spoken: string[]; asked: string[] }> {
+        const clean = (texts: string[]) =>
+            texts.map((text) => text.trim()).filter(Boolean);
+
+        await turn
+            .locator('p, li')
+            .first()
+            .waitFor({ state: 'visible', timeout });
+
+        return {
+            spoken: clean(await turn.locator('p').allInnerTexts()),
+            asked: clean(await turn.locator('li').allInnerTexts()),
+        };
+    }
+
     /** Wait for the surface the question navigated to. */
     async waitForArrival(timeout: number): Promise<void> {
         await this.page.waitForURL(/\/plan\//, { timeout });

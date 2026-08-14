@@ -300,7 +300,7 @@ def test_the_outcome_distinguishes_no_tool_call_from_an_honest_miss():
     # indistinguishable.
     evidence = _code(E2E / "evidence.ts")
 
-    for outcome in ("grounded", "honest-miss", "no-tool-call"):
+    for outcome in ("grounded", "honest-miss", "no-tool-call", "clarified"):
         assert f"'{outcome}'" in evidence or f'"{outcome}"' in evidence, (
             f"the ledger cannot record the {outcome!r} outcome"
         )

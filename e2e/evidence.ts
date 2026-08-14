@@ -34,7 +34,19 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const LEDGER = resolve(HERE, 'artifacts/sop-evidence.jsonl');
 
 /** What one run saw. Mirrored by `scripts/sop_rehearsal.py`. */
-export type Outcome = 'grounded' | 'honest-miss' | 'no-tool-call' | 'unknown';
+export type Outcome =
+    | 'grounded'
+    | 'honest-miss'
+    | 'no-tool-call'
+    | 'clarified'
+    | 'unknown';
+
+/** The two signals that separate the outcomes, plus the one that hides them. */
+export interface Seen {
+    grounded: boolean;
+    honestMiss: boolean;
+    clarified: boolean;
+}
 
 export interface Rehearsal {
     /** When the run ended. */
@@ -75,12 +87,21 @@ function shortCommit(): string | null {
  * distance — both leave the beat red with no citation. The Grounding panel is
  * what tells them apart: it lights only when the backend pushed `source_used`,
  * which it does only when a Direct Line answer actually came back.
+ *
+ * `clarified` is checked **before** `grounded` is reported, because it is the
+ * outcome that hides inside a success: the hop completed, the citation is on
+ * screen, and the conversation still shows a question asked back at the
+ * presenter. Reported as `grounded`, that run says the beat worked and the
+ * harness is broken — which is what it looked like until this outcome existed.
  */
-export function outcomeOf(grounded: boolean, honestMiss: boolean): Outcome {
-    if (!grounded) {
+export function outcomeOf(seen: Seen): Outcome {
+    if (!seen.grounded) {
         return 'no-tool-call';
     }
-    return honestMiss ? 'honest-miss' : 'grounded';
+    if (seen.honestMiss) {
+        return 'honest-miss';
+    }
+    return seen.clarified ? 'clarified' : 'grounded';
 }
 
 /**

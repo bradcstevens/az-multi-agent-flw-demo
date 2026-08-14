@@ -37,6 +37,17 @@ interface Observed {
     toolQuery: string | null;
     retrievalQuery: string | null;
     citations: string[];
+    /**
+     * Whether the visible turn asked the presenter a question back.
+     *
+     * The failure mode a grounded run can still have, and the one that looked
+     * like a broken selector until it was recorded (#54): the SOP answer is
+     * retrieved and cited in the Grounding panel while the conversation shows
+     * the Troubleshooting Agent asking *"What is stopping Store 223 from
+     * closing right now?"*. Everything about the hop worked; the presenter is
+     * still standing in front of a question instead of an answer.
+     */
+    clarified: boolean;
 }
 
 let observed: Observed;
@@ -48,6 +59,7 @@ test.beforeEach(() => {
         toolQuery: null,
         retrievalQuery: null,
         citations: [],
+        clarified: false,
     };
 });
 
@@ -67,7 +79,7 @@ test.afterEach(async () => {
         target: metadata.target ?? 'unknown',
         baseURL: metadata.baseURL ?? 'unknown',
         passed: info.status === info.expectedStatus,
-        outcome: outcomeOf(observed.grounded, observed.honestMiss),
+        outcome: outcomeOf(observed),
         toolQuery: observed.toolQuery,
         retrievalQuery: observed.retrievalQuery,
         citations: observed.citations,
@@ -183,9 +195,29 @@ test.describe('the cross-platform hop', () => {
         // presenter's own question read back.
         const turn = plan.latestAgentTurn;
         await expect(turn).toBeVisible({ timeout: 120_000 });
-        const spoken = await plan.spokenIn(turn);
+        const said = await plan.saidIn(turn);
+        observed.clarified = said.asked.length > 0 && said.spoken.length === 0;
+
+        // A question asked back is failed *by name*, before the emptiness it
+        // also produces is reported (#54). The presenter taps "How do I close
+        // the store?" and the surface asks "What is stopping Store 223 from
+        // closing right now?" — while the Grounding panel behind it holds the
+        // answer, cited. Every assertion above this line passes on that run,
+        // so without this one the beat fails on "no paragraph rendered", which
+        // reads as a slow surface or a broken selector and sends the reader to
+        // the harness. It sent one there for a day.
         expect(
-            spoken.filter((paragraph) => paragraph !== hit.question),
+            observed.clarified,
+            'the agent asked the presenter a question back instead of ' +
+                `answering: ${said.asked.join(' / ')}. The SOP hop itself ` +
+                'worked — the Grounding panel named Copilot Studio and cited ' +
+                'the corpus — so this is the orchestrator routing a procedure ' +
+                'lookup into a troubleshooting clarification, not a retrieval ' +
+                'failure. See docs/sop-rehearsal.md.',
+        ).toBe(false);
+
+        expect(
+            said.spoken.filter((paragraph) => paragraph !== hit.question),
         ).not.toHaveLength(0);
     });
 });

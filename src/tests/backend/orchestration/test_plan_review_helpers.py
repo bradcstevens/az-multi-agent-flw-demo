@@ -141,7 +141,7 @@ sys.modules['orchestration.helper.plan_to_mplan_converter'] = Mock(
 # ---- Import module under test ----
 from backend.orchestration.plan_review_helpers import (
     convert_plan_review_to_mplan, get_magentic_prompt_kwargs,
-    wait_for_plan_approval)
+    mandatory_participants, wait_for_plan_approval)
 
 # Re-bind mocked singletons for convenient assertions
 connection_config = sys.modules['orchestration.connection_config'].connection_config
@@ -474,3 +474,90 @@ class TestWaitForPlanApproval:
         # Assert
         assert result is None
         orchestration_config.cleanup_approval.assert_called_with("plan-1")
+
+
+class TestMandatoryInclusionIsOptIn:
+    """#54. The clause that forces every agent into every plan is the reason
+    the walkthrough's opening beat asks the presenter a question back.
+
+    `MANDATORY AGENTS (CRITICAL — NON-NEGOTIABLE)` was inherited for the
+    accelerator's coordinator/compliance teams, where an agent the manager
+    silently dropped was the bug. Applied to the store team it turns a
+    one-lookup procedure question into a three-specialist conversation: the
+    Troubleshooting Agent is *required* to appear, its job is to ask what you
+    have already tried, so it asks — and the presenter, who asked "How do I
+    close the store?", is asked "What is stopping Store 223 from closing right
+    now?" while the answer sits retrieved and cited in the Grounding panel.
+
+    Measured on 2026-08-14 against `rg-macae-flw-v1`, from a validator run
+    whose Grounding panel named Copilot Studio, reported Dataverse and cited
+    `SOP-102 Store Closing Procedure.docx` — a green hop with a red beat.
+
+    So the clause becomes opt-**out** per team, and the default stays what it
+    has always been: every team that has not thought about it keeps the
+    inherited behaviour, and only a team that says so gets a manager free to
+    plan one step.
+    """
+
+    def test_a_team_that_says_nothing_keeps_the_inherited_behaviour(self):
+        # The blast radius of this change is meant to be one team. Every
+        # accelerator team predates the flag, and a default of "off" would
+        # silently drop the agent the clause exists to keep.
+        assert mandatory_participants(Mock(spec=[]), ["TriageAgent"]) == [
+            "TriageAgent"
+        ]
+
+    def test_a_team_that_opts_out_forces_no_agent_into_the_plan(self):
+        team = Mock(require_all_agents=False)
+
+        assert mandatory_participants(team, ["TroubleshootingAgent"]) == []
+
+    def test_opting_out_removes_the_clause_from_the_prompt_entirely(self):
+        # Not "a shorter list" — the whole block. A MANDATORY AGENTS heading
+        # with nothing under it is a prompt the model still reasons about.
+        team = Mock(require_all_agents=False)
+
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=True,
+            participant_names=mandatory_participants(
+                team, ["TroubleshootingAgent", "ShiftTasksAgent"]
+            ),
+        )
+
+        assert "MANDATORY AGENTS" not in result["task_ledger_plan_prompt"]
+
+    def test_opting_out_does_not_touch_the_scope_policy(self):
+        """The out-of-scope guard is a different rule and must survive.
+
+        It is what keeps a team answering only what its agents cover, and it
+        is the reason a plan can legitimately be one MagenticManager step. If
+        opting out of mandatory inclusion also dropped it, the store team would
+        start answering questions no agent on it has any knowledge of.
+        """
+        team = Mock(require_all_agents=False)
+
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=True,
+            participant_names=mandatory_participants(team, ["ShiftTasksAgent"]),
+        )
+
+        assert "TEAM SCOPE POLICY" in result["task_ledger_plan_prompt"]
+
+    def test_the_store_team_is_the_team_that_opts_out(self):
+        """Read out of the pack, because that is where it takes effect.
+
+        A flag nothing sets is a flag that fixed nothing, and this is the one
+        assertion that ties the mechanism above to the beat below.
+        """
+        import json
+        from pathlib import Path
+
+        pack = Path(__file__).resolve().parents[4] / (
+            "content_packs/store_assistant/agent_teams/store_assistant.json")
+        team = json.loads(pack.read_text(encoding="utf-8"))
+
+        assert team.get("require_all_agents") is False, (
+            "the store team still forces every specialist into every plan; "
+            "the rehearsed procedure question will be answered with a "
+            "clarifying question from the Troubleshooting Agent"
+        )
