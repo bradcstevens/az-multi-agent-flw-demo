@@ -1,0 +1,108 @@
+# Check: the deployed surface is the demonstration
+
+**Verdict: `macae-flw-v1` serves the Circle K Frontline Store Assistant at the commit this
+repository is on, and a procedure question is answered from Dataverse through Copilot Studio with
+a citation.** Observed 2026-08-13 (issue #44), in `rg-macae-flw-v1`, subscription
+`3523b0e6-bb53-4e87-8340-25c416e26093`, images built from `23d97b3dda59`.
+
+The images were built from that commit's tree; everything committed since is documentation and the
+check tooling below, none of which is inside an image's build context (`src/backend`,
+`src/mcp_server`, `src/App`). The tag is a claim about what was built, not a stamp the image
+carries — see *Scope*.
+
+Re-check with `scripts/preflight/check-deployed-surface.sh` — it exits non-zero the moment any of
+the facts below stops being true.
+
+This is the record's other half.
+[deployed-environment.md](deployed-environment.md) proves the **infrastructure**: the right
+regions, the whole model roster answering, three application hosts on one replica each, running
+images from our own registry. All thirteen of its checks were green on 2026-08-13 while the
+Container Apps were running images built **42 commits earlier** — before the rebrand (#25), the
+transparency panels (#23, #24), the Quick Tasks (#26), the mocked sign-in (#27), the escalation
+ticket (#22), the troubleshooting memory (#21), the lane router (#16), the identity boundary gate
+(#14) and the Direct Line client (#18). What was deployed was substantially the stock accelerator,
+and it said so in the page title.
+
+An image's **provenance** is not its **currency**, and every declared feedback loop runs against
+fakes, so nothing in this repository observed the deployment at all. This check is what observes
+it: it reads the running surface the way the presenter will.
+
+## What the check proves, and why each fact needed proving
+
+| Check | Why it is not assumable |
+| --- | --- |
+| `store-surface` | Nothing sets the document title at run time, so the served `<title>` is whatever `src/App/index.html` said **in the image that is running**. That makes it the cheapest honest answer to "is this the build we think it is" available without a commit stamp, and it is the string that gave the drift away: `Multi-Agent - Custom Automation Engine` served while the repository read `Circle K Frontline Store Assistant`. A surface that served no title at all is a cold or failed revision, which fails for a different reason and is reported as one. |
+| `quick-tasks` | The Quick Tasks live in **Cosmos**, not in the image — `post_deploy.sh` uploads the store pack and a re-provision does not re-seed it. So a deployment can be running the current build and still have no assistant on it, and the surface then reports that the assistant is not loaded. Each task's **declared lane** is checked too: a task that arrives without one falls to the keyword router, and the escalation beat runs without the approval gate that raises its ticket — which looks like a working demonstration right up to the ticket. The team the backend answered with is checked against the authored identifier, because an earlier pack left in Cosmos under a renumbered one carries tasks that satisfy every name while the surface, which recognises the authored identifier, shows none of them. |
+| `direct-line-endpoint` | `COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT` had **never been set** on this deployment. The bicep plumbs it through unconditionally from a `main.parameters.json` substitution, so this was never an infrastructure gap; the value was simply missing, and unset the SOP tool answers with its fixed failure message. The check also rejects a value assembled from the default Direct Line hostname, which [ADR-011](../ADR/011-direct-line-over-a2a-for-the-copilot-studio-sop-agent.md) rules out — the token endpoint is whatever `PvaGetDirectLineEndpoint` returned for *this* environment's region, and a hand-built URL is a plausible-looking one that issues no token. |
+| `grounded-answer` | The three above are all readable without asking the deployment a question, and all three were true of environments whose centrepiece beat could not have worked. One real procedure question goes through `/api/v4/sop/ask` — the exact path the MCP tool takes — and what is graded is the **provenance and the citations**, never the prose: a fluent answer is precisely what an ungrounded fallback produces. The citation must name a document out of `content/sop/docx`: `direct-line-endpoint` accepts any endpoint that is not the assembled hostname, so a second Dataverse-grounded agent in the same tenant would answer and cite *something*, and the filename is what ties the answer back to the corpus this repository uploaded. Probed by default. `--no-probe` does not quietly omit it: it reports the cross-platform hop as unproven and exits non-zero, because a run that asked nothing must not claim the SOP agent is reachable. |
+
+Observed 2026-08-13, all four green, `'How do I close the store?'` answered from Dataverse through
+Copilot Studio citing `SOP-102 Store Closing Procedure.docx`.
+
+## The expectation is read out of the repository
+
+The assistant's name comes from `src/App/src/models/storeSurface.ts`, the team identifier and the
+Quick Tasks from `content_packs/store_assistant/agent_teams/store_assistant.json`, and the SOP
+filenames a citation may name from `content/sop/docx/` — not from constants in the check.
+This is the [ADR-019](../ADR/019-rebrand-the-sop-corpus-to-circle-k.md) lesson applied one layer
+out: a check carrying its own copy of the surface's strings passes a rebrand it never saw, which is
+the exact failure mode being guarded against here.
+
+## The order that shipped it
+
+The registry is filled **before** provisioning, for the reason
+[deployed-environment.md](deployed-environment.md#the-fix-fill-the-registry-first-then-provision)
+records — the accelerator's documented order updates Container Apps that provisioning never
+created, and the placeholder image stalls the whole `mcp → backend → frontend` chain.
+
+```bash
+# 1. The three images, built server-side straight into ACR, tagged with the commit.
+sha="$(git rev-parse --short=12 HEAD)"
+az acr build --registry crmacaeflwv1flrpd --image "macaemcp:$sha"      --image macaemcp:latest      --file src/mcp_server/Dockerfile src/mcp_server
+az acr build --registry crmacaeflwv1flrpd --image "macaebackend:$sha"  --image macaebackend:latest  --file src/backend/Dockerfile   src/backend
+az acr build --registry crmacaeflwv1flrpd --image "macaefrontend:$sha" --image macaefrontend:latest --file src/App/Dockerfile       src/App
+
+# 2. The Direct Line token endpoint, read from the live agent rather than pinned.
+python3 -c "import sys; sys.path.insert(0, 'scripts')
+from copilot_studio import sop_agent as s
+env = s.resolve_environment(None); bot = s.read_bot(env)
+print(env.call(f\"bots({bot['botid']})/Microsoft.Dynamics.CRM.PvaGetDirectLineEndpoint\", 'POST', {})['Endpoint'])"
+
+azd env set COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT '<what that printed>'
+azd env set MACAE_USE_CASE none
+azd env set AZURE_ENV_IMAGE_TAG "$sha"
+azd provision
+
+# 3. The store pack, and nothing else.
+MACAE_USE_CASE=none bash infra/scripts/post-provision/post_deploy.sh
+```
+
+Three things about that sequence are load-bearing:
+
+- **The image tag is the commit, not `latest`.** `azd provision` only produces a new revision where
+  the template changed, so a re-pushed `latest` leaves the frontend and MCP apps serving the image
+  they already cached — the backend would pick up the new setting and the other two would not, and
+  the run would look successful. A commit-shaped tag changes all three templates and forces all
+  three pulls. It is not a provenance stamp; the image carries no commit of its own. That is #48.
+- **`MACAE_USE_CASE=none` is set before `post_deploy.sh` runs.** Unset, the script prompts, and an
+  unattended run has nobody to answer it; answered wrongly, it restores the six stock content packs
+  that #25 deliberately suppressed. The store pack itself is uploaded regardless of the selection,
+  which is why `none` still leaves an assistant on the surface.
+- **The endpoint is re-read, not remembered.** It is what `PvaGetDirectLineEndpoint` says today for
+  this environment's region. See
+  [../copilot-studio/direct-line-client.md](../copilot-studio/direct-line-client.md).
+
+Which Copilot Studio agent the token endpoint points at is **not** proven here, only that the agent
+it reaches answers out of this corpus. The agent's own identity, its authored components and its
+published state are [../copilot-studio/sop-agent.md](../copilot-studio/sop-agent.md)'s to prove.
+
+## Scope
+
+Verified: the served page title, the six Quick Tasks and the lane each declares, the SOP agent's
+token endpoint on the backend Container App, and one procedure question answered from Dataverse
+through Copilot Studio citing a document this repository authored.
+
+**Not** verified here: that the Container Apps are running the **current commit** — the tag says
+so, and a tag is a claim rather than a stamp (#48); nor any of the seven beats end to end through a
+browser (#47, #49, #50); nor the fourth specialist, which does not exist yet (#52). The roster this
+deployment holds is three agents — `TroubleshootingAgent`, `ShiftTasksAgent`, `EscalationAgent`.

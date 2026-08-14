@@ -231,3 +231,6 @@ assistant's knowledge bases resolve to populated indexes behind `ProjectManagedI
 and that an agent **retrieves grounded documents from them across the region boundary** (#30).
 **Not** verified here: that the multi-agent orchestration answers end to end through the deployed
 surface (#19), or anything in the Copilot Studio tenant (#2, #3, #5, #6, recorded separately).
+Whether what the deployment *serves* is this demonstration — the page title, the Quick Tasks, the
+SOP agent's token endpoint and one grounded procedure question — is the sibling record,
+[deployed-surface.md](deployed-surface.md) (#44).

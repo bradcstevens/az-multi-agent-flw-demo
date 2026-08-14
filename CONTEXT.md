@@ -840,11 +840,14 @@ _Avoid_: DLP policy, connector policy
 before the build, each backed by a re-runnable check in `scripts/preflight/`. Distinct from a
 Feedback loop: a loop guards a change, a preflight guards an assumption about the tenant or
 subscription, and its verdict is point-in-time. Read the record rather than re-deriving it, and
-re-run the check rather than trusting the date on it. Five today: three about the Copilot Studio
-tenant (#2, #5, #6), one about **Dataverse search** (#3) and one about the **deployed environment**
+re-run the check rather than trusting the date on it. Six today: three about the Copilot Studio
+tenant (#2, #5, #6), one about **Dataverse search** (#3), one about the **deployed environment**
 (#12) — the model roster, Search's region, single-replica scale, keyless configuration and the
 application images in
-[docs/preflight/deployed-environment.md](docs/preflight/deployed-environment.md).
+[docs/preflight/deployed-environment.md](docs/preflight/deployed-environment.md) — and one about the
+**deployed surface** (#44), which is the same environment asked a different question: not whether
+the infrastructure is shaped right but whether what it serves is *this* demonstration. See
+[docs/preflight/deployed-surface.md](docs/preflight/deployed-surface.md).
 
 **Placeholder image** — `mcr.microsoft.com/azuredocs/containerapps-helloworld`, the image all three
 Container Apps are declared with until real ones exist. It listens on `80` while the apps declare
@@ -879,10 +882,14 @@ pre-rebrand surface, is wired into no workflow, and is a different and dead thin
 as a way to present. Not a second suite: a second suite is a second thing to keep true.
 
 **Deployment drift** — the distance between the images the Container Apps are running and the commit
-they were built from. Nothing here detects it. `check-deployed-environment.sh` asserts the image is
+they were built from. Nothing measures it yet. `check-deployed-environment.sh` asserts the image is
 not the **Placeholder image** and that it came from the expected registry, and never that it is
 *current*; every declared loop runs against fakes and stubs, so all of them stay green while the
-deployment is arbitrarily old.
+deployment is arbitrarily old. `check-deployed-surface.sh` (#44) catches the drift that has already
+changed something visible — the served page title, the Quick Tasks, the SOP agent's token endpoint,
+a grounded answer — which is a symptom rather than a measurement: it cannot tell a deployment one
+commit behind from a current one. The measurement needs a commit stamped into the image at build
+time, which is #48 and [ADR-018](docs/ADR/018-deployed-build-provenance-check.md).
 _Avoid_: stale deployment, drift
 
 ## Confirmed findings
@@ -908,6 +915,26 @@ Two things made this invisible. Every feedback loop runs against fakes, so none 
 deployment at all; and the deployed-environment preflight checks an image's *provenance* but not its
 *currency*. **Deployment drift** is the term for the gap, and a check comparing the deployed image
 to `HEAD` is the answer to it.
+
+Shipped 2026-08-13 (#44): the registry was filled first, `azd provision` put all three Container
+Apps on images tagged with the commit, `post_deploy.sh` ran with `MACAE_USE_CASE=none`, and the
+surface now serves `Circle K Frontline Store Assistant` with its six Quick Tasks and answers a
+procedure question from Dataverse through Copilot Studio with a citation. The **image tag** is what
+forced all three revisions to roll: `azd provision` only makes a new revision where the template
+changed, so a re-pushed `latest` would have updated the backend — whose template gained the token
+endpoint — and left the frontend and MCP apps serving what they had already cached. A tag is a
+claim, not a stamp; #48 is still the measurement. See
+[docs/preflight/deployed-surface.md](docs/preflight/deployed-surface.md).
+
+### A CI-tooling test was dialling the live tenant (confirmed 2026-08-13, issue #44)
+
+Two tests in `src/tests/ci/test_deployed_environment.py` called `main` with a stubbed model probe
+and **no** `retrieve` stub, so the default `probe_knowledge_bases` ran — a real agent, against the
+live Foundry project, from inside a suite whose whole premise is that it unit-tests the verdict
+*without a tenant*. It passed for as long as retrieval happened to work and went red on a transient
+empty result while the environment was healthy, which is the failure mode the derived probe question
+(#30) exists to remove. Both now stub `retrieve`. The suite went from ~23s to ~5s, which is the
+other tell: a unit suite that takes twenty seconds is doing something it should not.
 
 ### A Copilot Studio agent needs none of the thirteen template topics (confirmed 2026-08-13, issue #17)
 

@@ -14,7 +14,15 @@ given what the deployed frontend, backend and Container App actually answered,
 HTTP and `az` reads sit outside it.
 """
 
-from preflight.deployed_surface import Expected, evaluate, grounded_answer_check
+import json
+
+from preflight.deployed_surface import (
+    Expected,
+    authored_expectation,
+    evaluate,
+    grounded_answer_check,
+    main,
+)
 
 EXPECTED = Expected(
     assistant="Circle K Frontline Store Assistant",
@@ -26,6 +34,18 @@ EXPECTED = Expected(
         ("task-223-escalation", "deliberate"),
         ("task-223-identity", "fast"),
         ("task-223-shift-tasks", "fast"),
+    ),
+    documents=(
+        "SOP-101 Store Opening Procedure.docx",
+        "SOP-102 Store Closing Procedure.docx",
+        "SOP-103 Restroom Cleaning and Inspection.docx",
+        "SOP-104 Coffee Bar Setup and Shutdown.docx",
+        "SOP-105 Forecourt Emergency Stop and Fuel Spill Response.docx",
+        "SOP-106 Cash Handling and Safe Drops.docx",
+        "SOP-107 Hot Food Case Temperature Control.docx",
+        "SOP-108 Age-Restricted Sales Verification.docx",
+        "SOP-109 Delivery Receiving and Backroom Stocking.docx",
+        "SOP-110 Shift Handover and Task Board.docx",
     ),
 )
 
@@ -111,6 +131,20 @@ class TestQuickTasks:
         assert not check.ok
         assert "task-223-escalation" in check.detail
 
+    def test_a_team_that_is_not_the_authored_one_fails(self):
+        # The team the backend answers with is not necessarily the team that
+        # was asked for: an earlier pack under a renumbered identifier can be
+        # left in Cosmos, carrying tasks that satisfy every name below while
+        # the surface — which recognises the authored identifier — shows none
+        # of them.
+        team = observed()["team"]
+        team["team_id"] = "00000000-0000-0000-0000-000000000007"
+        verdict = evaluate(observed(team=team), EXPECTED)
+
+        check = verdict.check("quick-tasks")
+        assert not check.ok
+        assert EXPECTED.team_id in check.detail
+
     def test_a_task_that_lost_its_declared_lane_fails(self):
         # A Quick Task that declares no lane falls to the keyword router, and
         # the escalation beat quietly runs without its approval gate — which
@@ -177,7 +211,7 @@ class TestGroundedAnswer:
     """One real procedure question, all the way to Copilot Studio and back."""
 
     def test_a_cited_answer_from_dataverse_passes(self):
-        check = grounded_answer_check(answer())
+        check = grounded_answer_check(answer(), EXPECTED)
 
         assert check.ok
         assert "SOP-102 Store Closing Procedure.docx" in check.detail
@@ -187,13 +221,13 @@ class TestGroundedAnswer:
         # Copilot Studio. A run that asked nothing has no evidence of that, and
         # reporting it as a pass is how the deployment shipped unreachable in
         # the first place.
-        check = grounded_answer_check(None)
+        check = grounded_answer_check(None, EXPECTED)
 
         assert not check.ok
         assert "not" in check.detail
 
     def test_the_fixed_failure_message_fails(self):
-        check = grounded_answer_check(answer(failed=True, citations=[]))
+        check = grounded_answer_check(answer(failed=True, citations=[]), EXPECTED)
 
         assert not check.ok
 
@@ -201,15 +235,99 @@ class TestGroundedAnswer:
         # There is no fallback to model knowledge by design, but an answer with
         # no citations is exactly what a fallback would look like, and the
         # Grounding panel would have nothing to render.
-        check = grounded_answer_check(answer(citations=[]))
+        check = grounded_answer_check(answer(citations=[]), EXPECTED)
 
         assert not check.ok
+
+    def test_a_citation_this_repository_did_not_author_fails(self):
+        # The token endpoint check accepts any endpoint that is not the
+        # assembled Direct Line hostname, so a second Dataverse-grounded agent
+        # in the same tenant would answer, cite something, and pass. The
+        # citation naming a document out of `content/sop/` is what ties the
+        # answer back to the corpus this repository uploaded.
+        check = grounded_answer_check(
+            answer(citations=["HR-201 Benefits Enrolment.docx"]), EXPECTED)
+
+        assert not check.ok
+        assert "HR-201 Benefits Enrolment.docx" in check.detail
 
     def test_an_answer_from_somewhere_else_fails(self):
         # Platform and source are the two facts the Grounding panel is a claim
         # about. An answer the orchestrator produced itself is a working demo
         # of the wrong thing.
-        check = grounded_answer_check(answer(platform="Azure AI Foundry"))
+        check = grounded_answer_check(answer(platform="Azure AI Foundry"), EXPECTED)
 
         assert not check.ok
         assert "Copilot Studio" in check.detail
+
+
+class TestTheReport:
+    """What the operator is told, and what the exit code says."""
+
+    def test_a_healthy_deployment_reports_the_walkthrough_as_shippable(self, capsys):
+        exit_code = main(
+            argv=[],
+            read=lambda *_: observed(),
+            ask=lambda backend, question: answer(question=question),
+        )
+        out = capsys.readouterr().out
+
+        assert exit_code == 0
+        for name in (
+            "store-surface",
+            "quick-tasks",
+            "direct-line-endpoint",
+            "grounded-answer",
+        ):
+            assert f"PASS  {name}" in out
+
+    def test_no_probe_reports_the_grounded_answer_as_unproven_and_exits_nonzero(
+        self, capsys
+    ):
+        # The same rule the roster probe follows: a run that asked nothing must
+        # not report the cross-platform hop as working.
+        exit_code = main(argv=["--no-probe"], read=lambda *_: observed())
+        out = capsys.readouterr().out
+
+        assert exit_code == 1
+        assert "FAIL  grounded-answer" in out
+
+    def test_a_pre_rebrand_deployment_exits_nonzero(self, capsys):
+        exit_code = main(
+            argv=[],
+            read=lambda *_: observed(title=ACCELERATOR_TITLE),
+            ask=lambda backend, question: answer(question=question),
+        )
+
+        assert exit_code == 1
+        assert "FAIL  store-surface" in capsys.readouterr().out
+
+
+class TestWhatCountsAsAuthored:
+    """The expectation is read out of the repository, never pinned in the check."""
+
+    def test_the_repository_is_the_source_of_the_expectation(self):
+        # The ADR-019 lesson: a check carrying its own copy of the surface's
+        # strings passes a rebrand it never saw. These literals are this test's
+        # independent record of what the walkthrough currently claims — when
+        # the surface is renamed, this is what has to be changed alongside it.
+        authored = authored_expectation()
+
+        assert authored.assistant == EXPECTED.assistant
+        assert authored.team_id == EXPECTED.team_id
+        assert authored.quick_tasks == EXPECTED.quick_tasks
+        assert authored.documents == EXPECTED.documents
+
+    def test_a_renamed_assistant_is_followed_rather_than_ignored(self, tmp_path):
+        surface = tmp_path / "storeSurface.ts"
+        surface.write_text("export const ASSISTANT_NAME = 'Renamed Assistant';\n")
+        pack = tmp_path / "pack.json"
+        pack.write_text(json.dumps({
+            "team_id": "00000000-0000-0000-0000-000000000999",
+            "starting_tasks": [{"id": "task-999-only", "lane": "deliberate"}],
+        }))
+
+        authored = authored_expectation(surface=str(surface), pack=str(pack))
+
+        assert authored.assistant == "Renamed Assistant"
+        assert authored.quick_tasks == (("task-999-only", "deliberate"),)
