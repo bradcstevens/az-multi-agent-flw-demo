@@ -154,7 +154,7 @@ def test_given_a_miss_on_the_orchestrators_own_wording_then_the_rephrasing():
 
     assert verdict is not None
     assert "rephrasing" in verdict.layer
-    assert "was not normalised" in verdict.detail
+    assert "not the corpus wording" in verdict.detail
 
 
 def test_given_a_miss_on_the_corpus_wording_then_the_dataverse_index():
@@ -367,3 +367,95 @@ class TestTheClarificationIsRouting:
 
         assert ROUTING in report
         assert "NOT proved" in report
+
+
+class TestTheHonestMissIsAttributedToTheRightLayer:
+    """The comparison that decides between a query bug and a corpus bug.
+
+    Reindexing Dataverse and normalising the orchestrator's query are days of
+    work apiece, in different repositories, by different people. Getting this
+    branch backwards spends one of them on the other's bug.
+    """
+
+    def test_a_verbatim_question_that_missed_is_the_index_not_the_rephrasing(self):
+        # The case the obvious comparison gets wrong. When the orchestrator
+        # does not rephrase at all, the tool query and the retrieval query are
+        # *equal* -- the shape that reads as "not normalised". But nothing
+        # needed normalising: the corpus's own words were searched for and
+        # Dataverse missed, which is the index.
+        verdict = attribution({
+            "passed": False,
+            "outcome": HONEST_MISS,
+            "toolQuery": CORPUS_QUESTION,
+            "retrievalQuery": CORPUS_QUESTION,
+            "citations": [],
+        })
+
+        assert verdict.layer == INDEX
+
+    def test_the_corpus_question_is_read_rather_than_pinned(self):
+        from sop_rehearsal import rehearsed_question
+
+        assert rehearsed_question() == CORPUS_QUESTION
+
+    def test_a_miss_with_no_retrieval_query_names_no_layer(self):
+        # A panel that reported the miss but not what it searched for is a
+        # backend older than the evidence fields. Guessing from the tool query
+        # alone would attribute it to whichever branch happened to match.
+        verdict = attribution({
+            "passed": False,
+            "outcome": HONEST_MISS,
+            "toolQuery": "anything",
+            "retrievalQuery": None,
+            "citations": [],
+        })
+
+        assert verdict.layer == UNKNOWN
+
+
+class TestAFailedValidatorIsNeverAProof:
+    """The ledger and the loop can disagree, and the loop wins.
+
+    The beat appends its row from an `afterEach` hook, so a run whose test body
+    passed and whose teardown, reporter or browser then failed leaves a
+    `passed` row behind a non-zero exit. Ten of those would be reported as the
+    beat proved -- on the strength of ten runs nobody would call green.
+    """
+
+    def test_ten_passing_rows_behind_a_failed_run_do_not_prove_the_beat(
+        self, tmp_path
+    ):
+        ledger = tmp_path / "sop-evidence.jsonl"
+        calls = []
+
+        def run(index):
+            calls.append(index)
+            with open(ledger, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps({
+                    "passed": True,
+                    "outcome": GROUNDED,
+                    "toolQuery": "the closing procedure",
+                    "retrievalQuery": CORPUS_QUESTION,
+                }) + "\n")
+            return index != 10
+
+        exit_code = main(
+            ["--runs", "10", "--ledger", str(ledger)], run=run)
+
+        assert calls == list(range(1, 11))
+        assert exit_code == 1
+
+    def test_ten_clean_runs_still_prove_it(self, tmp_path):
+        ledger = tmp_path / "sop-evidence.jsonl"
+
+        def run(index):
+            with open(ledger, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps({
+                    "passed": True,
+                    "outcome": GROUNDED,
+                    "toolQuery": "the closing procedure",
+                    "retrievalQuery": CORPUS_QUESTION,
+                }) + "\n")
+            return True
+
+        assert main(["--runs", "10", "--ledger", str(ledger)], run=run) == 0

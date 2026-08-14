@@ -701,14 +701,39 @@ class TestCosmosDBTeamOperations:
         result = await client.get_team("test_team_id")
         
         assert result == mock_team
-        expected_query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type AND (c.user_id=@user_id OR c.is_default=true)"
+        expected_query = (
+            "SELECT * FROM c WHERE c.team_id=@team_id "
+            "AND c.data_type=@data_type "
+            "AND (c.user_id=@user_id OR c.is_default=true) "
+            "ORDER BY c._ts DESC"
+        )
         expected_params = [
             {"name": "@team_id", "value": "test_team_id"},
             {"name": "@data_type", "value": DataType.team_config},
             {"name": "@user_id", "value": "test_user"},
         ]
         client.query_items.assert_called_once_with(expected_query, expected_params, TeamConfiguration)
-    
+
+    @pytest.mark.asyncio
+    async def test_get_team_reads_the_newest_of_several(self, client):
+        """A default team cannot be deleted, so re-upload duplicates it (#54).
+
+        `delete_team` refuses on `is_default`, and the post-provision script
+        warns and uploads anyway -- a second document with the same team_id
+        under a new partition key. Both stay live and every re-deploy adds
+        another. Without an order, a configuration change lands on one
+        deployment and silently does nothing on the next.
+        """
+        client.query_items.return_value = [Mock(spec=TeamConfiguration)]
+
+        await client.get_team("test_team_id")
+
+        query = client.query_items.call_args[0][0]
+        assert "ORDER BY c._ts DESC" in query, (
+            "get_team does not order, so which of several documents with this "
+            "team_id is returned is whatever Cosmos hands back first"
+        )
+
     @pytest.mark.asyncio
     async def test_get_team_not_found(self, client):
         """Test getting a team when not found."""

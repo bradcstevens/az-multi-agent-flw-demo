@@ -86,6 +86,33 @@ test.afterEach(async () => {
     });
 });
 
+/**
+ * Whether a turn asked the presenter something instead of answering.
+ *
+ * Deliberately conservative, because the two mistakes are not equally bad. A
+ * missed clarification costs a less specific failure message on a run that goes
+ * red anyway; a *false* clarification turns a working demonstration red and
+ * makes this beat flakier than the bug it was written for (#54).
+ *
+ * So all three signals must agree, and none of them is the wording:
+ *
+ * - no paragraph — the corpus's answer opens with a bolded heading line, and
+ *   the measured clarification had none;
+ * - list items present — a clarification renders as a list;
+ * - at least one of them is punctuated as a question — a procedure step is an
+ *   instruction, and none of SOP-102's twelve ends in a question mark.
+ *
+ * A list-only answer with no question mark therefore falls through to the
+ * arrival assertion below and passes, which is the safe direction.
+ */
+function isQuestionBack(said: { spoken: string[]; asked: string[] }): boolean {
+    return (
+        said.spoken.length === 0 &&
+        said.asked.length > 0 &&
+        said.asked.some((line) => line.endsWith('?'))
+    );
+}
+
 test.describe('the cross-platform hop', () => {
     test('is answered by Copilot Studio out of Dataverse, citing the corpus', async ({
         page,
@@ -196,7 +223,7 @@ test.describe('the cross-platform hop', () => {
         const turn = plan.latestAgentTurn;
         await expect(turn).toBeVisible({ timeout: 120_000 });
         const said = await plan.saidIn(turn);
-        observed.clarified = said.asked.length > 0 && said.spoken.length === 0;
+        observed.clarified = isQuestionBack(said);
 
         // A question asked back is failed *by name*, before the emptiness it
         // also produces is reported (#54). The presenter taps "How do I close
@@ -216,8 +243,16 @@ test.describe('the cross-platform hop', () => {
                 'failure. See docs/sop-rehearsal.md.',
         ).toBe(false);
 
+        // Paragraphs *or* list items: the corpus's own answer is a bolded
+        // heading followed by a numbered procedure, and which of those the
+        // model emits is formatting. Requiring a paragraph makes a list-only
+        // answer — the same steps, same citation, no preamble — a red beat,
+        // which is `docs/demo-validator.md`'s rule broken one layer down: model
+        // prose is asserted only to have arrived.
         expect(
-            said.spoken.filter((paragraph) => paragraph !== hit.question),
+            [...said.spoken, ...said.asked].filter(
+                (line) => line !== hit.question,
+            ),
         ).not.toHaveLength(0);
     });
 });

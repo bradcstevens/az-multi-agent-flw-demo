@@ -267,13 +267,32 @@ class CosmosDBClient(DatabaseBase):
     async def get_team(self, team_id: str) -> Optional[TeamConfiguration]:
         """Retrieve a specific team configuration by team_id.
 
+        Ordered newest-first, and that is load-bearing rather than tidy (#54).
+        A team marked ``is_default`` cannot be deleted — `delete_team` refuses —
+        so the post-provision re-upload that is meant to *replace* it warns and
+        uploads anyway, writing a second document with the same ``team_id``
+        under a **new partition key**. Both are then live, and an unordered
+        `teams[0]` returns whichever Cosmos hands back first.
+
+        Every re-upload adds another. The symptom is a configuration change that
+        works on one deployment, silently does nothing on the next, and cannot
+        be reproduced from the repository: the store team's
+        ``require_all_agents`` flag would be read off a document written before
+        the flag existed and default to True, putting the walkthrough's opening
+        beat back through three specialists.
+
         Args:
             team_id: The team_id of the team configuration to retrieve
 
         Returns:
             TeamConfiguration object or None if not found
         """
-        query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type AND (c.user_id=@user_id OR c.is_default=true)"
+        query = (
+            "SELECT * FROM c WHERE c.team_id=@team_id "
+            "AND c.data_type=@data_type "
+            "AND (c.user_id=@user_id OR c.is_default=true) "
+            "ORDER BY c._ts DESC"
+        )
         parameters = [
             {"name": "@team_id", "value": team_id},
             {"name": "@data_type", "value": DataType.team_config},

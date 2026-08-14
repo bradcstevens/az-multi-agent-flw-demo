@@ -33,6 +33,8 @@ import json
 import os
 import subprocess
 import sys
+
+from preflight.deployed_surface import rehearsed_question as _rehearsed_question
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
@@ -56,6 +58,17 @@ INDEX = "the agent's Dataverse index"
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEDGER = os.path.join(REPO_ROOT, "e2e", "artifacts", "sop-evidence.jsonl")
 VALIDATOR = os.path.join(REPO_ROOT, "scripts", "e2e-tests.sh")
+SOP_MANIFEST = os.path.join(REPO_ROOT, "content", "sop", "corpus.toml")
+
+
+def rehearsed_question(manifest: str = SOP_MANIFEST) -> str:
+    """The question the walkthrough opens with, read out of the corpus.
+
+    Section-scoped, because `question` is a key under `[honest_miss]` too and
+    that one names the question the corpus deliberately cannot answer — an
+    attribution built on it would call every honest miss an index failure.
+    """
+    return _rehearsed_question(manifest)
 
 
 # ---------------------------------------------------------------------------
@@ -167,17 +180,28 @@ def attribution(row) -> Optional[Attribution]:
         )
 
     if outcome == HONEST_MISS:
-        if retrieval_query and retrieval_query == tool_query:
+        if not retrieval_query:
             return Attribution(
-                REPHRASING,
-                f"Dataverse was searched for {retrieval_query!r}, which was "
-                "not normalised to the corpus wording — the orchestrator "
-                "rephrased the question and the rephrasing missed",
+                UNKNOWN,
+                "the panel reported an honest miss without saying what was "
+                "retrieved against; the evidence does not reach a layer",
+            )
+        # Against the corpus's own question, not against the tool query. The
+        # two are equal on a turn the orchestrator did not rephrase at all —
+        # and a run where it asked verbatim and Dataverse still missed is the
+        # *index*, which comparing the two strings to each other reports as a
+        # rephrasing that never happened.
+        if retrieval_query == rehearsed_question():
+            return Attribution(
+                INDEX,
+                f"Dataverse was searched for {retrieval_query!r} — the "
+                "corpus's own wording — and found no matching procedure",
             )
         return Attribution(
-            INDEX,
-            f"Dataverse was searched for {retrieval_query!r} — the corpus's "
-            "own wording — and found no matching procedure",
+            REPHRASING,
+            f"Dataverse was searched for {retrieval_query!r}, which is not "
+            "the corpus wording — the marker did not fire and the "
+            "orchestrator's own phrasing missed",
         )
 
     return Attribution(
@@ -292,9 +316,18 @@ def main(argv=None, run: Optional[Callable[[int], bool]] = None) -> int:
     # ledger already ended.
     skip = len(read_evidence(args.ledger))
 
+    # Tracked separately from the ledger, because they can disagree. The beat
+    # appends its row from an `afterEach` hook, so a run whose test body passed
+    # and whose reporter, teardown or browser teardown then failed leaves a
+    # `passed` row behind a non-zero exit. Trusting the ledger alone would let
+    # the tenth such run report the beat as proved.
+    ran_clean = True
+
     for index in range(1, args.runs + 1):
         green = runner(index)
         rows = read_evidence(args.ledger, skip=skip)
+        if not green:
+            ran_clean = False
         if not green or not rows or not rows[-1].get("passed"):
             # Over the moment it goes red. The streak is broken, and nine more
             # live conversations spend Copilot Credits proving nothing.
@@ -303,7 +336,13 @@ def main(argv=None, run: Optional[Callable[[int], bool]] = None) -> int:
     summary = summarise(read_evidence(args.ledger, skip=skip), args.runs)
     print(f"\nRehearsed hit, {args.runs} consecutive runs wanted:")
     print(format_report(summary))
-    return 0 if summary.ok else 1
+    if summary.ok and not ran_clean:
+        print(
+            "  ----  but the validator itself exited non-zero on a run whose "
+            "beat passed: the ledger says proved and the loop does not, so "
+            "this rehearsal proves nothing. Read e2e/artifacts/report."
+        )
+    return 0 if summary.ok and ran_clean else 1
 
 
 if __name__ == "__main__":  # pragma: no cover
