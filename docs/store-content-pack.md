@@ -158,10 +158,16 @@ windows) and the service-incident ticket template (`TKT-001`), which carries a
 `steps_attempted` field — that field is why escalation happens *here* rather
 than on a phone call, and it is what #22 consumes.
 
-The content is fictional: **Brightpath Convenience, Store 223**, matching
-`content/sop/corpus.toml`. The surface is branded Circle K; the documents are
-not, for the same reason #25 drew an abstract storefront rather than reproducing
-a real mark.
+The content is fictional: **Brightpath Convenience, Store 223** — the site
+`src/backend/escalation/ticket.py` also stamps on every escalation ticket.
+
+It no longer matches `content/sop/corpus.toml`. The **SOP corpus** was rebranded
+**Circle K** by [ADR-019](./ADR/019-rebrand-the-sop-corpus-to-circle-k.md), whose
+scope is the ten SOP documents and nothing else, so the two provenances now carry
+different banners: a citation at beat 1 reads Circle K, and the ticket raised at
+beat 4 reads Brightpath. Both stay badged `SIMULATED` either way — rebranding
+changes whose name is on a document, not whether it is real — but the difference
+is visible on stage and is a live follow-up, not an oversight.
 
 ## The shift-task alerts
 

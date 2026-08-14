@@ -32,6 +32,8 @@ from copilot_studio.sop_agent import (
 )
 
 
+BANNER = "Circle K"
+
 CORPUS = [
     "SOP-101 Store Opening Procedure.docx",
     "SOP-102 Store Closing Procedure.docx",
@@ -326,7 +328,7 @@ def test_an_answer_that_quotes_the_banner_out_of_the_document_proves_the_content
     documents rather than the ones it held before.
     """
     check = evaluate(bot_row(), uploaded(), probe=probed(), corpus=CORPUS,
-                     banner="Circle K").check("corpus-content-current")
+                     banner=BANNER).check("corpus-content-current")
 
     assert check.ok, check.detail
 
@@ -339,11 +341,11 @@ def test_an_answer_still_carrying_the_previous_banner_fails():
     )
 
     check = evaluate(bot_row(), uploaded(), probe=probed(branding=stale),
-                     corpus=CORPUS, banner="Circle K").check(
+                     corpus=CORPUS, banner=BANNER).check(
                          "corpus-content-current")
 
     assert not check.ok
-    assert "Circle K" in check.detail
+    assert BANNER in check.detail
 
 
 def test_a_branding_answer_that_cites_nothing_fails_even_when_it_says_the_banner():
@@ -351,11 +353,11 @@ def test_a_branding_answer_that_cites_nothing_fails_even_when_it_says_the_banner
     uncited answer naming the banner is exactly what a stale index produces once
     the question has told it what to say.
     """
-    uncited = reply(f"That procedure applies to Circle K Store 223.",
+    uncited = reply("That procedure applies to Circle K Store 223.",
                     citations=())
 
     check = evaluate(bot_row(), uploaded(), probe=probed(branding=uncited),
-                     corpus=CORPUS, banner="Circle K").check(
+                     corpus=CORPUS, banner=BANNER).check(
                          "corpus-content-current")
 
     assert not check.ok
@@ -383,7 +385,8 @@ def test_a_run_that_never_opened_a_conversation_reports_no_evidence():
 
 
 def test_a_live_conversation_that_answers_in_numbered_steps_passes():
-    verdict = evaluate(bot_row(), uploaded(), probe=probed(), corpus=CORPUS)
+    verdict = evaluate(bot_row(), uploaded(), probe=probed(), corpus=CORPUS,
+                       banner=BANNER)
 
     assert verdict.ok, [c.detail for c in verdict.checks if not c.ok]
     assert "SOP-102 Store Closing Procedure.docx" in (
@@ -520,7 +523,7 @@ def test_the_report_states_the_consequence_for_the_orchestrator():
     rather than an independent fact.
     """
     passing = format_report(evaluate(bot_row(), uploaded(), probe=probed(),
-                                     corpus=CORPUS))
+                                     corpus=CORPUS, banner=BANNER))
     failing = format_report(evaluate(None, [], probe=None, corpus=CORPUS))
 
     assert "reachable over Direct Line" in passing

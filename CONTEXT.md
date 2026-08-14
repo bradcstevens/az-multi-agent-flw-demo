@@ -229,7 +229,13 @@ a hard deployment dependency** — see [ADR-007](docs/ADR/007-foundry-iq-knowled
 and no local copy is kept as a fallback. Distinct from, and never merged with, any Foundry-side
 knowledge base — the demo's whole claim rests on the two provenances being visibly separate.
 Grounding **Option A only**; the SharePoint-via-service-account option is deleted, not deferred —
-see [ADR-012](docs/ADR/012-grounding-option-a-dataverse-documents-only.md).
+see [ADR-012](docs/ADR/012-grounding-option-a-dataverse-documents-only.md). Branded **Circle K** by
+[ADR-019](docs/ADR/019-rebrand-the-sop-corpus-to-circle-k.md), which reversed the fictional banner it
+carried before so the **Grounding panel**'s snippet reads coherently under the Circle K header; the
+procedures under that banner are still 100% invented. The banner lives once, in
+`content/sop/corpus.toml`, and `check-sop-agent.sh --probe` reads it back out of a live conversation
+because the rebrand rewrote every document without renaming one — the check that counts uploaded
+documents by name passes either way.
 _Avoid_: SharePoint SOP library, the SharePoint source
 
 **Copilot Studio SOP agent** — the single low-code agent and the entire cross-platform proof.

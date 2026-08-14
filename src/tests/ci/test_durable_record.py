@@ -24,13 +24,16 @@ def _linking_docs() -> list[Path]:
     """Every tracked document that links into the durable record.
 
     Every markdown file in the record this repository authors — the ADRs and
-    the ``agents``, ``copilot-studio`` and ``preflight`` folders — not just the
-    ADRs: the live tenant records and the preflight records cite ADRs by
-    relative path too, and ``docs/adr`` for ``docs/ADR`` resolves on a
-    developer's macOS checkout and 404s on github.com. The accelerator's
-    inherited documentation is deliberately out of scope; it is a one-way
-    baseline (ADR-006), so editing it to satisfy a guard here buys merge
-    friction rather than a working link.
+    the ``agents``, ``copilot-studio`` and ``preflight`` folders, plus the SOP
+    corpus' own documentation under ``content`` — not just the ADRs: the live
+    tenant records and the preflight records cite ADRs by relative path too, and
+    ``docs/adr`` for ``docs/ADR`` resolves on a developer's macOS checkout and
+    404s on github.com. ``content`` is wholly this fork's own — the corpus and
+    its README exist nowhere upstream — and its README cites ADRs the same way,
+    which is how the ADR-019 rebrand shipped a lowercase link nothing was
+    reading. The accelerator's inherited documentation is deliberately out of
+    scope; it is a one-way baseline (ADR-006), so editing it to satisfy a guard
+    here buys merge friction rather than a working link.
     """
     authored = ("ADR", "agents", "copilot-studio", "preflight")
     return [
@@ -42,6 +45,7 @@ def _linking_docs() -> list[Path]:
             for folder in authored
             for doc in (REPO_ROOT / "docs" / folder).rglob("*.md")
         ),
+        *sorted((REPO_ROOT / "content").rglob("*.md")),
     ]
 
 

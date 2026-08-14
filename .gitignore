@@ -507,3 +507,8 @@ temp/
 # the base worktree and makes its publish merge refuse to overwrite the file.
 # Tracking the line here keeps that a permanent no-op.
 .git-loopy/
+
+# Copilot Studio solution exports (`check-sop-agent.sh --export .artifacts`). The zip is the
+# only backup a Default environment can have, and it carries tenant identifiers and the whole
+# authored agent — it belongs on the machine that took it, not in the repository.
+.artifacts/

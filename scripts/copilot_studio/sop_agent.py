@@ -791,6 +791,15 @@ OUT_OF_CORPUS_QUESTION = (
     "How do I restart the car wash after a vehicle stalls in the bay?"
 )
 
+# The third question is not a demo beat: it is the evidence that the published
+# index holds the documents this repository built. It asks for the one line the
+# rebrand (ADR-019) changed and the filename did not, so the answer is either
+# the current corpus or the previous one, plainly.
+BRANDING_QUESTION = (
+    "In the store closing procedure document, who is listed as the owner and "
+    "which store does it say it applies to? Quote the document."
+)
+
 # A publish is asynchronous: `PvaPublish` returns before the published content
 # is what Direct Line serves. Measured at 17-85 seconds on this environment.
 PUBLISH_ATTEMPTS = 40
@@ -936,6 +945,26 @@ def corpus_filenames(repo_root):
     directory = os.path.join(repo_root, CORPUS_DIR)
     return sorted(name for name in os.listdir(directory)
                   if name.endswith(".docx"))
+
+
+def corpus_banner(repo_root):
+    """Return the banner the SOP corpus is written under, or None.
+
+    Read from the corpus manifest rather than pinned here, so the banner has one
+    home: `content/sop/corpus.toml` is what the builder stamps into every
+    document, and a check carrying its own copy would pass a rebrand it never
+    saw. None if the manifest cannot be read — which the verdict reports as no
+    evidence rather than as a pass.
+    """
+    import os
+    import tomllib
+
+    path = os.path.join(repo_root, "content", "sop", "corpus.toml")
+    try:
+        with open(path, "rb") as manifest:
+            return tomllib.load(manifest).get("banner") or None
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
 
 
 def provision(environment, repo_root, solution=DEFAULT_SOLUTION):
@@ -1102,13 +1131,14 @@ def converse(token, questions, answer_seconds=ANSWER_SECONDS):
 
 
 def probe_live(environment, bot):
-    """Ask the agent the two rehearsed questions and return a `Probe`."""
+    """Ask the agent the three rehearsed questions and return a `Probe`."""
     endpoint, token = direct_line_token(environment, bot)
     print(f"  Direct Line endpoint: {endpoint.split('?')[0]}")
     identifier, greeting, answers = converse(
-        token, [PROCEDURE_QUESTION, OUT_OF_CORPUS_QUESTION])
+        token, [PROCEDURE_QUESTION, OUT_OF_CORPUS_QUESTION, BRANDING_QUESTION])
     print(f"  conversation: {identifier}")
-    return Probe(greeting=greeting, procedure=answers[0], miss=answers[1])
+    return Probe(greeting=greeting, procedure=answers[0], miss=answers[1],
+                 branding=answers[2])
 
 
 def export_solution(environment, directory, solution=DEFAULT_SOLUTION):
@@ -1180,7 +1210,7 @@ def main(argv=None):
 
     probe = probe_live(environment, bot) if (should_probe and bot) else None
     verdict = evaluate(bot, read_components(environment, bot), probe,
-                       corpus_filenames(repo_root))
+                       corpus_filenames(repo_root), corpus_banner(repo_root))
     print(format_report(verdict))
     return 0 if verdict.ok else 1
 
