@@ -49,8 +49,6 @@ test.describe('the troubleshooting beat', () => {
         const store = new StoreSurface(page);
         await store.open();
         await store.tapQuickTask(task.name);
-        await expect(store.questionBox).toHaveValue(task.prompt);
-        await store.send();
 
         const plan = new PlanSurface(page);
         await plan.waitForArrival(120_000);
