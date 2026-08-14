@@ -118,3 +118,7 @@ which reads like a broken selector and sends the reader to the wrong place.
 `retries: 0` stands. A retry would turn an intermittently-working demonstration into a green run,
 and the presenter would find out in the room. The intermittency is the finding, not the noise — it
 is #54.
+
+The recording this produces is the bottom rung of the presenter's fallback ladder — see
+[presenter-runbook.md](presenter-runbook.md), which is where the findings above become
+instructions for the person in the room.

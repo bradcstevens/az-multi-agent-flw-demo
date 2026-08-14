@@ -566,7 +566,13 @@ An **auto-repeat** is not a press — holding the chord a beat too long would ot
 every repeat interval, and a stack of identical cards reads as a bug rather than a beat. A
 **global** listener — the one place this codebase departs from its inline `onKeyDown` convention,
 because the chord must work while focus is anywhere. It POSTs an **empty body**; the words and the
-recipient are both the server's. The alert renders as visibly a different object from a reply
+recipient are both the server's. **Global within the plan surface, though, not within the demo**:
+`usePresenterChord` is mounted by `PlanPage` alone, and the recipient is resolved from the sole
+connected WebSocket, which only a plan has. So on the home surface — where the six **Quick Task**
+cards are, and where the refusal and the **Mocked unlock**'s answer render — no listener is bound
+and the key does nothing at all. That is a fact about the walkthrough's order, not a detail: the
+shift-task beat has to tap first and fire second, which is why the **Presenter runbook** says so.
+The alert renders as visibly a different object from a reply
 (`role="alert"`, its own badge), because an alert mistaken for an answer is worse than no alert.
 Alerts survive a new question — an alert answered none, so a new one does not make it untrue — and
 clear at the **conversation** boundary (`conversationStarted`), which the meter deliberately
@@ -658,6 +664,20 @@ Recorded in [docs/escalation-ticket.md](docs/escalation-ticket.md).
 
 **Attempted steps** — what the associate has already tried, persisted explicitly to the Cosmos
 memory container. Framework checkpoint state is in-memory and must not be relied on for this.
+
+**Presenter runbook** — the walkthrough written for the person who will drive it: seven taps, what
+to say at each, what the audience should be looking at, and a per-beat decision about whether to
+continue when one fails. It exists because two of the affordances the demonstration depends on
+have **no representation on screen at all** — the **Presenter chord** and the **Rehearsed reply**
+chips — so for the presenter in the room the runbook *is* those features. Browser-first: their
+access is the URL, and the repository is a documented fallback rather than the assumed starting
+point. Every string it quotes is asserted to be the string the repository authors — the chord's
+label, the **Quick Task** names and prompts, the chips, the **Rehearsed hit**'s `SOP-NNN`, the
+**Store surface**'s own words — which is ADR-019's lesson applied to prose: a runbook carrying its
+own copy passes a rebrand it never saw, and the presenter finds out in front of the customer.
+
+Recorded in [docs/presenter-runbook.md](docs/presenter-runbook.md), guarded by
+`src/tests/ci/test_presenter_runbook.py`.
 
 ## Licensing and capacity
 
