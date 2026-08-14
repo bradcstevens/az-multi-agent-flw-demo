@@ -20,13 +20,11 @@ What is timed, and why it is timed in two phases:
 Not timed: the HTTP hop, the Cosmos plan write and the Identity boundary gate.
 The gate is a keyword match plus one embedding call and the plan write is a
 single point-write; both are tens of milliseconds against a multi-second
-orchestration, and including them here would mean standing up Cosmos to
-measure something orchestration-bound.
+orchestration. Cosmos is read once only to retrieve the deployed Store Assistant
+roster that the workflow builds.
 
-The team is a **stand-in**, not the demo roster: #19 owns the real one, and
-this probe deliberately does not upload a throwaway roster to the deployed
-environment's Cosmos that #25 would then have to suppress. Re-run it once #19
-lands to get the number for the real roster:
+The team is the **real, deployed Store Assistant roster**, read by its stable
+team identifier. The probe does not upload or mutate any team configuration.
 
     az login
     cd src/backend && uv sync
@@ -50,13 +48,13 @@ import json
 import os
 import sys
 import time
-import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 FAST_LANE_TARGET_SECONDS = 10.0
+STORE_ASSISTANT_TEAM_ID = "00000000-0000-0000-0000-000000000223"
+PROBE_USER_ID = "fast-lane-probe"
 
 DEFAULT_TASK = "How do I close the store at the end of the night?"
 
@@ -89,51 +87,16 @@ def load_azd_environment(repo_root: Path = REPO_ROOT) -> str | None:
     return env_name
 
 
-def _stand_in_team(deployment_name: str):
-    """A two-agent team on the cheap model, with no index and no toolbox.
-
-    Shaped like the demo roster in the only ways that affect latency — how many
-    agents the pool builds and which model they run on — and deliberately not
-    in any of the ways that would make it the demo roster.
-    """
-    from common.models.messages import TeamAgent, TeamConfiguration
-
-    now = datetime.now(timezone.utc).isoformat()
-    return TeamConfiguration(
-        id=str(uuid.uuid4()),
-        team_id=f"fast-lane-probe-{uuid.uuid4().hex[:8]}",
-        session_id=str(uuid.uuid4()),
-        name="Fast-lane latency probe",
-        status="visible",
-        created=now,
-        created_by="fast-lane-probe",
-        user_id="fast-lane-probe",
-        deployment_name=deployment_name,
-        agents=[
-            TeamAgent(
-                input_key="procedure",
-                type="Custom",
-                name="ProcedureAgent",
-                deployment_name=deployment_name,
-                description="Answers store procedure questions.",
-                system_message=(
-                    "You answer store procedure questions for a convenience "
-                    "store associate. Answer in numbered steps. Be brief."
-                ),
-            ),
-            TeamAgent(
-                input_key="tasks",
-                type="Custom",
-                name="ShiftTaskAgent",
-                deployment_name=deployment_name,
-                description="Answers shift task questions.",
-                system_message=(
-                    "You answer questions about shift tasks for a convenience "
-                    "store associate. Be brief."
-                ),
-            ),
-        ],
-    )
+async def _load_store_assistant_team(memory_store):
+    """Read the seeded Store Assistant roster without creating or changing it."""
+    team = await memory_store.get_team(STORE_ASSISTANT_TEAM_ID)
+    if team is None:
+        raise RuntimeError(
+            "The deployed Store Assistant roster "
+            f"({STORE_ASSISTANT_TEAM_ID}) was not found. Run the store-pack "
+            "deployment check before measuring latency."
+        )
+    return team
 
 
 async def _drain(workflow, task: str, stop_on_plan_review: bool) -> int:
@@ -150,15 +113,16 @@ async def measure(task: str, plan_review: bool, project_endpoint: str) -> dict:
     # Imported here, not at module scope: AppConfig is constructed on import and
     # reads the environment, so main() must finish exporting before this runs.
     from agents.agent_factory import AgentFactory
-    from common.config.app_config import config
+    from common.database.database_factory import DatabaseFactory
     from orchestration.orchestration_manager import OrchestrationManager
 
-    team = _stand_in_team(config.AZURE_OPENAI_DEPLOYMENT_NAME)
+    memory_store = await DatabaseFactory.get_database(user_id=PROBE_USER_ID)
+    team = await _load_store_assistant_team(memory_store)
 
     build_started = time.perf_counter()
     factory = AgentFactory(team_service=None)
     agents = await factory.get_agents(
-        user_id="fast-lane-probe", team_config_input=team, memory_store=None
+        user_id=PROBE_USER_ID, team_config_input=team, memory_store=memory_store
     )
     if not agents:
         raise RuntimeError(
@@ -168,8 +132,8 @@ async def measure(task: str, plan_review: bool, project_endpoint: str) -> dict:
     workflow = await OrchestrationManager.init_orchestration(
         agents=agents,
         team_config=team,
-        memory_store=None,
-        user_id="fast-lane-probe",
+        memory_store=memory_store,
+        user_id=PROBE_USER_ID,
         plan_review=plan_review,
     )
     build_seconds = time.perf_counter() - build_started

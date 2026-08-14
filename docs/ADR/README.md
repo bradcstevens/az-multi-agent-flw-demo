@@ -26,6 +26,10 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [013](./013-per-request-plan-review-over-orchestrator-bypass.md) | Vary Plan review per request instead of building an orchestrator bypass | Accepted |
 | [014](./014-deterministic-identity-boundary-gate.md) | The identity boundary gate is deterministic code, not a prompt | Accepted |
 | [015](./015-two-class-margin-for-the-identity-boundary-gate.md) | Score the identity boundary gate's similarity tier as a two-class margin | Accepted |
+| [016](./016-typescript-playwright-for-the-demo-validator.md) | TypeScript `@playwright/test` for the Demo validator, against the Python loop convention | Accepted |
+| [017](./017-workforce-agent-answers-process-never-record.md) | The Workforce agent answers HR process, and never an individual's record | Accepted |
+| [018](./018-deployed-build-provenance-check.md) | Check that the deployed build is the build we think it is | Accepted |
+| [019](./019-rebrand-the-sop-corpus-to-circle-k.md) | Rebrand the SOP corpus to Circle K, reversing the Brightpath position | Accepted |
 
 ## Writing a new one
 

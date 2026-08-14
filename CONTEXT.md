@@ -321,6 +321,20 @@ answer the rehearsed **honest miss** and the SOP corpus' own verifier could not 
 `ShiftTasksAgent` (`gpt-5.4-mini`, the `sop` toolbox) and `EscalationAgent` (`gpt-5.4`, the
 operations knowledge base). The manager runs on `ORCHESTRATOR_MODEL_NAME` (ADR-003).
 
+**Workforce agent** — `WorkforceAgent`, a fourth participant, decided 2026-08-13 and not yet built.
+It answers an **HR process question** and never an individual's record. Named for its function
+rather than for Workday because the surface would otherwise claim an integration that does not
+exist, which is the rule every other simulated thing here is held to.
+_Avoid_: WorkdayAgent, HR agent
+
+**HR process question** — a question about how an employment task is performed ("how do I swap a
+shift with another associate?"), as against a **personal question**, which is about an individual's
+own record ("how much PTO do I have?"). Only the second is the **Identity boundary gate**'s
+business. The first has to clear both of the gate's tiers, which is why the wording of the beat that
+asks one is a design decision and not copy: the **Keyword fast path** is deterministic and
+inspectable, but the similarity tier is a live model call that can refuse a process question on
+stage.
+
 **The SOP tool has one holder, and it has nothing else** — `ShiftTasksAgent` declares
 `toolbox_filter: "sop"` and **no** `knowledge_base_name`. An agent holding both a Foundry knowledge
 base and `search_store_procedures` chooses between them turn by turn, and the branch it does not
@@ -845,7 +859,49 @@ never commits that edit — which dirties the base worktree and makes the integr
 log (`.git-loopy/logs/<iso>-<run_id>.log`) is the first place to look when the gate reports red —
 it distinguishes "gate could not run" and "publish failed" from an actually-failing loop.
 
+**Demo validator** — the headless Playwright suite that drives the walkthrough through a real
+browser and asserts what the demonstration *claims*. It asserts the deterministic transparency
+signals — the platform the **Grounding panel** names, the citation's document identifier, the
+**Token meter**'s rows, the **Lane badge**, the **Simulated ticket**'s number, the gate's refusal
+copy, the signed-in header — and about model prose it asserts only that it arrived. A suite that
+asserts a sentence a model wrote goes red when the model paraphrases and the demonstration was fine,
+and a validator nobody trusts is one nobody reads on the morning it matters.
+_Avoid_: e2e test (`tests/e2e-test/` is the accelerator's own, drives an Entra login and the
+pre-rebrand surface, is wired into no workflow, and is a different and dead thing)
+
+**Stage driver** — the same specs and the same page objects run headed and paced, for rehearsal and
+as a way to present. Not a second suite: a second suite is a second thing to keep true.
+
+**Deployment drift** — the distance between the images the Container Apps are running and the commit
+they were built from. Nothing here detects it. `check-deployed-environment.sh` asserts the image is
+not the **Placeholder image** and that it came from the expected registry, and never that it is
+*current*; every declared loop runs against fakes and stubs, so all of them stay green while the
+deployment is arbitrarily old.
+_Avoid_: stale deployment, drift
+
 ## Confirmed findings
+
+### The deployed environment was 42 commits behind, and every loop was green (confirmed 2026-08-13)
+
+The `macae-flw-v1` Container Apps were running images built at `2026-08-12T23:32Z` — before the
+rebrand (#25), the transparency signals and panels (#23, #24), the Quick Tasks (#26), the mocked
+sign-in (#27), the escalation ticket (#22), the troubleshooting memory (#21), the lane router (#16),
+the identity boundary gate (#14) and the Direct Line client and SOP tool (#18). What was deployed
+was substantially the stock accelerator, and it said so: the served page title was
+`Multi-Agent - Custom Automation Engine`, while `src/App/index.html` reads `Circle K Frontline Store
+Assistant` and nothing sets the title at runtime.
+
+`COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT` was absent from the backend Container App and from every
+secret store. The Bicep plumbs it through unconditionally (`infra/bicep/main.bicep`,
+`infra/avm/main.bicep`) from a `main.parameters.json` substitution, so this was never an
+infrastructure gap — the value was simply never set, and unset the SOP tool answers with its fixed
+failure message rather than a grounded one. The centrepiece cross-platform beat could not have
+worked.
+
+Two things made this invisible. Every feedback loop runs against fakes, so none of them observes a
+deployment at all; and the deployed-environment preflight checks an image's *provenance* but not its
+*currency*. **Deployment drift** is the term for the gap, and a check comparing the deployed image
+to `HEAD` is the answer to it.
 
 ### A Copilot Studio agent needs none of the thirteen template topics (confirmed 2026-08-13, issue #17)
 
