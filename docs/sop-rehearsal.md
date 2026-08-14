@@ -235,6 +235,48 @@ because `check-deployed-surface.sh` now carries a `mandatory-agents` row that as
 what flag it is actually running under. A revert, a stale read, or a team document that predates the
 field fails the deploy gate rather than the walkthrough.
 
+## The proof has to name the build it proved
+
+Ten green runs against *which* build? Until this the rehearsal never said, and could not have: the
+ledger row carried the commit the **harness** ran from, which is explicitly not the deployed build.
+
+The Demo validator dates the deployment before a browser opens (#48, [ADR-018]) — but there are two
+signposted ways past that gate, and both of them are right. `--target local` runs the same specs
+against a `npm run dev`, which dates no deployment at all. And the gate's own failure message ends:
+
+> To go anyway — knowing the beats are about another build — set `E2E_SKIP_BUILD_CHECK=1`.
+
+Which is correct for the **Stage driver**: a refusal to start, mid-demonstration, over a one-commit
+drift is the check doing more harm than the drift it found. It is a lie in a *rehearsal's* ledger.
+A run under that flag appended a row indistinguishable from a verified one, and ten of them printed
+**the beat is proved** — about a build nobody could name. That is this issue's own failure mode
+wearing the harness's clothes: the proof and the thing being proved were about different questions.
+
+So the gate now publishes what it verified — one `check-deployed-build.sh --json` read, whose payload
+carries the commit *and* the rendered report, so the human text and the machine answer come from a
+single `az` call and `format_report` is never given a second opinion in TypeScript. Every ledger row
+records `deployedBuild` and `buildVerified`, and `provenance` refuses three streaks the arithmetic
+used to accept:
+
+| The streak | Why it is not a proof |
+| --- | --- |
+| A run that skipped the gate | Whatever those runs are about, it is not a build this rehearsal can name. |
+| Ten runs against a local surface | They prove the harness. The claim is about the deployment. |
+| Ten runs spanning two builds | `deploy-main.yml` runs on every push to `main`, so this is not hypothetical. Ten green runs across two builds is two rehearsals of five, and neither is the proof. |
+
+A row from a harness older than the fields counts as none of these and as no proof either, which is
+ADR-018's rule inherited: an unproved build is not a passing one.
+
+The verdict prints the commit on the line that says the beat is proved, because the sentence was
+never complete without it:
+
+```
+  ----  the rehearsed hit answered from the corpus 10 consecutive times
+        against 03a80ef18183: the beat is proved
+```
+
+[ADR-018]: ADR/018-deployed-build-provenance-check.md
+
 ## Running the proof
 
 ```bash
@@ -247,6 +289,18 @@ Ten, because nine is what an intermittent beat produces often enough to be belie
 stops at the first red run and names the layer that run implicates, so a broken streak costs one run
 rather than ten. It runs `scripts/e2e-tests.sh` repeatedly rather than `--repeat-each`, which the
 walkthrough reporter treats as a filter and which would leave the **Recorded fallback** stale.
+
+Each run is scoped to the **rehearsed hit's own beat**. With one spec that was the same run and the
+difference never showed; since the fourth specialist got a beat of its own (#52) it is not. A red
+**workforce** beat exits the validator non-zero, and this harness treats a non-zero exit as fatal to
+the streak — deliberately, because a green ledger row behind a red run is a teardown failure. So on
+2026-08-14 the hop's beat was green and cited, the run was red, and the centrepiece was unprovable
+for a reason its own ledger said nothing about. That is this issue's mistake wearing the harness's
+clothes, and scoping is what restores the exit code to being the verdict on the beat being graded.
+
+The **Recorded fallback** is not lost by that; it is correctly declined. The walkthrough reporter
+reads a positional spec as a filter and refuses to replace the recording from a run that is not a
+whole walkthrough. Making the fallback is a plain Demo validator run's job.
 
 **It is not a feedback loop and must not be added to a workflow** — the Demo validator's own rule
 (`docs/demo-validator.md`) multiplied by ten. It drives a real browser through ten live conversations

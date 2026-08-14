@@ -89,6 +89,22 @@ what the presenter falls back to when clicking through the walkthrough by hand g
 refusal to start over a one-commit drift, mid-demonstration, is the check doing more harm than the
 drift. A skipped run prints what it did not prove.
 
+## What it answers, as well as whether it passed
+
+`--json` renders the verdict for a machine rather than a reader, and carries three things the text
+report cannot be asked for:
+
+| Field | Why |
+| --- | --- |
+| `deployedBuild` | The one commit every application host runs, or `null` when they do not agree on one datable commit. It is what the **rehearsal**'s ledger records, so ten green runs can name the build they were ten green runs *of* (#54). |
+| `report` | The rendered human report. It travels *with* the verdict so `globalSetup` gets the presenter's text and the commit from one `az` read, and `format_report` is never given a second implementation in TypeScript. |
+| `checks` | Each check's name, three-state status and detail. |
+
+`deployedBuild` is `null` on exactly the states the checks call `UNKN` or `FAIL` for disagreement —
+an image on `latest`, three hosts on two commits, no container apps at all — for ADR-018's reason
+seen from the other side: a build that cannot be named has not been proved, and the name is the
+whole point of recording it.
+
 ## The failure this closes
 
 Recorded twice, in two shapes:

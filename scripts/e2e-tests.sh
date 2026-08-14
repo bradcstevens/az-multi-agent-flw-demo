@@ -78,7 +78,14 @@ fi
 # A `--project` of the caller's own wins outright. Two `--project` flags is not
 # an override in Playwright, it is a *union*: both projects run, every beat is
 # recorded twice, and the walkthrough reporter refuses the lot.
-PROJECT_ARGS=(--project "$PROJECT")
+#
+# `--project=<name>`, one argument, because Playwright's `--project` is
+# **variadic**: spelled as two arguments it goes on consuming positionals, so
+# `--project validator specs/cross-platform.spec.ts` reads the spec as a second
+# project name and dies with `Project(s) "specs/..." not found`. The SOP
+# rehearsal scopes every run to one spec, so that is ten runs that exit
+# non-zero without opening a browser.
+PROJECT_ARGS=("--project=$PROJECT")
 for arg in ${PLAYWRIGHT_ARGS[@]+"${PLAYWRIGHT_ARGS[@]}"}; do
   case "$arg" in
     --project|--project=*|-p)

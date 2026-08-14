@@ -53,6 +53,16 @@ in the second row.
 it holds the last true statement rather than inventing the next one.** The four authored messages
 and the `setInterval` that rotates them are deleted.
 
+**And it stops.** Reaching the Done phase removes the in-flight indicator from the screen — a rule
+worth stating separately because every other sentence here governs what the surface *says*, and
+none of them governs it ever *finishing*. That gap is already a shipped defect (#69): nothing
+clears `waitingForPlan` on the **Fast lane**, because the only signal that clears it is
+`plan_approval_request` and [ADR-013](./013-per-request-plan-review-over-orchestrator-bypass.md)
+means that lane has no plan to approve. So the surface renders *"Creating your plan..."* under the
+answer, indefinitely, three inches from a rail reading *"No plan to review on this request."* A
+narration that claims only what a signal reports and then never stops is still making a false
+claim — that the request is in flight — and it makes it for the rest of the conversation.
+
 Every phase is an observable event:
 
 | Phase | Signal |

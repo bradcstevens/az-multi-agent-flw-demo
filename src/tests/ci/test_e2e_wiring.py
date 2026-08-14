@@ -25,6 +25,9 @@ What they defend is narrow and specific:
 from pathlib import Path
 import os
 import re
+import subprocess
+
+from sop_rehearsal import REHEARSED_BEAT
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 E2E = REPO_ROOT / "e2e"
@@ -344,6 +347,72 @@ def test_the_proof_runs_the_loop_repeatedly_rather_than_repeat_each():
     )
 
 
+def _loop_argv(tmp_path, *args):
+    """The `playwright test` argv `scripts/e2e-tests.sh` builds for `args`.
+
+    Through a stub `npx` on `PATH`, because the seam the bug lived at is the
+    argv and nothing else: asserting on the script's *text* would have passed
+    for both spellings of `--project`, and running the real Playwright needs a
+    browser this loop is not allowed to open.
+    """
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    argv_log = tmp_path / "argv"
+    stub = binaries / "npx"
+    stub.write_text(
+        '#!/usr/bin/env bash\n'
+        'if [ "${2:-}" = "test" ]; then\n'
+        '  shift 1\n'
+        '  printf "%s\\n" "$@" > "$ARGV_LOG"\n'
+        'fi\n'
+        'exit 0\n'
+    )
+    stub.chmod(0o755)
+
+    environment = dict(os.environ)
+    environment["PATH"] = f"{binaries}{os.pathsep}{environment['PATH']}"
+    environment["ARGV_LOG"] = str(argv_log)
+    subprocess.run(
+        ["bash", str(LOOP), "--target", "local", *args],
+        env=environment,
+        check=True,
+        capture_output=True,
+    )
+    return argv_log.read_text(encoding="utf-8").splitlines()
+
+
+def test_the_loop_lets_a_spec_filter_through_instead_of_the_project_eating_it(
+    tmp_path,
+):
+    """Playwright's `--project` is **variadic**, and the spec came after it.
+
+    Found by review before it ever ran (#54). The rehearsal scopes each run to
+    the rehearsed hit's spec, and `--project validator specs/…` made Playwright
+    read the spec as a *second project name*:
+
+        Error: Project(s) "specs/cross-platform.spec.ts" not found.
+
+    Which is the worst available failure for this harness: ten runs that each
+    exit non-zero without opening a browser, attributed to whatever the ledger
+    last said. `--project=validator` binds the value to the flag and the
+    positional survives as a filter.
+    """
+    argv = _loop_argv(tmp_path, REHEARSED_BEAT)
+
+    assert REHEARSED_BEAT in argv, (
+        "the spec filter never reached Playwright"
+    )
+    assert "--project" not in argv, (
+        "the loop passes --project as two arguments, and Playwright's "
+        "--project is variadic: it swallows the spec filter after it and the "
+        "run dies with 'Project(s) not found'"
+    )
+    assert "--project=validator" in argv, (
+        "the loop no longer names the validator project, so an unattended run "
+        "would also run the headed Stage driver"
+    )
+
+
 # ---------------------------------------------------------------------------
 # The deployed build is the validator's first assertion (#48, ADR-018).
 # ---------------------------------------------------------------------------
@@ -454,6 +523,59 @@ def test_the_opt_out_is_a_deliberate_act_and_says_what_was_not_proved():
     assert "NOT verified" in provenance or "not verified" in provenance, (
         "the opt-out is silent: a run that skipped the check looks exactly "
         "like one that passed it"
+    )
+
+
+# ---------------------------------------------------------------------------
+# The build a rehearsal's runs were about (#54).
+# ---------------------------------------------------------------------------
+
+
+def test_the_gate_publishes_the_build_it_verified():
+    """A verdict nobody can read back is a verdict the ledger cannot record.
+
+    The gate dates the deployment before a browser opens and then, until this,
+    kept the answer to itself. The **rehearsal** is a claim about ten
+    consecutive runs of *one* build, so the run has to be able to say which —
+    and the gate is the only thing in the suite that has asked.
+    """
+    provenance = _code(PROVENANCE)
+
+    assert "--json" in provenance, (
+        "the setup reads the preflight's prose rather than its verdict, so "
+        "the commit it verified can only be recovered by parsing a report"
+    )
+    assert "DEPLOYED_BUILD" in provenance and "BUILD_VERIFIED" in provenance, (
+        "the setup does not publish what it verified, so the ledger row "
+        "cannot name the build the run was about"
+    )
+
+
+def test_the_ledger_records_the_build_and_whether_it_was_verified():
+    # The hole this closes: `E2E_SKIP_BUILD_CHECK` is offered by the gate's own
+    # failure message — rightly, for a presenter mid-demonstration — and a
+    # rehearsal run under it appended a row indistinguishable from a verified
+    # one. Ten of those printed "the beat is proved".
+    evidence = _code(E2E / "evidence.ts")
+
+    assert "deployedBuild" in evidence, (
+        "the ledger row cannot name the build the run observed"
+    )
+    assert "buildVerified" in evidence, (
+        "a run that skipped the deployed-build gate is recorded exactly like "
+        "one that passed it"
+    )
+
+
+def test_the_proof_refuses_a_streak_it_cannot_attribute_to_a_build():
+    # The arithmetic is Python's, unit-tested without a tenant. What is
+    # asserted here is only that it is *wired* to the fields the harness writes
+    # — a ledger that records the build and a verdict that ignores it is the
+    # same hole with a longer row.
+    proof = _text(REPO_ROOT / "scripts" / "sop_rehearsal.py")
+
+    assert "buildVerified" in proof and "deployedBuild" in proof, (
+        "the ten-run proof never reads the build its runs were about"
     )
 
 

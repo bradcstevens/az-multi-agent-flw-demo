@@ -121,10 +121,10 @@ def _run_loop(tmp_path, *args, env_extra=None):
 
 def test_the_switch_selects_the_driver_and_the_default_selects_the_validator(tmp_path):
     _, _, driver = _run_loop(tmp_path / "stage", "--stage")
-    assert "--project stage" in driver, driver
+    assert "--project=stage" in driver, driver
 
     _, _, default = _run_loop(tmp_path / "default")
-    assert "--project validator" in default, (
+    assert "--project=validator" in default, (
         "an unattended run must not open a browser window on somebody's screen"
     )
 
@@ -132,14 +132,14 @@ def test_the_switch_selects_the_driver_and_the_default_selects_the_validator(tmp
 def test_the_driver_runs_against_either_target(tmp_path):
     # The switch and the target compose: neither shadows the other.
     _, deployed, argv = _run_loop(tmp_path / "deployed", "--stage")
-    assert deployed == "deployed" and "--project stage" in argv
+    assert deployed == "deployed" and "--project=stage" in argv
 
     _, local, argv = _run_loop(tmp_path / "local", "--stage", "--target", "local")
     assert local == "local", "--stage swallowed the target"
-    assert "--project stage" in argv
+    assert "--project=stage" in argv
 
     _, joined, argv = _run_loop(tmp_path / "joined", "--target=local", "--stage")
-    assert joined == "local" and "--project stage" in argv
+    assert joined == "local" and "--project=stage" in argv
 
 
 def test_a_project_of_the_callers_own_is_not_doubled(tmp_path):

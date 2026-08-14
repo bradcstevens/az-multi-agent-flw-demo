@@ -132,6 +132,30 @@ def commit_from_image(image):
     return tag if COMMIT_TAG.match(tag) else None
 
 
+def deployed_build(observed):
+    """Return the one commit every application host runs, or None. Pure.
+
+    The verdict grades a deployment and then throws away *which* deployment it
+    graded. That was enough while the only reader was a presenter reading the
+    report — and it is not enough for the **rehearsal** (#54), whose claim is
+    ten consecutive runs of the centrepiece beat against **one** build. A run
+    that cannot name the build it observed cannot be told apart from a run
+    somebody got past the gate with `E2E_SKIP_BUILD_CHECK`, and ten of those
+    read as a proof.
+
+    `None` whenever the hosts do not agree on one datable commit, which is
+    ADR-018's rule seen from the other side: a build that cannot be named has
+    not been proved, and the name is what the ledger records.
+    """
+    container_apps = observed.get("containerApps") or []
+    if not container_apps:
+        return None
+    commits = {commit_from_image(app.get("image")) for app in container_apps}
+    if len(commits) != 1:
+        return None
+    return commits.pop()
+
+
 def _comparison_base_check(observed):
     """Which commit this run compared against.
 
@@ -402,12 +426,20 @@ def main(argv=None, read=None):
     args = parser.parse_args(argv)
 
     reader = read or read_build
-    verdict = evaluate(reader(args.resource_group))
+    read_state = reader(args.resource_group)
+    verdict = evaluate(read_state)
 
     if args.json:
         print(json.dumps({
             "ok": verdict.ok,
             "failed": verdict.failed,
+            "resourceGroup": args.resource_group,
+            "deployedBuild": deployed_build(read_state),
+            # The rendered report travels with the verdict so its one reader —
+            # the Demo validator's global setup — gets the human text and the
+            # commit from a single `az` read, and never renders a second
+            # opinion of `format_report` in another language.
+            "report": format_report(verdict),
             "checks": [
                 {"name": c.name, "status": c.status, "detail": c.detail}
                 for c in verdict.checks

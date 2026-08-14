@@ -55,10 +55,33 @@ ROUTING = "the orchestrator's routing"
 REPHRASING = "the orchestrator's rephrasing"
 INDEX = "the agent's Dataverse index"
 
+#: The deliberate act that gets a validator run past the deployed-build gate,
+#: named here because this module's whole job is to notice that it was used.
+#: `e2e/deployedBuild.ts` offers it to a presenter mid-demonstration on purpose
+#: — a refusal to start over a one-commit drift does more harm than the drift —
+#: and what is right for the Stage driver is a lie in a rehearsal's ledger.
+SKIP_BUILD_CHECK = "E2E_SKIP_BUILD_CHECK"
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEDGER = os.path.join(REPO_ROOT, "e2e", "artifacts", "sop-evidence.jsonl")
 VALIDATOR = os.path.join(REPO_ROOT, "scripts", "e2e-tests.sh")
 SOP_MANIFEST = os.path.join(REPO_ROOT, "content", "sop", "corpus.toml")
+
+#: The beat this harness proves, relative to `e2e/`.
+#:
+#: Ten runs of the **rehearsed hit**, not of the walkthrough. With one spec
+#: those were the same run; since the fourth specialist got a beat of its own
+#: (#52) they are not, and a red **workforce** beat exits the validator
+#: non-zero — which this harness treats as fatal to the streak, deliberately,
+#: because a green row behind a red run is a teardown failure. Unscoped, the
+#: centrepiece could not be proved while any other beat was failing: a proof
+#: hostage to a beat its ledger says nothing about.
+#:
+#: The **Recorded fallback** is not lost by this, it is correctly declined: the
+#: walkthrough reporter reads a positional filter as a filter and refuses to
+#: replace the recording from a run that is not a whole walkthrough. The
+#: fallback is a plain Demo validator run's job.
+REHEARSED_BEAT = os.path.join("specs", "cross-platform.spec.ts")
 
 
 def rehearsed_question(manifest: str = SOP_MANIFEST) -> str:
@@ -212,6 +235,75 @@ def attribution(row) -> Optional[Attribution]:
 
 
 # ---------------------------------------------------------------------------
+# The build the runs were about
+# ---------------------------------------------------------------------------
+
+def provenance(rows):
+    """Why these runs are not ten consecutive runs of one build, or None.
+
+    A streak is necessary and not sufficient. The Demo validator dates the
+    deployed build before a browser opens (#48, ADR-018), and there are two
+    signposted ways past that gate — `E2E_SKIP_BUILD_CHECK`, which the gate's
+    own failure message offers, and `--target local`, which dates no deployment
+    at all. Rows produced either way are green, well-formed, and about a build
+    nobody can name; ten of them used to print *the beat is proved*.
+
+    So this returns the reason a rehearsal's rows fall short of a proof about a
+    single verified build, and `None` when they do not fall short. An absent
+    field is a reason, not a pass — ADR-018's rule, inherited: a build that
+    could not be dated has not been proved current, and the name is the whole
+    point of recording it.
+    """
+    rows = list(rows)
+    if not rows:
+        return None
+
+    for index, row in enumerate(rows, start=1):
+        if not row.get("buildVerified"):
+            where = row.get("target") or "unknown"
+            if where == "local":
+                return (
+                    f"run {index} of {len(rows)} ran against a local surface, "
+                    "which dates no deployed build: these runs prove the "
+                    "harness, not the deployment"
+                )
+            return (
+                f"run {index} of {len(rows)} did not verify the deployed "
+                f"build — {SKIP_BUILD_CHECK}, or a harness older than the "
+                "field. Whatever these runs are about, it is not a build this "
+                "rehearsal can name"
+            )
+
+    builds = []
+    for row in rows:
+        build = (row.get("deployedBuild") or "").strip()
+        if not build:
+            return (
+                "a run verified the deployed build and recorded no commit for "
+                "it, so there is nothing to say these runs were about"
+            )
+        if build not in builds:
+            builds.append(build)
+
+    if len(builds) > 1:
+        # `deploy-main.yml` runs on every push to `main`, so a rehearsal begun
+        # before one and finished after it is not a hypothetical. Ten green
+        # runs across two builds is two rehearsals of five.
+        return (
+            f"these runs span {len(builds)} builds ({', '.join(builds)}): "
+            "consecutive runs of two builds are not consecutive runs of either"
+        )
+    return None
+
+
+def proved_build(rows):
+    """The one build a clean rehearsal was about, or None."""
+    builds = {(row.get("deployedBuild") or "").strip() for row in rows}
+    builds.discard("")
+    return builds.pop() if len(builds) == 1 else None
+
+
+# ---------------------------------------------------------------------------
 # The verdict
 # ---------------------------------------------------------------------------
 
@@ -223,10 +315,13 @@ class Summary:
     wanted: int = WANTED_RUNS
     consecutive: int = 0
     first_red: Optional[Dict[str, Any]] = None
+    #: Why the runs are not about one verified build, or None. A streak with a
+    #: reason here is a streak about nothing nameable.
+    unnameable: Optional[str] = None
 
     @property
     def ok(self) -> bool:
-        return self.consecutive >= self.wanted
+        return self.consecutive >= self.wanted and self.unnameable is None
 
 
 def summarise(rows, wanted: int = WANTED_RUNS) -> Summary:
@@ -245,7 +340,11 @@ def summarise(rows, wanted: int = WANTED_RUNS) -> Summary:
         streak += 1
     first_red = next((row for row in rows if not row.get("passed")), None)
     return Summary(
-        rows=rows, wanted=wanted, consecutive=streak, first_red=first_red
+        rows=rows,
+        wanted=wanted,
+        consecutive=streak,
+        first_red=first_red,
+        unnameable=provenance(rows),
     )
 
 
@@ -274,15 +373,22 @@ def format_report(summary: Summary) -> str:
         )
 
     if summary.ok:
+        build = proved_build(summary.rows)
         lines.append(
             f"  ----  the rehearsed hit answered from the corpus "
-            f"{summary.consecutive} consecutive times: the beat is proved"
+            f"{summary.consecutive} consecutive times against {build}: "
+            f"the beat is proved"
         )
     else:
         lines.append(
             f"  ----  {summary.consecutive} consecutive of "
             f"{summary.wanted} wanted: the beat is NOT proved"
         )
+    if summary.unnameable:
+        # Printed whatever the streak did, because a rehearsal that went red on
+        # run three *and* skipped the build check has two things wrong with it
+        # and a reader who fixes one will run the other again.
+        lines.append(f"  ----  and {summary.unnameable}")
     return "\n".join(lines)
 
 
@@ -290,9 +396,18 @@ def format_report(summary: Summary) -> str:
 # The runner
 # ---------------------------------------------------------------------------
 
+def validator_command(extra=()) -> List[str]:
+    """The Demo validator invocation one rehearsal run makes. Pure.
+
+    Scoped to `REHEARSED_BEAT`, so the exit code this harness grades is the
+    verdict on the beat its ledger describes.
+    """
+    return ["bash", VALIDATOR, *extra, REHEARSED_BEAT]
+
+
 def run_validator(index: int, extra=()) -> bool:
     """Run the Demo validator once. Returns whether it was green."""
-    command = ["bash", VALIDATOR, *extra]
+    command = validator_command(extra)
     print(f"\n=== rehearsal run {index}: {' '.join(command)}", flush=True)
     return subprocess.call(command, cwd=REPO_ROOT) == 0
 

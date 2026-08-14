@@ -18,6 +18,7 @@ The distinction the tests defend hardest is **unknown is not a pass**. ADR-018:
 "treating that as a pass would rebuild the exact hole this closes."
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from preflight.deployed_build import (
     PASS,
     UNKNOWN,
     commit_from_image,
+    deployed_build,
     evaluate,
     format_report,
     main,
@@ -262,6 +264,77 @@ class TestTheHostsAgree:
         assert check.status == FAIL
         assert HOSTS[1] in check.detail
         assert not verdict.ok
+
+
+class TestNamingTheBuildThatWasGraded:
+    """The verdict can name the commit it graded, for whoever records it.
+
+    A green verdict says "the deployment is HEAD" and then throws the commit
+    away. That was enough while the only reader was a presenter standing in
+    front of the report — and it is not enough for the **rehearsal**, whose
+    whole claim is *ten consecutive runs against one build* (#54). A ledger row
+    that cannot name the build it observed cannot tell ten runs against this
+    commit from ten runs against a build two commits behind that somebody got
+    past the gate with `E2E_SKIP_BUILD_CHECK`.
+
+    `None` is the answer whenever the hosts do not agree on one datable commit,
+    for ADR-018's reason: an undatable build is unproved, not current.
+    """
+
+    def test_a_deployment_on_one_commit_is_named(self):
+        assert deployed_build(observed()) == HEAD[:12]
+
+    def test_hosts_on_two_commits_name_no_single_build(self):
+        assert (
+            deployed_build(
+                observed(
+                    containerApps=[
+                        {"name": HOSTS[0], "image": f"{REGISTRY}/macaebackend:{HEAD[:12]}"},
+                        {"name": HOSTS[1], "image": f"{REGISTRY}/macaefrontend:a96b44815f80"},
+                    ]
+                )
+            )
+            is None
+        )
+
+    def test_an_undatable_host_names_no_build(self):
+        # Two hosts on HEAD and one on `latest` is exactly the state a hand-run
+        # `az acr build` leaves behind, and it is the state that looks most
+        # like everything being fine.
+        assert (
+            deployed_build(
+                observed(
+                    containerApps=[
+                        {"name": HOSTS[0], "image": f"{REGISTRY}/macaebackend:{HEAD[:12]}"},
+                        {"name": HOSTS[1], "image": f"{REGISTRY}/macaefrontend:{HEAD[:12]}"},
+                        {"name": HOSTS[2], "image": f"{REGISTRY}/macaemcp:latest"},
+                    ]
+                )
+            )
+            is None
+        )
+
+    def test_no_container_apps_name_no_build(self):
+        assert deployed_build(observed(containerApps=[])) is None
+
+    def test_the_json_payload_carries_the_build_and_the_rendered_report(self, capsys):
+        # The report travels *in* the payload so its only reader — the
+        # validator's global setup — gets the human text and the commit from
+        # one `az` read, and never renders a second opinion of `format_report`
+        # in TypeScript.
+        main(["--json"], read=lambda group: observed())
+        payload = json.loads(capsys.readouterr().out)
+
+        assert payload["deployedBuild"] == HEAD[:12]
+        assert payload["ok"] is True
+        assert "build-currency" in payload["report"]
+
+    def test_a_drifted_payload_names_the_build_it_is_drifted_to(self, capsys):
+        main(["--json"], read=lambda group: drifted())
+        payload = json.loads(capsys.readouterr().out)
+
+        assert payload["deployedBuild"] == "a96b44815f80"
+        assert payload["ok"] is False
 
 
 class TestTheReport:

@@ -1233,6 +1233,14 @@ specialists into a plan for a one-lookup question; the store team now opts out w
 `require_all_agents: false`, and mandatory inclusion stays the default for every team that predates
 the flag.
 
+The proof itself then had to be made honest about *what* it proved. A rehearsal's ledger rows carried
+the commit the **harness** ran from and nothing about the deployed build, so a run that got past the
+build gate with `E2E_SKIP_BUILD_CHECK` — which the gate's own failure message offers, rightly, for a
+presenter mid-demonstration — was indistinguishable from a verified one, and ten of them printed *the
+beat is proved* about a build nobody could name. The gate now publishes what it verified, every row
+records `deployedBuild` and `buildVerified`, and a streak that skipped the gate, ran against a local
+surface, or spanned a redeploy is reported as no proof at all.
+
 ### Every transparency signal was dropped in the browser, and 223 frontend tests were green (confirmed 2026-08-13, issue #47)
 
 The first live run of the **Demo validator** timed out waiting for the **Grounding panel** on a

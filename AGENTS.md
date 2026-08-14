@@ -116,11 +116,14 @@ Notes:
   are green — `bash scripts/sop-rehearsal.sh`. It is not a loop and is not in the table, for
   the validator's reason multiplied by ten: ten live conversations with the deployed agent
   pool. It is how the centrepiece beat is proved rather than believed, and it stops at the
-  first red run and names the layer that run implicates. Every validator run feeds it by
-  appending what the orchestrator actually asked the SOP tool to
-  `e2e/artifacts/sop-evidence.jsonl`. Its record is `docs/sop-rehearsal.md`, its verdict is
-  unit-tested by `src/tests/ci/test_sop_rehearsal.py`, and `test_e2e_wiring.py` fails if a
-  workflow ever runs it.
+  first red run and names the layer that run implicates. Each run is scoped to the rehearsed
+  hit's own beat, so an unrelated red beat cannot make the centrepiece unprovable. Every
+  validator run feeds it by appending what the orchestrator actually asked the SOP tool — and
+  which build it observed — to `e2e/artifacts/sop-evidence.jsonl`; a streak that skipped the
+  deployed-build gate, ran locally, or spanned a redeploy is reported as no proof at all. Its
+  record is `docs/sop-rehearsal.md`, its verdict is unit-tested by
+  `src/tests/ci/test_sop_rehearsal.py`, and `test_e2e_wiring.py` fails if a workflow ever
+  runs it.
 - Both backend phases pass `-m "not integration"`, so the **Guardrail corpus** — which
   scores against the live embedding deployment — stays out of unattended runs.
   `src/tests/ci/test_integration_marker.py` fails if that deselection is dropped from

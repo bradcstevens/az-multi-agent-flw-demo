@@ -18,14 +18,22 @@ criteria made executable rather than written down:
 """
 
 import json
+from pathlib import Path
 
 from sop_rehearsal import (CLARIFIED, GROUNDED, HONEST_MISS, INDEX,
-                           NO_TOOL_CALL, REPHRASING, ROUTING, UNKNOWN,
-                           WANTED_RUNS, attribution, format_report, main,
-                           read_evidence, rephrasings, summarise)
+                           NO_TOOL_CALL, REHEARSED_BEAT, REPHRASING, ROUTING,
+                           UNKNOWN, WANTED_RUNS, attribution, format_report,
+                           main, read_evidence, rephrasings, summarise,
+                           validator_command)
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 CORPUS_QUESTION = "How do I close the store?"
 SOP_102 = "SOP-102 Store Closing Procedure.docx"
+
+#: The commit the deployment was serving when the run observed it. Twelve hex
+#: characters, because that is what `deploy-main.yml` stamps an image with.
+DEPLOYED_BUILD = "530bacfa364e"
 
 
 def row(**overrides):
@@ -35,6 +43,8 @@ def row(**overrides):
         "target": "deployed",
         "baseURL": "https://app.example",
         "commit": "0eb208cb",
+        "deployedBuild": DEPLOYED_BUILD,
+        "buildVerified": True,
         "passed": True,
         "outcome": GROUNDED,
         "toolQuery": CORPUS_QUESTION,
@@ -413,6 +423,140 @@ class TestTheHonestMissIsAttributedToTheRightLayer:
         assert verdict.layer == UNKNOWN
 
 
+class TestTheRehearsalRunsTheBeatItIsAbout:
+    """Ten runs of the **rehearsed hit**, not of the walkthrough (#54).
+
+    With one spec these were the same run and the difference never showed.
+    Since the fourth specialist got a beat of its own (#52) they are not: a red
+    **workforce** beat exits the validator non-zero, and the harness — which
+    treats a non-zero exit as fatal to the streak, deliberately — could never
+    report the centrepiece proved while an unrelated beat was failing. Measured
+    2026-08-14: the hop's beat green and cited, the run red, the proof
+    unobtainable.
+
+    That is this issue's own mistake wearing the harness's clothes. The
+    conflation `direct-sop-answer` was renamed for is a check and a browser
+    asking different questions of the same agent; this is a proof and a ledger
+    describing different runs.
+
+    Scoping restores what the exit-code guard meant when it was written — a
+    green row behind a red run is a **teardown** failure — and halves the live
+    conversations a rehearsal holds.
+    """
+
+    def test_the_validator_is_scoped_to_the_rehearsed_hits_spec(self):
+        assert REHEARSED_BEAT in validator_command([])
+
+    def test_the_spec_it_names_is_a_spec_that_exists(self):
+        # A filter that matches nothing is Playwright's most dangerous exit: it
+        # reports "No tests found" and returns zero, which this harness would
+        # read as ten green runs of a beat that never ran.
+        assert (REPO_ROOT / "e2e" / REHEARSED_BEAT).exists()
+
+    def test_the_target_still_reaches_the_loop(self):
+        command = validator_command(["--target", "local"])
+
+        assert "--target" in command and "local" in command
+
+    def test_a_rehearsal_asks_the_loop_for_that_spec(self, tmp_path):
+        seen = []
+
+        def run(index):
+            seen.append(index)
+            with open(tmp_path / "l.jsonl", "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(row()) + "\n")
+            return True
+
+        assert main(
+            ["--runs", "2", "--ledger", str(tmp_path / "l.jsonl")], run=run
+        ) == 0
+        assert seen == [1, 2]
+
+
+class TestAProofNamesTheBuildItProved:
+    """Ten green runs against *which* build? (#54)
+
+    The rehearsal is the proof of the centrepiece beat, and until this it
+    reported that proof without ever saying what it was a proof *of*. The
+    validator gates on the deployed build before a browser opens — and the
+    error it prints when that gate goes red ends with the way past it:
+
+        To go anyway — knowing the beats are about another build — set
+        E2E_SKIP_BUILD_CHECK=1.
+
+    Which is the right thing for the **Stage driver** to offer a presenter
+    mid-demonstration, and the wrong thing to leave invisible in the ledger: a
+    rehearsal run under that flag appends a row indistinguishable from a
+    verified one, and ten of them print *the beat is proved*. `--target local`
+    is the same hole through a different door — ten green runs against a
+    `npm run dev` and a fake, reported in the words reserved for the
+    deployment.
+
+    So the streak is necessary and not sufficient. Every run in a rehearsal
+    must have verified the build, and it must be the **same** build.
+    """
+
+    def test_ten_verified_runs_of_one_build_name_it_in_the_report(self):
+        summary = summarise([row() for _ in range(WANTED_RUNS)])
+
+        assert summary.ok
+        assert DEPLOYED_BUILD in format_report(summary)
+
+    def test_a_run_that_skipped_the_build_check_is_not_part_of_a_proof(self):
+        rows = [row() for _ in range(WANTED_RUNS)]
+        rows[3] = row(buildVerified=False, deployedBuild=None)
+
+        summary = summarise(rows)
+
+        assert not summary.ok
+        assert summary.consecutive == WANTED_RUNS
+        assert "E2E_SKIP_BUILD_CHECK" in format_report(summary)
+
+    def test_local_runs_prove_the_harness_and_say_so(self):
+        summary = summarise([
+            row(target="local", buildVerified=False, deployedBuild=None)
+            for _ in range(WANTED_RUNS)
+        ])
+
+        assert not summary.ok
+        assert "local" in format_report(summary)
+
+    def test_a_rehearsal_spanning_a_redeploy_is_not_ten_consecutive_runs(self):
+        # Ten green runs across two builds is two rehearsals of five, and
+        # neither of them is the proof. `deploy-main.yml` runs on every push to
+        # `main`, so a rehearsal begun before one and finished after it is not
+        # a hypothetical.
+        rows = [row() for _ in range(WANTED_RUNS)]
+        for index in range(5, WANTED_RUNS):
+            rows[index] = row(deployedBuild="a96b44815f80")
+
+        summary = summarise(rows)
+
+        assert not summary.ok
+        report = format_report(summary)
+        assert DEPLOYED_BUILD in report and "a96b44815f80" in report
+
+    def test_a_ledger_older_than_the_field_is_unproved_not_proved(self):
+        # ADR-018's rule, which this module now inherits: an unproved build is
+        # not a passing one. A row from a harness that never dated its build
+        # cannot be told from one that did, so it counts as neither.
+        legacy = row()
+        del legacy["buildVerified"]
+        del legacy["deployedBuild"]
+
+        summary = summarise([legacy for _ in range(WANTED_RUNS)])
+
+        assert not summary.ok
+
+    def test_a_verified_run_that_named_no_build_is_not_a_proof(self):
+        summary = summarise([
+            row(buildVerified=True, deployedBuild=None)
+            for _ in range(WANTED_RUNS)
+        ])
+
+        assert not summary.ok
+
+
 class TestAFailedValidatorIsNeverAProof:
     """The ledger and the loop can disagree, and the loop wins.
 
@@ -450,12 +594,7 @@ class TestAFailedValidatorIsNeverAProof:
 
         def run(index):
             with open(ledger, "a", encoding="utf-8") as handle:
-                handle.write(json.dumps({
-                    "passed": True,
-                    "outcome": GROUNDED,
-                    "toolQuery": "the closing procedure",
-                    "retrievalQuery": CORPUS_QUESTION,
-                }) + "\n")
+                handle.write(json.dumps(row()) + "\n")
             return True
 
         assert main(["--runs", "10", "--ledger", str(ledger)], run=run) == 0

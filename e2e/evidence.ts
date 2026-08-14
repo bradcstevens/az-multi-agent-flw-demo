@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { BUILD_VERIFIED, DEPLOYED_BUILD } from './deployedBuild';
+
 /**
  * The **evidence ledger** for the rehearsed hit (issue #54).
  *
@@ -56,6 +58,23 @@ export interface Rehearsal {
     baseURL: string;
     /** The commit the **harness** ran from, which is not the deployed build. */
     commit: string | null;
+    /**
+     * The commit the **deployment** was serving, as the gate dated it.
+     *
+     * The other half of the sentence above, and the one the rehearsal's proof
+     * is actually about (#54). Null when nothing dated it.
+     */
+    deployedBuild: string | null;
+    /**
+     * Whether that dating actually happened on this run.
+     *
+     * The gate's own failure message ends by offering `E2E_SKIP_BUILD_CHECK`,
+     * which is right for a presenter mid-demonstration and a lie in a
+     * rehearsal's ledger: a run under that flag used to append a row
+     * indistinguishable from a verified one, and ten of them printed *the beat
+     * is proved*. `--target local` is the same hole through a different door.
+     */
+    buildVerified: boolean;
     passed: boolean;
     outcome: Outcome;
     /** What the orchestrator handed `search_store_procedures`. */
@@ -120,7 +139,7 @@ export function outcomeOf(seen: Seen): Outcome {
  * beat, which is the same rule `_push_source_used` follows on the backend.
  */
 export function recordRehearsal(
-    row: Omit<Rehearsal, 'at' | 'commit'>,
+    row: Omit<Rehearsal, 'at' | 'commit' | 'deployedBuild' | 'buildVerified'>,
     ledger: string = LEDGER,
 ): void {
     try {
@@ -128,6 +147,13 @@ export function recordRehearsal(
         const entry: Rehearsal = {
             at: new Date().toISOString(),
             commit: shortCommit(),
+            // Read from the environment rather than taken as an argument,
+            // because the spec has no way of knowing it: the gate runs in
+            // `globalSetup`, in the main process, before this worker existed.
+            // The spec would have to re-run `az` to answer, and a second
+            // reading is a second thing that can disagree.
+            deployedBuild: (process.env[DEPLOYED_BUILD] || '').trim() || null,
+            buildVerified: Boolean(process.env[BUILD_VERIFIED]),
             ...row,
         };
         appendFileSync(ledger, `${JSON.stringify(entry)}\n`, 'utf-8');

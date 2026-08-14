@@ -62,27 +62,99 @@ export const BUILD_CHECK = resolve(
  */
 export const SKIP = 'E2E_SKIP_BUILD_CHECK';
 
+/**
+ * What this run verified, published for the evidence ledger (#54).
+ *
+ * The gate dates the deployment and then, until this, kept the answer. The
+ * **rehearsal** is a claim about ten consecutive runs of *one* build, so a run
+ * that cannot name the build it observed cannot be part of one — and the gate
+ * is the only thing in the suite that has asked.
+ *
+ * `process.env`, because `globalSetup` runs in the main process **before** any
+ * worker is forked, so what it sets here is what the worker running the beat
+ * inherits. `config.metadata` carries `target` and `baseURL` the same way and
+ * would have been the tidier home, except that it is serialised from the
+ * config at load time — which is before this function has run.
+ */
+export const DEPLOYED_BUILD = 'E2E_DEPLOYED_BUILD';
+export const BUILD_VERIFIED = 'E2E_BUILD_VERIFIED';
+
+/** What `check-deployed-build.sh --json` answers. */
+interface BuildVerdict {
+    ok: boolean;
+    resourceGroup: string;
+    deployedBuild: string | null;
+    report: string;
+}
+
+/**
+ * Read the preflight's verdict, or null when it did not produce one.
+ *
+ * Null is the honest answer for an `az` that failed, a login that expired or a
+ * Python traceback — none of which is a verdict, and all of which used to be
+ * indistinguishable from one because the report was prose either way.
+ */
+function readVerdict(stdout: string): BuildVerdict | null {
+    try {
+        const parsed = JSON.parse(stdout) as Partial<BuildVerdict>;
+        if (typeof parsed?.report !== 'string') {
+            return null;
+        }
+        return {
+            ok: parsed.ok === true,
+            resourceGroup: parsed.resourceGroup ?? '',
+            deployedBuild: parsed.deployedBuild ?? null,
+            report: parsed.report,
+        };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Record what was proved about the build, for whoever reads the ledger.
+ *
+ * Both variables are always written, including the negative case: an unset
+ * variable left over from a previous process is exactly the state that would
+ * make an unverified run look verified.
+ */
+function publish(verdict: BuildVerdict | null, verified: boolean): void {
+    process.env[DEPLOYED_BUILD] = verified
+        ? (verdict?.deployedBuild ?? '')
+        : '';
+    process.env[BUILD_VERIFIED] = verified ? '1' : '';
+}
+
 export default async function checkDeployedBuild(): Promise<void> {
     const target = resolveTarget();
 
     // `--target local` runs the same specs against a `npm run dev`. There is no
     // deployment to date, and a check that ran anyway would refuse every local
-    // run for the wrong reason.
+    // run for the wrong reason. It is still not a *verified* build — the
+    // rehearsal says so out loud rather than counting the run.
     if (target.name === 'local') {
+        publish(null, false);
         return;
     }
 
-    const result = spawnSync('bash', [BUILD_CHECK], {
+    const result = spawnSync('bash', [BUILD_CHECK, '--json'], {
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'pipe'],
     });
-    const report = `${result.stdout ?? ''}${result.stderr ?? ''}`.trimEnd();
+    // The rendered report travels inside the verdict, so the human text and
+    // the commit come from one `az` read and `format_report` is never given a
+    // second opinion in TypeScript.
+    const verdict = readVerdict(result.stdout ?? '');
+    const report =
+        verdict?.report ??
+        `${result.stdout ?? ''}${result.stderr ?? ''}`.trimEnd();
 
     // Read whether it passed *before* the opt-out, so a skipped run still
     // prints the verdict it is skipping.
-    console.log(`\n${report}\n`);
+    console.log(`\nDeployed build: ${verdict?.resourceGroup ?? ''}\n${report}\n`);
 
     if (process.env[SKIP]) {
+        publish(verdict, false);
         console.log(
             `${SKIP} is set: the deployed build was NOT verified. Whatever ` +
                 'the beats below report, they report it about an image this ' +
@@ -96,6 +168,7 @@ export default async function checkDeployedBuild(): Promise<void> {
     // say", and ADR-018 is explicit that treating the second as a pass
     // rebuilds the exact hole it closes.
     if (result.status !== 0) {
+        publish(verdict, false);
         throw new Error(
             'The deployed build is not this commit, so no beat below would ' +
                 'mean what it says.\n\n' +
@@ -106,4 +179,6 @@ export default async function checkDeployedBuild(): Promise<void> {
                 `set ${SKIP}=1.`,
         );
     }
+
+    publish(verdict, true);
 }
