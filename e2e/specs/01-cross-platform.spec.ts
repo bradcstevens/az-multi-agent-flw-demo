@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { quickTaskNamed, rehearsedHit } from '../authored';
+import { quickTaskNamed, rehearsedHit, sopProvenance } from '../authored';
 import { outcomeOf, recordRehearsal } from '../evidence';
 import { PlanSurface } from '../pages/PlanSurface';
 import { StoreSurface } from '../pages/StoreSurface';
@@ -20,8 +20,7 @@ import { StoreSurface } from '../pages/StoreSurface';
  */
 
 /** Where the platform badge's own attribute must land (`sop/provenance.py`). */
-const SOP_PLATFORM = 'Copilot Studio';
-const SOP_SOURCE = 'Dataverse';
+const { platform: SOP_PLATFORM, source: SOP_SOURCE } = sopProvenance();
 
 /**
  * What this run saw, for the evidence ledger (#54).

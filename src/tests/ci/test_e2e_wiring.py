@@ -34,7 +34,7 @@ AUTHORED = E2E / "authored.ts"
 AGENTS = REPO_ROOT / "AGENTS.md"
 INHERITED = REPO_ROOT / "tests" / "e2e-test"
 STORE_SURFACE = E2E / "pages" / "StoreSurface.ts"
-CROSS_PLATFORM_SPEC = E2E / "specs" / "cross-platform.spec.ts"
+CROSS_PLATFORM_SPEC = E2E / "specs" / "01-cross-platform.spec.ts"
 HOME_INPUT = (
     REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
 )
@@ -454,4 +454,415 @@ def test_the_opt_out_is_a_deliberate_act_and_says_what_was_not_proved():
     assert "NOT verified" in provenance or "not verified" in provenance, (
         "the opt-out is silent: a run that skipped the check looks exactly "
         "like one that passed it"
+    )
+
+
+# ---------------------------------------------------------------------------
+# The walkthrough's order, and the beats added by #49.
+# ---------------------------------------------------------------------------
+
+SPECS = E2E / "specs"
+RUNBOOK = REPO_ROOT / "docs" / "presenter-runbook.md"
+HONEST_MISS_SPEC = SPECS / "02-honest-miss.spec.ts"
+BOUNDARY_SPEC = SPECS / "05-boundary.spec.ts"
+UNLOCK_SPEC = SPECS / "06-sign-in-unlock.spec.ts"
+ALERT_SPEC = SPECS / "07-shift-task-alert.spec.ts"
+PLAN_SURFACE = E2E / "pages" / "PlanSurface.ts"
+TRANSPARENCY_RAIL = E2E / "pages" / "TransparencyRail.ts"
+TOKEN_METER = (
+    REPO_ROOT
+    / "src"
+    / "App"
+    / "src"
+    / "components"
+    / "transparency"
+    / "TokenMeterPanel.tsx"
+)
+
+#: What the Token meter renders for a cost nobody reported.
+NOT_REPORTED = "\u2014"
+
+
+def _taps() -> dict[int, str]:
+    """The presenter runbook's taps, in the order the presenter makes them."""
+    return {
+        int(number): title.strip()
+        for number, title in re.findall(
+            r"^### (\d+)\. (.+)$", _text(RUNBOOK), flags=re.MULTILINE
+        )
+    }
+
+
+def test_the_recording_plays_the_walkthrough_in_the_presenters_order():
+    """A spec file is named for the tap it asserts, so the fallback is in order.
+
+    The **Recorded fallback** is "the beats in order, one after another" — the
+    reporter says so and the presenter is handed it. But it reads the beats off
+    the run, and Playwright runs spec *files* in path order, which is
+    alphabetical. Left to the alphabet the recording opens on the boundary
+    refusal, plays the cross-platform hop third and shows the sign-in unlock
+    before the wall it is a door in: the walkthrough shuffled, which is worse
+    than no recording because it looks exactly like one.
+
+    So the number is in the filename, and it is the runbook's own tap number
+    rather than a second ordering invented here.
+    """
+    taps = _taps()
+    assert taps, "the presenter runbook no longer numbers its taps"
+
+    specs = sorted(path.name for path in SPECS.glob("*.spec.ts"))
+    assert specs, "there are no beats"
+
+    for name in specs:
+        match = re.match(r"^(\d\d)-", name)
+        assert match, (
+            f"{name} carries no tap number, so where it lands in the Recorded "
+            "fallback is whatever the alphabet decides"
+        )
+        assert int(match.group(1)) in taps, (
+            f"{name} is numbered for a tap the presenter runbook does not "
+            f"make; its taps are {sorted(taps)}"
+        )
+
+    numbers = [int(name[:2]) for name in specs]
+    assert numbers == sorted(numbers), "the specs do not sort into tap order"
+    assert len(set(numbers)) == len(numbers), (
+        "two beats claim the same tap, so which one plays first is undefined"
+    )
+
+
+def test_the_honest_miss_is_asserted_as_an_explicit_miss():
+    """An empty panel, a missing panel and an honest miss are three states.
+
+    From the browser the first two look alike, and the third looks like either
+    of them to any assertion phrased as *the citation list is empty*. They mean
+    entirely different things: no `source_used` arrived at all (the orchestrator
+    never called the tool), the panel is not on the page (the image is old, or
+    the rail did not render), and the SOP agent searched Dataverse and honestly
+    found nothing — which is the beat, working.
+
+    So the beat reads all of them and fails naming which one happened. It is
+    the lesson `docs/demo-validator.md` records for the rehearsed hit, where
+    asserting only on the citation "reports a miss as an empty string, which
+    reads like a broken selector and sends the reader to the wrong place".
+    Here the miss is the *expected* outcome, so the wrong place is every other
+    layer in the stack.
+    """
+    spec = _flat(HONEST_MISS_SPEC)
+
+    assert "grounding-miss" in _flat(TRANSPARENCY_RAIL), (
+        "the rail no longer locates the honest miss"
+    )
+    assert "honestMiss" in spec, (
+        "the beat never reads the Grounding panel's honest-miss state, so a "
+        "panel that arrived empty passes as the rehearsed miss"
+    )
+    assert "groundingEmpty" in spec, (
+        "the beat cannot tell an honest miss from a panel nothing ever "
+        "reached: it never reads the empty state"
+    )
+    assert "groundingPanel" in spec, (
+        "the beat never asserts the panel is on the page, so a rail that did "
+        "not render is graded as a miss"
+    )
+
+
+def test_the_honest_miss_is_the_corpus_question_the_corpus_cannot_answer():
+    """Read from `[honest_miss]`, never restated here or in the spec.
+
+    The whole beat is *this question is not in the library*, and the corpus is
+    the only thing that decides that. A validator that wrote the question down
+    would keep asserting a miss after somebody added a car-wash procedure —
+    reporting the corpus as unchanged for the one change that breaks the beat.
+    """
+    authored = _code(AUTHORED)
+    spec = _code(HONEST_MISS_SPEC)
+
+    assert "honest_miss" in authored, (
+        "authored.ts does not read the corpus's [honest_miss] section"
+    )
+    assert "honestMiss()" in spec, (
+        "the honest-miss beat does not read the corpus's rehearsed miss"
+    )
+    assert "car wash" not in spec.lower(), (
+        "the beat restates the rehearsed miss instead of reading it out of "
+        "corpus.toml"
+    )
+
+
+# ---------------------------------------------------------------------------
+# The boundary refusal and the sign-in unlock (beats 5 and 6).
+# ---------------------------------------------------------------------------
+
+
+def test_the_refusal_is_asserted_before_any_agent_ran():
+    """A refused request costs nothing *because nothing ran*.
+
+    The claim the presenter makes over this beat is "refused by code, before
+    any agent ran and before a single token was spent". A beat that only reads
+    the gate's own row proves the first half and assumes the second: an
+    orchestration that ran and *also* refused leaves the guardrail row reading
+    a truthful zero and is graded green.
+
+    So what is asserted is the shape of the whole table — the gate's row is the
+    **only** row — and that no plan was raised. Both are browser-observable and
+    neither is anybody's wording.
+    """
+    spec = _flat(BOUNDARY_SPEC)
+
+    assert "toHaveLength(1)" in spec, (
+        "the beat does not assert the gate's row is the only row, so an "
+        "orchestration that ran and then refused is graded as a refusal that "
+        "cost nothing"
+    )
+    assert "REFUSED" in spec, (
+        "the beat does not identify the gate's row by the meter it is on, so "
+        "it cannot tell the gate's zero from an agent's"
+    )
+    assert "/plan/" in spec, (
+        "the beat never asserts the refusal raised no plan; a refusal that "
+        "navigated is a refusal the orchestrator had already been handed"
+    )
+
+
+def test_the_refusals_zero_is_asserted_to_be_a_measurement():
+    """`0` and `—` are the panel's two ways of being empty, and only one is this.
+
+    `models/meter.ts` states the rule this beat exists to prove: "a refused
+    request adds nothing to the meter, and the row that proves it only proves
+    it if nothing is the only thing that looks like nothing". A beat that
+    asserted the row is *present* passes on a pair of em dashes — the panel
+    saying nobody reported a cost, which is exactly what it says about the
+    Copilot Studio row's tokens, and which proves nothing about the gate.
+
+    Both matchers are here on purpose and neither is redundant. `—` means the
+    surface stopped distinguishing *not reported* from *nothing*; a number
+    means the gate billed something. Different defects, different fixes, and a
+    shared failure message would send the reader to one of them.
+    """
+    spec = _flat(BOUNDARY_SPEC)
+
+    assert NOT_REPORTED in _text(TOKEN_METER), (
+        "the Token meter no longer renders an em dash for an unreported cost; "
+        "the beat below is asserting against a rule the surface dropped"
+    )
+    assert NOT_REPORTED in spec, (
+        "the beat never mentions what the panel renders for a cost nobody "
+        "reported, so it cannot be asserting the difference"
+    )
+    assert ".not.toBe(NOT_REPORTED)" in spec.replace(" ", ""), (
+        "the beat does not refuse an em dash: a refusal whose cost the panel "
+        "stopped reporting is graded as a refusal that cost nothing"
+    )
+    assert ".toBe('0')" in spec.replace(" ", ""), (
+        "the refusal's cost is not asserted to be a measured zero"
+    )
+    for column in ("tokens", "credits"):
+        assert f"refusal.{column}" in spec, (
+            f"the beat never reads the refusal's {column} column, so half of "
+            "the two-meter claim is unasserted"
+        )
+
+
+def test_the_door_is_asserted_to_be_inside_the_wall():
+    """The sign-in renders **within** the refusal, not beside it.
+
+    The runbook says it out loud — "it is deliberately not a separate login
+    screen" — because the beat is the delta between one surface and the next.
+    A page-wide lookup for the button passes just as happily against a sign-in
+    rendered in the header, which is the same demonstration with its closing
+    argument removed.
+    """
+    spec = _flat(UNLOCK_SPEC)
+    page_object = _flat(STORE_SURFACE)
+
+    assert "policyBlock.getByTestId('sign-in-to-continue')" in page_object, (
+        "StoreSurface looks the sign-in up across the whole page, so a button "
+        "rendered anywhere at all satisfies 'inside the refusal'"
+    )
+    assert "toHaveCount(1)" in spec, (
+        "the beat does not assert there is exactly one sign-in on the page; a "
+        "second one beside the refusal is invisible to it"
+    )
+
+
+def test_the_unlock_re_asks_the_words_the_gate_refused():
+    """The same words, read off the request rather than off the screen.
+
+    "The same question, unedited" is the whole beat: the audience has to see
+    one set of words refused and the identical set answered. Nothing on the
+    surface shows the question twice — the box is cleared by the refusal — so
+    the only place the claim is observable is the request the browser sent.
+
+    Asserted on `process_request`'s own body, which is neither model prose nor
+    the store pack's: it is what the surface asked, which is the claim.
+    """
+    spec = _flat(UNLOCK_SPEC)
+    page_object = _flat(STORE_SURFACE)
+
+    assert "apiEndpoint('PROCESS_REQUEST')" in page_object, (
+        "StoreSurface does not read the route it watches out of the surface's "
+        "own endpoint table; a versioned route renamed in one place would "
+        "leave the beat observing no traffic and reporting it as no re-ask"
+    )
+    assert "description" in page_object, (
+        "the watcher reads no question out of the request it recorded"
+    )
+    assert "watchQuestionsAsked" in spec, (
+        "the beat does not watch what the surface asked, so 'the same words' "
+        "is asserted against nothing"
+    )
+    assert "toBe(refusedWords)" in spec, (
+        "the beat does not assert the second asking is the words the gate "
+        "refused; a re-ask of anything at all satisfies it"
+    )
+    assert "simulated-badge" in spec, (
+        "the unlocked answer is not asserted to carry its simulated "
+        "labelling; a stakeholder who finds that out afterwards stops "
+        "believing the panels that are real"
+    )
+
+
+def test_a_sign_in_that_signs_nobody_in_is_asserted_not_to_re_ask():
+    """The failure the surface fails *closed* on, asserted by making it happen.
+
+    `HomeInput` states it: "a sign-in that signed nobody in does not re-ask.
+    Asking again anonymously would show the identical refusal a second time and
+    read on stage as the tap having done nothing at all." That branch runs only
+    when the sign-in route fails, which a healthy deployment never does — so
+    the beat has to break it deliberately, and a beat that does not is a
+    requirement asserted by reading the code that implements it.
+    """
+    spec = _flat(UNLOCK_SPEC)
+
+    assert "page.route(" in spec or "context.route(" in spec, (
+        "the beat never fails the sign-in, so the fails-closed branch is "
+        "asserted only by hoping it is never reached"
+    )
+    assert "sign_in" in spec, (
+        "the beat intercepts something other than the sign-in route"
+    )
+
+
+# ---------------------------------------------------------------------------
+# The shift-task alert and the hidden chord (beat 7).
+# ---------------------------------------------------------------------------
+
+
+def test_the_alert_is_asserted_to_be_an_alert_and_not_a_reply():
+    """The beat is that a proactive message is a *different object*.
+
+    `PresenterAlertCard` says why: "an alert is not a reply. It answers no
+    question, because nobody asked one — that is the entire beat". Rendered
+    among the replies it reads as an answer to whatever was asked last, "which
+    is worse than not showing it".
+
+    So the beat asserts the two signals that make it a different object — the
+    ARIA role a screen reader hears and the message kind the DOM carries — and
+    asserts it is outside the reply stream. A beat that only asserted the card
+    is *visible* passes on the failure the card was designed against.
+    """
+    spec = _flat(ALERT_SPEC)
+
+    assert "toHaveRole('alert')" in spec or "getByRole('alert')" in spec, (
+        "the alert is not asserted to be an alert; a card that lost its role "
+        "is announced to a screen reader as one more paragraph of reply"
+    )
+    assert "data-message-kind" in spec, (
+        "the alert's message kind is unasserted, so the DOM's own statement "
+        "that this is not a reply can be dropped without going red"
+    )
+    assert "agentTurns" in spec, (
+        "the beat never asserts the alert is outside the reply stream, so an "
+        "alert rendered among the answers passes"
+    )
+    assert "AI Agent" in spec, (
+        "the beat does not check the alert is free of an agent's byline; a "
+        "card wearing one is a reply whatever its role attribute says"
+    )
+
+
+def test_the_chord_is_read_out_of_the_repository_not_typed_into_the_beat():
+    """`PRESENTER_CHORD_LABEL` is the chord's only public statement.
+
+    It is what the runbook prints and what the presenter memorises. A beat with
+    the combination typed into it goes red on a *working* demonstration the day
+    somebody moves the chord off a key a European layout needs — the failure
+    this whole suite exists not to produce.
+    """
+    authored = _code(AUTHORED)
+    spec = _code(ALERT_SPEC)
+
+    assert "PRESENTER_CHORD_LABEL" in authored, (
+        "authored.ts does not read the chord off the label the presenter is "
+        "given"
+    )
+    assert "presenterChord()" in spec, (
+        "the alert beat does not read the chord out of the repository"
+    )
+    assert "Ctrl + Alt + Shift" not in spec, (
+        "the beat restates the chord instead of reading it"
+    )
+
+
+def test_the_chord_is_asserted_not_to_fire_on_auto_repeat_or_under_altgr():
+    """The two ways the chord fires when nobody meant it to.
+
+    Both are already unit-tested in jsdom, and that is exactly why they are
+    here as well. `CONTEXT.md` records the finding this suite was built for:
+    every transparency signal was dropped in the browser while 223 frontend
+    tests were green. A pure predicate passing in jsdom says the rule was
+    written; only the running image says it is *deployed*.
+
+    An auto-repeat POSTs an alert every repeat interval, and a stack of
+    identical cards on stage reads as a bug rather than a beat. AltGr is worse:
+    on Windows and several European layouts it is reported as Ctrl+Alt, so the
+    chord would fire mid-sentence while the presenter typed an accented
+    character into the question box.
+    """
+    spec = _flat(ALERT_SPEC)
+
+    assert "repeat: true" in spec, (
+        "the beat never dispatches an auto-repeat, so a chord that fires on "
+        "every repeat interval passes"
+    )
+    assert "altGraph: true" in spec, (
+        "the beat never dispatches the AltGr combination a European layout "
+        "produces, so a chord that fires while the presenter types an "
+        "accented character passes"
+    )
+    assert "modifierAltGraph" in _flat(PLAN_SURFACE), (
+        "the synthetic dispatch does not set the AltGraph modifier state, so "
+        "the AltGr negative is asserting an ordinary chord press"
+    )
+
+
+def test_the_chords_negatives_are_not_vacuous():
+    """A negative asserted through a mechanism that never works proves nothing.
+
+    Neither `repeat` nor `AltGraph` can be produced by driving a real keyboard,
+    so both negatives are dispatched as synthetic `KeyboardEvent`s. If a
+    synthetic event did not reach the listener at all — a hardened build, a
+    listener moved onto a React root, an `isTrusted` check added — both
+    negatives would pass for the wrong reason, and would go on passing after
+    the chord itself broke.
+
+    So the same synthetic event is dispatched *without* either flag and is
+    required to fire. That control is what makes the two silences mean
+    something.
+    """
+    spec = _flat(ALERT_SPEC)
+
+    assert "control" in _text(ALERT_SPEC), (
+        "the beat does not explain why its negatives are believable"
+    )
+    dispatches = spec.count("dispatchPresenterChord(")
+    assert dispatches >= 3, (
+        "fewer than three synthetic dispatches: the beat cannot be running "
+        "both negatives and the control that proves they are not vacuous "
+        f"(found {dispatches})"
+    )
+    assert "toBeGreaterThan" in spec, (
+        "the control never requires the synthetic chord to fire, so a build "
+        "that ignores synthetic events passes every negative here"
     )

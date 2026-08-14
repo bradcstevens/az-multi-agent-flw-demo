@@ -1,5 +1,6 @@
 import { Locator, Page, expect } from '@playwright/test';
 
+import { PresenterChord, presenterAlertEndpoint } from '../authored';
 import { TransparencyRail } from './TransparencyRail';
 
 /**
@@ -122,5 +123,81 @@ export class PlanSurface {
     /** The **Simulated ticket** an approved escalation raises (#50's beat). */
     get simulatedTicket(): Locator {
         return this.page.getByTestId('simulated-ticket');
+    }
+
+    /** The **Presenter alerts** on this surface, in the order they arrived. */
+    get presenterAlerts(): Locator {
+        return this.page.getByTestId('presenter-alert');
+    }
+
+    /**
+     * Press the hidden chord the way the presenter does: real keys.
+     *
+     * The chord is matched on `event.code` rather than `event.key` — with Alt
+     * held, several layouts compose a different character entirely — so this
+     * presses the *physical* key, which is what `presenterChord()` resolves the
+     * presenter's own label into.
+     */
+    async pressPresenterChord(chord: PresenterChord): Promise<void> {
+        await this.page.keyboard.press(chord.press);
+    }
+
+    /**
+     * Dispatch the chord as a **synthetic** keydown, carrying modifiers no
+     * keyboard automation can produce.
+     *
+     * Two of the chord's rules are reachable no other way. `repeat` is set by
+     * the platform's own auto-repeat and Playwright's keyboard never sets it;
+     * `AltGraph` is a modifier state a European layout reports alongside
+     * Ctrl+Alt and that no key name asks for. Both are why the chord has the
+     * guards it has.
+     *
+     * The event goes to `window`, which is where `usePresenterChord` listens,
+     * and it is dispatched into the **running image** — which is the whole
+     * point of asserting here what a jsdom predicate already asserts.
+     */
+    async dispatchPresenterChord(
+        chord: PresenterChord,
+        init: { repeat?: boolean; altGraph?: boolean } = {},
+    ): Promise<void> {
+        await this.page.evaluate(
+            ([keyChord, extra]) => {
+                window.dispatchEvent(
+                    new KeyboardEvent('keydown', {
+                        code: keyChord.code,
+                        key: keyChord.code.replace(/^Key/, ''),
+                        ctrlKey: keyChord.ctrlKey,
+                        altKey: keyChord.altKey,
+                        shiftKey: keyChord.shiftKey,
+                        repeat: extra.repeat ?? false,
+                        modifierAltGraph: extra.altGraph ?? false,
+                        bubbles: true,
+                        cancelable: true,
+                    }),
+                );
+            },
+            [chord, init] as const,
+        );
+    }
+
+    /**
+     * Record every firing of the hidden chord's route, as it happens.
+     *
+     * What the chord *did*, rather than what the surface then showed. The two
+     * come apart in the direction that matters: the backend answers 404 when
+     * nobody is connected and the hook swallows it, so a chord that fired and
+     * was not delivered looks on screen exactly like a chord that never fired.
+     * Only the request can say a suppressed chord was suppressed **here**
+     * rather than lost somewhere in the push.
+     */
+    watchPresenterAlertsFired(): string[] {
+        const route = presenterAlertEndpoint();
+        const fired: string[] = [];
+        this.page.on('request', (request) => {
+            if (request.method() !== 'POST') return;
+            if (!request.url().includes(route)) return;
+            fired.push(request.url());
+        });
+        return fired;
     }
 }

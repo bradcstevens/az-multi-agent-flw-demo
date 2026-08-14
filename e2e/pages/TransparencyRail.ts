@@ -14,6 +14,20 @@ import { Locator, Page, expect } from '@playwright/test';
  * red on a paraphrase while the demonstration was fine, and a validator nobody
  * trusts is one nobody reads on the morning it matters.
  */
+/**
+ * One row of the Token meter, exactly as the panel rendered it.
+ *
+ * Every number is a string on purpose. See `meterRows()`.
+ */
+export interface MeterRowRead {
+    agent: string;
+    /** Which meter this row is on: `tokens`, `credits` or `refused`. */
+    billing: string | null;
+    calls: string;
+    tokens: string;
+    credits: string;
+}
+
 export class TransparencyRail {
     readonly root: Locator;
 
@@ -112,5 +126,42 @@ export class TransparencyRail {
         }
         const names = await this.citations.locator('li').allInnerTexts();
         return names.map((name) => name.split('\n')[0].trim());
+    }
+
+    /** Nothing has been spent yet: the meter describes itself. */
+    get meterEmpty(): Locator {
+        return this.page.getByTestId('meter-empty');
+    }
+
+    /**
+     * Every row on the Token meter, as the panel rendered them.
+     *
+     * The cells are read as **text**, never parsed into numbers, because the
+     * distinction the meter exists to make is a rendering rule: `null` renders
+     * `—` for a cost nobody reported and `0` renders `0` for a cost known to
+     * be nothing (`models/meter.ts`). Parsing collapses the two — `Number('—')`
+     * is `NaN` and `Number('')` is `0` — and a beat asserting a *measured* zero
+     * against a parsed one is asserting nothing at all.
+     *
+     * A row is identified by the meter it is on rather than by the name in its
+     * first column: the billing is the model's own field and the name is copy.
+     */
+    async meterRows(): Promise<MeterRowRead[]> {
+        const rows = this.tokenMeter.locator('tbody tr');
+        const read: MeterRowRead[] = [];
+        const count = await rows.count();
+        for (let index = 0; index < count; index += 1) {
+            const row = rows.nth(index);
+            const cell = async (testId: string) =>
+                (await row.getByTestId(testId).innerText()).trim();
+            read.push({
+                agent: await cell('meter-agent'),
+                billing: await row.getAttribute('data-billing'),
+                calls: await cell('meter-calls'),
+                tokens: await cell('meter-tokens'),
+                credits: await cell('meter-credits'),
+            });
+        }
+        return read;
     }
 }

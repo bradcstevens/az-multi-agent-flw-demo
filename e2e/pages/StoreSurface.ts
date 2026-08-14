@@ -1,5 +1,6 @@
 import { Locator, Page, expect } from '@playwright/test';
 
+import { apiEndpoint } from '../authored';
 import { TransparencyRail } from './TransparencyRail';
 
 /**
@@ -71,8 +72,86 @@ export class StoreSurface {
         return this.page.getByTestId('policy-block');
     }
 
+    /**
+     * The **door in the wall** (#27), looked up *through* the refusal.
+     *
+     * Scoped, and that is the assertion rather than tidiness. The runbook says
+     * it out loud — "it is deliberately not a separate login screen" — because
+     * the closing argument is the delta between one surface and the next: the
+     * same words refused, then answered, in the same place. A sign-in in the
+     * header is the same demonstration with that argument removed, and a
+     * page-wide lookup cannot tell the two apart.
+     */
+    get signInToContinue(): Locator {
+        return this.policyBlock.getByTestId('sign-in-to-continue');
+    }
+
+    /**
+     * Every sign-in affordance on the page, wherever it is.
+     *
+     * The other half of the claim above: *inside the refusal* is proved only by
+     * a scoped locator that finds one **and** a page-wide one that finds no
+     * more. Without this, a second button beside the refusal is invisible.
+     */
+    get signInAnywhere(): Locator {
+        return this.page.getByTestId('sign-in-to-continue');
+    }
+
+    /** The **Personal answer** — the refused question, answered (#27). */
+    get personalAnswer(): Locator {
+        return this.page.getByTestId('personal-answer');
+    }
+
+    /** The header naming an associate. Absent while the device is anonymous. */
+    get identityName(): Locator {
+        return this.page.getByTestId('store-identity-name');
+    }
+
+    /** The header saying nobody is signed in. The refusing state. */
+    get identityAnonymous(): Locator {
+        return this.page.getByTestId('store-identity-user');
+    }
+
     /** The surface saying the store assistant never reached this deployment. */
     get assistantUnavailable(): Locator {
         return this.page.getByTestId('assistant-unavailable');
+    }
+
+    /**
+     * Record the words the surface asks, in the order it asks them.
+     *
+     * The **Mocked unlock** (#27) is the one place in the walkthrough where the
+     * same question is said twice, and *"the same question, unedited"* is the
+     * whole of its claim: the audience has to watch one set of words refused
+     * and the identical set answered. Nothing on screen shows the question
+     * twice — the refusal clears the box, and the surface deliberately re-asks
+     * from the words it kept rather than from anything a presenter could
+     * retype — so the only place the claim is observable is the request.
+     *
+     * The route is read out of the surface's own endpoint table rather than
+     * written down here: these are versioned and have moved before, and a
+     * renamed route would leave this watching no traffic at all and reporting
+     * it as *the surface did not re-ask*.
+     *
+     * Started before the first tap and returned live, because a request already
+     * sent cannot be recovered afterwards.
+     */
+    watchQuestionsAsked(): string[] {
+        const route = apiEndpoint('PROCESS_REQUEST');
+        const asked: string[] = [];
+        this.page.on('request', (request) => {
+            if (request.method() !== 'POST') return;
+            if (!request.url().includes(route)) return;
+            try {
+                const body = request.postDataJSON() as { description?: string };
+                asked.push(body?.description ?? '');
+            } catch {
+                // A body that is not JSON is still a question having been
+                // asked, and swallowing the count would make "it did not
+                // re-ask" the reading of a malformed request.
+                asked.push(request.postData() ?? '');
+            }
+        });
+        return asked;
     }
 }

@@ -114,6 +114,89 @@ remains a routing failure: no tool query exists because the orchestrator did not
 The suite also asserts the Grounding panel is **empty before the question is asked**. Without it, a
 panel left lit by a previous conversation satisfies every other assertion in the spec.
 
+## The beats, in the presenter's order
+
+A spec file is named for the **tap** it asserts — `05-boundary.spec.ts` is the runbook's fifth tap —
+and `test_e2e_wiring.py` fails on a spec that carries no number, on one numbered for a tap the
+runbook does not make, and on two beats claiming the same tap.
+
+That is not filing. The **Recorded fallback** is *"the beats in order, one after another"*, and it
+reads the beats off the run: Playwright runs spec files in **path order**, which is alphabetical.
+Left to the alphabet the recording opens on the boundary refusal, plays the cross-platform hop
+third, and shows the sign-in unlock before the wall it is a door in — the walkthrough shuffled,
+which is worse than no recording at all, because it looks exactly like one.
+
+## The honest miss is asserted as an honest miss
+
+An **empty** Grounding panel, a **missing** Grounding panel and an **honest miss** look alike from
+the browser and mean three different things: the orchestrator never called the tool, the rail did
+not render, and the SOP agent searched Dataverse and truthfully found nothing — which is the beat,
+working. So all three are read, and the beat fails naming which one happened.
+
+The rehearsed miss is read out of `corpus.toml`'s `[honest_miss]`. A beat with the question typed
+into it would go on asserting a miss after somebody added a car-wash procedure — reporting the
+corpus as unchanged for the one change that breaks the beat.
+
+## A refused request costs nothing, and `0` is not `—`
+
+The presenter's claim over the boundary probe is *"refused by code, before any agent ran and before
+a single token was spent"*. A beat that read only the gate's own row would prove the first clause
+and assume the second: an orchestration that ran **and** refused leaves that row reading a truthful
+zero. So what is graded is the shape of the whole table — the gate's row is the **only** row — plus
+the absence of a plan. A refusal that navigated is a refusal the orchestrator had already been
+handed.
+
+The measurement itself is asserted twice per column, and neither matcher is the other.
+`models/meter.ts` renders `—` for a cost **nobody reported** and `0` for a cost **measured to be
+nothing**; a beat that asserted only that the row is present passes on a pair of em dashes, which
+is exactly what the panel says about Copilot Studio's tokens and proves nothing about the gate. An
+em dash means the surface stopped distinguishing the two; a number means the gate billed something.
+Different defects, different fixes, one failure message each.
+
+## The door is inside the wall
+
+The sign-in is looked up **through** the refusal — `policyBlock.getByTestId(...)` — and the page is
+then asserted to hold exactly one. The runbook says it out loud: *"it is deliberately not a separate
+login screen."* The closing argument is the delta between one surface and the next, and a page-wide
+lookup passes just as happily against a sign-in in the header, which is the same demonstration with
+its argument removed. The scoped locator finds the door; the page-wide count proves there is no
+second one beside it.
+
+*"The same question, unedited"* is observable in only one place. Nothing on the surface shows the
+question twice — the refusal clears the box, and the surface re-asks from the words it kept — so
+the beat records what the browser **sent**, off `process_request`'s own body, and asserts the second
+asking is character-for-character the words the gate refused. The route is read out of the
+surface's endpoint table rather than written down: a versioned route renamed in one place would
+leave the beat watching no traffic at all and reporting it as *the surface did not re-ask*.
+
+The unlocked answer is asserted to carry its **simulated labelling**. And a sign-in that signs
+nobody in is asserted **not** to re-ask — a branch a healthy deployment never reaches, so the beat
+fails the sign-in route deliberately. A requirement asserted only by reading the code that
+implements it is not asserted.
+
+## An alert is not a reply, and the chord has two silences
+
+The shift-task alert is graded on the two signals that make it a **different object** — the ARIA
+role a screen reader hears and the message kind the DOM carries — and on its being outside the
+reply stream and free of an agent's byline. A beat asserting only that the card is *visible* passes
+on the precise failure `PresenterAlertCard` was designed against: an unasked-for message rendered
+among the answers reads as an answer to whatever was asked last.
+
+The chord is read off `PRESENTER_CHORD_LABEL`, the presenter's own printed label. Its two negatives
+— **auto-repeat** and the **AltGr** combination a European layout reports as Ctrl+Alt — cannot be
+produced by driving a real keyboard, so both are dispatched as synthetic `KeyboardEvent`s at
+`window`, where the hook listens. Both are already unit-tested in jsdom, and that is exactly why
+they are here too: `CONTEXT.md` records the finding this suite exists for — every transparency
+signal dropped in the browser while 223 frontend tests were green. A predicate passing in jsdom says
+the rule was *written*; only the running image says it is *deployed*.
+
+Because a synthetic event that never reached the listener would satisfy both negatives for the wrong
+reason — and go on satisfying them after the chord itself broke — the same synthetic dispatch is
+made **without** either flag and is required to fire. That control is what makes the two silences
+mean something. What each dispatch is graded on is the **request**, not the screen: the backend
+answers 404 when nobody is connected and the hook swallows it, so a chord that fired and was not
+delivered looks on screen exactly like one that never fired.
+
 ## Selectors
 
 Only `data-testid`s that the **currently deployed image** carries. Adding an attribute to the
