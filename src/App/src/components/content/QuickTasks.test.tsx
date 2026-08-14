@@ -139,6 +139,57 @@ describe('the walkthrough as one-tap tasks', () => {
     });
 });
 
+/**
+ * The lane on the card that declares it (issue #16).
+ *
+ * The badge is the only thing on this grid that distinguishes the two lanes,
+ * and the accelerator's sat inline beside the title where it had neither room
+ * nor a fixed position: a grid column is ~237px at the surface's 728px, so a
+ * two-word pill took most of what the padding left, the title wrapped a word at
+ * a time, and the pill — vertically centred against a title of one line or two
+ * — landed at a different height on every card. Six badges at six heights
+ * cannot be compared at a glance, and comparing them at a glance is the entire
+ * reason five cards say one thing and one says another.
+ */
+describe('where the lane sits on a Quick Task', () => {
+    it('gives the badge a row of its own, ahead of the title', () => {
+        renderInput(walkthrough());
+
+        const card = screen.getByRole('button', { name: /Close the store/ });
+        const badge = within(card).getByTestId('lane-badge');
+        const title = within(card).getByText('Close the store');
+
+        // Its own row: the title is not in it, so the two never contend for
+        // the same width.
+        expect(badge.parentElement!.contains(title)).toBe(false);
+        // And it leads, so the lane is the first thing read on every card.
+        expect(
+            badge.compareDocumentPosition(title) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+    });
+
+    it('starts the content of every card at the same corner', () => {
+        // jsdom has no layout engine, so the property is asserted where it is
+        // decided. Fluent's Button centres its children on both axes; in a
+        // column that is a content block only as wide as its own longest line,
+        // floated to the middle of whatever height the grid row stretched the
+        // card to. Either one moves the badge, and a badge that moves is a
+        // badge nobody can scan down a column.
+        renderInput(walkthrough());
+
+        const cards = screen
+            .getAllByTestId('lane-badge')
+            .map((badge) => badge.closest('button')!);
+
+        expect(cards).toHaveLength(SIX_TASKS.length);
+        for (const card of cards) {
+            expect(card.style.alignItems).toBe('stretch');
+            expect(card.style.justifyContent).toBe('flex-start');
+        }
+    });
+});
+
 describe('tapping a Quick Task', () => {
     it('submits the task prompt and its declared lane in one pointer interaction', async () => {
         renderInput(walkthrough());
