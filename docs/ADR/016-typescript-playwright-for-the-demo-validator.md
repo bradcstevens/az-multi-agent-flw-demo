@@ -83,4 +83,6 @@ changes is the language behind the script, and only for the suite whose subject 
 - [ADR-005: Declare the Feedback loops in `AGENTS.md`](./005-declare-feedback-loops-in-agents-md.md)
 - [ADR-018: A deployed-build provenance check](./018-deployed-build-provenance-check.md)
 - `CONTEXT.md` — **Demo validator**, **Stage driver**, **Deployment drift**
+- [docs/demo-validator.md](../demo-validator.md) — the validator's record
+- [docs/stage-driver.md](../stage-driver.md) — the Stage driver and the recorded fallback (#51)
 - [docs/quick-tasks.md](../quick-tasks.md) — the walkthrough the validator asserts

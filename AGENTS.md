@@ -104,6 +104,13 @@ Notes:
   asserted by `src/tests/ci/test_e2e_wiring.py` in the CI-tooling loop. Run the validator
   deliberately, after `az login`, and read `e2e/artifacts/report`. Its record is
   `docs/demo-validator.md`.
+- The **Stage driver** is the same specs run headed and paced — `bash scripts/e2e-tests.sh
+  --stage`, composing with `--target`. It is not a loop and is not in the table: it is
+  presenter-facing, for rehearsal and for presenting the walkthrough when clicking through
+  it by hand goes wrong. A run in which every beat passed leaves the **Recorded fallback**
+  in `e2e/artifacts/walkthrough/`; a red one leaves the last good recording alone. Its
+  record is `docs/stage-driver.md`, and its CI-runnable wiring is
+  `src/tests/ci/test_stage_driver.py`.
 - Both backend phases pass `-m "not integration"`, so the **Guardrail corpus** — which
   scores against the live embedding deployment — stays out of unattended runs.
   `src/tests/ci/test_integration_marker.py` fails if that deselection is dropped from

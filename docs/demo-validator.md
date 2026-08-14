@@ -14,6 +14,7 @@ stayed green for weeks, and how all four out-of-band signals came to be dropped 
 ```bash
 bash scripts/e2e-tests.sh                 # the deployed surface (default)
 bash scripts/e2e-tests.sh --target local  # a local `npm run dev` on :3001
+bash scripts/e2e-tests.sh --stage         # the Stage driver: headed and paced (#51)
 bash scripts/e2e-tests.sh -- --headed     # anything after `--` goes to Playwright
 ```
 
@@ -38,6 +39,10 @@ the repository's convention and hand the presenter a stack trace.
 the fallback, and a fallback produced only by failing runs is a fallback of failures. Artefacts land
 under `e2e/artifacts/` (`runs/` for videos and traces, `report/` for the HTML report), which is
 gitignored.
+
+A run in which **every beat passed** additionally leaves `e2e/artifacts/walkthrough/` — the beats in
+order, with a self-contained player beside them. That is the **Recorded fallback**, and it is what
+the presenter is handed; see [docs/stage-driver.md](stage-driver.md).
 
 `retries: 0` and `workers: 1`, deliberately. A retried beat is a beat that flaked, and a flaky
 demonstration is the thing this suite exists to find. One worker because the walkthrough is one
@@ -110,8 +115,9 @@ with the walkthrough. The class has named the region since #26, it is plain CSS 
 rather than a Griffel hash, and `test_e2e_wiring.py` reads it out of `HomeInput.tsx` and out of
 `StoreSurface.ts` and fails if they drift.
 
-Page objects live in `e2e/pages/` and hold no assertions, so the headed **Stage driver** (#51) can
-reuse them without a second description of the walkthrough.
+Page objects live in `e2e/pages/` and hold no assertions, so the headed **Stage driver** (#51)
+reuses them without a second description of the walkthrough — it is a second `projects` entry over
+these same specs, chosen with `--stage`. See [docs/stage-driver.md](stage-driver.md).
 
 ## The seam that stays runnable in CI
 

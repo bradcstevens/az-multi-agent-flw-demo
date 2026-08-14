@@ -906,7 +906,22 @@ _Avoid_: e2e test (the accelerator's own suite lived at `tests/e2e-test/`, drove
 against the pre-rebrand surface, was wired into no workflow, and was deleted in #47)
 
 **Stage driver** — the same specs and the same page objects run headed and paced, for rehearsal and
-as a way to present. Not a second suite: a second suite is a second thing to keep true.
+as a way to present. Not a second suite: a second suite is a second thing to keep true. It is a
+`projects` entry in the validator's own config, chosen with `bash scripts/e2e-tests.sh --stage`,
+and it composes with `--target` exactly as the validator does. Its pace is `slowMo`, defined once in
+`e2e/stage.ts` and adjustable with `E2E_PACE_MS`, because the number belongs to the presenter.
+Dropping it leaves the validator working — it is presenter-facing and the first thing to cut. See
+[docs/stage-driver.md](docs/stage-driver.md).
+
+**Recorded fallback** — the video of the walkthrough that a run in which **every beat passed** leaves
+in `e2e/artifacts/walkthrough/`: one file per beat in run order, a self-contained player beside them,
+and a manifest naming the target, the commit and the time. The demonstration is handed to a presenter
+who will be alone in the room and for whom "the Container App is cold" is not a recoverable
+situation, so the last resort is a recording of the real system produced by the run that proved it
+works. A red, filtered, sharded or two-project run leaves the previous recording untouched and says
+why: a fallback made of the demonstration failing is worse than no fallback, because the presenter
+finds out what is on it in front of the customer.
+_Avoid_: demo video, screen recording (it is not made by hand, and it is not a marketing asset)
 
 **Deployment drift** — the distance between the images the Container Apps are running and the commit
 they were built from. Nothing measures it yet. `check-deployed-environment.sh` asserts the image is
