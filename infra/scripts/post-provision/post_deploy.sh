@@ -386,6 +386,38 @@ run_python() {
   "$python_cmd" "$REPO_ROOT/$module" "$@"
 }
 
+# The object id of whoever is running this script.
+#
+# `az ad signed-in-user show` is a Graph `/me` call, valid only for delegated
+# authentication: under a service principal it fails outright with "/me request
+# is only valid with delegated authentication flow". That is what the deploy
+# workflow signs in as (ADR-020), and without this fallback the whole script
+# stopped at `fatal` before it seeded anything.
+#
+# A service principal's own object id serves both uses the id has. It is the
+# principal the Foundry User role is granted to, which is correct — the grant
+# exists so that *this caller* can create the KB MCP connection. And it is the
+# `x-ms-client-principal-id` the team configurations are uploaded under, which
+# is harmless: the store assistant's pack is `is_default`, and
+# `get_all_teams` matches `c.user_id=@user_id OR c.is_default=true`, so the team
+# stays visible to every user whoever uploaded it.
+resolve_principal_id() {
+  local id
+  id="$(az ad signed-in-user show --query id -o tsv 2>/dev/null || true)"
+  if [ -n "$id" ]; then
+    printf '%s' "$id"
+    return 0
+  fi
+
+  # `user.name` is the client id when the CLI is authenticated as a service
+  # principal, and the object id the role assignment needs is a different guid.
+  local client_id
+  client_id="$(az account show --query user.name -o tsv 2>/dev/null || true)"
+  if [ -n "$client_id" ]; then
+    az ad sp show --id "$client_id" --query id -o tsv 2>/dev/null || true
+  fi
+}
+
 ensure_role_assignments_for_kbmcp() {
   local foundry_resource_id="$1"
   local principal_id="$2"
@@ -829,9 +861,9 @@ main() {
   echo "==============================================="
   echo ""
 
-  user_principal_id="$(az ad signed-in-user show --query id -o tsv 2>/dev/null || true)"
+  user_principal_id="$(resolve_principal_id)"
   if [ -z "$user_principal_id" ]; then
-    fatal "Could not retrieve signed-in user principal id."
+    fatal "Could not retrieve a principal id for the current login (neither a signed-in user nor a service principal)."
   fi
 
   if ! ensure_role_assignments_for_kbmcp "$ai_foundry_resource_id" "$user_principal_id"; then

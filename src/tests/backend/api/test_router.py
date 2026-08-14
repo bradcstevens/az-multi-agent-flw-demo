@@ -1484,13 +1484,16 @@ class TestSopAsk:
     ):
         """The tool's query and the retrieval query are both observable.
 
-        The orchestrator is free to phrase a procedure request differently
-        from the presenter. The SOP index is not: this one rehearsed hit is
-        resolved against the corpus's authored query, while the original tool
-        input stays available to attribute a miss correctly.
+        This is the exact rephrasing the deployed orchestrator produced. The
+        SOP index is not: this one rehearsed hit is resolved against the
+        corpus's authored query, while the original tool input stays available
+        to attribute a miss correctly.
         """
         monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
-        tool_query = "What are the steps for closing the store tonight?"
+        tool_query = (
+            "Please look up the Store 223 closing procedure in the Store SOP "
+            "Assistant and return the quoted SOP guidance for how to close the store."
+        )
 
         response = self._post(rt, tool_query)
 

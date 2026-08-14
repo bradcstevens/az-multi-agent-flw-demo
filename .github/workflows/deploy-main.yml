@@ -1,0 +1,223 @@
+# Deploy `main` to the demonstration environment.
+#
+# ADR-020. Until this existed, merging to `main` changed nothing in Azure and
+# nothing said so: on 2026-08-13 the deployed environment was 42 commits behind
+# while all thirteen preflight checks were green, because every declared
+# feedback loop runs against fakes and none of them observes a deployment.
+#
+# This is *not* `azure-dev.yml`. That workflow provisions a fresh timestamped
+# environment (`azd-<name>-HHMM`) to prove the template deploys, and is left
+# alone as inherited baseline (ADR-006). This one updates the single long-lived
+# environment the demonstration runs on, and reproduces by hand the sequence
+# `docs/preflight/deployed-surface.md` records.
+#
+# Three things in the ordering below are load-bearing. Changing them silently
+# reintroduces a failure this repository has already paid for once:
+#
+#   1. The registry is filled BEFORE `azd provision`, not after. The
+#      accelerator's documented order updates Container Apps that provisioning
+#      never created; the Placeholder image never produces a ready revision and
+#      stalls the `mcp -> backend -> frontend` chain for twenty minutes. Commit
+#      `6a7199a5`.
+#   2. The image tag is the COMMIT, not `latest`. `azd provision` only makes a
+#      new revision where the template changed, so a re-pushed `latest` rolls
+#      whichever app's template happened to change and leaves the others
+#      serving what they cached — a run that looks successful and deploys one
+#      app in three.
+#   3. `MACAE_USE_CASE=none` is set before `post_deploy.sh`. Unset, it prompts
+#      and an unattended run hangs; answered wrongly it restores the six stock
+#      content packs that #25 deliberately suppressed.
+#
+# `src/tests/ci/test_deploy_workflow.py` asserts all three without a tenant.
+
+name: Deploy main
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # What is inside an image's build context...
+      - 'src/backend/**'
+      - 'src/mcp_server/**'
+      - 'src/App/**'
+      # ...what provisioning reads...
+      - 'infra/**'
+      - 'azure.yaml'
+      # ...and what `post_deploy.sh` seeds into Cosmos, Storage and Search.
+      # These are not in any image: a corpus or pack edit changes the deployed
+      # demonstration without changing a single line of application code.
+      - 'content/sop/**'
+      - 'content_packs/**'
+      - 'tools/store_pack/**'
+      - '.github/workflows/deploy-main.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+# Never cancel a deploy in flight. `cancel-in-progress: true` would abandon an
+# `azd provision` midway through an ARM deployment and leave the environment in
+# a state neither commit describes; queueing is the only safe answer.
+concurrency:
+  group: deploy-macae-flw-v1
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Deliberately no `environment:`. The federated credential this job signs in
+    # with has the subject `repo:<owner>/<repo>:ref:refs/heads/main`; declaring a
+    # GitHub Environment changes the OIDC subject to `...:environment:<name>` and
+    # the token exchange stops matching. Adding an approval gate later means
+    # adding the environment AND a second federated credential, not just a line
+    # here. See docs/deploy-from-main.md.
+    env:
+      AZURE_ENV_NAME: macae-flw-v1
+      DEPLOY_INPUTS: infra/environments/macae-flw-v1.env
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_DEV_COLLECT_TELEMETRY: 'no'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Name the commit being deployed
+        id: commit
+        run: |
+          set -euo pipefail
+          # 12 hex characters, the same width `deployed-surface.md` records and
+          # the deployed-environment check reads back. A tag is still a claim
+          # rather than a stamp inside the image — that is #48 — but it is the
+          # claim this workflow is judged against.
+          sha="$(git rev-parse --short=12 HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Deploying $sha"
+
+      - name: Log in to Azure
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Log in to azd
+        run: |
+          azd auth login \
+            --client-id "$AZURE_CLIENT_ID" \
+            --federated-credential-provider github \
+            --tenant-id "$AZURE_TENANT_ID"
+
+      # Step 1 of the recorded order. Server-side builds: no local Docker, and
+      # they authenticate as the signed-in principal rather than the registry
+      # admin user the template keeps disabled.
+      - name: Fill the registry, before provisioning
+        env:
+          IMAGE_TAG: ${{ steps.commit.outputs.sha }}
+        run: |
+          set -euo pipefail
+          endpoint="$(grep '^AZURE_ENV_CONTAINER_REGISTRY_ENDPOINT=' "$DEPLOY_INPUTS" | cut -d= -f2-)"
+          registry="${endpoint%%.*}"
+          echo "Registry: $registry"
+
+          build() {
+            local image="$1" context="$2"
+            echo "::group::az acr build $image:$IMAGE_TAG"
+            az acr build \
+              --registry "$registry" \
+              --image "$image:$IMAGE_TAG" \
+              --image "$image:latest" \
+              --file "$context/Dockerfile" \
+              "$context"
+            echo "::endgroup::"
+          }
+
+          # In the order ARM serialises them, so a broken image fails on the
+          # app the rest depend on rather than after two successful builds.
+          build "$(grep '^AZURE_ENV_MCP_IMAGE_NAME=' "$DEPLOY_INPUTS" | cut -d= -f2-)" src/mcp_server
+          build "$(grep '^AZURE_ENV_BACKEND_IMAGE_NAME=' "$DEPLOY_INPUTS" | cut -d= -f2-)" src/backend
+          build "$(grep '^AZURE_ENV_FRONTEND_IMAGE_NAME=' "$DEPLOY_INPUTS" | cut -d= -f2-)" src/App
+
+      - name: Restore the azd environment
+        env:
+          IMAGE_TAG: ${{ steps.commit.outputs.sha }}
+          DIRECT_LINE_TOKEN_ENDPOINT: ${{ secrets.COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          # A runner starts with no azd environment at all, so every input
+          # `main.parameters.json` substitutes has to be put back. Three of them
+          # default to the Placeholder image if forgotten.
+          if ! azd env select "$AZURE_ENV_NAME" 2>/dev/null; then
+            azd env new "$AZURE_ENV_NAME" \
+              --subscription "$AZURE_SUBSCRIPTION_ID" \
+              --location "$(grep '^AZURE_LOCATION=' "$DEPLOY_INPUTS" | cut -d= -f2-)" \
+              --no-prompt
+          fi
+
+          while IFS='=' read -r key value; do
+            case "$key" in ''|'#'*) continue;; esac
+            [ -z "$value" ] && continue
+            azd env set "$key" "$value"
+          done < "$DEPLOY_INPUTS"
+
+          if [ -z "$DIRECT_LINE_TOKEN_ENDPOINT" ]; then
+            # Unset, the SOP tool answers with its fixed failure message and the
+            # centrepiece cross-platform beat cannot work. It was absent from
+            # this deployment for four weeks and nothing noticed, so this is a
+            # hard stop rather than a warning.
+            echo "::error::COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT is not set." \
+                 "The SOP agent would be unreachable. Refusing to deploy."
+            exit 1
+          fi
+          azd env set COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT "$DIRECT_LINE_TOKEN_ENDPOINT"
+
+          azd env set AZURE_ENV_IMAGE_TAG "$IMAGE_TAG"
+          azd env set MACAE_USE_CASE none
+
+      # Step 2. The registry is already full, so the Container Apps come up on
+      # real images and the commit-shaped tag rolls all three revisions.
+      - name: Provision
+        run: azd provision --no-prompt
+
+      # Step 3. The store assistant's pack, and nothing else.
+      - name: Seed the store assistant, and no stock content pack
+        env:
+          MACAE_USE_CASE: none
+        run: bash infra/scripts/post-provision/post_deploy.sh
+
+      # The deploy is not finished when `azd` exits; it is finished when the
+      # surface serves this build and answers a real procedure question. Both
+      # checks read the running deployment, and both were written because a
+      # green repository sat on top of a deployment that could not have run its
+      # own centrepiece beat.
+      - name: Prove the deployed surface is the demonstration
+        run: bash scripts/preflight/check-deployed-surface.sh
+
+      - name: Prove the deployed environment still matches its record
+        # `--no-probe` because the step above already asked the deployment a
+        # real question end to end. What is left here is the infrastructure —
+        # regions, roster, one replica each, images from our own registry —
+        # and none of it needs tokens spent to read.
+        run: bash scripts/preflight/check-deployed-environment.sh --no-probe
+
+      - name: Report what was deployed
+        if: always()
+        env:
+          IMAGE_TAG: ${{ steps.commit.outputs.sha }}
+        run: |
+          {
+            echo "### Deploy \`main\` -> \`$AZURE_ENV_NAME\`"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Image tag | \`$IMAGE_TAG\` |"
+            echo "| Stock content packs | none (\`MACAE_USE_CASE=none\`) |"
+            echo
+            echo "Re-check by hand with \`scripts/preflight/check-deployed-surface.sh\`."
+          } >> "$GITHUB_STEP_SUMMARY"
