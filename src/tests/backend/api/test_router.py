@@ -375,6 +375,23 @@ class TestProcessRequest:
         assert resp.status_code == 200
         assert resp.json()["session_id"]
 
+    def test_the_rehearsed_closing_task_arms_its_sop_lookup(self, rt, monkeypatch):
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        note_rehearsal = MagicMock()
+        monkeypatch.setattr(router_mod, "note_rehearsal", note_rehearsal)
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-1",
+                "description": router_mod.REHEARSED_SOP_QUERY,
+            },
+        )
+
+        assert response.status_code == 200
+        note_rehearsal.assert_called_once_with("sess-1")
+
 
 # ---------------------------------------------------------------------------
 # /process_request — the Identity boundary gate (issue #14, ADR-014)
@@ -1479,16 +1496,9 @@ class TestSopAsk:
         assert resp.status_code == 200
         assert resp.json()["text"] == "1. Count the drawer."
 
-    def test_a_rephrased_closing_question_uses_the_corpuss_rehearsed_query(
+    def test_a_rephrased_closing_question_without_a_rehearsal_is_preserved(
         self, rt, monkeypatch
     ):
-        """The tool's query and the retrieval query are both observable.
-
-        This is one exact rephrasing the deployed orchestrator produced. The
-        SOP index is not: this one rehearsed hit is resolved against the
-        corpus's authored query, while the original tool input stays available
-        to attribute a miss correctly.
-        """
         monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
         tool_query = (
             "Please look up the Store 223 closing procedure in the Store SOP "
@@ -1499,9 +1509,34 @@ class TestSopAsk:
         response = self._post(rt, tool_query)
 
         assert response.status_code == 200
+        rt.sop.ask.assert_awaited_once_with(tool_query)
+        assert response.json()["tool_query"] == tool_query
+        assert response.json()["retrieval_query"] == tool_query
+
+    def test_a_rehearsal_turn_canonicalizes_any_orchestrator_rephrase(
+        self, rt, monkeypatch
+    ):
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        tool_query = (
+            "Please look up the Store 223 closing procedure in the Store SOP "
+            "Assistant on Copilot Studio and provide the exact closing steps, "
+            "quoting the SOP document it comes from."
+        )
+        turn = router_mod.sole_turn.__globals__
+        rehearsal = router_mod.note_rehearsal.__globals__
+        turn["forget_turns"]()
+        rehearsal["forget_rehearsals"]()
+        turn["note_turn"]("user-1", "session-1")
+        router_mod.note_rehearsal("session-1")
+
+        response = self._post(rt, tool_query)
+
+        assert response.status_code == 200
         rt.sop.ask.assert_awaited_once_with("How do I close the store?")
         assert response.json()["tool_query"] == tool_query
         assert response.json()["retrieval_query"] == "How do I close the store?"
+        rehearsal["forget_rehearsals"]()
+        turn["forget_turns"]()
 
     def test_an_out_of_corpus_question_is_not_normalized_to_the_rehearsed_hit(
         self, rt, monkeypatch
@@ -1623,7 +1658,7 @@ class TestSourceUsedSignal:
 
         (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
         assert push[0][0].tool_query == tool_query
-        assert push[0][0].retrieval_query == "How do I close the store?"
+        assert push[0][0].retrieval_query == tool_query
 
     def test_a_failure_lights_nothing(self, rt, monkeypatch):
         """The fixed failure message is the backend's own words. A panel lit

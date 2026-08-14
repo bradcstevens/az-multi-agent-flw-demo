@@ -32,6 +32,8 @@ from services.team_service import TeamService
 from session.store import SessionStateStore
 from sop.direct_line import DIRECT_LINE_FAILURE, DirectLineClient, SopAnswer
 from sop.provenance import SOP_PLATFORM, SOP_SOURCE
+from sop.rehearsal import (forget_rehearsal, note_rehearsal,
+                           take_rehearsal_for_current_turn)
 from transparency.alert import REHEARSED_ALERT, REHEARSED_ALERTS  # noqa: F401  (the rehearsed copy, asserted on in tests)
 from transparency.alert import presenter_alert as build_presenter_alert
 from transparency.source import source_used
@@ -427,6 +429,10 @@ async def process_request(
     # fault. Left above the plan so a tool call made anywhere in the turn can
     # be attributed.
     note_turn(user_id, input_task.session_id)
+    if input_task.description == REHEARSED_SOP_QUERY:
+        note_rehearsal(input_task.session_id)
+    else:
+        forget_rehearsal(input_task.session_id)
 
     # Attach session_id to current span for Application Insights
     span = trace.get_current_span()
@@ -834,35 +840,10 @@ async def clarification_ask(request: Request):
 _sop_client: Optional[DirectLineClient] = None
 
 # The presenter opens the walkthrough with this corpus-authored query. The
-# orchestrator can rephrase it before it calls the MCP tool, while the Copilot
-# Studio index was rehearsed against these exact words. Each alias is an
-# equivalent closing-procedure request; this deliberately is not a keyword
-# match, so a qualified request still gets an honest retrieval result.
+# orchestrator can rephrase it before it calls the MCP tool, so /process_request
+# arms a one-shot, session-scoped marker for this exact presenter request.
+# This is not a keyword match: a direct or qualified question is left unchanged.
 REHEARSED_SOP_QUERY = "How do I close the store?"
-_REHEARSED_SOP_QUERY_ALIASES = frozenset(
-    {
-        REHEARSED_SOP_QUERY.casefold(),
-        "what are the steps for closing the store tonight?",
-        "what are the steps for closing the store?",
-        "how do i close the store at the end of the night?",
-        "what is the store closing procedure?",
-        "provide the store closing procedure.",
-        (
-            "please look up the store 223 closing procedure in the store sop "
-            "assistant and return the quoted sop guidance for how to close the store."
-        ),
-        (
-            "please look up the store closing procedure for store 223 in the store "
-            "sop assistant on copilot studio. return the step-by-step closing "
-            "process and quote the sop document it comes from."
-        ),
-        (
-            "please look up the store 223 closing procedure in the store sop "
-            "assistant on copilot studio and provide the exact closing steps, "
-            "quoting the sop document it comes from."
-        ),
-    }
-)
 
 
 def sop_client() -> DirectLineClient:
@@ -875,7 +856,7 @@ def sop_client() -> DirectLineClient:
 
 def _retrieval_query(tool_query: str) -> str:
     """Return the corpus query for the one explicitly rehearsed procedure."""
-    if tool_query.casefold() in _REHEARSED_SOP_QUERY_ALIASES:
+    if tool_query == REHEARSED_SOP_QUERY or take_rehearsal_for_current_turn():
         return REHEARSED_SOP_QUERY
     return tool_query
 
