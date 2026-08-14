@@ -29,7 +29,7 @@ import { ASSISTANT_NAME } from "../../models/storeSurface";
 import ChatInput from "@/commonComponents/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
 import PromptCard from "@/commonComponents/components/PromptCard";
-import { Send } from "@/commonComponents/imports/bundleicons";
+import SendControl, { SEND_QUESTION } from "./SendControl";
 import {
   Clipboard20Regular,
   PersonKey20Regular,
@@ -423,12 +423,10 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
             onEnter={handleSubmit}
             disabledChat={submitting}
           >
-            <Button
-              appearance="subtle"
-              className="home-input-send-button"
-              onClick={handleSubmit}
-              disabled={submitting}
-              icon={<Send />}
+            <SendControl
+              label={SEND_QUESTION}
+              onSend={handleSubmit}
+              unavailable={submitting}
             />
           </ChatInput>
 

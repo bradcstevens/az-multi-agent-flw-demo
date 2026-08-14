@@ -444,6 +444,25 @@ asking them to make it turns getting an answer into a routing decision. The pick
 dialog and the EasyAuth login button were deleted rather than hidden — a picker that is merely not
 rendered is one prop away from returning.
 
+**Send control** — the button that submits what has been typed, one component
+(`components/content/SendControl.tsx`) on both surfaces, named out loud because it is an icon and
+nothing else: **Send question** on the **Store surface**, **Send message** on the plan surface
+(#56). It was two declarations that had already drifted — one repainted by a stylesheet Fluent
+overrides, one by inline styles that override Fluent — so the surface's primary action rendered
+transparent with a grey glyph and looked like its own disabled state. Nothing outside the component
+declares its colour: Fluent's styles are injected after an imported stylesheet, so a rule of ours is
+a rule that reads like the thing the surface renders and does nothing.
+
+Unavailability is **`disabledFocusable`, not `disabled`** — a natively-disabled control leaves the
+tab order, so the one affordance that asks a question disappears for a keyboard user instead of
+saying why it cannot be used. `opacity: 0.3` on the input wrapper is not a claim a screen reader can
+read.
+
+**Character counter** — `ChatInput`'s count against the 5000-character cap, shown from
+`COUNTER_INFORMATIVE_FROM` (the last 500) and not before. On an empty box a zero of five thousand is
+noise beside the **Send control**, reporting a limit nobody is near; near the cap it is the only
+warning that the textarea is about to drop what is typed in silence.
+
 **Stock content packs** — the accelerator's six seeded agent teams (RFP Evaluation, Retail Customer
 Satisfaction, HR Employee Onboarding, Marketing Press Release, Contract Compliance Review, Content
 Generation). Suppressed as part of R1's single-assistant surface (#25), in two places, because

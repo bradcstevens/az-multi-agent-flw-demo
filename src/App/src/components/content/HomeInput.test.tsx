@@ -3,7 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
+import { Button } from '@fluentui/react-components';
+import { Send } from '@/commonComponents/imports/bundleicons';
 import { configureStore } from '@reduxjs/toolkit';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 vi.mock('../../store/TaskService', () => ({
     TaskService: { createPlan: vi.fn(), signInDevice: vi.fn() },
@@ -64,7 +68,7 @@ const renderInput = (team: any = TEAM) =>
 
 const ask = async (question: string) => {
     await userEvent.type(screen.getByRole('textbox'), question);
-    await userEvent.click(screen.getByRole('button', { name: '' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send question' }));
 };
 
 beforeEach(() => {
@@ -331,3 +335,98 @@ describe('the socket the answer arrives on', () => {
         expect(FakeSocket.instances).toHaveLength(0);
     });
 });
+
+describe('the send control', () => {
+    it('is named for what it does', () => {
+        // WCAG 2.1 4.1.2. It is an icon and nothing else, so without a name a
+        // screen reader announces the one control that asks the question as
+        // "button".
+        renderInput();
+
+        expect(
+            screen.getByRole('button', { name: 'Send question' }),
+        ).toBeInTheDocument();
+    });
+
+    it('says it is unavailable while a question is in flight', async () => {
+        // The only signal today is the input wrapper's `opacity: 0.3`, which a
+        // screen reader cannot see, and a natively-disabled control leaves the
+        // tab order entirely — so the one affordance that submits a question
+        // vanishes rather than explaining itself.
+        createPlan.mockReturnValue(new Promise(() => {}) as any);
+        renderInput();
+
+        await ask('how do I close the store?');
+
+        const send = screen.getByRole('button', { name: 'Send question' });
+        await waitFor(() => expect(send).toHaveAttribute('aria-disabled', 'true'));
+        expect(send.tabIndex).not.toBe(-1);
+
+        // Reachable, and inert when reached: `pointer-events: none` on the
+        // wrapper stops a mouse, and nothing but the control itself stops a
+        // keyboard.
+        send.focus();
+        await userEvent.keyboard('{Enter}');
+        expect(createPlan).toHaveBeenCalledTimes(1);
+    });
+
+    it('is rendered as the primary action of the input', () => {
+        // The stylesheet has always described a filled brand button that nobody
+        // has seen: Fluent's `subtle` styling is injected after the imported
+        // stylesheet and wins at equal specificity, so the surface's primary
+        // action renders transparent with a grey glyph — wearing the disabled
+        // state's clothes. Compared against Fluent's own buttons rather than
+        // against a class name copied out of the implementation.
+        renderInput();
+        const rendered = new Set(
+            screen.getByRole('button', { name: 'Send question' }).classList,
+        );
+
+        const fluentClasses = (appearance: 'primary' | 'subtle') => {
+            const { container, unmount } = render(
+                <Button appearance={appearance} icon={<Send />} aria-label="reference" />,
+            );
+            const classes = Array.from(
+                container.querySelector('button')!.classList,
+            );
+            unmount();
+            return classes;
+        };
+
+        expect(fluentClasses('primary').every((c) => rendered.has(c))).toBe(true);
+        expect(fluentClasses('subtle').every((c) => rendered.has(c))).toBe(false);
+    });
+
+    it('is painted by Fluent alone, with no rule of ours for Fluent to override', () => {
+        // The counterpart to the test above, and the half jsdom cannot see: a
+        // declaration this project makes about the send control is a
+        // declaration Fluent overrides, because griffel's styles are injected
+        // after an imported stylesheet. A rule that silently does nothing is
+        // the reason the next person will assume it works.
+        renderInput();
+        const send = screen.getByRole('button', { name: 'Send question' });
+
+        for (const cls of Array.from(send.classList)) {
+            for (const [file, declarations] of rulesNaming(cls)) {
+                expect(
+                    declarations,
+                    `${file} paints .${cls}, which Fluent will override`,
+                ).not.toMatch(/(^|[;{\s])(color|background-color|border)\s*:/);
+            }
+        }
+    });
+});
+
+/** Every stylesheet rule in this project whose selector names `cls`, as [file, body]. */
+const rulesNaming = (cls: string): [string, string][] => {
+    const dir = join(__dirname, '..', '..', 'styles');
+    const named = new RegExp(`\\.${cls}(?![\\w-])`);
+    return readdirSync(dir)
+        .filter((entry) => entry.endsWith('.css'))
+        .flatMap((entry) => {
+            const css = readFileSync(join(dir, entry), 'utf8');
+            return Array.from(css.matchAll(/([^{}]+)\{([^{}]*)\}/g))
+                .filter((rule) => named.test(rule[1]))
+                .map((rule) => [entry, rule[2]] as [string, string]);
+        });
+};

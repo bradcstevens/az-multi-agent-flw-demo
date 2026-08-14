@@ -61,19 +61,13 @@
   color: var(--colorNeutralForeground3);
 }
 
-.home-input-send-button {
-  min-width: 32px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--borderRadiusSmall);
-  background-color: var(--colorBrandBackground);
-  color: var(--colorNeutralForegroundInverted);
-  border: none;
-  cursor: pointer;
-}
+/*
+ * There is deliberately no rule for the send control here. It is an icon-only
+ * Fluent Button asked for the primary appearance, and Fluent's styles are
+ * injected after this stylesheet — so anything declared here about its size or
+ * its colours would be overridden in every state the control can be in, while
+ * reading like the thing the surface renders (#56).
+ */
 
 .home-input-quick-tasks-section {
   width: 100%;

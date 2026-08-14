@@ -8,6 +8,17 @@ import React, {
 import { Caption1 } from "@fluentui/react-components";
 import HeaderTools from "../components/Header/HeaderTools";
 
+/** The hard cap the textarea enforces. */
+export const MAX_MESSAGE_LENGTH = 5000;
+
+/**
+ * The counter appears here and not before. On an empty box a zero of five
+ * thousand is noise competing with the send control, and it reports a limit
+ * nobody is near; within the last few hundred characters it is the only
+ * warning that the textarea is about to stop accepting input silently (#56).
+ */
+export const COUNTER_INFORMATIVE_FROM = MAX_MESSAGE_LENGTH - 500;
+
 // ✅ Props definition
 interface ChatInputProps {
   value: string;
@@ -80,7 +91,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           }}
         >
           <textarea
-            maxLength={5000}
+            maxLength={MAX_MESSAGE_LENGTH}
             disabled={disabledChat}
             ref={textareaRef}
             value={value}
@@ -132,7 +143,9 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 marginLeft: "8px",
               }}
             >
-              {value.length}/5000
+              {value.length >= COUNTER_INFORMATIVE_FROM
+                ? `${value.length}/${MAX_MESSAGE_LENGTH}`
+                : ""}
             </span>
 
             <HeaderTools>{children}</HeaderTools>

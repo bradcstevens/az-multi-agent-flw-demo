@@ -1,8 +1,7 @@
 import React from "react";
 import ChatInput from "@/commonComponents/modules/ChatInput";
 import { PlanChatProps } from "@/models";
-import { Button } from "@fluentui/react-components";
-import { Send } from "@/commonComponents/imports/bundleicons";
+import SendControl, { SEND_MESSAGE } from "./SendControl";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
     planData: any;
@@ -52,23 +51,10 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
                     boxSizing: 'border-box',
                 }}
             >
-                <Button
-                    appearance="subtle"
-                    className="home-input-send-button"
-                    onClick={() => OnChatSubmit(input)}
-                    disabled={submittingChatDisableInput || !input.trim()}
-                    icon={<Send />}
-                    style={{
-                        height: '32px',
-                        width: '32px',
-                        borderRadius: '4px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        color: (submittingChatDisableInput || !input.trim())
-                            ? 'var(--colorNeutralForegroundDisabled)'
-                            : 'var(--colorBrandForeground1)',
-                        flexShrink: 0,
-                    }}
+                <SendControl
+                    label={SEND_MESSAGE}
+                    onSend={() => OnChatSubmit(input)}
+                    unavailable={submittingChatDisableInput || !input.trim()}
                 />
             </ChatInput>
         </div>
