@@ -31,15 +31,20 @@ def _linking_docs() -> list[Path]:
     404s on github.com. ``content`` is wholly this fork's own — the corpus and
     its README exist nowhere upstream — and its README cites ADRs the same way,
     which is how the ADR-019 rebrand shipped a lowercase link nothing was
-    reading. The accelerator's inherited documentation is deliberately out of
-    scope; it is a one-way baseline (ADR-006), so editing it to satisfy a guard
-    here buys merge friction rather than a working link.
+    reading. The **presenter runbook** is named explicitly rather than by
+    folder: it sits beside the accelerator's inherited documentation in
+    ``docs/``, and it is the one document here whose reader is holding it in
+    front of a customer with no way to recover from a dead link. The
+    accelerator's inherited documentation is deliberately out of scope; it is a
+    one-way baseline (ADR-006), so editing it to satisfy a guard here buys merge
+    friction rather than a working link.
     """
     authored = ("ADR", "agents", "copilot-studio", "preflight")
     return [
         REPO_ROOT / "CONTEXT.md",
         REPO_ROOT / ".reference" / "README.md",
         CORRECTIONS,
+        REPO_ROOT / "docs" / "presenter-runbook.md",
         *sorted(
             doc
             for folder in authored

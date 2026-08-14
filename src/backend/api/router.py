@@ -847,6 +847,10 @@ _REHEARSED_SOP_QUERY_ALIASES = frozenset(
         "how do i close the store at the end of the night?",
         "what is the store closing procedure?",
         "provide the store closing procedure.",
+        (
+            "please look up the store 223 closing procedure in the store sop "
+            "assistant and return the quoted sop guidance for how to close the store."
+        ),
     }
 )
 

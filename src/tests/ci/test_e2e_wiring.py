@@ -32,6 +32,13 @@ CONFIG = E2E / "playwright.config.ts"
 AUTHORED = E2E / "authored.ts"
 AGENTS = REPO_ROOT / "AGENTS.md"
 INHERITED = REPO_ROOT / "tests" / "e2e-test"
+STORE_SURFACE = E2E / "pages" / "StoreSurface.ts"
+HOME_INPUT = (
+    REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
+)
+
+#: The Quick Tasks region, named once and asserted on both sides of the tap.
+QUICK_TASKS_REGION = "home-input-quick-tasks"
 
 
 def _text(path: Path) -> str:
@@ -114,4 +121,36 @@ def test_the_inherited_accelerator_suite_is_gone():
     assert not INHERITED.exists(), (
         "tests/e2e-test/ is back: it drives an identity-provider login against "
         "the pre-rebrand surface and is wired into no workflow"
+    )
+
+
+def test_the_quick_task_tap_is_aimed_at_the_quick_tasks_region():
+    # The validator's first action is a tap on a Quick Task, by the card title
+    # the store pack authors. Those titles are substrings of the questions they
+    # ask — "Close the store" of "How do I close the store?" — and every plan
+    # the walkthrough has ever raised is listed in the task rail under exactly
+    # that question. So a page-wide lookup matches one card on a fresh
+    # deployment, two things after the first run, and twenty-one after the
+    # twentieth: the loop rots by being run, which is the one failure mode a
+    # loop must not have.
+    #
+    # The region is named on both sides and checked from both sides, the way
+    # `authored.ts` reads the corpus rather than restating it: a hook renamed
+    # in the surface and not in the page object goes red here, in a loop that
+    # runs without a tenant, rather than on the morning of a demonstration.
+    #
+    # It is the surface's own layout class rather than a `data-testid`, because
+    # the validator's target is a *running image*: an attribute this repository
+    # authored this morning is not in it, and a locator that misses for that
+    # reason reports "the image is old" as "the beat is broken".
+    surface = _text(HOME_INPUT)
+    page_object = _code(STORE_SURFACE)
+
+    assert f'className="{QUICK_TASKS_REGION}"' in surface, (
+        f"the Quick Tasks region no longer carries {QUICK_TASKS_REGION!r}; "
+        "the validator has nothing to aim its tap at"
+    )
+    assert f"locator('.{QUICK_TASKS_REGION}')" in page_object, (
+        "StoreSurface looks a Quick Task up across the whole page; the task "
+        "rail carries the same words and the tap is ambiguous"
     )

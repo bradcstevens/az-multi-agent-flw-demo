@@ -29,9 +29,33 @@ export class StoreSurface {
         });
     }
 
+    /**
+     * The **Quick Tasks region**, and nothing else on the surface.
+     *
+     * Load-bearing, not tidiness. The cards are named by the store pack's card
+     * titles — "Close the store" — and every plan the walkthrough has ever
+     * raised is listed in the task rail beside them under the question that
+     * title asks: *How do I close the store?*. An accessible-name lookup
+     * matches by substring, so a page-wide one resolves to one card on a fresh
+     * deployment and to twenty-one elements after twenty runs. The loop would
+     * rot by being run, and it did: the beat went red on a strict-mode
+     * violation while the demonstration itself was working.
+     *
+     * Anchored on the surface's own layout class rather than a new
+     * `data-testid`, for the reason `docs/demo-validator.md` states under
+     * *Selectors*: an attribute this repository has just authored is not in the
+     * image that is running, so it turns "the beat is broken" into "the image
+     * is old". This class has named the region since the Quick Tasks landed
+     * (#26), it is plain CSS in this repository rather than a Griffel hash, and
+     * `test_e2e_wiring.py` fails if the surface stops using it.
+     */
+    get quickTasks(): Locator {
+        return this.page.locator('.home-input-quick-tasks');
+    }
+
     /** The Quick Task card carrying a given title, by its authored name. */
     quickTask(name: string): Locator {
-        return this.page.getByRole('button', { name });
+        return this.quickTasks.getByRole('button', { name });
     }
 
     /** Tap a Quick Task, which asks its authored question in one interaction. */

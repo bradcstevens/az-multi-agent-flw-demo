@@ -20,6 +20,24 @@ check tooling below, none of which is inside an image's build context (`src/back
 `src/mcp_server`, `src/App`). The tag is a claim about what was built, not a stamp the image
 carries — see *Scope*.
 
+Re-observed 2026-08-14 (issue #53). The running frontend was still **pre-#55**: its Quick Task card
+filled the question box and waited for send, while the Demo validator taps once and expects a plan,
+so the walkthrough's opening beat timed out on a card it had found and tapped. It was rolled onto
+`macaefrontend:5758aa1c`, and the beat passed.
+
+**Two integration branches were rolling this deployment minutes apart**, which is the fact worth
+carrying forward. #50 rolled the backend to `macaebackend:834c82bf2db1` and the frontend to its own
+build; #53 rolled the frontend again; #50 rolled it back to `macaefrontend:038f5e6c8927`. Beat 1
+timed out once on a backend that had just been replaced under it, and was green on a re-run. Nothing
+serialises this — the resource group is shared, `az containerapp update` is last-writer-wins, and a
+red validator run is as likely to mean *somebody else is deploying* as it is to mean the beat is
+broken. The MCP app was untouched throughout, on `23d97b3dda59`.
+
+The **selector** consequence is recorded in [../demo-validator.md](../demo-validator.md#selectors):
+a locator that depends on an attribute added the same morning cannot be told apart from a locator
+that is simply pointed at an older image, so the Quick Task tap is aimed at the region's layout
+class instead — which every one of those three images carries.
+
 Re-check with `scripts/preflight/check-deployed-surface.sh` — it exits non-zero the moment any of
 the facts below stops being true.
 
