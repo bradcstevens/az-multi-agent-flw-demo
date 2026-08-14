@@ -424,7 +424,11 @@ const rulesNaming = (cls: string): [string, string][] => {
     return readdirSync(dir)
         .filter((entry) => entry.endsWith('.css'))
         .flatMap((entry) => {
-            const css = readFileSync(join(dir, entry), 'utf8');
+            // Comments first. These sheets carry long explanations of the rules
+            // they deliberately *do not* declare, so a class named in prose was
+            // read as part of the selector of whatever rule came next — and the
+            // declarations of an unrelated rule were reported against it (#59).
+            const css = readFileSync(join(dir, entry), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
             return Array.from(css.matchAll(/([^{}]+)\{([^{}]*)\}/g))
                 .filter((rule) => named.test(rule[1]))
                 .map((rule) => [entry, rule[2]] as [string, string]);

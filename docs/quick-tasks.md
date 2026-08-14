@@ -174,6 +174,50 @@ a `minmax` track reflows with the width it is given, so the row that held six
 holds seven. That is what a rule fixed at a breakpoint would not have done, and
 it is why the finding above was worth fixing rather than working around.
 
+## The card stopped fighting itself for space (#59)
+
+Six cards laid out correctly is not six cards anybody can read. Measured on the
+deployed surface at 1440px, every one of the six titles wrapped onto two lines
+and none of them needed to: the badge shared the title's flex row, so
+*"I can't fix it"* — fourteen characters — was allotted 62.9px of the 203px the
+card had, beside a 104.4px *Needs approval* pill. The badge suffered worst, and
+the badge is the point: the Fast lane / Needs approval contrast is something the
+demonstration says out loud, and it was the element being crowded out.
+
+Three separate causes, and each of them a different layer:
+
+* **The eyebrow.** The badge moved to a row of its own ahead of the title, and
+  the icon followed it — a 20px glyph and its gap took 28px of the 205px the
+  padding left, which is what asked *"The coffee brewer is down"* to fit in
+  177px. Both are decoration for the card rather than for the words, and up
+  there they land at the same position on all six cards, which is the whole
+  reason a grid of badges can be scanned at all.
+* **Two lines of description, always.** The descriptions are the tasks' own
+  prompts, 25 to 71 characters, so they came out at one, two, two, three, two
+  and two lines. Shortening them is not on offer — they are what the tap asks,
+  and the corpus and the rehearsal marker are held to their exact wording — so
+  the card clamps to two lines and reserves the second whether or not it is
+  used. `fullDescription` is still what the tap submits.
+* **`grid-auto-rows: 1fr`.** Grid rows are sized independently by default, so
+  the row holding the one card that had to wrap was taller than the other and
+  the six beats read as two unrelated strips. Measured at 118, 118, 118 then
+  138, 138, 138.
+
+Underneath, the card had been styled with inline styles and imperative hover —
+`onMouseOver` / `onMouseOut` mutating `element.style`, one of which reassigned
+the border it already had. That is why it had no theme-aware hover, no press
+feedback at all on the touchscreen this is operated from, and no focus ring of
+its own; `HomeInput.css` reached in at `.home-input-quick-tasks .fui-Button` to
+add one, with `!important` twice, naming a class Fluent generates. It is Griffel
+now: hover, press, disabled and `:focus-visible` are ordinary declarations on
+the card, spacing comes from the Fluent spacing scale rather than from five
+pixel literals, and the lift is dropped entirely under
+`prefers-reduced-motion` — `index.css` only shortens transitions to 0.01ms,
+which makes a lift *instant* rather than absent.
+
+Measured after, in Chromium at 320, 768, 1024 and 1440px: no title wraps at any
+of them, every card is 128px tall, and the badge sits 17px from the top of each.
+
 ## What is not covered here
 
 * **Nothing has run against a deployment.** That tapping *Close the store*
