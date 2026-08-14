@@ -171,7 +171,11 @@ In EITHER out-of-scope case you MUST NOT invoke any domain agent. Output a plan 
 EXACTLY ONE step and nothing else:
   [{{"agent": "MagenticManager", "action": "Inform the user that this request cannot be handled by this team — because it is outside the team's scope, or because the team cannot perform the requested action such as deleting or modifying data — and that no data was changed, without naming any specific team."}}]
 
-When out of scope, the mandatory-inclusion rule below does NOT apply — the lone
+When out of scope, """ + (
+        "the PLAN RULES below do NOT apply"
+        if minimal_plan
+        else "the mandatory-inclusion rule below does NOT apply"
+    ) + """ — the lone
 MagenticManager step IS the complete, valid plan. Only take this path when the
 request is genuinely outside every agent's domain or asks for an action no agent can
 perform; when in doubt, plan normally.
@@ -200,6 +204,47 @@ PLAN RULES:
   sub-tasks, parameters, or data retrieval. Agents discover their own processes.
 """
 
+    if minimal_plan:
+        # A rule was already read as a template once — "one step per agent" —
+        # and a worked example is a stronger template than a rule (#54). Under
+        # `minimal_plan` the only plan the manager was shown was a three-agent
+        # one, directly beneath the paragraph saying one step can be complete.
+        worked_example = """ — the shape follows the request, not the team list:
+[
+  {{"agent": "HRHelperAgent", "action": "execute the onboarding process for the new employee"}}
+]
+That is a complete plan when one agent's description covers what was asked.
+Add a second step only when the request contains a second job that a different
+agent's description names:
+[
+  {{"agent": "HRHelperAgent", "action": "execute the onboarding process for the new employee"}},
+  {{"agent": "TechnicalSupportAgent", "action": "provision IT resources and accounts for the new employee"}}
+]
+"""
+    else:
+        worked_example = """:
+[
+  {{"agent": "HRHelperAgent", "action": "execute the onboarding process for the new employee"}},
+  {{"agent": "TechnicalSupportAgent", "action": "provision IT resources and accounts for the new employee"}},
+  {{"agent": "MagenticManager", "action": "compile a final onboarding summary for the user"}}
+]
+"""
+
+    # The fifth expression of "every agent on the team runs on every request",
+    # and the one that survived the four rewritten in PLAN RULES and the
+    # progress ledger: not *a plan-step agent* — an agent. On a three-
+    # specialist team holding a one-step plan, that is an instruction to run
+    # the other two (#54).
+    if minimal_plan:
+        invocation_completeness = """The plan is the measure of completeness,
+  not the team list. An agent with no step in the plan is not a missing step —
+  the work is done when every step in the plan has been executed by its named
+  agent."""
+    else:
+        invocation_completeness = (
+            "If an agent has not been invoked yet, the workflow is NOT complete."
+        )
+
     plan_append = scope_policy + plan_rules + mandatory_block + \
         clarification_policy + """
 OUTPUT FORMAT (CRITICAL — use EXACTLY this JSON structure, nothing else):
@@ -220,20 +265,14 @@ call it and resumes when the user answers.
 agent in the plan. Agents apply sensible defaults for missing details and proceed
 without asking the user any questions.
 """) + """
-Example plan:
-[
-  {{"agent": "HRHelperAgent", "action": "execute the onboarding process for the new employee"}},
-  {{"agent": "TechnicalSupportAgent", "action": "provision IT resources and accounts for the new employee"}},
-  {{"agent": "MagenticManager", "action": "compile a final onboarding summary for the user"}}
-]
-
+Example plan""" + worked_example + """
 MagenticManager NEVER asks the user questions directly. MagenticManager NEVER
 lists missing information or asks clarifying questions — it ONLY routes tasks.
 
 INVOCATION RULES:
 - Every plan step MUST be executed by its named agent. MagenticManager MUST NOT
   fabricate content on behalf of other agents (no fake URLs, no invented results).
-- If an agent has not been invoked yet, the workflow is NOT complete.
+- """ + invocation_completeness + """
 - MagenticManager's final job: compile verbatim agent outputs into one response.
 """
 

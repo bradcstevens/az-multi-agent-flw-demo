@@ -282,6 +282,88 @@ class TestGetMagenticPromptKwargs:
         assert "prefer a work agent that has NOT yet been invoked" in progress
         assert "select the next uninvoked agent" in progress
 
+    def test_given_minimal_plan_when_called_then_the_roster_is_not_the_completion_test(self):
+        # The sixth residual (#54). Four clauses had been rewritten in the
+        # progress ledger and the plan rules, and the troubleshooter was still
+        # billed on a question with nothing broken in it. INVOCATION RULES —
+        # in the *plan* prompt, and never conditioned on `minimal_plan` — was
+        # still saying the whole assumption in one line: "If an agent has not
+        # been invoked yet, the workflow is NOT complete." Not *a plan-step
+        # agent*: an agent. On a three-specialist team with a one-step plan
+        # that is an instruction to run the other two.
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=False, minimal_plan=True)
+
+        plan_prompt = result["task_ledger_plan_prompt"]
+        assert "If an agent has not been invoked yet" not in plan_prompt
+        assert "The plan is the measure of completeness" in plan_prompt
+
+    def test_given_no_minimal_plan_when_called_then_an_uninvoked_agent_is_incomplete(self):
+        # Unchanged for a pipeline team, where the clause is what stops the
+        # manager finishing before the ComplianceAgent has run.
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=False, participant_names=["ComplianceAgent"])
+
+        plan_prompt = result["task_ledger_plan_prompt"]
+        assert "If an agent has not been invoked yet, the workflow is NOT complete." \
+            in plan_prompt
+
+    def test_given_minimal_plan_when_called_then_the_worked_example_is_one_step(self):
+        # A rule was already read as a template once — "one step per agent" —
+        # and a worked example is a stronger template than a rule (#54). Under
+        # `minimal_plan` the only concrete plan the manager was shown was a
+        # three-agent, one-step-each plan, directly underneath the paragraph
+        # telling it a one-step plan is complete.
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=False, minimal_plan=True)
+
+        plan_prompt = result["task_ledger_plan_prompt"]
+        example = plan_prompt.split("Example plan")[1]
+        first_plan = example.split("]")[0]
+        assert first_plan.count('{"agent"') == 1, \
+            "the first plan the manager is shown must be a one-step plan"
+        assert "Add a second step only when" in example
+        # And the pipeline example is *gone*, not merely demoted below the
+        # one-step one. Counting the first array alone would pass with the old
+        # three-agent template restored underneath it, which is the whole of
+        # the regression: the manager reads the section, not its first line.
+        assert '"MagenticManager", "action": "compile a final onboarding' \
+            not in plan_prompt
+        assert plan_prompt.count('"HRHelperAgent"') == 2
+        assert plan_prompt.count('"TechnicalSupportAgent"') == 1
+
+    def test_given_minimal_plan_when_called_then_scope_policy_names_no_mandatory_rule(self):
+        # TEAM SCOPE POLICY told the manager that "the mandatory-inclusion rule
+        # below does NOT apply" *when out of scope* — and under `minimal_plan`
+        # there is no such rule below. Naming one is how a manager infers that
+        # in-scope requests do include every agent, which is the assumption
+        # this whole issue is made of (#54).
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=False, minimal_plan=True)
+
+        plan_prompt = result["task_ledger_plan_prompt"]
+        assert "mandatory-inclusion rule" not in plan_prompt
+        assert "the PLAN RULES below do NOT apply" in plan_prompt
+
+    def test_given_no_minimal_plan_when_called_then_scope_policy_names_the_mandatory_rule(self):
+        # For a pipeline team the rule exists and the exemption must name it.
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=False, participant_names=["TriageAgent"])
+
+        assert "mandatory-inclusion rule below does NOT apply" \
+            in result["task_ledger_plan_prompt"]
+
+    def test_given_no_minimal_plan_when_called_then_the_worked_example_is_the_pipeline_one(self):
+        # A pipeline team is shown a pipeline, including the manager's own
+        # compile step.
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=False, participant_names=["TriageAgent"])
+
+        example = result["task_ledger_plan_prompt"].split("Example plan")[1]
+        first_plan = example.split("]")[0]
+        assert first_plan.count('{"agent"') == 3
+        assert "MagenticManager" in first_plan
+
     def test_given_no_user_responses_when_called_then_final_has_answer_rules(self):
         # Act
         result = get_magentic_prompt_kwargs(has_user_responses=False)

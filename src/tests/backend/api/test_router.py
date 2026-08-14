@@ -1624,6 +1624,100 @@ class TestSopAsk:
         rehearsal["forget_rehearsals"]()
         turn["forget_turns"]()
 
+    def test_the_reply_is_recorded_beside_the_question_it_answered(
+        self, rt, monkeypatch, caplog
+    ):
+        """The half the log was missing when it mattered (#54).
+
+        Measured 2026-08-14 against `rg-macae-flw-v1`: three of six validator
+        runs went red, two of them as the **honest miss**, and every one of
+        those turns had already been rewritten to the corpus's own wording —
+        the log line above says so. Ten direct probes with that same wording,
+        minutes later, came back cited every time. So the request half of the
+        log had exonerated the rephrasing and could say nothing at all about
+        what came back: an agent that answered *"no matching procedure"* and an
+        agent that answered the procedure with no citation metadata are
+        different faults at different layers, and both reach the Grounding
+        panel as an empty citation list.
+        """
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+
+        with caplog.at_level(logging.INFO, logger=router_mod.logger.name):
+            self._post(rt)
+
+        logged = "\n".join(record.getMessage() for record in caplog.records)
+        assert "SOP-102 Store Closing Procedure.docx" in logged
+        assert "1. Count the drawer." in logged
+
+    def test_an_uncited_reply_is_named_an_honest_miss_in_the_log(
+        self, rt, monkeypatch, caplog
+    ):
+        # The row that has to be readable months later, from a container log
+        # and nothing else: what was asked, what it was retrieved against, and
+        # that the agent came back with words and no document.
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        rt.sop.ask = AsyncMock(
+            return_value=SopAnswer(
+                text="I searched Dataverse and found no matching procedure.",
+                citations=[],
+                conversation_id="conv-2",
+            )
+        )
+
+        with caplog.at_level(logging.INFO, logger=router_mod.logger.name):
+            self._post(rt)
+
+        logged = "\n".join(record.getMessage() for record in caplog.records)
+        assert "the honest miss" in logged
+
+    def test_a_direct_line_failure_is_not_logged_as_an_honest_miss(
+        self, rt, monkeypatch, caplog
+    ):
+        """The two uncited replies that must never be read as each other.
+
+        The honest miss is a *demonstrated* capability — the SOP agent searched
+        and said so — and the fixed failure message is the hop not happening at
+        all. Both carry zero citations, so a log line that reads emptiness as
+        the miss would name the corpus for an outage.
+        """
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        rt.sop.ask = AsyncMock(side_effect=RuntimeError("no route to Direct Line"))
+
+        with caplog.at_level(logging.INFO, logger=router_mod.logger.name):
+            self._post(rt)
+
+        logged = "\n".join(record.getMessage() for record in caplog.records)
+        assert "the honest miss" not in logged
+        assert "the hop failed" in logged
+
+    def test_the_reply_log_names_the_query_it_answered(
+        self, rt, monkeypatch, caplog
+    ):
+        # The request and the reply are two records with an `await` between
+        # them, and the backend serves every agent in the pool at once. Without
+        # the retrieval query on the reply, two interleaved turns read as one
+        # question answered twice.
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        turn = router_mod.sole_turn.__globals__
+        rehearsal = router_mod.note_rehearsal.__globals__
+        turn["forget_turns"]()
+        rehearsal["forget_rehearsals"]()
+        turn["note_turn"]("user-1", "session-1")
+        router_mod.note_rehearsal("session-1")
+
+        with caplog.at_level(logging.INFO, logger=router_mod.logger.name):
+            self._post(rt, "the closing checklist for store 223, please")
+
+        reply = [
+            record.getMessage() for record in caplog.records
+            if "citation(s)" in record.getMessage()
+        ]
+        assert len(reply) == 1
+        assert "How do I close the store?" in reply[0]
+        assert "conv-1" in reply[0]
+        rehearsal["forget_rehearsals"]()
+        turn["forget_turns"]()
+
     def test_an_out_of_corpus_question_is_not_normalized_to_the_rehearsed_hit(
         self, rt, monkeypatch
     ):

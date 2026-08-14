@@ -903,6 +903,42 @@ async def sop_ask(request: Request):
         logger.error("sop/ask: no SOP agent to ask: %s", exc)
         answer = SopAnswer(text=DIRECT_LINE_FAILURE, failed=True)
 
+    # And what came back (#54). The request half above exonerates the
+    # rephrasing; on its own it says nothing about the reply, and the reply is
+    # where the beat was still failing once the rephrasing was handled.
+    # Measured 2026-08-14: three of six validator runs red, two of them the
+    # honest miss, every one of them retrieved against the corpus's own
+    # wording — and ten direct probes of that same wording cited SOP-102 every
+    # time. An agent that answers "no matching procedure" and an agent that
+    # answers the procedure with no citation metadata are different faults at
+    # different layers, and both reach the Grounding panel as an empty list.
+    #
+    # It names the retrieval query and the conversation because the request
+    # record is a separate line with an `await` between them and this backend
+    # serves the whole agent pool at once: two interleaved turns would
+    # otherwise read as one question answered twice.
+    #
+    # A Direct Line failure is **not** the honest miss and must never be
+    # logged as one. The miss is a demonstrated capability — the agent
+    # searched and said so; the failure is the hop not happening. Both carry
+    # zero citations, and only one of them means the corpus is wrong.
+    if answer.failed:
+        emptiness = " — the hop failed"
+    elif not answer.citations:
+        emptiness = " — the honest miss"
+    else:
+        emptiness = ""
+    logger.info(
+        "sop/ask: %r came back with %d citation(s)%s %s "
+        "(conversation %s): %r",
+        retrieval_query,
+        len(answer.citations),
+        emptiness,
+        [citation.name for citation in answer.citations],
+        answer.conversation_id,
+        (answer.text or "")[:400],
+    )
+
     reply = {
         "text": answer.text,
         "failed": answer.failed,

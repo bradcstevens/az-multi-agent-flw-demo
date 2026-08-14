@@ -305,6 +305,74 @@ came back with two agents on a beat that had recorded one.
 This is the fifth way the proof could have come back green, or red, about the wrong thing — and the
 only one of the five that would have been read as evidence rather than as a passing streak.
 
+## The sixth residual: three more places the roster is the plan
+
+With the meter finally readable, the next question was whether the troubleshooter was still being
+billed. Four clauses had already been rewritten for that, and each had *reduced* the failure rate
+without removing it, because each was one expression of a single inherited assumption — **every agent
+on the team runs on every request** — and the assumption is written down in more places than anybody
+had counted.
+
+Counting them rather than finding them one red run at a time turns up three more, all of them in the
+*plan* prompt and none of them conditioned on `minimal_plan`:
+
+| Where | What it said | Read on a team of alternatives |
+| --- | --- | --- |
+| `INVOCATION RULES` | *"If **an agent** has not been invoked yet, the workflow is NOT complete."* | Not *a plan-step agent*: an agent. With a one-step plan and three specialists, this is an instruction to run the other two. |
+| The worked example | A three-agent plan, one step each | The repository has already learned that *"one step per agent"* is read as a template. An example is a stronger template than a rule, and it sat directly under the paragraph saying a one-step plan is complete. |
+| `TEAM SCOPE POLICY` | *"When out of scope, the mandatory-inclusion rule below does NOT apply"* | Under `minimal_plan` there is no such rule below. Naming an exemption is how a reader infers the rule it exempts them from. |
+
+All three are now the `minimal_plan` fork the other four already have, and a pipeline team's prompt is
+byte-for-byte what it was. They were fixed **together**, which is a departure from how the first four
+were found and is deliberate: fixing them one at a time costs one deploy and one ten-run rehearsal
+each, and none of the three is desirable under `minimal_plan`, so there is no guess to get wrong.
+
+## What six live runs said instead
+
+The rate was measured before anything was changed — six Demo validator runs against `rg-macae-flw-v1`
+on 2026-08-14, build `e21d6516`, three green and three red. **Not one of the three was the
+troubleshooter.** Two were the **honest miss** and one was grounded-and-cited but failed downstream;
+the cost table on every run named `Store SOP Assistant` and `Shift Tasks Agent` and nobody else.
+
+That is the *original* symptom of this issue, and the ledger's request half ruled out the layer it
+was built to rule out:
+
+```
+sop/ask: the orchestrator asked 'Please look up the store closing procedure for Store 223 …';
+         retrieving against 'How do I close the store?' — the rehearsed turn's corpus wording
+```
+
+The marker fired. Dataverse was searched for the corpus's own words, and the panel came back with no
+citation. So the same wording was then put to `/api/v4/sop/ask` ten times in the following two
+minutes — the third layer asked directly, with no orchestrator in front of it:
+
+```
+failed=False cites=['SOP-102 Store Closing Procedure.docx']   × 10
+```
+
+Ten out of ten. Three out of six through the orchestrator, with the identical retrieval query, on one
+replica. Both cannot be a property of the corpus or of the index, and the wording is now excluded by
+measurement rather than by argument.
+
+## The half of the log that was missing
+
+What no record could say next is **what the SOP agent replied**. The Grounding panel renders an empty
+citation list as the honest miss, and it renders it identically for two different faults:
+
+- the agent searched the knowledge source and genuinely found nothing;
+- the agent answered from its own instructions without consulting the knowledge source at all, so
+  there was no appearance metadata for `citations_from_activity` to read.
+
+The first is the corpus or the index. The second is the Copilot Studio agent's own generative
+answering, and it is not fixed anywhere in this repository's prompt layer. Guessing between them is
+the same shape of mistake as guessing between *must not run* and *must not have the last word*, which
+has already cost three deploys.
+
+So `/sop/ask` now logs the reply beside the question — the citation count, the document names, and the
+first 400 characters of what the agent actually said. The request half was added for issue #54's first
+acceptance criterion and did its job; this is that criterion applied to the other end of the hop, and
+the next red run is readable from `az containerapp logs` alone.
+
 ## Running the proof
 
 ```bash
@@ -334,8 +402,10 @@ whole walkthrough. Making the fallback is a plain Demo validator run's job.
 (`docs/demo-validator.md`) multiplied by ten. It drives a real browser through ten live conversations
 with the deployed agent pool. `src/tests/ci/test_e2e_wiring.py` fails if a workflow ever runs it.
 
-A presenter's own rehearsal leaves the same trace: `/sop/ask` logs both strings on every call, so
-`az containerapp logs` answers "what did the orchestrator actually ask?" without the validator.
+A presenter's own rehearsal leaves the same trace: `/sop/ask` logs both strings on every call, plus
+what came back — the citation count, the documents named, and the opening of the answer — so
+`az containerapp logs` answers both "what did the orchestrator actually ask?" and "what did the SOP
+agent actually say?" without the validator.
 
 ## Reading a red run
 
@@ -346,6 +416,9 @@ The report names one of four layers:
   the marker did not fire. Check that the tapped Quick Task's prompt is still exactly
   `[rehearsed_hit].question`; the marker is armed on an exact match, deliberately.
 - **the agent's Dataverse index** — the corpus's own wording was retrieved against and missed. The
-  expensive one, and the only one that means the demonstration's *content* is wrong.
+  expensive one, and the only one that means the demonstration's *content* is wrong. Before believing
+  it, put the same wording to `/api/v4/sop/ask` ten times: on 2026-08-14 that came back cited ten out
+  of ten while the browser missed three of six, which rules the index out and leaves the SOP agent's
+  own answering. The backend log now carries what it replied, which is how the two are told apart.
 - **unknown** — the evidence does not reach a layer, and the harness says so rather than guessing.
   Read `e2e/artifacts/report` and the run's `error-context.md`.
