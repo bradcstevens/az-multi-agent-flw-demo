@@ -30,6 +30,7 @@ from orchestration.connection_config import (connection_config,
 from orchestration.plan_review_helpers import (convert_plan_review_to_mplan,
                                                get_magentic_prompt_kwargs,
                                                mandatory_participants,
+                                               plans_minimally,
                                                wait_for_plan_approval)
 from patches.tool_history_leak import apply_tool_history_leak_patch
 from services.team_service import TeamService
@@ -175,6 +176,8 @@ class OrchestrationManager:
         prompt_kwargs = get_magentic_prompt_kwargs(
             has_user_responses=has_user_responses,
             participant_names=required_agent_names,
+            minimal_plan=plans_minimally(
+                team_config, participant_agent_names),
         )
 
         cls.logger.info(

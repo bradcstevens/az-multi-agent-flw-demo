@@ -128,6 +128,40 @@ That this was findable at all is the ledger's doing. A single red Playwright run
 flaky; the ledger says it is flaky at run 7 of 10, with the retrieval green and the clarification
 verbatim, which names one agent's system message.
 
+## The second residual: "one step per agent" is read as a template
+
+Reordering the troubleshooter's instructions was not enough either — the next rehearsal failed at
+run 1, same outcome, and the cost table is what said why:
+
+| Agent | Model | Calls | Tokens |
+| --- | --- | --- | --- |
+| Store SOP Assistant | — | 1 | — |
+| Shift Tasks Agent | gpt-5.4-mini | 1 | 3,888 |
+| Troubleshooting Agent | gpt-5.4 | 1 | 6,911 |
+
+The troubleshooter was still *in the plan*. Its system message is not what put it there, so no edit
+to that message could have taken it out — and an agent handed a step by the manager does the step it
+was handed, whatever its own instructions say about deferring.
+
+`PLAN RULES` was the reason:
+
+> Steps are HIGH-LEVEL task assignments — **one step per agent**.
+
+That sentence means *at most* one step each. A manager reads it as a template: one step, per agent.
+With the MANDATORY AGENTS clause removed there was nothing left saying a shorter plan was allowed, so
+it kept producing the same three-step plan the clause used to compel.
+
+So `minimal_plan` replaces the rule for a team that opts out, saying the thing that was never said:
+include only the agents whose description names the job being asked for, a one-step plan is complete,
+and do not add an agent because it might be tangentially relevant. The reason is stated in the prompt
+too, because it is the part a manager cannot infer — an unneeded agent does not sit quietly; it does
+its own job on a request that did not ask for it, and the user is answered by the wrong specialist.
+
+`plans_minimally` is a separate pure function from `mandatory_participants` rather than an inline
+`not required_agent_names`, because these two clauses failed **independently**: removing one left the
+other doing its work, and a reader of either one alone would conclude the team plans minimally when
+it does not.
+
 ## The flag reaches Cosmos, and is still not read
 
 Carrying `require_all_agents` through the validator was necessary and not sufficient. The store team

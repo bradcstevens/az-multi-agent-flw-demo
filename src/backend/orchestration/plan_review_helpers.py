@@ -56,10 +56,29 @@ def mandatory_participants(team_config, agent_names) -> list:
     return list(agent_names)
 
 
+def plans_minimally(team_config, agent_names) -> bool:
+    """Whether the manager should plan only the agents the request needs. Pure.
+
+    The complement of `mandatory_participants`, and it needs saying separately
+    because dropping the MANDATORY AGENTS clause did not stop the manager
+    planning every agent: `PLAN RULES` still said *one step per agent*, which
+    reads as a template rather than a ceiling. Measured against the deployment,
+    the store team kept billing the Troubleshooting Agent for *"How do I close
+    the store?"* — which then asked which equipment was blocking closing, with
+    nothing broken (#54).
+
+    False for a team with no agents at all, where there is no plan to minimise
+    and the phrasing would only confuse the manager.
+    """
+    return bool(agent_names) and not mandatory_participants(
+        team_config, agent_names)
+
+
 def get_magentic_prompt_kwargs(
     *,
     has_user_responses: bool = False,
     participant_names: Optional[list[str]] = None,
+    minimal_plan: bool = False,
 ) -> dict:
     """Build the prompt-override kwargs dict for ``MagenticBuilder``.
 
@@ -73,6 +92,12 @@ def get_magentic_prompt_kwargs(
             clause requiring every one of these agents to appear as a plan step,
             so coordinator-like agents (e.g. TriageAgent) and final-validation
             agents (e.g. ComplianceAgent) are not silently dropped.
+        minimal_plan: Whether a plan should contain only the agents the request
+            actually needs. The counterpart of ``participant_names``, for a team
+            whose agents are alternatives rather than a pipeline: dropping the
+            MANDATORY AGENTS clause alone left "one step per agent" standing,
+            which a manager reads as a template rather than a ceiling and keeps
+            planning a step for every specialist (#54).
 
     Returns:
         A dict suitable for unpacking into ``MagenticBuilder(**kwargs)``.
@@ -152,12 +177,31 @@ request is genuinely outside every agent's domain or asks for an action no agent
 perform; when in doubt, plan normally.
 """
 
-    plan_append = scope_policy + """
+    if minimal_plan:
+        plan_rules = """
+
+PLAN RULES:
+- Steps are HIGH-LEVEL task assignments. Do NOT prescribe sub-tasks,
+  parameters, or data retrieval. Agents discover their own processes.
+- Include ONLY the agents whose expertise the request actually needs. Read each
+  agent's description and include an agent when the request is the job that
+  description names. A ONE-STEP plan is a correct and complete plan whenever one
+  agent's description covers the request.
+- Do NOT add an agent because it might be tangentially relevant, because it
+  could add context, or because it has not been used yet. An agent that is not
+  needed does not stay silent: it does its own job on a request that did not ask
+  for it, and the user is answered by the wrong specialist.
+"""
+    else:
+        plan_rules = """
 
 PLAN RULES:
 - Steps are HIGH-LEVEL task assignments — one step per agent. Do NOT prescribe
   sub-tasks, parameters, or data retrieval. Agents discover their own processes.
-""" + mandatory_block + clarification_policy + """
+"""
+
+    plan_append = scope_policy + plan_rules + mandatory_block + \
+        clarification_policy + """
 OUTPUT FORMAT (CRITICAL — use EXACTLY this JSON structure, nothing else):
 ```json
 [

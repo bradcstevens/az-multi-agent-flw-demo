@@ -141,7 +141,7 @@ sys.modules['orchestration.helper.plan_to_mplan_converter'] = Mock(
 # ---- Import module under test ----
 from backend.orchestration.plan_review_helpers import (
     convert_plan_review_to_mplan, get_magentic_prompt_kwargs,
-    mandatory_participants, wait_for_plan_approval)
+    mandatory_participants, plans_minimally, wait_for_plan_approval)
 
 # Re-bind mocked singletons for convenient assertions
 connection_config = sys.modules['orchestration.connection_config'].connection_config
@@ -229,6 +229,29 @@ class TestGetMagenticPromptKwargs:
 
         # Assert
         assert "MANDATORY AGENTS" not in result["task_ledger_plan_prompt"]
+
+    def test_given_minimal_plan_when_called_then_only_relevant_agents_are_planned(self):
+        # Dropping MANDATORY AGENTS was necessary and not sufficient (#54).
+        # PLAN RULES still said "one step per agent", which a manager reads as
+        # a template rather than a ceiling: with the mandatory clause gone it
+        # kept planning a step for all three store specialists, and the
+        # troubleshooter asked which equipment was blocking closing when
+        # nothing was broken. Measured against the deployment, run 1 of 10.
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=False, minimal_plan=True)
+
+        plan_prompt = result["task_ledger_plan_prompt"]
+        assert "MANDATORY AGENTS" not in plan_prompt
+        assert "ONLY the agents" in plan_prompt
+        assert "one step per agent" not in plan_prompt
+
+    def test_given_no_minimal_plan_when_called_then_one_step_per_agent_stands(self):
+        # The accelerator's teams are pipelines and keep the inherited rule.
+        result = get_magentic_prompt_kwargs(has_user_responses=False)
+
+        plan_prompt = result["task_ledger_plan_prompt"]
+        assert "one step per agent" in plan_prompt
+        assert "ONLY the agents" not in plan_prompt
 
     def test_given_no_user_responses_when_called_then_final_has_answer_rules(self):
         # Act
@@ -561,3 +584,29 @@ class TestMandatoryInclusionIsOptIn:
             "the rehearsed procedure question will be answered with a "
             "clarifying question from the Troubleshooting Agent"
         )
+
+
+class TestPlansMinimally:
+    """Which teams get a manager free to plan one step.
+
+    Separate from `mandatory_participants` because the two clauses failed
+    independently: dropping the mandatory one still left "one step per agent"
+    standing, and the store team kept planning all three specialists (#54).
+    """
+
+    def test_a_team_that_opts_out_plans_minimally(self):
+        assert plans_minimally(
+            Mock(require_all_agents=False), ["A", "B"]) is True
+
+    def test_a_team_that_did_not_opt_out_does_not(self):
+        assert plans_minimally(
+            Mock(require_all_agents=True), ["A", "B"]) is False
+
+    def test_a_team_predating_the_flag_does_not(self):
+        # Opt-out, not opt-in: an accelerator team keeps what it was
+        # configured under.
+        assert plans_minimally(Mock(spec=[]), ["A", "B"]) is False
+
+    def test_a_team_with_no_agents_has_no_plan_to_minimise(self):
+        assert plans_minimally(
+            Mock(require_all_agents=False), []) is False
