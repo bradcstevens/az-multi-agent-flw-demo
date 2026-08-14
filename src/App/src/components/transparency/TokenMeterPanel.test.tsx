@@ -10,6 +10,18 @@ import {
     GUARDRAIL_ROW_KEY,
 } from '../../models/meter';
 import { parseSourceUsed, parseTokenUsage } from '../../models/transparency';
+import { allRulesIncludingMediaQueries } from '@/testing/stylesheets';
+
+/** Every selector the stylesheets forbid a line break in, read out of them. */
+const COLUMNS = 5;
+
+const nowrapSelectors = (): string[] =>
+    allRulesIncludingMediaQueries()
+        .filter((rule) => /white-space:\s*nowrap/.test(rule.body))
+        .map((rule) => rule.selector);
+
+const wraps = (cell: HTMLElement): boolean =>
+    !nowrapSelectors().some((selector) => cell.matches(selector));
 
 const usage = (executorId: string, agentName: string, input: number, output: number) =>
     parseTokenUsage({
@@ -30,6 +42,54 @@ const sopAnswer = parseSourceUsed({
 const models = { shift_tasks_agent: 'gpt-4.1-mini', orchestrator: 'o4-mini' };
 
 describe('the Token meter', () => {
+    it('gives every column a share of the rail rather than its content width', () => {
+        // Wrapping the names is only half of it. Left to size themselves, the
+        // three numeric columns still take whatever their content asks for and
+        // the name columns absorb the shortfall, so a five-figure token count
+        // squeezes `Agent` to one character a line. `table-layout: fixed` plus
+        // a declared share per column is what makes the table's width the
+        // rail's rather than its content's — read out of the stylesheet,
+        // because nothing in jsdom lays a table out.
+        const meter = allRulesIncludingMediaQueries().filter((rule) =>
+            rule.selector.split(',').some((part) => part.trim().startsWith('.token-meter')),
+        );
+
+        const table = meter.find((rule) => /table-layout:\s*fixed/.test(rule.body));
+        expect(table, 'no rule fixes the token meter\u2019s table layout').toBeDefined();
+
+        const shares = meter
+            .filter((rule) => /nth-child\(\d+\)/.test(rule.selector))
+            .map((rule) => /width:\s*([\d.]+)%/.exec(rule.body)?.[1])
+            .filter((share): share is string => share !== undefined)
+            .map(Number);
+
+        expect(shares, 'every column needs a declared share').toHaveLength(COLUMNS);
+        expect(shares.reduce((total, share) => total + share, 0)).toBe(100);
+    });
+
+    it('breaks the names rather than the credits column', () => {
+        // Five columns that could not wrap made the table 448px wide inside a
+        // 320px rail, so its right-hand end — the estimated Copilot Credits,
+        // the number the two-billing-models point is made with — sat outside
+        // the box at every width the surface has. The numbers keep their
+        // nowrap, because a wrapped figure breaks the side-by-side reading; the
+        // agent and model names give the room up instead.
+        let meter = recordTokenUsage(emptyMeter(), usage('shift_tasks_agent', 'Shift Tasks Agent', 900, 100));
+        meter = recordSourceUsed(meter, sopAnswer);
+
+        render(<TokenMeterPanel meter={meter} models={models} />);
+
+        const row = screen.getByTestId('meter-row-shift_tasks_agent');
+        expect(wraps(within(row).getByTestId('meter-agent')), 'the agent name cannot wrap').toBe(true);
+        expect(wraps(within(row).getByTestId('meter-model')), 'the model name cannot wrap').toBe(true);
+        expect(wraps(within(row).getByTestId('meter-tokens')), 'the token count may wrap').toBe(false);
+        expect(wraps(within(row).getByTestId('meter-credits')), 'the credits count may wrap').toBe(false);
+        expect(
+            wraps(screen.getByTestId('meter-credits-heading')),
+            'the credits heading cannot wrap, so it sets the column width on its own',
+        ).toBe(true);
+    });
+
     it('shows a row per agent with its call count and tokens', () => {
         let meter = emptyMeter();
         meter = recordTokenUsage(meter, usage('shift_tasks_agent', 'Shift Tasks Agent', 900, 100));

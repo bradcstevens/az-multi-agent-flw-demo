@@ -19,6 +19,34 @@
     overflow: hidden;
 }
 
+/*
+ * The conversation column, moved out of `Content`'s inline style in #60 so the
+ * stacking breakpoint can reach it. `min-width` is 280px and not 320px because
+ * 320 + the task-history panel's 280 + the rail's 320 is 920px of furniture in
+ * a shell that stacks at 900 — a 19px band above the breakpoint in which the
+ * shell, which clips horizontally, silently cut the end off the rail.
+ */
+.content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    height: 100%;
+    min-width: 280px;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.panelContent {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    /* Prevents a second scrollbar inside the conversation. */
+    overflow: hidden;
+    /* Lets the reply stream shrink rather than pushing the column open. */
+    min-height: 0;
+}
+
 .store-identity {
     display: flex;
     align-items: center;
@@ -57,6 +85,30 @@
         overflow-y: auto;
     }
 
+    /*
+     * The stacked shell scrolls as one — and it can only do that if nothing
+     * inside it shrinks. Every column here has a non-visible `overflow`, and a
+     * flex item with one has an automatic minimum size of **zero**, so the
+     * column crushed its contents to fit rather than letting the page grow:
+     * measured at 320px, a conversation 900px tall rendered 17px and the rail
+     * 32px around 189px of content, while the shell's own `overflow-y: auto`
+     * never engaged. (#60)
+     */
+    .coral-shell-row > * {
+        flex-shrink: 0;
+    }
+
+    /*
+     * And the conversation is as tall as what it holds, not a viewport. Pinned
+     * to `height: 100%` in a stacked column it puts a whole screen between the
+     * answer and the panels that explain it — the same complaint as the plan
+     * panel's `100vh`, in the column beside it.
+     */
+    .coral-shell-row .content {
+        height: auto;
+        min-width: 0;
+    }
+
     .panel-left-container {
         display: none;
     }
@@ -84,5 +136,19 @@
      */
     .coral-shell-row .plan-panel-right {
         height: auto;
+    }
+
+    /*
+     * And neither keeps a scroll window of its own (#60). A box that caps its
+     * own height inside an already-scrolling page hides content behind a second
+     * scrollbar nobody looks for: the rail held six times its own height at
+     * 390px — the Grounding panel and the Token meter, the two things the rail
+     * exists to show, in practice invisible on the device the associate is
+     * actually holding.
+     */
+    .coral-shell-row .transparency-rail,
+    .coral-shell-row .plan-panel-right {
+        max-height: none;
+        overflow: visible;
     }
 }

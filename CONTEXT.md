@@ -506,6 +506,25 @@ stack. The border box is part of the release rather than a detail: these columns
 shell clips horizontally, so a content-box column at `width: 100%` is wider than the viewport and
 loses its right-hand end silently, which for the **Token meter** is the credits column.
 
+Stacking the columns is not the same as **sizing** them, and #60 is the second half. Three rules,
+each read out of the stylesheets by the frontend loop rather than listed in it:
+
+- **Declared is rendered.** A padded, fixed-width box carries `box-sizing: border-box`. The rail
+  declared 320px and rendered 353px, so every container sized to its number clipped 33px of it.
+- **One width per column.** The rail declares it; `.plan-panel-right` takes `width: min-content`,
+  which is the rail's number and not a second one. It used to declare 280px with `overflow: hidden`
+  around a 353px rail, amputating 53px at every desktop width with no scrollbar to say so.
+- **One scroll region per column, and nothing shrinks when stacked.** Every column has a non-visible
+  `overflow`, and a flex item with one has an automatic minimum size of **zero** — so the stacked
+  shell crushed its children rather than scrolling, and a 900px conversation rendered 17px. The
+  breakpoint releases both (`flex-shrink: 0`, `overflow: visible`), so the surface scrolls as one.
+
+None of which reaches a column whose layout is an inline style. `Content` declared `flex: 1`,
+`height: 100%` and `min-width: 320px` inline — the trap #25 already found in the shell, one column
+over — so its layout moved to `storeSurface.css` too. The minimum is now 280px, because 320 plus the
+task-history panel's 280 plus the rail's 320 is 920px of columns in a shell that stacks at 900, and
+the 19px band above the breakpoint was clipped off the rail's end without a scrollbar.
+
 **Grounding panel** — the R6 surface showing where an answer came from. Driven by **two signals
 combined**: a "source used" event emitted server-side over the existing WebSocket, which proves
 *which platform* answered, and citation data parsed from the SOP agent's response, which supplies
@@ -564,6 +583,12 @@ The panel (#24) is one row per agent in the order each first spent, with **token
 Copilot Credits side by side** and a **model** column read from the workflow roster's
 `deployment_name`, which is how "cheap models on cheap work" becomes checkable. Each row fills only
 its own billing column, because the point is that the two models are not uniform.
+
+The table gives its width up in the **names**, never the figures (#60): `white-space: nowrap` is
+scoped to `.token-meter__number`, and `table-layout: fixed` makes each column a share of the rail
+rather than a negotiation the largest token total wins. Unscoped, the table measured 448px inside a
+320px rail and the column outside the box was the credits one — the panel that proves what an
+answer cost, losing the number it exists to show.
 
 **Not reported vs measured** — the rendering rule the whole meter turns on: `—` means *nobody told
 us*, `0` means *we know it was nothing*. The Copilot Studio row's tokens are `—` because Direct Line

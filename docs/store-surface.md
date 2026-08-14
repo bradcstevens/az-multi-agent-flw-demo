@@ -151,6 +151,52 @@ against these stylesheets and a synthetic shell DOM: stacked, the panel and the 
 exactly the viewport width at 320, 390, 768 and 900px, where before the fix the panel rendered
 430px into a 390px viewport.
 
+### The rail fits its own box, and the column owns one width
+
+Stacking the right boxes is not the same as sizing them. Both were wrong underneath (#60), and each
+failure was invisible in a different way.
+
+The rail was a **content box**: 320px declared plus 16px of padding on each side is 353px rendered,
+so every width in the stylesheet was 33px short of the truth. Its container declared 280px — a
+second number for the same column — and `overflow: hidden`, so on the plan surface a 353px rail
+rendered into a 321px box and **53px of it was amputated at every desktop width**, with no scrollbar
+to say so. Because `.token-meter` cells could not wrap, the end that fell outside was the estimated
+Copilot Credits column: the panel that exists to prove what an answer cost, losing the number.
+
+Stacked, the shell crushed what it held instead of scrolling. Every column in it has a non-visible
+`overflow`, and a flex item with one has an **automatic minimum size of zero** — so `overflow-y:
+auto` on the shell was a promise it could never keep: its children shrank to fit before it ever
+scrolled. Measured at 320px, a conversation 900px tall rendered **17px**, and `.plan-section` held
+456px of plan in 382px of box, taking a `max-height: 550px` from a `(max-width: 1920px) and
+(max-height: 1080px)` query that a phone matches.
+
+Four rules now, each read out of the stylesheets by the frontend loop:
+
+- **Declared is rendered.** A padded, fixed-width box carries `box-sizing: border-box`, or it is
+  wider than every container sized to its number.
+- **One width per column.** The rail declares it; `.plan-panel-right` takes `width: min-content`,
+  which is the rail's number rather than a second one.
+- **One scroll region per column.** The panel scrolls; the rail inside it does not, and stacked
+  neither does. A box that caps its own height inside an already-scrolling page hides content behind
+  a second scrollbar nobody looks for.
+- **Nothing shrinks when stacked.** `.coral-shell-row > * { flex-shrink: 0 }`, so the shell's own
+  scrolling is what absorbs the height.
+
+None of that reaches the conversation while its layout is an inline style. `Content` declared
+`flex: 1`, `height: 100%` and `min-width: 320px` inline, every one of which beats a media query —
+the same trap that made #25's breakpoint inert, one column over, and the column the stacked shell
+crushed first. Its layout now lives in `storeSurface.css`, and its minimum width is 280px rather
+than 320: 320 plus the task-history panel's 280 plus the rail's 320 is 920px of furniture in a shell
+that stacks at 900, so between 901 and 919px the shell — which clips horizontally — silently cut the
+end off the rail.
+
+The token meter gives its width up in the **names**, not the figures: `white-space: nowrap` is
+scoped to `.token-meter__number`, and `table-layout: fixed` makes the columns shares of the rail
+rather than a negotiation the largest token total wins. Measured across 320, 390, 768, 900, 1024 and
+1440px on both surfaces: the rail renders exactly its declared width, nothing overflows it in either
+axis, and stacked the shell scrolls as one — 961px of page in an 844px viewport at 320px, where
+before nothing scrolled at all.
+
 ## Labelling what is simulated
 
 `SimulatedBadge` marks anything whose content was authored for the walkthrough rather than produced

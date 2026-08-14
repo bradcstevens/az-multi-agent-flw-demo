@@ -67,8 +67,12 @@ const TokenMeterPanel: React.FC<TokenMeterPanelProps> = ({ meter, models = {} })
             <table className="token-meter" data-testid="meter-table">
                 <thead>
                     <tr>
-                        <th scope="col">Agent</th>
-                        <th scope="col">Model</th>
+                        <th scope="col" className="token-meter__name">
+                            Agent
+                        </th>
+                        <th scope="col" className="token-meter__name">
+                            Model
+                        </th>
                         <th scope="col">Calls</th>
                         <th scope="col">Tokens</th>
                         <th scope="col" data-testid="meter-credits-heading">
@@ -84,13 +88,21 @@ const TokenMeterPanel: React.FC<TokenMeterPanelProps> = ({ meter, models = {} })
                             data-billing={row.billing}
                             title={rowTitle(row)}
                         >
-                            <th scope="row" data-testid="meter-agent">
+                            <th scope="row" className="token-meter__name" data-testid="meter-agent">
                                 {row.agentName}
                             </th>
-                            <td data-testid="meter-model">{models[row.key] || '—'}</td>
-                            <td data-testid="meter-calls">{row.calls}</td>
-                            <td data-testid="meter-tokens">{count(row.totalTokens)}</td>
-                            <td data-testid="meter-credits">{count(row.credits)}</td>
+                            <td className="token-meter__name" data-testid="meter-model">
+                                {models[row.key] || '—'}
+                            </td>
+                            <td className="token-meter__number" data-testid="meter-calls">
+                                {row.calls}
+                            </td>
+                            <td className="token-meter__number" data-testid="meter-tokens">
+                                {count(row.totalTokens)}
+                            </td>
+                            <td className="token-meter__number" data-testid="meter-credits">
+                                {count(row.credits)}
+                            </td>
                         </tr>
                     ))}
                 </tbody>

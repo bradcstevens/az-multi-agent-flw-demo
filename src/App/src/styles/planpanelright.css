@@ -1,31 +1,49 @@
-/* PlanPanelRight styles */
+/*
+ * PlanPanelRight — the plan surface's right-hand column, and the container the
+ * transparency rail sits inside there.
+ *
+ * It declares **no width of its own** (#60). It used to declare 280px while the
+ * rail inside it declared 320px — forty pixels apart before either one's
+ * padding, and `overflow: hidden` on the outer one, so the rail rendered 353px
+ * into a 321px box and 53px of it was amputated at every desktop width, with no
+ * scrollbar to say so. `min-content` is the rail's number rather than a second
+ * one, so the two cannot drift apart again the way the two stacking breakpoints
+ * did in #58.
+ */
 .plan-panel-right {
-  width: 280px;
+  width: min-content;
   height: 100vh;
-  padding: 20px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  flex: none;
+  /*
+   * Never `hidden`. A panel whose whole job is to prove what an answer cost may
+   * not be able to amputate the number without saying so — content that does
+   * not fit scrolls here, visibly, and this is the column's one scroll region.
+   */
+  overflow-y: auto;
   border-left: 1px solid var(--colorNeutralStroke1);
-  /* backgroundColor: var(--colorNeutralBackground1); */
 }
 
-.plan-panel-right__no-data {
-  width: 280px;
-  height: 100vh;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-left: 1px solid var(--colorNeutralStroke1);
-  color: var(--colorNeutralForeground3);
-  font-size: 14px;
-  font-style: italic;
+/*
+ * Inside the panel the rail is not its own scroll region: the panel scrolls, and
+ * a flex child with a non-visible overflow has an automatic minimum size of
+ * zero, which is how the rail was crushed to 32 pixels around 189 pixels of
+ * content. Its left border is the panel's here, not its own.
+ */
+.plan-panel-right .transparency-rail {
+  overflow: visible;
+  border-left: none;
+}
+
+/* The panel's own padding is the rail's, so nothing is inset twice. */
+.plan-panel-right > .simulated-ticket {
+  margin: 12px 16px;
 }
 
 .plan-section {
-  margin-bottom: 24px;
-  padding-bottom: 20px;
+  padding: 16px;
   border-bottom: 1px solid var(--colorNeutralStroke1);
 }
 
@@ -82,191 +100,27 @@
   line-height: 1.4;
 }
 
-.agents-section {
-  flex: 1;
-  overflow: auto;
+/*
+ * The plan's words come from a model, so one unbroken 120-character string is a
+ * thing that can happen — and in a column sized from its content it would set
+ * the width of the whole panel, pushing the rail and the conversation aside.
+ * `anywhere` rather than `break-word` because only `anywhere` lowers the
+ * min-content contribution, which is the number the column is sized from. So
+ * every box in here that holds words carries it, not only the ones that hold
+ * the model's.
+ */
+.plan-section__title,
+.plan-section__empty,
+.plan-step__heading,
+.plan-step__arrow,
+.plan-step__text {
+  overflow-wrap: anywhere;
 }
 
-.agents-section__title {
-  margin-bottom: 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
-}
-
-.agents-section__empty {
-  text-align: center;
-  color: var(--colorNeutralForeground3);
-  font-size: 14px;
-  font-style: italic;
-  padding: 20px;
-}
-
-.agents-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.agent-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-}
-
-.agent-item__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: var(--colorNeutralBackground3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.agent-item__info {
-  flex: 1;
-}
-
-.agent-item__name {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--colorNeutralForeground1);
-}
-
-/* Media query for 1920x1080 and smaller screens */
-@media screen and (max-width: 1920px) and (max-height: 1080px) {
-  .plan-section {
-    /* Reduce bottom margin and padding to make it more compact */
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    /* Increase the height limit for better readability */
-    max-height: 550px;
-    overflow-y: auto;
-  }
-
-  .plan-section__title {
-    /* Keep title spacing reasonable */
-    margin-bottom: 14px;
-    font-size: 14px;
-  }
-
-  .plan-steps {
-    /* Keep reasonable gap between steps */
-    gap: 7px;
-  }
-
-  .plan-step__heading {
-    /* Keep headings readable */
-    font-size: 14px;
-    margin-bottom: 3px;
-  }
-
-  .plan-step__text {
-    /* Keep text readable */
-    font-size: 14px;
-    line-height: 1.35;
-  }
-
-  .plan-step__content {
-    /* Keep reasonable spacing in step content */
-    gap: 7px;
-    margin-bottom: 3px;
-  }
-
-  .plan-section__empty {
-    /* Keep empty state readable */
-    padding: 16px;
-    font-size: 14px;
-  }
-
-  .agents-section {
-    /* Give more space to agents section but not too much */
-    flex: 1.3;
-    /* Ensure it can scroll if needed */
-    overflow-y: auto;
-    /* Add some top spacing */
-    padding-top: 4px;
-  }
-
-  .agents-section__title {
-    /* Keep title spacing */
-    margin-bottom: 15px;
-    font-size: 14px;
-  }
-
-  .agents-list {
-    /* Keep reasonable gap between agents */
-    gap: 11px;
-  }
-
-  .agent-item {
-    /* Keep agent items readable */
-    padding: 7px 0;
-    gap: 11px;
-  }
-
-  .agent-item__icon {
-    /* Keep icons at good size */
-    width: 30px;
-    height: 30px;
-  }
-
-  .agent-item__name {
-    /* Keep font readable */
-    font-size: 14px;
-  }
-}
-
-/* Additional breakpoint for even smaller screens (laptops) */
-@media screen and (max-width: 1366px) and (max-height: 768px) {
-  .plan-section {
-    /* More compact for smaller screens but still readable */
-    max-height: 350px;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-  }
-
-  .plan-section__title {
-    margin-bottom: 12px;
-    font-size: 13px;
-  }
-
-  .plan-steps {
-    gap: 6px;
-  }
-
-  .plan-step__heading {
-    font-size: 13px;
-  }
-
-  .plan-step__text {
-    font-size: 13px;
-    line-height: 1.3;
-  }
-
-  .agents-section {
-    flex: 1.5;
-  }
-
-  .agents-section__title {
-    margin-bottom: 13px;
-    font-size: 13px;
-  }
-
-  .agent-item {
-    padding: 6px 0;
-    gap: 9px;
-  }
-
-  .agent-item__icon {
-    width: 26px;
-    height: 26px;
-  }
-
-  .agent-item__name {
-    font-size: 13px;
-  }
-}
+/*
+ * The Agent Team panel is the rail's (`transparency.css`), and has been since
+ * #24. The `.agents-section`, `.agents-list` and `.agent-item` rules that used
+ * to dress it here rendered on nothing at all, and one of them — `flex: 1;
+ * overflow: auto` — was a third scroll region nested in this column. Deleted
+ * with #60 rather than left as furniture for the next reader to route around.
+ */

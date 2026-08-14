@@ -18,6 +18,13 @@
     width: 320px;
     min-width: 260px;
     padding: 16px;
+    /*
+     * The declared width is the rendered width (#60). Content-box, the rail was
+     * 320px of declaration and 353px of pixels, and every container sized to
+     * the first number clipped 33px off the second — in the token meter, the
+     * end where the estimated Copilot Credits are.
+     */
+    box-sizing: border-box;
     overflow-y: auto;
     border-left: 1px solid var(--colorNeutralStroke2);
     background-color: var(--colorNeutralBackground2);
@@ -77,13 +84,63 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
+    /*
+     * Fixed, so the columns are shares of the rail rather than a negotiation
+     * with the content (#60). Under `auto` a seven-digit token total wins the
+     * argument and the two name columns are squeezed to a letter apiece, which
+     * is legible to nobody; the widths below give each column a share it can
+     * hold and put the wrapping in the names, where it costs nothing.
+     */
+    table-layout: fixed;
+}
+
+.token-meter th:nth-child(1) {
+    width: 30%;
+}
+
+.token-meter th:nth-child(2) {
+    width: 19%;
+}
+
+.token-meter th:nth-child(3) {
+    width: 11%;
+}
+
+.token-meter th:nth-child(4) {
+    width: 20%;
+}
+
+.token-meter th:nth-child(5) {
+    width: 20%;
 }
 
 .token-meter th,
 .token-meter td {
     text-align: right;
-    padding: 4px 6px;
+    padding: 4px 4px;
     border-bottom: 1px solid var(--colorNeutralStroke3);
+}
+
+/*
+ * The two name columns give the room up. `anywhere` rather than `break-word`:
+ * only `anywhere` lowers the cell's min-content width, and it is the table's
+ * min-content width that decides whether the rail can hold it — an agent or
+ * deployment name long enough to widen the table pushes the credits column out
+ * of the box. Scoped to the names, because a column heading broken as `Toke/ns`
+ * is not legible and the headings are short enough not to need it.
+ */
+.token-meter__name {
+    overflow-wrap: break-word;
+}
+
+/*
+ * Only the figures refuse to break (#60). With every column unbreakable the
+ * table was 448px wide inside a 320px rail, and the end that fell outside was
+ * the estimated Copilot Credits — the column the two-billing-models point is
+ * made with. A wrapped *number* would break the side-by-side reading that point
+ * depends on; a wrapped agent or model name costs nothing.
+ */
+.token-meter__number {
     white-space: nowrap;
 }
 

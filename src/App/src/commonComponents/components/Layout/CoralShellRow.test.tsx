@@ -1,123 +1,48 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import CoralShellRow from './CoralShellRow';
+import Content from '../Content/Content';
+import {
+    allRules,
+    SRC,
+    stackingBlock,
+    classesIn,
+    isRendered,
+    RAIL_STYLESHEET,
+    SHELL_STYLESHEET,
+    sourceFiles,
+    stackedBody,
+    stackingSelectors,
+    STACKING_BREAKPOINT,
+} from '@/testing/stylesheets';
 
-const SRC = join(__dirname, '..', '..', '..');
-const STYLES = join(SRC, 'styles');
-const STYLESHEET = join(STYLES, 'storeSurface.css');
-const RAIL_STYLESHEET = join(STYLES, 'transparency.css');
-const STACKING_BREAKPOINT = '@media (max-width: 900px)';
-
-interface Rule {
-    /** Which stylesheet the rule was read out of, so a failure names a file. */
-    file: string;
-    selector: string;
-    body: string;
-}
-
-const withoutComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '');
-
-/**
- * The rules a media query can override — top level, at-rules skipped. Parsed
- * rather than matched on indentation, because indentation is not a contract.
- */
-const rulesIn = (css: string, file: string): Rule[] => {
-    const source = withoutComments(css);
-    const rules: Rule[] = [];
-    let depth = 0;
-    let selectorStart = 0;
-    let bodyStart = 0;
-
-    for (let i = 0; i < source.length; i += 1) {
-        if (source[i] === '{') {
-            depth += 1;
-            if (depth === 1) bodyStart = i;
-        } else if (source[i] === '}') {
-            depth -= 1;
-            if (depth === 0) {
-                const selector = source.slice(selectorStart, bodyStart).trim();
-                if (!selector.startsWith('@')) {
-                    rules.push({ file, selector, body: source.slice(bodyStart + 1, i) });
-                }
-                selectorStart = i + 1;
-            }
-        }
-    }
-
-    return rules;
-};
-
-/** Every class named anywhere in a selector, not just the first one. */
-const classesIn = (selector: string): string[] =>
-    Array.from(selector.matchAll(/\.([a-z0-9_-]+)/gi)).map((m) => m[1]);
-
-/** The body of the shared stacking breakpoint, read from the shell's stylesheet. */
-const stackingBlock = (): string => {
-    const css = withoutComments(readFileSync(STYLESHEET, 'utf8'));
-    const block = css.slice(css.indexOf(STACKING_BREAKPOINT));
-    let depth = 0;
-    for (let i = block.indexOf('{'); i < block.length; i += 1) {
-        if (block[i] === '{') depth += 1;
-        if (block[i] === '}') {
-            depth -= 1;
-            if (depth === 0) return block.slice(block.indexOf('{') + 1, i);
-        }
-    }
-    return '';
-};
-
-/** The rules the stacking breakpoint declares. */
-const stackingRules = (): Rule[] => rulesIn(stackingBlock(), STYLESHEET);
-
-/** The class selectors inside the shared stacking breakpoint, read from the stylesheet. */
-const stackingSelectors = (): string[] =>
-    stackingRules().flatMap((rule) => classesIn(rule.selector));
-
-/** Every source file under `src`, so a class can be looked for where it is rendered. */
-const sourceFiles = (dir: string): string[] =>
-    readdirSync(dir).flatMap((entry) => {
-        const path = join(dir, entry);
-        if (statSync(path).isDirectory()) return sourceFiles(path);
-        return /\.tsx?$/.test(path) && !/\.test\.tsx?$/.test(path) ? [path] : [];
-    });
-
-/** Whether any component renders the class — a dead rule cannot mis-stack anything. */
-const isRendered = (className: string): boolean => {
-    const sources = sourceFiles(SRC).map((path) => readFileSync(path, 'utf8'));
-    return sources.some((source) => source.includes(className));
-};
-
-/** Every top-level rule in every stylesheet the surface loads. */
-const allRules = (): Rule[] =>
-    readdirSync(STYLES)
-        .filter((entry) => entry.endsWith('.css'))
-        .flatMap((entry) => rulesIn(readFileSync(join(STYLES, entry), 'utf8'), entry));
+const STYLESHEET = SHELL_STYLESHEET;
 
 /**
- * The rules that dress an element as a **side column**: a fixed pixel width and
- * a border down one side. Read out of the stylesheets rather than listed here,
- * because a list in a test agrees with itself forever — and the column this
- * missed the first time was the one that contains the rail rather than the rail.
+ * The rules that dress an element as a **side column**: a width it would not
+ * have if it were a band, and a border down one side. Read out of the
+ * stylesheets rather than listed here, because a list in a test agrees with
+ * itself forever — and the column this missed the first time was the one that
+ * contains the rail rather than the rail.
+ *
+ * A width is a column's width whenever it is not the band's own `100%`: a
+ * length, or a content keyword like `min-content`, which is how the rail's
+ * container sizes to the rail since #60.
  */
+const BAND_WIDTHS = ['100%', 'auto', 'inherit', 'initial', 'unset'];
+
+const declaresColumnWidth = (body: string): boolean =>
+    Array.from(body.matchAll(/(?:^|[;{\s])width:([^;}]+)/g))
+        .map((match) => match[1].trim())
+        .some((value) => !BAND_WIDTHS.includes(value));
+
 const sideColumns = (): { file: string; className: string }[] =>
     allRules()
-        .filter(
-            (rule) =>
-                /(?:^|[;\s])width:\s*\d+px/.test(rule.body) &&
-                /border-left:\s*\d/.test(rule.body),
-        )
+        .filter((rule) => declaresColumnWidth(rule.body) && /border-left:\s*\d/.test(rule.body))
         .flatMap((rule) => classesIn(rule.selector).map((className) => ({ file: rule.file, className })))
         .filter(({ className }) => isRendered(className));
-
-/** What the stacking breakpoint declares for one class, across every rule naming it. */
-const stackedBody = (className: string): string =>
-    stackingRules()
-        .filter((rule) => classesIn(rule.selector).includes(className))
-        .map((rule) => rule.body)
-        .join('\n');
 
 describe('the store surface on a phone-sized screen', () => {
     it('lets the shell stack, rather than pinning it to a row inline', () => {
@@ -135,6 +60,28 @@ describe('the store surface on a phone-sized screen', () => {
         expect(shell).toHaveClass('coral-shell-row');
         expect(shell.style.display).toBe('');
         expect(shell.style.flexDirection).toBe('');
+    });
+
+    it('lets the conversation stack too, rather than pinning it inline', () => {
+        // The same trap as the shell's, one column over, and it made half of
+        // #60's stacking fix inert: `.content` carried an inline `flex: 1`,
+        // `height: 100%` and `min-width: 320px`, every one of which beats a
+        // media query. So the breakpoint could say the stacked columns do not
+        // shrink and the conversation would shrink anyway — and it is the
+        // column the shell crushed first.
+        render(
+            <CoralShellRow>
+                <Content>
+                    <div>conversation</div>
+                </Content>
+            </CoralShellRow>,
+        );
+
+        const content = screen.getByTestId('coral-shell-row').querySelector('.content') as HTMLElement;
+        expect(content, 'the conversation column is not rendered').not.toBeNull();
+        expect(content.style.flex, 'an inline flex beats the breakpoint').toBe('');
+        expect(content.style.height, 'an inline height beats the breakpoint').toBe('');
+        expect(content.style.minWidth, 'an inline min-width beats the breakpoint').toBe('');
     });
 
     it('declares a shared stacking breakpoint at all', () => {
@@ -213,6 +160,20 @@ describe('the store surface on a phone-sized screen', () => {
                 `.${className} (${file}) stays a viewport tall once the shell stacks`,
             ).toBe(true);
         }
+    });
+
+    it('lets the stacked shell scroll rather than crushing what it holds', () => {
+        // Every column the shell stacks has a non-visible `overflow`, and a
+        // flex item with one has an automatic minimum size of **zero**. So the
+        // shell's `overflow-y: auto` was a promise it could never keep: its
+        // children shrank to fit before it ever scrolled. Measured at 320px
+        // before this landed — a 900px conversation rendered 17px tall, the
+        // rail 32px around 189px of content, and the shell's scrollHeight
+        // equalled its clientHeight. Nothing scrolled; everything was crushed.
+        expect(
+            stackingBlock(),
+            "the stacked shell's children may still shrink, so it will crush them rather than scroll",
+        ).toMatch(/\.coral-shell-row\s*>\s*\*[^{]*\{[^}]*flex-shrink:\s*0/);
     });
 
     it('declares the rail and shell stacking breakpoint once', () => {
