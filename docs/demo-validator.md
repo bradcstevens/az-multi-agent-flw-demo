@@ -114,6 +114,15 @@ remains a routing failure: no tool query exists because the orchestrator did not
 The suite also asserts the Grounding panel is **empty before the question is asked**. Without it, a
 panel left lit by a previous conversation satisfies every other assertion in the spec.
 
+### The troubleshooting and escalation beats preserve the conversation
+
+`troubleshooting.spec.ts` waits for the troubleshooting plan's authored
+**Rehearsed replies**, checks the labels against the store pack, and answers
+the pending clarification through one of them. `escalation.spec.ts` begins on
+that same troubleshooting plan and taps its **follow-on task**; it never
+creates an escalation from the home screen. The next plan takes the Deliberate
+lane, where approving it must produce the **Simulated ticket**.
+
 ### The workforce beat proves the routing, not the grounding
 
 `workforce.spec.ts` (#52) is the second spec file, and it is graded on the **cost table** — that
@@ -128,10 +137,11 @@ above applies. So a run in which the right agent answered from nothing would sti
 A Grounding-panel signal for the workforce tool is what would close that, and until it exists the
 library's coverage of the tap is asserted offline instead, by the store pack's own suite.
 
-A second spec file is not a second Playwright **project**, which matters: the walkthrough reporter
-refuses to replace the **Recorded fallback** for a multi-project run. Specs run in filename order,
-so `cross-platform.spec.ts` precedes `workforce.spec.ts` and the recording still opens on the beat
-the walkthrough opens on.
+Additional spec files are not additional Playwright **projects**, which matters: the walkthrough
+reporter refuses to replace the **Recorded fallback** for a multi-project run. The specs are
+independent rather than a cross-file conversation: the escalation spec starts with its own
+troubleshooting plan before it follows on, so the walkthrough remains valid without relying on
+filename order.
 
 ## Selectors
 

@@ -119,8 +119,48 @@ export class PlanSurface {
         return this.page.getByTestId('rehearsed-replies');
     }
 
+    /** The authored task that continues the conversation's initial Quick Task. */
+    get followOnTask(): Locator {
+        return this.page.getByTestId('follow-on-task');
+    }
+
+    /** The approval gate on a Deliberate-lane plan. */
+    get approveButton(): Locator {
+        return this.page.getByRole('button', { name: 'Approve Task Plan' });
+    }
+
     /** The **Simulated ticket** an approved escalation raises (#50's beat). */
     get simulatedTicket(): Locator {
         return this.page.getByTestId('simulated-ticket');
+    }
+
+    /** The authored choices for the clarification that is currently pending. */
+    async rehearsedReplyLabels(): Promise<string[]> {
+        return this.rehearsedReplies.getByRole('button').allInnerTexts();
+    }
+
+    /** Answer the current clarification through its authored one-tap choice. */
+    async tapRehearsedReply(answer: string): Promise<void> {
+        await this.rehearsedReplies
+            .getByRole('button', { name: answer })
+            .click();
+    }
+
+    /** Continue the conversation with its authored follow-on task. */
+    async tapFollowOnTask(name: string): Promise<void> {
+        await this.followOnTask.getByRole('button', { name }).click();
+    }
+
+    /** The ticket's deterministic field rows, keyed by TKT-001 field name. */
+    async ticketFields(): Promise<Record<string, string>> {
+        const rows = this.simulatedTicket.locator('.simulated-ticket__row');
+        const fields: Record<string, string> = {};
+        for (let index = 0; index < (await rows.count()); index += 1) {
+            const row = rows.nth(index);
+            fields[(await row.locator('dt').innerText()).trim()] = (
+                await row.locator('dd').innerText()
+            ).trim();
+        }
+        return fields;
     }
 }

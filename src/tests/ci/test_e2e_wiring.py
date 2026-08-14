@@ -38,6 +38,7 @@ AGENTS = REPO_ROOT / "AGENTS.md"
 INHERITED = REPO_ROOT / "tests" / "e2e-test"
 STORE_SURFACE = E2E / "pages" / "StoreSurface.ts"
 CROSS_PLATFORM_SPEC = E2E / "specs" / "cross-platform.spec.ts"
+SPECS = tuple(sorted(E2E.joinpath("specs").rglob("*.spec.ts")))
 HOME_INPUT = (
     REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
 )
@@ -122,6 +123,65 @@ def test_the_same_specs_run_against_either_target():
     assert config.count("testDir") == 1, (
         "more than one testDir: the walkthrough is described in two places"
     )
+
+
+def test_each_claimed_beat_has_a_spec_and_every_spec_is_reachable():
+    """The validator runs every spec under its one authored directory.
+
+    A spec added after this test must be covered without editing a roster here:
+    the filesystem is the source of the set. The explicit names are the
+    walkthrough beats this repository claims to demonstrate; an absent one is
+    a claim with no browser assertion behind it.
+    """
+    names = {spec.name for spec in SPECS}
+    claimed = {
+        "cross-platform.spec.ts",
+        "escalation.spec.ts",
+        "troubleshooting.spec.ts",
+        "workforce.spec.ts",
+    }
+
+    assert claimed <= names, (
+        "the Demo validator claims beats with no browser spec: "
+        f"{sorted(claimed - names)}"
+    )
+
+    config = _code(CONFIG)
+    assert "testDir: './specs'" in config, (
+        "the validator no longer selects the directory containing its specs"
+    )
+    assert "testMatch" not in config, (
+        "the validator filters its spec directory, so an authored spec can be "
+        "unreachable"
+    )
+    assert "testIgnore" not in config, (
+        "the validator excludes files from its spec directory, so an authored "
+        "spec can be unreachable"
+    )
+    for spec in SPECS:
+        assert spec.suffixes == [".spec", ".ts"], (
+            f"{spec.name} is not a Playwright default spec filename"
+        )
+
+
+def test_every_rebased_spec_leaves_rehearsal_evidence():
+    # The run is an observation of a deployed build, so every beat writes a
+    # result even when its assertion fails. Select from the filesystem-derived
+    # set: the new specifications cannot land without the current recorder.
+    rebased = {
+        spec.name: spec
+        for spec in SPECS
+        if spec.name in {"escalation.spec.ts", "troubleshooting.spec.ts"}
+    }
+    assert set(rebased) == {"escalation.spec.ts", "troubleshooting.spec.ts"}
+    for spec in rebased.values():
+        source = _code(spec)
+        assert "test.afterEach" in source, (
+            f"{spec.name} records no result after a failing beat"
+        )
+        assert "recordRehearsal" in source, (
+            f"{spec.name} has an afterEach but leaves no rehearsal evidence"
+        )
 
 
 def test_the_expectation_is_read_out_of_the_repository():
@@ -356,7 +416,7 @@ def _loop_argv(tmp_path, *args):
     browser this loop is not allowed to open.
     """
     binaries = tmp_path / "bin"
-    binaries.mkdir()
+    binaries.mkdir(parents=True)
     argv_log = tmp_path / "argv"
     stub = binaries / "npx"
     stub.write_text(
@@ -411,6 +471,23 @@ def test_the_loop_lets_a_spec_filter_through_instead_of_the_project_eating_it(
         "the loop no longer names the validator project, so an unattended run "
         "would also run the headed Stage driver"
     )
+
+
+def test_the_loop_can_filter_to_each_authored_spec(tmp_path):
+    # `SPECS` is read from the filesystem above. A new spec must therefore
+    # traverse the same argv seam without somebody adding it to a hand-written
+    # test roster; otherwise it exists in the repository but cannot be run by
+    # the validator loop.
+    for spec in SPECS:
+        filter_path = str(spec.relative_to(E2E))
+        argv = _loop_argv(tmp_path / spec.stem, filter_path)
+
+        assert filter_path in argv, (
+            f"the loop cannot pass {spec.name} through to Playwright"
+        )
+        assert "--project" not in argv, (
+            f"the project flag swallowed {spec.name} as another project name"
+        )
 
 
 # ---------------------------------------------------------------------------

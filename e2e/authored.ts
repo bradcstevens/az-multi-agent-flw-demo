@@ -43,6 +43,8 @@ export interface QuickTask {
     name: string;
     prompt: string;
     lane?: string;
+    followOn?: string;
+    rehearsedReplies: string[];
 }
 
 export interface RehearsedHit {
@@ -77,11 +79,18 @@ export function rehearsedHit(): RehearsedHit {
 /** The Quick Tasks the store pack authors, in the order they render. */
 export function quickTasks(): QuickTask[] {
     const pack = JSON.parse(readFileSync(STORE_PACK, 'utf-8'));
-    return (pack.starting_tasks || []).map((task: Record<string, string>) => ({
-        id: task.id,
-        name: task.name,
-        prompt: task.prompt,
-        lane: task.lane,
+    return (pack.starting_tasks || []).map((task: Record<string, unknown>) => ({
+        id: requiredTaskString(task, 'id'),
+        name: requiredTaskString(task, 'name'),
+        prompt: requiredTaskString(task, 'prompt'),
+        lane: optionalTaskString(task, 'lane'),
+        followOn: optionalTaskString(task, 'follow_on'),
+        rehearsedReplies: Array.isArray(task.rehearsed_replies)
+            ? task.rehearsed_replies.filter(
+                  (reply): reply is string =>
+                      typeof reply === 'string' && reply.trim() !== '',
+              )
+            : [],
     }));
 }
 
@@ -95,6 +104,61 @@ export function quickTaskNamed(name: string): QuickTask {
         );
     }
     return found;
+}
+
+/**
+ * The one task that offers both rehearsed replies and a conversation follow-on.
+ *
+ * The validator reads the handoff from the authored roster rather than carrying
+ * either task's title or prompt as a second description of the walkthrough.
+ */
+export function troubleshootingTask(): QuickTask {
+    return sole(
+        quickTasks().filter(
+            (task) => task.followOn && task.rehearsedReplies.length > 0,
+        ),
+        'a troubleshooting Quick Task with a follow-on and rehearsed replies',
+    );
+}
+
+/** The task the authored troubleshooting card continues to. */
+export function followOnTaskFor(task: QuickTask): QuickTask {
+    if (!task.followOn) {
+        throw new Error(`Quick Task ${task.id} has no follow-on`);
+    }
+
+    return sole(
+        quickTasks().filter((candidate) => candidate.id === task.followOn),
+        `the follow-on ${task.followOn} for Quick Task ${task.id}`,
+    );
+}
+
+function requiredTaskString(task: Record<string, unknown>, key: string): string {
+    const value = optionalTaskString(task, key);
+    if (!value) {
+        throw new Error(`a Quick Task has no non-empty ${key}`);
+    }
+    return value;
+}
+
+function optionalTaskString(
+    task: Record<string, unknown>,
+    key: string,
+): string | undefined {
+    const value = task[key];
+    return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+/** Exactly one authored task, or a failure that names the ambiguous roster. */
+function sole(found: QuickTask[], what: string): QuickTask {
+    if (found.length !== 1) {
+        throw new Error(
+            `the store pack has ${found.length} of: ${what}. The walkthrough ` +
+                'has one of each beat, so a beat this suite cannot identify ' +
+                'is a pack that needs reading, not a test that needs a tie-break',
+        );
+    }
+    return found[0];
 }
 
 /**
