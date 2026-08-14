@@ -67,6 +67,7 @@ on `PATH`. Set `DEV_VENV` to share one virtualenv across git worktrees.
 | CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the repo's own tooling: the helpers the loops and `test.yml` share (the advisory coverage report and the `scripts/preflight/` checks) plus the durable record's invariants (ADR index, corrections record, documentation links) and the deploy path's stock-pack suppression. |
 | Frontend tests | `bash scripts/frontend-tests.sh` | vitest over `src/App/src` — the transparency panels and the WebSocket message contract they render. `npm ci` on first use, a no-op afterwards; runs in `.github/workflows/frontend-tests.yml`. |
 | SOP corpus | `python3 -m pytest tools/tests -q` | `content/sop/` and its builder `tools/sop_corpus/`. After editing a source, rebuild with `PYTHONPATH=tools python3 -m sop_corpus build`. |
+| Demo validator | `bash scripts/e2e-tests.sh` | TypeScript `@playwright/test` over `e2e/` — the walkthrough asserted through a real browser against a **running deployment**. The only loop here that observes one; every other loop runs against fakes. `--target local` runs the same specs against a local surface. Not in any workflow, deliberately (see below). |
 
 Notes:
 
@@ -74,9 +75,16 @@ Notes:
   `src/tests/backend/test_app.py` mutates `sys.modules` and the environment at import
   time, so it runs first in its own pytest process and the rest of the suite follows
   with `--cov-append`. Preserve both phases.
-- A bare `pytest` from the repo root is **not** a loop: it collects `test_mcp_tools.py`
-  (which dials a live MCP server) and `tests/e2e-test` (which needs Playwright). Scope
-  runs to `src/tests/backend`.
+- A bare `pytest` from the repo root is **not** a loop: it collects `test_mcp_tools.py`,
+  which dials a live MCP server. Scope runs to `src/tests/backend`.
+- The **Demo validator** is not in any workflow and must not be added to one. It drives a
+  real browser against a running deployment and holds a live conversation with the agent
+  pool, so a pull request cannot run it and a scheduled run would spend Copilot Credits on
+  nobody's behalf. What *can* be asserted without a tenant — that the loop exists, that the
+  recording is unconditional, that the expectation is read out of the repository — is
+  asserted by `src/tests/ci/test_e2e_wiring.py` in the CI-tooling loop. Run the validator
+  deliberately, after `az login`, and read `e2e/artifacts/report`. Its record is
+  `docs/demo-validator.md`.
 - Both backend phases pass `-m "not integration"`, so the **Guardrail corpus** — which
   scores against the live embedding deployment — stays out of unattended runs.
   `src/tests/ci/test_integration_marker.py` fails if that deselection is dropped from

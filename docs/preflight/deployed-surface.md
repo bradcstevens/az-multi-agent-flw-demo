@@ -3,7 +3,17 @@
 **Verdict: `macae-flw-v1` serves the Circle K Frontline Store Assistant at the commit this
 repository is on, and a procedure question is answered from Dataverse through Copilot Studio with
 a citation.** Observed 2026-08-13 (issue #44), in `rg-macae-flw-v1`, subscription
-`3523b0e6-bb53-4e87-8340-25c416e26093`, images built from `23d97b3dda59`.
+`3523b0e6-bb53-4e87-8340-25c416e26093`, images built from `23d97b3dda59`. Re-observed 2026-08-13
+(issue #47) after the frontend and backend were rolled onto `47-transparency-wire`, which carries
+the WebSocket envelope fix at both ends and nothing else; the MCP app is untouched and still on
+`23d97b3dda59`.
+
+That tag is not commit-shaped, which is a knowing exception to the rule the *Scope* section states.
+The change it carries is one branch of `WebSocketService.handleMessage` and one call site in
+`orchestration_manager`, it had to be proved on the deployed surface before the commit that
+describes it could honestly claim it worked, and amending that commit would have changed the very
+sha the tag was meant to name. #48 replaces the whole scheme with a stamp inside the image, at which
+point the argument goes away.
 
 The images were built from that commit's tree; everything committed since is documentation and the
 check tooling below, none of which is inside an image's build context (`src/backend`,

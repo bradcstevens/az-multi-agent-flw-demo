@@ -1,0 +1,16 @@
+{
+  "name": "demo-validator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Demo validator (issue #47, ADR-016) — the walkthrough asserted through a real browser.",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report artifacts/report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "20.19.9",
+    "typescript": "5.8.3"
+  }
+}

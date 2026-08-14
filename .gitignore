@@ -512,3 +512,7 @@ temp/
 # only backup a Default environment can have, and it carries tenant identifiers and the whole
 # authored agent — it belongs on the machine that took it, not in the repository.
 .artifacts/
+
+# Browser artefacts: the Demo validator writes under e2e/artifacts (ignored there),
+# and the Playwright MCP server drops page dumps here.
+.playwright-mcp/

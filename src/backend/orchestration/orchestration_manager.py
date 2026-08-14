@@ -1082,10 +1082,7 @@ class OrchestrationManager:
             from escalation.payloads import TicketRaised
 
             await connection_config.send_status_update_async(
-                {
-                    "type": WebsocketMessageType.TICKET_RAISED,
-                    "data": TicketRaised.from_fields(ticket.fields).to_dict(),
-                },
+                TicketRaised.from_fields(ticket.fields).to_dict(),
                 user_id=user_id,
                 message_type=WebsocketMessageType.TICKET_RAISED,
             )

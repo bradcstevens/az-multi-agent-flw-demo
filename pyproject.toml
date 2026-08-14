@@ -32,7 +32,6 @@ omit = [
     "src/tests/mcp_server/*",
     "src/tests/agents/*",
     "src/**/__init__.py",
-    "tests/e2e-test/*",
     "*/venv/*",
     "*/env/*",
     "*/.pytest_cache/*",
@@ -54,7 +53,7 @@ exclude_lines = [
 ]
 
 [tool.pylint.main]
-init-hook = 'import sys; sys.path.insert(0, "src"); sys.path.insert(0, "src/backend"); sys.path.insert(0, "src/mcp_server"); sys.path.insert(0, "tests/e2e-test")'
+init-hook = 'import sys; sys.path.insert(0, "src"); sys.path.insert(0, "src/backend"); sys.path.insert(0, "src/mcp_server")'
 
 [tool.pylint."messages control"]
 disable = [

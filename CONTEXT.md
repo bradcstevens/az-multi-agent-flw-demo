@@ -874,9 +874,15 @@ signals — the platform the **Grounding panel** names, the citation's document 
 **Token meter**'s rows, the **Lane badge**, the **Simulated ticket**'s number, the gate's refusal
 copy, the signed-in header — and about model prose it asserts only that it arrived. A suite that
 asserts a sentence a model wrote goes red when the model paraphrases and the demonstration was fine,
-and a validator nobody trusts is one nobody reads on the morning it matters.
-_Avoid_: e2e test (`tests/e2e-test/` is the accelerator's own, drives an Entra login and the
-pre-rebrand surface, is wired into no workflow, and is a different and dead thing)
+and a validator nobody trusts is one nobody reads on the morning it matters. It lives in `e2e/`,
+behind `bash scripts/e2e-tests.sh`, and runs against **either** target — the deployed surface or a
+local one — from one set of specs, because two descriptions of the walkthrough will disagree. Its
+expectation is read out of the repository (the corpus manifest, the store pack, `storeSurface.ts`),
+never pinned in the spec, for the reason [ADR-019](docs/ADR/019-rebrand-the-sop-corpus-to-circle-k.md) taught one
+layer out: a check carrying its own copy passes a rebrand it never saw. See
+[docs/demo-validator.md](docs/demo-validator.md).
+_Avoid_: e2e test (the accelerator's own suite lived at `tests/e2e-test/`, drove an Entra login
+against the pre-rebrand surface, was wired into no workflow, and was deleted in #47)
 
 **Stage driver** — the same specs and the same page objects run headed and paced, for rehearsal and
 as a way to present. Not a second suite: a second suite is a second thing to keep true.
@@ -894,7 +900,68 @@ _Avoid_: stale deployment, drift
 
 ## Confirmed findings
 
+### The centrepiece beat is intermittent, and only a browser saw it (confirmed 2026-08-13, issue #47)
+
+Eight runs of the **Demo validator** against `rg-macae-flw-v1` on the same afternoon: six green, two
+red. Both failures were the rehearsed hit — *"How do I close the store?"*, the question
+`content/sop/corpus.toml` exists to guarantee an answer to — coming back as the **honest miss**.
+The hop itself completed: the **Grounding panel** named Copilot Studio and Dataverse. What it also
+said was *"Searched Dataverse and found no matching procedure."*
+
+`check-deployed-surface.sh`'s `grounded-answer` check passed on every attempt across the same
+period, because it asks `POST /api/v4/sop/ask` **the corpus's own words**. The orchestrator does
+not: it hands the SOP tool whatever the model rephrased the question into, and some rephrasings
+miss. The check and the browser are asking different questions of the same agent, and only one of
+them is asking the presenter's.
+
+There is a second, coarser variant: the orchestrator sometimes does not call the SOP tool at all —
+the **Group Chat Manager** answers from context, or the **Shift Tasks Agent** answers and the
+**Troubleshooting Agent** asks a clarification. No tool call, no `source_used`, an honestly empty
+panel.
+
+The validator keeps `retries: 0`. A retry converts an intermittently-working demonstration into a
+green run, and the presenter finds out in the room instead. This is #54, it is the walkthrough
+observation (#46) and the presenter runbook (#53)'s most important input, and it is the first thing
+the browser suite found that no API-level check could have.
+
+### Every transparency signal was dropped in the browser, and 223 frontend tests were green (confirmed 2026-08-13, issue #47)
+
+The first live run of the **Demo validator** timed out waiting for the **Grounding panel** on a
+deployment where the hop itself was working perfectly. Reading the socket off the wire showed the
+backend pushing `source_used` with `platform: "Copilot Studio"`, `source: "Dataverse"` and the
+`SOP-102` citation, `token_usage` per executor, and `presenter_alert` — and the panel never lighting
+at all, not even briefly.
+
+`WebSocketService.handleMessage`'s `default:` branch called `this.emit(message.type, message)`,
+passing the **whole frame** where the payload belonged, and `emit` wraps its argument again. So
+every subscriber of the four out-of-band signals received `{type, data: {type, data: payload}}` and
+read `message.data` as an envelope wearing the payload's name. The parsers in
+`models/transparency.ts` are **total** — they return `null` rather than a half-filled object — so
+they did exactly the right thing and returned `null`, and the panels, the meter, the alert and the
+**Simulated ticket** all stayed dark in silence. Totality made the failure safe and invisible at the
+same time.
+
+Every test in the area passed throughout. The panels, the slice and the parsers each had their own,
+and `useTransparencySignals.test.tsx` mocks `WebSocketService` and calls its handler with
+`{ type, data: payload }` — the correct shape, hand-fed. Four tests agreeing with each other about a
+shape the service does not produce is not four tests. `src/App/src/store/WebSocketService.test.ts`
+is the missing seam: raw wire text, copied from a live run, through the real service, asserted with
+the same parsers the panels use.
+
+The **Simulated ticket** had the same defect twice over, once at each end. `orchestration_manager`
+handed `send_status_update_async` a `{"type", "data"}` envelope, and that method wraps whatever it
+is given — so the ticket left the backend one envelope deeper than the three transparency signals,
+which hand over their bare payload. The backend tests read `call.args[0]["data"]`, which is the
+caller's own envelope rather than the wire, so they agreed with the bug exactly as the frontend
+mock did. Fixing only `handleMessage` would have left the card dark and every test green.
+
+The lesson is about where the mock sits. A mock at a seam **inside** the boundary under test asserts
+the author's belief about the collaborator, and no amount of coverage on either side of it will ever
+disagree. The **Demo validator** found this on its first run because it is the only thing in the
+repository that observes the browser.
+
 ### The deployed environment was 42 commits behind, and every loop was green (confirmed 2026-08-13)
+
 
 The `macae-flw-v1` Container Apps were running images built at `2026-08-12T23:32Z` — before the
 rebrand (#25), the transparency signals and panels (#23, #24), the Quick Tasks (#26), the mocked

@@ -1601,9 +1601,33 @@ class TestTheApprovalIsTheTicketConfirmation:
             if call.kwargs.get("message_type") == "ticket_raised"
         ]
         assert len(pushed) == 1
-        payload = pushed[0].args[0]["data"]
+        payload = pushed[0].args[0]
         assert payload["ticket_id"] == "SIM-223-0041"
         assert payload["status"] == "submitted"
+
+    @pytest.mark.asyncio
+    async def test_the_ticket_is_handed_over_unwrapped_like_every_other_signal(self):
+        """`send_status_update_async` puts `{"type", "data"}` on the wire around
+        whatever it is given, so a caller that hands it an envelope ships two.
+
+        The three transparency signals hand over their bare payload and this one
+        did not, so the Simulated ticket arrived at the browser one envelope
+        deeper than `parseRaisedTicket` — a total parser — would read. It
+        returned `None` and the card never rendered. The frontend half of the
+        same defect is `WebSocketService.handleMessage` (#47); this is the half
+        no amount of frontend work can fix, and it was invisible because the
+        assertions above read the caller's own envelope rather than the wire.
+        """
+        store = FakeTicketStore(ticket=_submitted_ticket())
+
+        await self._review(store)
+
+        handed_over = [
+            call for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "ticket_raised"
+        ][0].args[0]
+        assert "data" not in handed_over
+        assert "type" not in handed_over
 
     @pytest.mark.asyncio
     async def test_the_card_carries_the_attempted_steps_it_was_submitted_with(self):
@@ -1619,7 +1643,7 @@ class TestTheApprovalIsTheTicketConfirmation:
             call for call in connection_config.send_status_update_async.call_args_list
             if call.kwargs.get("message_type") == "ticket_raised"
         ][0]
-        rows = {row["name"]: row["value"] for row in pushed.args[0]["data"]["fields"]}
+        rows = {row["name"]: row["value"] for row in pushed.args[0]["fields"]}
         assert rows["steps_attempted"] == "Fitted a fresh paper filter"
 
     @pytest.mark.asyncio

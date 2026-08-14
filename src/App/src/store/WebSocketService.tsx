@@ -292,6 +292,27 @@ class WebSocketService {
             this.emit(WebsocketMessageType.ERROR_MESSAGE, message.data); // Emit the data
             break;
             }
+            /*
+              The four out-of-band signals: the three transparency signals (#23)
+              and the Simulated ticket (#22).
+
+              They emit `message.data` — the payload — rather than falling to the
+              default branch, which re-wraps the whole frame and hands the
+              listener an envelope wearing the payload's name. Every parser these
+              feed is total and returns `null` rather than a half-filled object,
+              so the wrapped form was read as unreadable and dropped in silence:
+              the Grounding panel stayed dark, the Token meter stayed empty and
+              the Presenter alert never rendered, on a deployment where the
+              backend was pushing all three correctly. Found by the Demo
+              validator (#47) against `rg-macae-flw-v1`.
+            */
+            case WebsocketMessageType.SOURCE_USED:
+            case WebsocketMessageType.TOKEN_USAGE:
+            case WebsocketMessageType.PRESENTER_ALERT:
+            case WebsocketMessageType.TICKET_RAISED: {
+                this.emit(message.type, message.data);
+                break;
+            }
             case WebsocketMessageType.USER_CLARIFICATION_RESPONSE:
             case WebsocketMessageType.REPLAN_APPROVAL_REQUEST:
             case WebsocketMessageType.REPLAN_APPROVAL_RESPONSE:
