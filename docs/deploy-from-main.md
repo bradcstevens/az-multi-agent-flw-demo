@@ -23,8 +23,13 @@ records, in the same order and for the same reasons:
    revisions roll.
 4. **`post_deploy.sh`.** The store assistant's pack and its two knowledge bases. No stock pack.
 5. **Two gates.** `check-deployed-surface.sh` asks the deployment a real procedure question;
-   `check-deployed-environment.sh --no-probe` re-reads the infrastructure. `azd` exiting zero is
-   not the demonstration working — that gap is the whole of ADR-018.
+   `check-deployed-environment.sh` re-reads the infrastructure and probes the model roster and the
+   knowledge bases. `azd` exiting zero is not the demonstration working — that gap is the whole of
+   ADR-018.
+
+   Neither gate is run with `--no-probe`. Both checks treat "not probed" as a **failure** rather
+   than a pass, on the principle that an unprobed roster is not a reachable one — so the flag does
+   not make a cheaper gate, it makes no gate at all.
 
 Pushes queue rather than race (`cancel-in-progress: false`): abandoning an `azd provision` midway
 through an ARM deployment leaves the environment in a state no commit describes.

@@ -233,11 +233,14 @@ jobs:
         run: bash scripts/preflight/check-deployed-surface.sh
 
       - name: Prove the deployed environment still matches its record
-        # `--no-probe` because the step above already asked the deployment a
-        # real question end to end. What is left here is the infrastructure —
-        # regions, roster, one replica each, images from our own registry —
-        # and none of it needs tokens spent to read.
-        run: bash scripts/preflight/check-deployed-environment.sh --no-probe
+        # No `--no-probe`. The check refuses to call an unprobed roster
+        # reachable and fails rather than claiming what it did not prove, which
+        # is the whole point of it — so the flag is not a cheaper gate, it is no
+        # gate at all. Probing costs one small request per model deployment and
+        # one agent run per knowledge base, which is the right price for
+        # learning that a cross-region hop is broken here rather than in a
+        # rehearsal.
+        run: bash scripts/preflight/check-deployed-environment.sh
 
       - name: Report what was deployed
         if: always()
