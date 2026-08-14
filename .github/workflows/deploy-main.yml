@@ -51,6 +51,13 @@ on:
       - 'content_packs/**'
       - 'tools/store_pack/**'
       - '.github/workflows/deploy-main.yml'
+  # And by hand. The Demo validator's build gate compares the deployed build to
+  # `HEAD`, so a commit touching only the harness, the loops or the docs moves
+  # `HEAD` past the deployment without matching any path above — leaving the
+  # gate red with no deployable path left to touch. This is the way to clear it
+  # (#54). It re-stamps the same images from a newer commit; it changes nothing
+  # about the order of operations below.
+  workflow_dispatch:
 
 permissions:
   contents: read

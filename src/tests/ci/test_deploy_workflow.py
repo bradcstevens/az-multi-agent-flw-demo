@@ -102,6 +102,31 @@ def _inputs_keys() -> set[str]:
     return keys
 
 
+def test_the_deploy_can_also_be_asked_for_by_hand():
+    """The way out of a red build gate that no push can reach (#54).
+
+    The gate the Demo validator opens with compares the **deployed build** to
+    `HEAD`, and a commit that touches only the harness, the loops or the docs
+    moves `HEAD` without matching a single path above. So the gate goes red,
+    correctly, and the only sanctioned answer — *"merge to `main` and let
+    `Deploy main` run"* — is one the repository has no way to ask for: there is
+    no deployable path left to touch. Measured on 2026-08-14, when the SOP
+    rehearsal's own fix was what put the deployment behind.
+
+    `workflow_dispatch` is the same manual trigger `azure-dev.yml` has kept
+    since it was inherited. It is a re-stamp, not a new order of operations:
+    the job below is unchanged and the concurrency group still queues it behind
+    anything in flight.
+    """
+    source = _uncommented(WORKFLOW)
+
+    assert "workflow_dispatch" in source, (
+        "the deploy can only be triggered by a push touching a deployable "
+        "path, so a harness-only commit leaves the build gate red with no way "
+        "to clear it"
+    )
+
+
 def test_the_workflow_exists_and_fires_on_push_to_main():
     assert WORKFLOW.is_file(), "nothing deploys `main`"
     source = _uncommented(WORKFLOW)

@@ -11,6 +11,14 @@ A push to `main` that touches an image's build context (`src/backend`, `src/mcp_
 (`content/sop/**`, `content_packs/**`, `tools/store_pack/**`) deploys `macae-flw-v1`. A
 documentation-only commit does not.
 
+It can also be **asked for by hand** — `gh workflow run deploy-main.yml --ref main`, or the *Run
+workflow* button. That is the way out of a state the Demo validator's build gate can otherwise get
+stuck in (#54): the gate compares the deployed build to `HEAD`, so a commit touching only the
+harness, the loops or the docs moves `HEAD` past the deployment without matching any path above, and
+the gate's own advice — *"merge to `main` and let `Deploy main` run"* — has no deployable path left
+to touch. A dispatched run re-stamps the same images from the newer commit and changes nothing about
+the sequence below.
+
 The sequence is the one [deployed-surface.md](./preflight/deployed-surface.md#the-order-that-shipped-it)
 records, in the same order and for the same reasons:
 
