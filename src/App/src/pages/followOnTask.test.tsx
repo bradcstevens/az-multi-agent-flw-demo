@@ -109,8 +109,6 @@ const PLAN_DATA = {
     messages: [],
     mplan: null,
     streaming_message: null,
-    agents: [],
-    steps: [],
 } satisfies ProcessedPlanData;
 
 const ESCALATION_RESPONSE = {
