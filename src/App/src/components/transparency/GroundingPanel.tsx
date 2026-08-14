@@ -39,7 +39,12 @@ export interface GroundingPanelProps {
 const ROUTE_ORIGIN = 'Foundry orchestrator';
 
 const GroundingPanel: React.FC<GroundingPanelProps> = ({ source }) => (
-    <section className="transparency-panel" data-testid="grounding-panel">
+    <section
+        className="transparency-panel"
+        data-testid="grounding-panel"
+        data-tool-query={source?.toolQuery}
+        data-retrieval-query={source?.retrievalQuery}
+    >
         <Body1Strong className="transparency-panel__title">
             <DocumentSearch20Regular aria-hidden="true" /> Grounding
         </Body1Strong>

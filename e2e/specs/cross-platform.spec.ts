@@ -56,6 +56,18 @@ test.describe('the cross-platform hop', () => {
         await plan.rail.waitForGrounding(240_000);
         expect(await plan.rail.platformNamed()).toBe(SOP_PLATFORM);
         await expect(plan.rail.route).toContainText(SOP_SOURCE);
+        expect(await plan.rail.retrievalQuery()).toBe(hit.question);
+        await test.info().attach('sop-tool-query', {
+            body: JSON.stringify(
+                {
+                    toolQuery: await plan.rail.toolQuery(),
+                    retrievalQuery: await plan.rail.retrievalQuery(),
+                },
+                null,
+                2,
+            ),
+            contentType: 'application/json',
+        });
 
         // The citation's document identifier, read out of the corpus manifest
         // rather than written down here. `[rehearsed_hit]` names the SOP-NNN

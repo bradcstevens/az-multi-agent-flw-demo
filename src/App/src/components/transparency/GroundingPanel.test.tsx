@@ -9,6 +9,8 @@ const cited = parseSourceUsed({
     source: 'Dataverse',
     agent_name: 'Store SOP Assistant',
     conversation_id: 'abc123',
+    tool_query: 'What are the steps for closing the store tonight?',
+    retrieval_query: 'How do I close the store?',
     citations: [
         {
             position: 1,
@@ -41,6 +43,17 @@ describe('the Grounding panel', () => {
         expect(route).toHaveTextContent('Copilot Studio');
         expect(route).toHaveTextContent('Dataverse');
         expect(route).not.toHaveTextContent(/SharePoint/i);
+    });
+
+    it('carries both SOP queries so a retrieval miss can be attributed', () => {
+        render(<GroundingPanel source={cited} />);
+
+        const panel = screen.getByTestId('grounding-panel');
+        expect(panel).toHaveAttribute(
+            'data-tool-query',
+            'What are the steps for closing the store tonight?',
+        );
+        expect(panel).toHaveAttribute('data-retrieval-query', 'How do I close the store?');
     });
 
     it('shows the document detail — the second half of the pair of signals', () => {

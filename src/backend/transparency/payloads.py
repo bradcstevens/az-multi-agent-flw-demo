@@ -43,6 +43,8 @@ class SourceUsed:
     platform: str
     source: str
     agent_name: str
+    tool_query: str
+    retrieval_query: str
     citations: List[Dict[str, Any]] = field(default_factory=list)
     conversation_id: Optional[str] = None
 

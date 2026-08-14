@@ -37,6 +37,10 @@ export interface SourceUsed {
     platform: string;
     source: string;
     agentName: string;
+    /** Query received from the Foundry orchestration tool call. */
+    toolQuery: string;
+    /** Query used to retrieve from the SOP corpus. */
+    retrievalQuery: string;
     citations: SourceCitation[];
     conversationId: string | null;
 }
@@ -119,6 +123,8 @@ export function parseSourceUsed(data: unknown): SourceUsed | null {
         platform,
         source: asText(raw.source),
         agentName: asText(raw.agent_name),
+        toolQuery: asText(raw.tool_query),
+        retrievalQuery: asText(raw.retrieval_query),
         citations,
         conversationId: typeof raw.conversation_id === 'string' ? raw.conversation_id : null,
     };

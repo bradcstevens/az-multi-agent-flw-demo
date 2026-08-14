@@ -21,6 +21,8 @@ describe('parseSourceUsed', () => {
             source: 'Dataverse',
             agent_name: 'Store SOP Assistant',
             conversation_id: 'abc123',
+            tool_query: 'What are the steps for closing the store tonight?',
+            retrieval_query: 'How do I close the store?',
             citations: [
                 {
                     position: 1,
@@ -36,6 +38,8 @@ describe('parseSourceUsed', () => {
         expect(source!.source).toBe('Dataverse');
         expect(source!.agentName).toBe('Store SOP Assistant');
         expect(source!.conversationId).toBe('abc123');
+        expect(source!.toolQuery).toBe('What are the steps for closing the store tonight?');
+        expect(source!.retrievalQuery).toBe('How do I close the store?');
         expect(source!.citations).toHaveLength(1);
         expect(source!.citations[0].name).toBe('SOP-102 Store Closing Procedure.docx');
         expect(source!.citations[0].snippet).toBe('Close the tills, then…');
