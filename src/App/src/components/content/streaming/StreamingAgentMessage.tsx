@@ -1,6 +1,8 @@
 import React from "react";
 import { AgentMessageData, AgentMessageType } from "@/models";
 import ReactMarkdown from "react-markdown";
+
+import { replyHeadings } from "./replyHeadings";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 import { Body1, Tag, makeStyles, tokens, Button } from "@fluentui/react-components";
@@ -277,15 +279,15 @@ const renderAgentMessages = (
                       p: ({ node: _pNode, ...props }) => (
                         <p {...props} style={{ margin: '0 0 8px 0' }} />
                       ),
-                      h1: ({ node: _hNode, ...props }) => (
-                        <h1 {...props} style={{ fontSize: '20px', fontWeight: 600, margin: '16px 0 8px 0', lineHeight: '1.3' }} />
-                      ),
-                      h2: ({ node: _hNode, ...props }) => (
-                        <h2 {...props} style={{ fontSize: '17px', fontWeight: 600, margin: '14px 0 8px 0', lineHeight: '1.3' }} />
-                      ),
-                      h3: ({ node: _hNode, ...props }) => (
-                        <h3 {...props} style={{ fontSize: '15px', fontWeight: 600, margin: '12px 0 6px 0', lineHeight: '1.3' }} />
-                      ),
+                      /*
+                        The reply's own headings, sized as they always were and
+                        kept out of the surface's outline (#57).
+                      */
+                      ...replyHeadings({
+                        h1: { fontSize: '20px', fontWeight: 600, margin: '16px 0 8px 0', lineHeight: '1.3' },
+                        h2: { fontSize: '17px', fontWeight: 600, margin: '14px 0 8px 0', lineHeight: '1.3' },
+                        h3: { fontSize: '15px', fontWeight: 600, margin: '12px 0 6px 0', lineHeight: '1.3' },
+                      }),
                       ul: ({ node: _ulNode, ...props }) => (
                         <ul {...props} style={{ margin: '8px 0', paddingLeft: '24px' }} />
                       ),

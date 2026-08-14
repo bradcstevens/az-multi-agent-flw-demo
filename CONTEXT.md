@@ -525,6 +525,39 @@ over — so its layout moved to `storeSurface.css` too. The minimum is now 280px
 task-history panel's 280 plus the rail's 320 is 920px of columns in a shell that stacks at 900, and
 the 19px band above the breakpoint was clipped off the rail's end without a scrollbar.
 
+**Heading outline** — the surface's structure, stated in headings rather than only in layout (#57).
+A query for every heading element on the deployed page came back **empty**: Fluent's typography
+components render a generic span unless they are told what element to be, so "How can I help?",
+"Quick tasks", "Plan Overview", "Grounding", "What this cost" and "Agent Team" were all styled
+spans and the whole surface was one undifferentiated run of text. Heading navigation is how a
+non-visual user skims a page, and here it landed on nothing. WCAG 2.1 Level A, 1.3.1.
+
+Two levels, declared once in `models/headingOutline.ts` on the `storeSurface.ts` precedent — a
+level chosen beside each title is a level that drifts, and an outline that skips one is the same
+defect in a different form. The **surface heading** is the assistant's name in the conversation's
+header, and it has to be that one: the left panel's toolbar says the same name and is dropped at
+the **Stacking breakpoint**, so a heading there is one the associate's phone never renders. Every
+section — the question input, the Quick tasks, the plan overview, each **transparency panel** —
+is one level below it.
+
+It costs the **transparency rail** most. The rail exists to be *skimmed*, and its panel titles are
+what make it skimmable; rendering them as spans took the rail's argument away from exactly the
+users who most need it stated in structure rather than in layout.
+
+Applied with Fluent's `as` override, so the typography classes still beat the user-agent sheet and
+nothing about the surface's appearance changes — except where a heading is **blockified**. A flex
+item or a flex container is a block box, and a block-level `h2` picks up the user-agent's
+`margin: .83em 0`: unzeroed, each transparency panel measured 71px instead of 48 and the Quick
+tasks header 43px instead of 20. Every class that heads a section declares its own margin.
+
+A **reply may not head the surface**. `react-markdown` renders a model's `#` as a real `h1`, and
+the orchestrator emits `### {display_name}` into the reply stream, so an answer could put a second
+top-level heading — and a skipped level — above the panels that explain that same answer.
+`replyHeadings.tsx` gives those elements `role="presentation"`: they keep every pixel and give up
+the semantics, on all three Markdown renderers, found by searching the source rather than listed.
+Demotion was rejected because the conversation has no section heading of its own to descend from.
+_Avoid_: visually-hidden headings — the outline is made of the titles the surface already shows.
+
 **Grounding panel** — the R6 surface showing where an answer came from. Driven by **two signals
 combined**: a "source used" event emitted server-side over the existing WebSocket, which proves
 *which platform* answered, and citation data parsed from the SOP agent's response, which supplies

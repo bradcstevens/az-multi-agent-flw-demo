@@ -3,6 +3,7 @@ import { Body1Strong, Caption1 } from '@fluentui/react-components';
 import { GaugeRegular } from '@fluentui/react-icons';
 
 import { MeterRow, MeterState } from '../../models/meter';
+import { SECTION_HEADING } from '../../models/headingOutline';
 
 /**
  * The Token meter (issue #24, R7).
@@ -54,7 +55,7 @@ const rowTitle = (row: MeterRow): string => {
 
 const TokenMeterPanel: React.FC<TokenMeterPanelProps> = ({ meter, models = {} }) => (
     <section className="transparency-panel" data-testid="token-meter-panel">
-        <Body1Strong className="transparency-panel__title">
+        <Body1Strong as={SECTION_HEADING} className="transparency-panel__title">
             <GaugeRegular aria-hidden="true" /> What this cost
         </Body1Strong>
 

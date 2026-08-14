@@ -7,6 +7,7 @@ import {
 } from "@fluentui/react-icons";
 import { PlanDetailsProps } from "../../models";
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
+import { SECTION_HEADING } from '../../models/headingOutline';
 import ContentNotFound from "../NotFound/ContentNotFound";
 import AgentTeamPanel from "../transparency/AgentTeamPanel";
 import TransparencyRail from "../transparency/TransparencyRail";
@@ -62,7 +63,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
 
     return (
       <div className="plan-section">
-        <Body1 className="plan-section__title">
+        <Body1 as={SECTION_HEADING} className="plan-section__title">
           Plan Overview
         </Body1>
 

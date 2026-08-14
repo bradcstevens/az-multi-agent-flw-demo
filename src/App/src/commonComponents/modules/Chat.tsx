@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+
+import { replyHeadings } from "@/components/content/streaming/replyHeadings";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 import {
@@ -183,7 +185,7 @@ const Chat: React.FC<ChatProps> = ({
           <div key={index} className={`message ${msg.role}`}>
             <Body1>
               <div style={{ display: "flex", flexDirection: "column", whiteSpace: "pre-wrap", width: "100%" }}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]} urlTransform={resolveApiAssetUrl}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypePrism]} urlTransform={resolveApiAssetUrl} components={replyHeadings()}>
                   {msg.content}
                 </ReactMarkdown>
                 {msg.role === "assistant" && (

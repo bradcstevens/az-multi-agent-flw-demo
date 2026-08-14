@@ -1,0 +1,285 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import { readFileSync } from 'node:fs';
+
+vi.mock('../store/TeamService', () => ({
+    TeamService: {
+        getUserTeams: vi.fn(),
+        initializeTeam: vi.fn(),
+        storageTeam: vi.fn(),
+        clearStoredTeam: vi.fn(),
+        getStoredTeam: vi.fn(() => null),
+    },
+}));
+
+vi.mock('@/api/apiService', () => {
+    const apiService = { getPlans: vi.fn(async () => []), approvePlan: vi.fn() };
+    return { apiService, APIService: vi.fn(() => apiService) };
+});
+
+vi.mock('../store/PlanDataService', () => ({
+    PlanDataService: { fetchPlanData: vi.fn() },
+}));
+
+import HomePage from './HomePage';
+import PlanPage from './PlanPage';
+import TransparencyRail from '@/components/transparency/TransparencyRail';
+import { TeamService } from '../store/TeamService';
+import { PlanDataService } from '../store/PlanDataService';
+import { ASSISTANT_NAME, STORE_ASSISTANT_TEAM_ID } from '../models/storeSurface';
+import { AgentMessageType } from '../models';
+import { SECTION_HEADING, SURFACE_HEADING } from '../models/headingOutline';
+import { sourceFiles } from '@/testing/stylesheets';
+import { FakeSocket } from '@/testing/fakeSocket';
+
+import planReducer from '@/store/slices/planSlice';
+import chatReducer from '@/store/slices/chatSlice';
+import appReducer from '@/store/slices/appSlice';
+import teamReducer from '@/store/slices/teamSlice';
+import streamingReducer from '@/store/slices/streamingSlice';
+import transparencyReducer from '@/store/slices/transparencySlice';
+import ticketReducer from '@/store/slices/ticketSlice';
+
+/**
+ * The surface's heading outline (issue #57).
+ *
+ * A query for every heading element on the deployed page came back **empty** —
+ * not with the wrong levels, with nothing at all — because Fluent's typography
+ * components render a generic span unless they are told what element to be. So
+ * these assertions read the outline off the rendered surface, which jsdom can
+ * see, and are deliberately about *structure* rather than about wording: the
+ * empty states and the panel copy are other tickets' to change.
+ */
+
+const TEAM = {
+    team_id: STORE_ASSISTANT_TEAM_ID,
+    name: ASSISTANT_NAME,
+    agents: [{ input_key: '', type: '', name: 'ShiftTasksAgent', deployment_name: 'gpt-4.1-mini' }],
+    starting_tasks: [
+        { id: 'qt-1', name: 'How do I close the store?', prompt: 'How do I close the store?', lane: 'fast' },
+    ],
+} as any;
+
+/**
+ * A reply with the model's own Markdown headings in it. The plan surface has
+ * to hold its outline while an agent is talking, and `#` in a reply is where
+ * the second top-level heading came from.
+ */
+const REPLY = {
+    agent: 'ShiftTasksAgent',
+    agent_type: AgentMessageType.AI_AGENT,
+    content: '# Closing the store\n\nCash up the tills.\n\n### Safe drop\n',
+} as any;
+
+const PLAN_DATA = {
+    plan: { id: 'plan-1', overall_status: 'completed' },
+    team: TEAM,
+    messages: [REPLY],
+    mplan: null,
+    streaming_message: null,
+    agents: [],
+    steps: [],
+} as any;
+
+const makeStore = () =>
+    configureStore({
+        reducer: {
+            plan: planReducer,
+            chat: chatReducer,
+            app: appReducer,
+            team: teamReducer,
+            streaming: streamingReducer,
+            transparency: transparencyReducer,
+            ticket: ticketReducer,
+        },
+        middleware: (getDefaultMiddleware) =>
+            getDefaultMiddleware({ serializableCheck: false }),
+    });
+
+/** Every heading the surface exposes, in document order, with its level. */
+const outline = (): { level: number; text: string }[] =>
+    screen
+        .queryAllByRole('heading')
+        .map((heading) => ({
+            level: Number(heading.tagName.slice(1)),
+            text: (heading.textContent ?? '').trim(),
+        }));
+
+const levelOf = (element: string): number => Number(element.slice(1));
+
+/**
+ * Every place the outline jumps down more than one level, in **document
+ * order** — which is the only order that matters. A set of the distinct levels
+ * would report `h1, h3, h2` as a clean `[1, 2, 3]`, and that exact sequence is
+ * what a model's Markdown heading in a reply used to produce.
+ */
+const skippedLevels = (): string[] => {
+    const jumps: string[] = [];
+    let previous = 0;
+    for (const heading of outline()) {
+        if (heading.level > previous + 1) {
+            jumps.push(`h${previous || 0} \u2192 h${heading.level} (${heading.text})`);
+        }
+        previous = heading.level;
+    }
+    return jumps;
+};
+
+const renderHomeSurface = () =>
+    render(
+        <Provider store={makeStore()}>
+            <MemoryRouter>
+                <HomePage />
+            </MemoryRouter>
+        </Provider>,
+    );
+
+const renderPlanSurface = () =>
+    render(
+        <Provider store={makeStore()}>
+            <MemoryRouter initialEntries={['/plan/plan-1']}>
+                <Routes>
+                    <Route path="/plan/:planId" element={<PlanPage />} />
+                </Routes>
+            </MemoryRouter>
+        </Provider>,
+    );
+
+beforeEach(() => {
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    FakeSocket.instances = [];
+    vi.stubGlobal('WebSocket', FakeSocket);
+    window.appConfig = { API_URL: 'https://backend.example/api' } as never;
+    vi.mocked(TeamService.getUserTeams).mockResolvedValue([TEAM]);
+    vi.mocked(TeamService.initializeTeam).mockResolvedValue({ success: true } as any);
+    vi.mocked(PlanDataService.fetchPlanData).mockResolvedValue(PLAN_DATA);
+});
+
+describe('the home surface has a heading outline', () => {
+    it('exposes exactly one top-level heading, and it names the assistant', async () => {
+        renderHomeSurface();
+
+        await waitFor(() => expect(screen.getByText('Quick tasks')).toBeInTheDocument());
+
+        const top = outline().filter((heading) => heading.level === levelOf(SURFACE_HEADING));
+        expect(top.map((heading) => heading.text)).toEqual([ASSISTANT_NAME]);
+    });
+
+    it('makes the question input and the Quick tasks reachable by heading navigation', async () => {
+        renderHomeSurface();
+
+        await waitFor(() => expect(screen.getByText('Quick tasks')).toBeInTheDocument());
+
+        const sections = outline()
+            .filter((heading) => heading.level === levelOf(SECTION_HEADING))
+            .map((heading) => heading.text);
+        expect(sections).toContain('How can I help?');
+        expect(sections).toContain('Quick tasks');
+    });
+
+    it('makes every transparency panel reachable by heading navigation', async () => {
+        // The rail exists so the audience can skim where an answer came from
+        // and what it cost. Panel titles rendered as spans take that away from
+        // the users who most need structure rather than layout.
+        renderHomeSurface();
+
+        await waitFor(() => expect(screen.getByText('Quick tasks')).toBeInTheDocument());
+
+        const sections = outline()
+            .filter((heading) => heading.level === levelOf(SECTION_HEADING))
+            .map((heading) => heading.text);
+        expect(sections).toContain('Grounding');
+        expect(sections).toContain('What this cost');
+    });
+
+    it('descends without skipping a level', async () => {
+        renderHomeSurface();
+
+        await waitFor(() => expect(screen.getByText('Quick tasks')).toBeInTheDocument());
+
+        expect(outline().length, 'no headings at all; this assertion is inert').toBeGreaterThan(0);
+        expect(skippedLevels(), 'the outline jumps a level').toEqual([]);
+    });
+});
+
+describe('the plan surface has a heading outline', () => {
+    it('exposes exactly one top-level heading, and it names the assistant', async () => {
+        renderPlanSurface();
+
+        await waitFor(() => expect(screen.getByTestId('transparency-rail')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText('Plan Overview')).toBeInTheDocument());
+
+        const top = outline().filter((heading) => heading.level === levelOf(SURFACE_HEADING));
+        expect(top.map((heading) => heading.text)).toEqual([ASSISTANT_NAME]);
+    });
+
+    it('makes the plan and every transparency panel reachable by heading navigation', async () => {
+        renderPlanSurface();
+
+        await waitFor(() => expect(screen.getByText('Plan Overview')).toBeInTheDocument());
+
+        const sections = outline()
+            .filter((heading) => heading.level === levelOf(SECTION_HEADING))
+            .map((heading) => heading.text);
+        expect(sections).toContain('Plan Overview');
+        expect(sections).toContain('Agent Team');
+        expect(sections).toContain('Grounding');
+        expect(sections).toContain('What this cost');
+    });
+
+    it('descends without skipping a level', async () => {
+        renderPlanSurface();
+
+        await waitFor(() => expect(screen.getByText('Plan Overview')).toBeInTheDocument());
+
+        expect(outline().length, 'no headings at all; this assertion is inert').toBeGreaterThan(0);
+        expect(skippedLevels(), 'the outline jumps a level').toEqual([]);
+    });
+});
+
+describe('the rail heads its panels without heading the surface', () => {
+    it('exposes no top-level heading of its own', () => {
+        // The rail is on both surfaces. A top-level heading inside it would be
+        // a second one on each — and on the plan surface it is rendered inside
+        // the panel *beside* the conversation, which is not what the page is
+        // about.
+        render(
+            <Provider store={makeStore()}>
+                <TransparencyRail team={TEAM} />
+            </Provider>,
+        );
+
+        expect(
+            outline().filter((heading) => heading.level === levelOf(SURFACE_HEADING)),
+        ).toEqual([]);
+    });
+
+    it('cannot ship a panel title as a span', () => {
+        // Read out of the source rather than listed here: the failure this
+        // guards is a *new* panel, and a list of the three that exist today
+        // would agree with itself forever. Every component that renders the
+        // panel-title class has to take its level from the outline module.
+        const TITLE_CLASS = 'transparency-panel__title';
+
+        // The opening tag itself, not the file: an unused import of
+        // `SECTION_HEADING` elsewhere in the same module would otherwise let a
+        // span through.
+        const untitled = sourceFiles().flatMap((path) =>
+            Array.from(readFileSync(path, 'utf8').matchAll(/<[^<>]*>/g))
+                .map((match) => match[0])
+                .filter((tag) => tag.includes(TITLE_CLASS))
+                .filter((tag) => !tag.includes('as={SECTION_HEADING}'))
+                .map((tag) => `${path}: ${tag.trim()}`),
+        );
+
+        expect(untitled, 'renders a panel title that is not a heading').toEqual([]);
+        expect(
+            sourceFiles().filter((path) => readFileSync(path, 'utf8').includes(TITLE_CLASS)),
+            'no component renders a panel title; this assertion is inert',
+        ).not.toEqual([]);
+    });
+});

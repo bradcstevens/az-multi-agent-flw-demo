@@ -29,6 +29,17 @@
   margin-bottom: 24px;
 }
 
+/*
+ * The section headings (#57) are real `h2` elements now, so the user-agent's
+ * `margin: .83em 0` is in play wherever one is blockified — a flex item, or a
+ * flex container of its own. Zeroing it is what keeps the outline a change of
+ * semantics rather than a change of layout.
+ */
+.home-input-title,
+.home-input-quick-tasks-title {
+  margin: 0;
+}
+
 .home-input-input-section {
   width: 100%;
   margin-bottom: 32px;

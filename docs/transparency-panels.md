@@ -160,6 +160,14 @@ surface the walkthrough visits — and it has to be. The refusal happens on the 
 answers happen on the plan surface, while the meter's running total spans both. A rail only on the
 plan page would mean the guardrail's zero was never seen beside a row that cost something.
 
+## The panels are headings
+
+Each panel's title is a section heading rather than a styled span (#57), at the level
+`models/headingOutline.ts` declares. The rail's whole job is to be **skimmed** — where the answer
+came from, what it cost, who could have answered — and heading navigation is how that is done
+without a mouse or a pair of eyes. A span makes the rail skimmable by layout only, which is to say
+by sight only. See [The heading outline](store-surface.md#the-heading-outline).
+
 ## The first frontend tests
 
 vitest, React Testing Library and jsdom were fully configured in the accelerator baseline, with **no

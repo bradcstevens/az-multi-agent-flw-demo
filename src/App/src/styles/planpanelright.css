@@ -48,7 +48,12 @@
 }
 
 .plan-section__title {
-  margin-bottom: 16px;
+  /*
+   * A section heading (#57). The declared bottom margin is the plan's; the
+   * top one has to be said, or the user-agent's `margin: .83em 0` supplies it
+   * the moment this becomes an `h2` in a blockifying context.
+   */
+  margin: 0 0 16px;
   font-size: 14px;
   font-weight: 600;
   color: var(--colorNeutralForeground1);

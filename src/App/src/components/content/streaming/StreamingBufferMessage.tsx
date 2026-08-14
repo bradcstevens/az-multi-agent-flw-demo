@@ -4,6 +4,8 @@ import {
 } from '@fluentui/react-components';
 import { CheckmarkCircle20Regular, ArrowTurnDownRightRegular } from '@fluentui/react-icons';
 import ReactMarkdown from "react-markdown";
+
+import { replyHeadings } from "./replyHeadings";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 import { formatJsonInText } from "@/utils/jsonFormatter";
@@ -167,6 +169,7 @@ const StreamingBufferMessage: React.FC<StreamingBufferMessageProps> = ({
                                     rehypePlugins={[rehypePrism]}
                                     urlTransform={resolveApiAssetUrl}
                                     components={{
+                                        ...replyHeadings(),
                                         a: ({ node, ...props }) => (
                                             <a
                                                 {...props}
@@ -221,6 +224,7 @@ const StreamingBufferMessage: React.FC<StreamingBufferMessageProps> = ({
                             rehypePlugins={[rehypePrism]}
                             urlTransform={resolveApiAssetUrl}
                             components={{
+                                ...replyHeadings(),
                                         a: ({ node, ...props }) => (
                                             <a
                                                 {...props}

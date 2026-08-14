@@ -25,6 +25,7 @@ import webSocketService from "@/store/WebSocketService";
 import { useAppDispatch } from "@/store/hooks";
 import { refusalRecorded, requestStarted } from "@/store/slices/transparencySlice";
 import { ASSISTANT_NAME } from "../../models/storeSurface";
+import { SECTION_HEADING } from "../../models/headingOutline";
 
 import ChatInput from "@/commonComponents/modules/ChatInput";
 import InlineToaster, { useInlineToaster } from "../toast/InlineToaster";
@@ -322,7 +323,13 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       <div className="home-input-content">
         <div className="home-input-center-content">
           <div className="home-input-title-wrapper">
-            <Title2>How can I help?</Title2>
+            {/*
+              The question input region's heading (#57). One level below the
+              conversation header's, which names the assistant.
+            */}
+            <Title2 as={SECTION_HEADING} className="home-input-title">
+              How can I help?
+            </Title2>
           </div>
 
           {/* Legal Disclaimer for Contract Compliance Review Team */}
@@ -436,7 +443,12 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
             {tasksToDisplay.length > 0 && (
               <>
                 <div className="home-input-quick-tasks-header">
-                  <Body1Strong>Quick tasks</Body1Strong>
+                  <Body1Strong
+                    as={SECTION_HEADING}
+                    className="home-input-quick-tasks-title"
+                  >
+                    Quick tasks
+                  </Body1Strong>
                 </div>
 
                 <div className="home-input-quick-tasks">

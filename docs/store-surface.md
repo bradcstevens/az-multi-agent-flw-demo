@@ -197,6 +197,76 @@ rather than a negotiation the largest token total wins. Measured across 320, 390
 axis, and stacked the shell scrolls as one — 961px of page in an 844px viewport at 320px, where
 before nothing scrolled at all.
 
+## The heading outline
+
+A query for every heading element on the deployed page returned an **empty list**. Not the wrong
+levels — none at all. Fluent's typography components render a generic `span` unless they are told
+what element to be, so "How can I help?", "Quick tasks", "Plan Overview", "Grounding", "What this
+cost" and "Agent Team" were styled spans, and a screen-reader user had no structure to move
+through: the whole surface was one undifferentiated run of text. WCAG 2.1 Level A, 1.3.1.
+
+It matters more here than it would on an ordinary surface, because the **transparency rail**'s
+whole job is to be skimmed. The rail exists so that the audience can see where an answer came from
+and what it cost without reading every word, and the panel titles are what make that possible.
+Rendering them as spans took the rail's argument away from exactly the users who most need it
+stated in structure rather than in layout.
+
+Two levels, declared once in `models/headingOutline.ts`:
+
+| Level | What | Where |
+| --- | --- | --- |
+| `SURFACE_HEADING` (`h1`) | The assistant's name | `ContentToolbar` — the conversation's header |
+| `SECTION_HEADING` (`h2`) | "How can I help?", "Quick tasks", "Plan Overview", each rail panel | `HomeInput`, `PlanPanelRight`, the three transparency panels |
+
+The levels live in the module rather than beside each title for the reason `storeSurface.ts` holds
+the surface's strings: a level chosen at each call site is a level that drifts, and an outline that
+skips one is the same defect this fixes in a different shape.
+
+The page heading has to be the **conversation's header** and not the left panel's, even though both
+say the assistant's name. The left panel is dropped at the stacking breakpoint, and a heading the
+associate's phone never renders is not an outline.
+
+It is applied with Fluent's `as` override — `TextSlots.root` accepts `h1` through `h6` — rather
+than by hand-rolled markup, so the typography classes are still there and still beat the user-agent
+sheet. One thing does change, and it had to be measured rather than assumed: a flex item and a flex
+container are both **block boxes**, so a blockified `h2` picks up the user-agent's `margin: .83em
+0`. In a headless Chromium against the real stylesheets, unzeroed, each `.transparency-panel` grew
+from 48px to 71.22px and the Quick tasks header from 20px to 43.22px — about seventy pixels of rail
+given up to nothing. Every class that heads a section now declares its own margin, and with those
+rules in place all five regions measure identically before and after.
+
+`src/App/src/pages/headingOutline.test.tsx` renders both surfaces and reads the outline off them —
+one top-level heading each, every section reachable, no level skipped. jsdom exposes heading roles
+and levels, so this is a rendered assertion rather than a source-read one. The exception is the
+panel titles: a *new* panel shipping a span is the regression a list of the three that exist today
+would never catch, so that one check reads the components' source and requires every renderer of
+`transparency-panel__title` to take its level from the module. Confirmed red by moving
+`SECTION_HEADING` to `h3` (skips a level) and to `h1` (a second top-level heading on both
+surfaces).
+
+### A reply may not head the surface
+
+The words in a reply come from a language model, and `react-markdown` renders a `#` as a real
+`<h1>`. So a reply that opened with one put a **second top-level heading** on the plan surface,
+above the very panels that explain where that reply came from and what it cost. A screen-reader
+user skimming by heading would meet the model's prose before **Grounding** and **What this cost**,
+with nothing to tell the surface's structure apart from the answer's. The backend makes it likelier
+than it sounds: `orchestration_manager` emits `### {display_name}` into the reply stream, which is
+an `h3` arriving before the rail's `h2`s — a skipped level in document order.
+
+The outline is the surface's to declare. `components/content/streaming/replyHeadings.tsx` gives the
+element its **role** rather than its tag: `role="presentation"`, so nothing at all changes on
+screen and no styling has to be restated in order to strip a semantic. Demoting them instead was
+rejected — the conversation has no section heading of its own to descend from, so every reply
+heading would skip a level rather than stop skipping one.
+
+It applies to all three Markdown renderers, and the test finds them by searching the source for
+`<ReactMarkdown` rather than by naming them: two of the three shipped with react-markdown's
+defaults precisely because nobody had asked. The two rendered assertions feed a reply containing
+`#`, `##` and `###` and require the surface to expose no heading from it; the plan-surface outline
+test carries the same reply, so "exactly one top-level heading" is asserted with an agent talking
+rather than only on a silent page. Mutation-checked by dropping the role.
+
 ## Labelling what is simulated
 
 `SimulatedBadge` marks anything whose content was authored for the walkthrough rather than produced

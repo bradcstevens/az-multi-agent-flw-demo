@@ -3,6 +3,7 @@ import { Badge, Body1Strong, Caption1, Caption1Strong } from '@fluentui/react-co
 import { ArrowRight16Regular, DocumentSearch20Regular } from '@fluentui/react-icons';
 
 import { SourceUsed } from '../../models/transparency';
+import { SECTION_HEADING } from '../../models/headingOutline';
 
 /**
  * The Grounding panel (issue #24, R6).
@@ -45,7 +46,7 @@ const GroundingPanel: React.FC<GroundingPanelProps> = ({ source }) => (
         data-tool-query={source?.toolQuery}
         data-retrieval-query={source?.retrievalQuery}
     >
-        <Body1Strong className="transparency-panel__title">
+        <Body1Strong as={SECTION_HEADING} className="transparency-panel__title">
             <DocumentSearch20Regular aria-hidden="true" /> Grounding
         </Body1Strong>
 

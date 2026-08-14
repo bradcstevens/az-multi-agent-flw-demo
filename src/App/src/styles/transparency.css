@@ -40,6 +40,13 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    /*
+     * A section heading (#57), and a flex item of the panel, so it is
+     * blockified and the user-agent's `margin: .83em 0` would otherwise apply
+     * and push the panels apart. The rail's spacing is the panel's `gap` to
+     * declare.
+     */
+    margin: 0;
 }
 
 .transparency-panel__empty {

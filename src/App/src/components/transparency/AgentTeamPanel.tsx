@@ -5,6 +5,7 @@ import { PeopleTeam20Regular } from '@fluentui/react-icons';
 import { TeamConfig } from '../../models/Team';
 import { rosterAgents } from '../../models/roster';
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
+import { SECTION_HEADING } from '../../models/headingOutline';
 
 /**
  * The Agent Team panel (issue #24).
@@ -32,7 +33,7 @@ const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({ team, plan }) => {
 
     return (
         <section className="transparency-panel" data-testid="agent-team-panel">
-            <Body1Strong className="transparency-panel__title">
+            <Body1Strong as={SECTION_HEADING} className="transparency-panel__title">
                 <PeopleTeam20Regular aria-hidden="true" /> Agent Team
             </Body1Strong>
 
