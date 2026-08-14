@@ -12,6 +12,9 @@ vi.mock('../../store/TaskService', () => ({
 import HomeInput from './HomeInput';
 import { TaskService } from '../../store/TaskService';
 import transparencyReducer from '@/store/slices/transparencySlice';
+import webSocketService from '@/store/WebSocketService';
+import { WebsocketMessageType } from '@/models';
+import { FakeSocket, frame } from '@/testing/fakeSocket';
 import { PolicyBlockError } from '../../api/policyBlock';
 import { PERSONAL_ANSWER_KIND } from '../../models/personalAnswer';
 import {
@@ -67,6 +70,10 @@ const ask = async (question: string) => {
 beforeEach(() => {
     window.sessionStorage.clear();
     forgetSignedInDevice();
+    FakeSocket.instances = [];
+    webSocketService.disconnect();
+    vi.stubGlobal('WebSocket', FakeSocket);
+    window.appConfig = { API_URL: 'https://backend.example/api' } as never;
     createPlan.mockReset().mockResolvedValue({ plan_id: 'plan-1' } as any);
     signInDevice.mockReset().mockImplementation(async () => {
         rememberSignedInName('Tanya Alvarez');
@@ -237,5 +244,90 @@ describe('the home surface', () => {
         renderInput();
 
         expect(screen.queryByTestId('assistant-unavailable')).not.toBeInTheDocument();
+    });
+});
+
+/**
+ * The window between the response and the render (issue #63, ADR-021).
+ *
+ * `process_request` schedules `run_orchestration_task` as a detached task
+ * *before* it returns the HTTP response, so everything the orchestration emits
+ * from that moment is pushed at whatever socket exists — and
+ * `send_status_update_async` drops it when there is none. Hanging the connect
+ * off the plan page put the navigation, a mount and a second GET inside that
+ * window, and the frames most likely to fall in it are the first agent's
+ * `agent_message_streaming` header — the only signal in the system that names
+ * *which* specialist took the question — and, on a short Fast lane answer,
+ * `source_used` and `token_usage` too.
+ *
+ * There is deliberately no plan page anywhere in this tree. That is the claim:
+ * the connect does not depend on one.
+ */
+describe('the socket the answer arrives on', () => {
+    /**
+     * What `send_status_update_async` does with a frame: push it to the socket
+     * for this plan, or drop it in silence when there isn't one.
+     */
+    const backendPushes = (text: string): boolean => {
+        const socket = FakeSocket.forPlan('plan-1')[0];
+        if (!socket) return false;
+        if (socket.readyState !== FakeSocket.OPEN) socket.open();
+        socket.deliver(text);
+        return true;
+    };
+
+    it('is open before any plan page has mounted', async () => {
+        renderInput();
+
+        await ask('how do I close the store?');
+
+        await waitFor(() => expect(FakeSocket.forPlan('plan-1')).toHaveLength(1));
+    });
+
+    it('carries the frame that names the specialist rather than dropping it', async () => {
+        // Raw wire text through the real service, per the #47 finding: a test
+        // that hand-feeds the payload shape agrees with its own author and
+        // cannot see this bug.
+        const named: string[] = [];
+        const unsub = webSocketService.on(
+            WebsocketMessageType.AGENT_MESSAGE_STREAMING,
+            (message: any) => named.push(message.data?.agent),
+        );
+        renderInput();
+
+        await ask('how do I close the store?');
+        const delivered = backendPushes(
+            frame('agent_message_streaming', {
+                agent_name: 'Troubleshooting Agent',
+                content: 'Let me check the closing procedure.',
+                is_final: false,
+            }),
+        );
+        unsub();
+
+        expect(delivered).toBe(true);
+        expect(named).toEqual(['Troubleshooting Agent']);
+    });
+
+    it('is not opened for a question the gate refused', async () => {
+        // A refusal costs no agent, no tokens and no plan, so there is no
+        // orchestration to observe and nothing to connect to.
+        createPlan.mockRejectedValue(REFUSAL);
+        renderInput();
+
+        await ask('my name is Tanya, how much PTO do I have?');
+
+        await screen.findByTestId('policy-block');
+        expect(FakeSocket.instances).toHaveLength(0);
+    });
+
+    it('is not opened for an answer that never had a plan', async () => {
+        createPlan.mockResolvedValue(ANSWER);
+        renderInput();
+
+        await ask('how much PTO do I have?');
+
+        await screen.findByTestId('personal-answer');
+        expect(FakeSocket.instances).toHaveLength(0);
     });
 });

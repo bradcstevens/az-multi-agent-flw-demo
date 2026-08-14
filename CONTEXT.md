@@ -587,6 +587,28 @@ takes: a model mis-copying a UUID must not be able to make the Grounding panel g
 and the alert route does not — the presenter pressed a key, and being told nothing happened is the
 difference between a bug and a chord that missed.
 
+**Connection window** — the gap between the backend scheduling the orchestration and the browser's
+socket existing. `process_request` starts `run_orchestration_task` as a detached task *before* it
+returns the HTTP response, and `send_status_update_async` **drops** anything pushed at a socket that
+is not there. Since #63 the connect is initiated on the **`createPlan` response**, before `navigate`
+(ADR-021) — so the window is the round trip and no longer the round trip *plus* a navigation, a
+mount and a second GET. The plan page keeps a connect of its own for the path with no response to
+hang off: a reload of `/plan/:id`. Two entry points, one socket — `connect()` returns the in-flight
+handshake for a plan it is already opening rather than reporting a failure to the second caller, and
+`isServing()` counts a handshake as serving because the response's connect and the navigation happen
+in the same tick. The plan page **adopts** the socket it finds rather than opening a second one, and
+owns the **disconnect** for as long as it is on screen, rather than leaving it to
+`continueWithWebsocketFlow` — which only turns true once the plan GET has landed, so a presenter who
+left before it did used to leave an adopted socket open with nothing to close it. Adoption is what
+makes the teardown symmetric, and symmetry is what survives **StrictMode**: React 18 runs setup,
+cleanup, setup, so a cleanup disconnecting a socket no setup reopens closes the adopted one on
+arrival and puts #63 straight back on the dev server. On the backend, a socket asking to be closed
+must **be the registered one**: a replacement supersedes its predecessor, and the predecessor's
+endpoint then reaches its `finally` — keyed on the process alone that arrival closed and
+unregistered the replacement, and every frame after it was dropped with nothing said. The window is
+**narrowed, not closed**: the "No active WebSocket" log stays reachable and stays logged, because a
+drop that still happens must stay visible to whoever reads the logs.
+
 All three signals are recorded in full in
 [docs/transparency-signals.md](docs/transparency-signals.md), and the panels that render them in
 [docs/transparency-panels.md](docs/transparency-panels.md). The rebrand that surrounds them is

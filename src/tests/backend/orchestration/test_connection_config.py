@@ -248,6 +248,43 @@ class TestConnectionRegistry:
         await cc.close_connection("proc1")
         assert "proc1" not in cc.connections
 
+    @pytest.mark.asyncio
+    async def test_a_superseded_socket_does_not_evict_the_one_that_replaced_it(self):
+        """The Connection window, closed from the other end (#63, ADR-021).
+
+        A second socket for one process supersedes the first, and
+        ``add_connection`` closes the first — whose endpoint then reaches its
+        ``finally`` and asks for the process to be closed. Keyed on the process
+        alone, that request finds the *replacement* and unregisters it, and
+        every frame after that is dropped with nothing said. The browser
+        reconnects into exactly this shape, and so does React 18 StrictMode
+        mounting the plan page twice.
+        """
+        cc = ConnectionConfig()
+        superseded = AsyncMock()
+        replacement = AsyncMock()
+        cc.add_connection("proc1", superseded, user_id="u1")
+        cc.add_connection("proc1", replacement, user_id="u1")
+        await asyncio.sleep(0)
+
+        await cc.close_connection("proc1", connection=superseded)
+
+        assert cc.get_connection("proc1") is replacement
+        assert cc.user_to_process["u1"] == "proc1"
+        replacement.close.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_the_socket_that_is_still_the_current_one_is_closed(self):
+        cc = ConnectionConfig()
+        ws = AsyncMock()
+        cc.add_connection("proc1", ws, user_id="u1")
+
+        await cc.close_connection("proc1", connection=ws)
+
+        ws.close.assert_awaited_once()
+        assert "proc1" not in cc.connections
+        assert "u1" not in cc.user_to_process
+
 
 class TestSoleUser:
     """Who an out-of-band push goes to (issue #23).

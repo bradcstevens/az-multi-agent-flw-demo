@@ -113,6 +113,16 @@ export function usePlanWebSocket({
     const streamingChunkQueueRef = React.useRef<string[]>([]);
     const streamingFlushHandleRef = React.useRef<number | null>(null);
 
+    // The plan this page has taken responsibility for a socket for — set when
+    // it opens one and when it adopts one opened on the `createPlan` response.
+    const socketOwnedForRef = React.useRef<string | null>(null);
+
+    const connectWebSocket = (id: string) => {
+        webSocketService.connect(id).catch(() => {
+            console.log('WebSocket connection failed, continuing without real-time updates');
+        });
+    };
+
     useEffect(() => {
         if (showProcessingPlanSpinner) {
             if (processingStartedAtRef.current === null) {
@@ -380,19 +390,24 @@ export function usePlanWebSocket({
         return unsub;
     }, [dispatch, scrollToBottom, planData, planApproved]);
 
-    // ── WebSocket connect / disconnect lifecycle ──────────────────
+    // ── WebSocket connect ─────────────────────────────────────────
+    /*
+      The plan page's connect, which is now the *second* one (ADR-021). The
+      first is initiated by `HomeInput` on the `createPlan` response, because
+      the backend schedules the orchestration before that response returns and
+      everything it emits in the meantime is pushed at a socket that does not
+      exist (#63). This one serves the case that has no response to hang off —
+      a direct load or a reload of /plan/:id — and is a no-op when the socket
+      for this plan is already open or still handshaking.
+    */
     useEffect(() => {
         if (!planId || !continueWithWebsocketFlow) return;
+        socketOwnedForRef.current = planId;
+        connectWebSocket(planId);
+    }, [planId, continueWithWebsocketFlow]);
 
-        const connectWebSocket = async () => {
-            try {
-                await webSocketService.connect(planId);
-            } catch {
-                console.log('WebSocket connection failed, continuing without real-time updates');
-            }
-        };
-        connectWebSocket();
-
+    // ── WebSocket subscriptions ───────────────────────────────────
+    useEffect(() => {
         const handleConnectionChange = (connected: boolean) => {
             dispatch(setWsConnected(connected));
         };
@@ -418,9 +433,37 @@ export function usePlanWebSocket({
             unsubStreaming();
             unsubApproval();
             unsubApprovalReq();
+        };
+    }, [dispatch]);
+
+    // ── WebSocket disconnect ──────────────────────────────────────
+    /*
+      The socket belongs to the plan page for as long as the plan page is on
+      screen, whether the page opened it or adopted one opened on the
+      `createPlan` response (ADR-021). It cannot be owned by
+      `continueWithWebsocketFlow`, which only turns true once the plan GET has
+      landed: a presenter who leaves before it does used to leave an adopted
+      socket open with nothing to close it.
+
+      Setup and cleanup are symmetric on purpose. React 18 StrictMode runs
+      setup, cleanup, setup — so a cleanup that disconnects a socket no setup
+      reopens closes the adopted socket on arrival, and #63 comes straight back
+      on the dev server. `socketOwnedForRef` is what survives that teardown:
+      once this page owns a socket for a plan it re-establishes it, and a
+      completed plan that never had one still gets none.
+    */
+    useEffect(() => {
+        if (!planId) return;
+
+        if (socketOwnedForRef.current === planId || webSocketService.isServing(planId)) {
+            socketOwnedForRef.current = planId;
+            connectWebSocket(planId);
+        }
+
+        return () => {
             webSocketService.disconnect();
         };
-    }, [dispatch, planId, continueWithWebsocketFlow]);
+    }, [planId]);
 }
 
 export default usePlanWebSocket;

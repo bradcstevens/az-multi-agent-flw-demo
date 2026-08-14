@@ -234,12 +234,35 @@ class ConnectionConfig:
             return next(iter(self.user_to_process))
         return None
 
-    async def close_connection(self, process_id: str) -> None:
-        """Close and remove a connection by process_id."""
-        connection = self.get_connection(process_id)
-        if connection:
+    async def close_connection(
+        self, process_id: str, connection: Optional[WebSocket] = None
+    ) -> None:
+        """Close and remove a connection by process_id.
+
+        ``connection`` is the socket asking to be closed, and when it is given
+        this is a no-op unless that socket is still the registered one. A
+        second socket for one process supersedes the first, and
+        ``add_connection`` closes the first — whose endpoint then reaches its
+        ``finally`` and lands here. Keyed on the process alone, that arrival
+        closes and unregisters the *replacement*, and every frame after it is
+        dropped in silence. Both the browser's reconnect and React 18
+        StrictMode mounting the plan page twice produce exactly that pair, and
+        the second is what the **Connection window** narrowed in #63 depends on
+        (ADR-021).
+        """
+        registered = self.get_connection(process_id)
+        if connection is not None and registered is not connection:
+            logger.info(
+                "Ignoring close for a superseded socket on process %s — a newer "
+                "one is registered",
+                process_id,
+            )
+            return
+
+        connection_to_close = registered
+        if connection_to_close:
             try:
-                await connection.close()
+                await connection_to_close.close()
                 logger.info("Connection closed for process ID: %s", process_id)
             except Exception as e:
                 logger.error("Error closing connection for %s: %s", process_id, e)
@@ -280,8 +303,17 @@ class ConnectionConfig:
                 )
                 process_id = self.user_to_process[fallback_user_id]
             else:
-                # Demoted to DEBUG: this fires once per streaming token before
-                # the frontend WS connects, flooding logs and burying real events.
+                # A dropped frame. DEBUG because it fires once per streaming
+                # token while the browser is still connecting, and at that rate
+                # it buries the events worth reading.
+                #
+                # The Connection window it fires in is narrower since #63: the
+                # browser starts its connect on the `createPlan` response
+                # rather than after navigating and rendering the plan page
+                # (ADR-021). Narrower, not closed — a fast enough orchestration
+                # can still emit before that response reaches the browser, so
+                # this path stays reachable and stays logged rather than being
+                # quietly deleted as fixed.
                 logger.debug(
                     "No active WebSocket process found for user ID: %s", user_id
                 )

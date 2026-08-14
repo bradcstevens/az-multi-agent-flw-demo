@@ -152,7 +152,9 @@ async def start_comms(
                 logging.debug(
                     f"Unexpected error awaiting cancelled heartbeat task for user {user_id}: {e}"
                 )
-            await connection_config.close_connection(process_id=process_id)
+            await connection_config.close_connection(
+                process_id=process_id, connection=websocket
+            )
 
 
 @app_router.get("/init_team")

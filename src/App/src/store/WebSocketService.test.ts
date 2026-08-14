@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import webSocketService from './WebSocketService';
 import { WebsocketMessageType } from '@/models';
 import { parseSourceUsed, parseTokenUsage, parsePresenterAlert } from '@/models/transparency';
+import { FakeSocket, frame } from '@/testing/fakeSocket';
 
 /**
  * What a listener actually receives when a frame arrives on the socket.
@@ -22,42 +23,9 @@ import { parseSourceUsed, parseTokenUsage, parsePresenterAlert } from '@/models/
  * what comes out the other side is the payload the parsers were written for.
  */
 
-class FakeSocket {
-    static instances: FakeSocket[] = [];
-    static readonly OPEN = 1;
-
-    readyState = 0;
-    onopen: (() => void) | null = null;
-    onmessage: ((event: { data: string }) => void) | null = null;
-    onclose: ((event: unknown) => void) | null = null;
-    onerror: ((event: unknown) => void) | null = null;
-
-    constructor(readonly url: string) {
-        FakeSocket.instances.push(this);
-    }
-
-    send(): void {}
-
-    close(): void {
-        this.readyState = 3;
-    }
-
-    open(): void {
-        this.readyState = FakeSocket.OPEN;
-        this.onopen?.();
-    }
-
-    deliver(text: string): void {
-        this.onmessage?.({ data: text });
-    }
-}
-
-/** One frame, exactly as the backend put it on the wire. */
-const frame = (type: string, data: unknown) => JSON.stringify({ type, data });
-
 async function connectedSocket(): Promise<FakeSocket> {
     const connecting = webSocketService.connect('plan-223');
-    const socket = FakeSocket.instances[FakeSocket.instances.length - 1];
+    const socket = FakeSocket.latest()!;
     socket.open();
     await connecting;
     return socket;
@@ -152,5 +120,84 @@ describe('a transparency signal arriving on the socket', () => {
         );
 
         expect(received[0].ticket_id).toBe('SIM-223-0041');
+    });
+});
+
+/**
+ * Two entry points, one socket (issue #63, ADR-021).
+ *
+ * The connect is initiated on the `createPlan` response, and the plan page
+ * keeps its own for a reload of `/plan/:id`. So for a plan asked from the home
+ * surface both run, the second one landing while the first is still
+ * handshaking — the exact case the service used to reject outright, telling its
+ * caller the connection had failed while the same connection was succeeding.
+ */
+describe('connecting twice for one plan', () => {
+    beforeEach(() => {
+        FakeSocket.instances = [];
+        webSocketService.disconnect();
+        vi.stubGlobal('WebSocket', FakeSocket);
+        window.appConfig = { API_URL: 'https://backend.example/api' } as never;
+    });
+
+    it('opens one socket rather than two', async () => {
+        const fromTheResponse = webSocketService.connect('plan-223');
+        const fromThePlanPage = webSocketService.connect('plan-223');
+
+        FakeSocket.latest()!.open();
+        await Promise.all([fromTheResponse, fromThePlanPage]);
+
+        expect(FakeSocket.forPlan('plan-223')).toHaveLength(1);
+    });
+
+    it('leaves the frames arriving on the one socket', async () => {
+        const received: unknown[] = [];
+        webSocketService.on(WebsocketMessageType.SOURCE_USED, (message) =>
+            received.push(message.data),
+        );
+
+        const fromTheResponse = webSocketService.connect('plan-223');
+        const fromThePlanPage = webSocketService.connect('plan-223');
+        const socket = FakeSocket.latest()!;
+        socket.open();
+        await Promise.all([fromTheResponse, fromThePlanPage]);
+
+        socket.deliver(
+            frame('source_used', {
+                platform: 'Copilot Studio',
+                source: 'Dataverse',
+                agent_name: 'Store SOP Assistant',
+                citations: [],
+                conversation_id: 'abc',
+            }),
+        );
+
+        expect(parseSourceUsed(received[0])?.source).toBe('Dataverse');
+    });
+
+    it('goes on deduping the handshake it started when another plan asks mid-flight', async () => {
+        // A connect for a different plan is refused, and must leave the
+        // handshake already in flight exactly as it found it. Book-keeping the
+        // refusal as though it were the pending connect made the *next* caller
+        // for the right plan look like a collision.
+        const fromTheResponse = webSocketService.connect('plan-223');
+        await expect(webSocketService.connect('plan-999')).rejects.toThrow();
+
+        const fromThePlanPage = webSocketService.connect('plan-223');
+        FakeSocket.latest()!.open();
+        await Promise.all([fromTheResponse, fromThePlanPage]);
+
+        expect(FakeSocket.forPlan('plan-223')).toHaveLength(1);
+        expect(FakeSocket.forPlan('plan-999')).toHaveLength(0);
+    });
+
+    it('opens no second socket once the first is open', async () => {
+        const connecting = webSocketService.connect('plan-223');
+        FakeSocket.latest()!.open();
+        await connecting;
+
+        await webSocketService.connect('plan-223');
+
+        expect(FakeSocket.forPlan('plan-223')).toHaveLength(1);
     });
 });

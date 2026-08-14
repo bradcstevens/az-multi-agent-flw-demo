@@ -12,6 +12,8 @@ class WebSocketService {
     private planSubscriptions: Set<string> = new Set();
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private isConnecting = false;
+    private pendingConnect: Promise<void> | null = null;
+    private pendingPlanId: string | undefined;
     private intentionalDisconnect = false;
     private lastPlanId: string | undefined;
     private lastProcessId: string | undefined;
@@ -37,7 +39,22 @@ class WebSocketService {
         return url;
     }
     connect(planId: string, processId?: string): Promise<void> {
-        return new Promise((resolve, reject) => {
+        /*
+          One socket per plan, whichever caller asks first (ADR-021).
+
+          The connect is initiated on the `createPlan` response and the plan
+          page keeps its own for a reload of /plan/:id, so both run for a plan
+          asked from the home surface — the second landing while the first is
+          still handshaking. Rejecting it told that caller the connection had
+          failed while the same connection was succeeding, and the plan page
+          logs a reject as "continuing without real-time updates", which was
+          then untrue.
+        */
+        if (this.isConnecting && this.pendingConnect && this.pendingPlanId === planId) {
+            return this.pendingConnect;
+        }
+        let handshakeStarted = false;
+        const connecting = new Promise<void>((resolve, reject) => {
             if (this.isConnecting) {
                 reject(new Error('Connection already in progress'));
                 return;
@@ -48,6 +65,8 @@ class WebSocketService {
             }
             try {
                 this.isConnecting = true;
+                handshakeStarted = true;
+                this.pendingPlanId = planId;
                 this.intentionalDisconnect = false;
                 this.lastPlanId = planId;
                 this.lastProcessId = processId;
@@ -99,6 +118,20 @@ class WebSocketService {
                 reject(error);
             }
         });
+        // Only a connect that actually started a handshake is the pending one.
+        // A refusal recorded here would retire the live handshake's book-keeping
+        // and make the next caller for the right plan look like a collision.
+        if (!handshakeStarted) return connecting;
+
+        this.pendingConnect = connecting;
+        const settled = () => {
+            if (this.pendingConnect === connecting) {
+                this.pendingConnect = null;
+                this.pendingPlanId = undefined;
+            }
+        };
+        connecting.then(settled, settled);
+        return connecting;
     }
 
     disconnect(): void {
@@ -132,6 +165,8 @@ class WebSocketService {
         }
         this.planSubscriptions.clear();
         this.isConnecting = false;
+        this.pendingConnect = null;
+        this.pendingPlanId = undefined;
     }
 
 
@@ -358,6 +393,20 @@ class WebSocketService {
 
     isConnected(): boolean {
         return this.ws?.readyState === WebSocket.OPEN;
+    }
+
+    /**
+     * Is this service already serving that plan — open, or still handshaking?
+     *
+     * The handshake counts. `HomeInput` starts the connect on the `createPlan`
+     * response and navigates in the same tick (ADR-021), so by the time the
+     * plan page's effects run the socket it must adopt is almost always still
+     * `CONNECTING`. A check that only saw `OPEN` would call it somebody else's
+     * and close it.
+     */
+    isServing(planId: string): boolean {
+        if (this.lastPlanId !== planId) return false;
+        return this.ws?.readyState === WebSocket.OPEN || this.isConnecting;
     }
 
     send(message: any): void {

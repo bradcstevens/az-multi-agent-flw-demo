@@ -21,6 +21,7 @@ import PersonalAnswerCard from "../identity/PersonalAnswerCard";
 import { isLane, LANE_LABELS } from "../../models/lane";
 import LaneBadge from "../lane/LaneBadge";
 import { NewTaskService } from "../../store/NewTaskService";
+import webSocketService from "@/store/WebSocketService";
 import { useAppDispatch } from "@/store/hooks";
 import { refusalRecorded, requestStarted } from "@/store/slices/transparencySlice";
 import { ASSISTANT_NAME } from "../../models/storeSurface";
@@ -172,6 +173,23 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       // carried to the plan page, where the answer (or the approval step)
       // arrives, so it outlives this toast.
       if (response.plan_id && response.plan_id !== null) {
+        // The socket opens here, on the response, and not on the plan page
+        // (ADR-021). `process_request` schedules the orchestration *before* it
+        // returns this response, so every frame emitted between now and the
+        // browser's connect is pushed at a socket that does not exist and
+        // dropped in silence — including the first agent's
+        // `agent_message_streaming` header, the only signal that names which
+        // specialist took the question. Waiting for `navigate`, a mount and a
+        // second GET put all three inside that window (#63).
+        //
+        // This looks misplaced in a submit handler and is not: the plan page
+        // keeps its own connect for a reload of /plan/:id, which has no
+        // response to hang off. Read ADR-021 before moving it back.
+        webSocketService.connect(response.plan_id).catch(() => {
+          // The plan page retries, and the surface degrades to polling. A
+          // failure here must not take the navigation with it.
+        });
+
         showToast(
           isLane(response.lane)
             ? `Plan created — ${LANE_LABELS[response.lane]}`
