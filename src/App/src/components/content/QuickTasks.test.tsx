@@ -174,11 +174,20 @@ describe('where the lane sits on a Quick Task', () => {
 
     it('starts the content of every card at the same corner', () => {
         // jsdom has no layout engine, so the property is asserted where it is
-        // decided. Fluent's Button centres its children on both axes; in a
-        // column that is a content block only as wide as its own longest line,
-        // floated to the middle of whatever height the grid row stretched the
-        // card to. Either one moves the badge, and a badge that moves is a
-        // badge nobody can scan down a column.
+        // decided — and since #66 that is a Griffel class rather than the
+        // `style` attribute. It cannot be read back with `getComputedStyle`:
+        // Fluent's Button carries a monolithic *reset* class that also declares
+        // `align-items`, Griffel's atomic dedup cannot cancel a reset rule, and
+        // jsdom resolves the resulting tie by stylesheet order rather than by
+        // Griffel's bucket order — so it reports Fluent's value where a real
+        // browser renders the card's. What is asserted instead is the
+        // declaration the card actually carries.
+        //
+        // Fluent's Button centres its children on both axes; in a column that
+        // is a content block only as wide as its own longest line, floated to
+        // the middle of whatever height the grid row stretched the card to.
+        // Either one moves the badge, and a badge that moves is a badge nobody
+        // can scan down a column.
         renderInput(walkthrough());
 
         const cards = screen
@@ -187,8 +196,8 @@ describe('where the lane sits on a Quick Task', () => {
 
         expect(cards).toHaveLength(HOME_TASKS.length);
         for (const card of cards) {
-            expect(card.style.alignItems).toBe('stretch');
-            expect(card.style.justifyContent).toBe('flex-start');
+            expect(declares(card, 'align-items')).toContain('stretch');
+            expect(declares(card, 'justify-content')).toContain('flex-start');
         }
     });
 });
@@ -275,4 +284,34 @@ const mediaBlocks = (css: string): string[] => {
     }
 
     return blocks;
+};
+
+/**
+ * Every value `element`'s own classes declare for `property`.
+ *
+ * Griffel writes one atomic rule per declaration, so a class list is a set of
+ * declarations and this reads them back. Used where `getComputedStyle` cannot
+ * be trusted: Fluent's reset classes declare the same properties, and jsdom
+ * breaks the resulting single-class-specificity tie by stylesheet order rather
+ * than by the bucket order a browser actually applies.
+ */
+const declares = (element: Element, property: string): string[] => {
+    const selectors = new Set(Array.from(element.classList, (c) => `.${c}`));
+    const found: string[] = [];
+
+    for (const sheet of Array.from(document.styleSheets)) {
+        let rules: CSSRule[];
+        try {
+            rules = Array.from(sheet.cssRules);
+        } catch {
+            continue;
+        }
+        for (const rule of rules) {
+            if (!(rule instanceof CSSStyleRule) || !selectors.has(rule.selectorText)) continue;
+            const value = rule.style.getPropertyValue(property);
+            if (value) found.push(value.trim());
+        }
+    }
+
+    return found;
 };

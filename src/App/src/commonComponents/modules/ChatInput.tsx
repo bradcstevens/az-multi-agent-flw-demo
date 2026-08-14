@@ -77,12 +77,29 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             alignItems: "stretch",
             width: "100%",
             padding: "8px",
-            borderRadius: "var(--borderRadiusLarge)",
+            borderRadius: "var(--borderRadiusXLarge)",
             backgroundColor: "var(--colorNeutralBackground1)",
-            // border: `1px solid ${isFocused
-            //   ? "var(--colorNeutralStroke1Pressed)"
-            //   : "var(--colorNeutralStroke1)"}`,
-            transition: "border-color 0.2s ease-in-out",
+            /*
+             * The box has an edge again (#66).
+             *
+             * This border was commented out, which left the only control on the
+             * home surface as an unbordered white panel — invisible the moment
+             * the conversation column stopped being a different colour from it,
+             * and carrying a `isFocused` state that nothing but a 2px underline
+             * consumed. It is the primary affordance on the surface and it now
+             * looks like one: an edge at rest, the brand hue and a soft ring
+             * when it holds focus.
+             */
+            border: `1px solid ${
+              isFocused
+                ? "var(--colorBrandStroke1)"
+                : "var(--colorNeutralStroke1)"
+            }`,
+            boxShadow: isFocused
+              ? "var(--shadow8), 0 0 0 3px color-mix(in srgb, var(--colorBrandBackground) 18%, transparent)"
+              : "var(--shadow4)",
+            transition:
+              "border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
             position: "relative",
             boxSizing: "border-box",
             overflow: "hidden",
@@ -150,19 +167,6 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
             <HeaderTools>{children}</HeaderTools>
           </div>
-
-          <span
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              width: "100%",
-              height: "2px",
-              backgroundColor: "var(--colorCompoundBrandStroke)",
-              transform: isFocused ? "scaleX(1)" : "scaleX(0)",
-              transition: "transform 0.2s ease-in-out",
-            }}
-          />
         </div>
 
         <div

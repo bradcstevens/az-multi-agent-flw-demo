@@ -34,6 +34,40 @@
     min-width: 280px;
     box-sizing: border-box;
     position: relative;
+    background-color: var(--colorNeutralBackground1);
+}
+
+/*
+ * Ambient depth on the conversation column.
+ *
+ * The surface was three flat panes of grey meeting at hairlines, which reads as
+ * unfinished on a projector — there is nothing to tell the eye which pane is
+ * the subject. This is a single soft wash, warm-side-up from the brand hue,
+ * pinned behind the content and inert to the pointer. It is deliberately almost
+ * invisible: it should be noticed as depth rather than as a gradient, and it
+ * must never compete with the reply.
+ *
+ * `radial-gradient` rather than a linear fade — an even 45-degree ramp is the
+ * flattest, most templated thing a background can do.
+ */
+.content::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        radial-gradient(
+            ellipse 80% 50% at 50% 0%,
+            color-mix(in srgb, var(--colorBrandBackground) 7%, transparent),
+            transparent 70%
+        );
+}
+
+/* The content itself rides above the wash. */
+.content > * {
+    position: relative;
+    z-index: var(--zIndexRaised);
 }
 
 .panelContent {
