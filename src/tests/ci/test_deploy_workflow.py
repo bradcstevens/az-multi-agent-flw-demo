@@ -264,6 +264,42 @@ def test_post_deploy_resolves_a_principal_without_a_signed_in_user():
     )
 
 
+def test_the_login_is_refreshed_before_the_data_plane():
+    # A GitHub OIDC assertion is short-lived and `azure/login` does not refresh
+    # it. The first run of this workflow reached `post_deploy.sh` ten minutes
+    # after logging in, could no longer acquire a *new* Microsoft Graph token,
+    # and stopped before seeding anything — while its cached ARM token was still
+    # perfectly valid, which is why the provision had just succeeded.
+    source = _uncommented(WORKFLOW)
+
+    assert source.count("uses: azure/login@v3") >= 2, (
+        "the workflow logs in once and then runs for ten minutes; the seeding "
+        "step will not be able to acquire tokens for Storage, Search or Foundry"
+    )
+    assert _index_of(source, "azd provision") < source.rfind("uses: azure/login@v3"), (
+        "the login is not refreshed *after* the slow steps, so it refreshes nothing"
+    )
+    assert source.rfind("uses: azure/login@v3") < _index_of(source, "post_deploy.sh"), (
+        "the refreshed login comes after the step that needs it"
+    )
+
+
+def test_the_principal_is_resolved_while_the_assertion_is_fresh():
+    # Handed to `post_deploy.sh` rather than looked up by it, so the one Graph
+    # call the deploy needs happens at a moment the token is known to work.
+    source = _uncommented(WORKFLOW)
+
+    assert "MACAE_PRINCIPAL_ID=" in source, (
+        "the deploying principal is never resolved for post_deploy.sh"
+    )
+    assert "MACAE_PRINCIPAL_ID" in _text(POST_DEPLOY), (
+        "post_deploy.sh ignores the principal the workflow resolved for it"
+    )
+    assert _index_of(source, "MACAE_PRINCIPAL_ID=") < _index_of(source, "post_deploy.sh"), (
+        "the principal is resolved after the script that needs it has run"
+    )
+
+
 def test_the_workflow_and_the_inputs_name_the_same_environment():
     # The env name appears twice — as the job's `AZURE_ENV_NAME`, which the
     # workflow needs before it has read anything, and as a value in the inputs.

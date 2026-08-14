@@ -388,11 +388,16 @@ run_python() {
 
 # The object id of whoever is running this script.
 #
+# `MACAE_PRINCIPAL_ID` wins when set. The deploy workflow (ADR-020) sets it,
+# because resolving it here is not reliable *there*: a GitHub OIDC assertion is
+# short-lived, this script runs ten minutes into the job, and by then the Azure
+# CLI can still use its cached ARM token but can no longer acquire a *new* token
+# for Microsoft Graph. `az ad sp show` then fails and the script stops before it
+# seeds anything.
+#
 # `az ad signed-in-user show` is a Graph `/me` call, valid only for delegated
 # authentication: under a service principal it fails outright with "/me request
-# is only valid with delegated authentication flow". That is what the deploy
-# workflow signs in as (ADR-020), and without this fallback the whole script
-# stopped at `fatal` before it seeded anything.
+# is only valid with delegated authentication flow".
 #
 # A service principal's own object id serves both uses the id has. It is the
 # principal the Foundry User role is granted to, which is correct — the grant
@@ -402,6 +407,11 @@ run_python() {
 # `get_all_teams` matches `c.user_id=@user_id OR c.is_default=true`, so the team
 # stays visible to every user whoever uploaded it.
 resolve_principal_id() {
+  if [ -n "${MACAE_PRINCIPAL_ID:-}" ]; then
+    printf '%s' "$MACAE_PRINCIPAL_ID"
+    return 0
+  fi
+
   local id
   id="$(az ad signed-in-user show --query id -o tsv 2>/dev/null || true)"
   if [ -n "$id" ]; then
@@ -413,9 +423,23 @@ resolve_principal_id() {
   # principal, and the object id the role assignment needs is a different guid.
   local client_id
   client_id="$(az account show --query user.name -o tsv 2>/dev/null || true)"
-  if [ -n "$client_id" ]; then
-    az ad sp show --id "$client_id" --query id -o tsv 2>/dev/null || true
+  if [ -z "$client_id" ]; then
+    return 0
   fi
+
+  local object_id errors
+  errors="$(mktemp)"
+  object_id="$(az ad sp show --id "$client_id" --query id -o tsv 2>"$errors" || true)"
+  if [ -z "$object_id" ]; then
+    # Never silently. This returned empty once in CI and the only symptom was a
+    # message saying the login had no principal, which was untrue and sent the
+    # investigation the wrong way.
+    warn "Could not read the service principal's object id from Microsoft Graph:"
+    warn "  $(tr '\n' ' ' < "$errors")"
+    warn "Set MACAE_PRINCIPAL_ID to skip this lookup."
+  fi
+  rm -f "$errors"
+  printf '%s' "$object_id"
 }
 
 ensure_role_assignments_for_kbmcp() {
