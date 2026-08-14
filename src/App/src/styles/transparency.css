@@ -171,6 +171,23 @@
     gap: 6px;
 }
 
+/*
+ * The count over the names (#65). A subsection heading, and a flex item of the
+ * panel, so it is blockified and the user-agent's `margin: 1em 0` for an `h3`
+ * would push the roster down the rail — the same pixels every section heading
+ * gave up in #57 before its margin was zeroed.
+ */
+.agent-team__availability {
+    margin: 0;
+    color: var(--colorNeutralForeground2);
+}
+
+/* Availability is not participation, said in words as well as in the count. */
+.agent-team__note {
+    color: var(--colorNeutralForeground3);
+    overflow-wrap: anywhere;
+}
+
 .agent-team__member {
     display: flex;
     align-items: baseline;

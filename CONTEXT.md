@@ -538,7 +538,8 @@ defect in a different form. The **surface heading** is the assistant's name in t
 header, and it has to be that one: the left panel's toolbar says the same name and is dropped at
 the **Stacking breakpoint**, so a heading there is one the associate's phone never renders. Every
 section — the question input, the Quick tasks, the plan overview, each **transparency panel** —
-is one level below it.
+is one level below it. A third, `SUBSECTION_HEADING`, was added by #65 for a named part *inside* a
+section, and has exactly one user: the Agent Team panel's count of who is available.
 
 It costs the **transparency rail** most. The rail exists to be *skimmed*, and its panel titles are
 what make it skimmable; rendering them as spans took the rail's argument away from exactly the

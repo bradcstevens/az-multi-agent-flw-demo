@@ -3,9 +3,14 @@ import { Body1Strong, Caption1, Caption1Strong } from '@fluentui/react-component
 import { PeopleTeam20Regular } from '@fluentui/react-icons';
 
 import { TeamConfig } from '../../models/Team';
-import { rosterAgents } from '../../models/roster';
+import {
+    AVAILABILITY_NOTE,
+    NO_ROSTER_MESSAGE,
+    availabilityHeading,
+    resolveAvailability,
+} from '../../models/agentAvailability';
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
-import { SECTION_HEADING } from '../../models/headingOutline';
+import { SECTION_HEADING, SUBSECTION_HEADING } from '../../models/headingOutline';
 
 /**
  * The Agent Team panel (issue #24).
@@ -20,16 +25,36 @@ import { SECTION_HEADING } from '../../models/headingOutline';
  * the architecture claims it puts cheap models on cheap work, and this is where
  * the claim becomes checkable. An agent with no assignment shows `—` rather
  * than a default that nobody configured.
+ *
+ * It states **availability**, never participation (issue #65). The roster says
+ * who *could* answer and is known before the question is typed; who *did* is
+ * named one at a time by the **Progress narration** as each specialist speaks.
+ * Conflating them puts "3 agents identified" over the beat where the
+ * **Identity boundary gate** refuses first and the **Token meter** below it
+ * renders a measured `0`.
  */
 export interface AgentTeamPanelProps {
     /** The workflow roster, from the plan-fetch response's `team`. */
     team: TeamConfig | null;
     /** The plan's flat list of member names, used only when there is no roster. */
     plan: string[] | null;
+    /**
+     * The **store assistant roster** the app is already holding, for the
+     * loading window — `selectedTeam`, in Redux since `HomePage`'s mount and
+     * needing nothing from the wire.
+     */
+    available?: TeamConfig | null;
+    /** Its size, from `selectTeamAgentCount`. Not recounted here. */
+    availableCount?: number;
 }
 
-const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({ team, plan }) => {
-    const agents = rosterAgents(team, plan);
+const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({
+    team,
+    plan,
+    available = null,
+    availableCount = 0,
+}) => {
+    const { agents, count } = resolveAvailability(team, plan, available, availableCount);
 
     return (
         <section className="transparency-panel" data-testid="agent-team-panel">
@@ -39,28 +64,40 @@ const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({ team, plan }) => {
 
             {agents.length === 0 ? (
                 <Caption1 data-testid="agent-team-empty" className="transparency-panel__empty">
-                    No agent roster loaded for this conversation.
+                    {NO_ROSTER_MESSAGE}
                 </Caption1>
             ) : (
-                <ul className="agent-team">
-                    {agents.map((agent) => (
-                        <li
-                            key={agent.name}
-                            className="agent-team__member"
-                            data-testid={`agent-team-member-${agent.name}`}
-                        >
-                            <Caption1Strong>
-                                {getAgentDisplayNameWithSuffix(agent.name)}
-                            </Caption1Strong>
-                            <Caption1
-                                data-testid="agent-team-model"
-                                title="The model deployment this agent is assigned"
+                <>
+                    <Caption1Strong
+                        as={SUBSECTION_HEADING}
+                        data-testid="agent-team-availability"
+                        className="agent-team__availability"
+                    >
+                        {availabilityHeading(count)}
+                    </Caption1Strong>
+                    <ul className="agent-team">
+                        {agents.map((agent) => (
+                            <li
+                                key={agent.name}
+                                className="agent-team__member"
+                                data-testid={`agent-team-member-${agent.name}`}
                             >
-                                {agent.deployment_name || '—'}
-                            </Caption1>
-                        </li>
-                    ))}
-                </ul>
+                                <Caption1Strong>
+                                    {getAgentDisplayNameWithSuffix(agent.name)}
+                                </Caption1Strong>
+                                <Caption1
+                                    data-testid="agent-team-model"
+                                    title="The model deployment this agent is assigned"
+                                >
+                                    {agent.deployment_name || '—'}
+                                </Caption1>
+                            </li>
+                        ))}
+                    </ul>
+                    <Caption1 data-testid="agent-team-note" className="agent-team__note">
+                        {AVAILABILITY_NOTE}
+                    </Caption1>
+                </>
             )}
         </section>
     );

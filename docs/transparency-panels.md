@@ -130,6 +130,35 @@ off there is no plan object at all (ADR-013), and the panel previously read
 and no panels. The early return is gone, and "Plan is being generated…" is now shown only when a
 plan is actually coming; a Fast-lane request says "No plan to review on this request."
 
+### It states availability, never participation
+
+The panel is on screen for the whole loading window — `PlanPanelRight` renders *outside*
+`PlanPage`'s `loading || !planData` branch — and `planData` is `null` for all of it. Sourced only
+from the plan fetch, it therefore rendered its honest empty state, **"No agent roster loaded for
+this conversation."**, two inches from a spinner reading *"Initializing AI agents…"*. One of those
+was wrong and it was not the panel.
+
+Nothing was missing. The **store assistant roster** is in Redux from `HomePage`'s mount, so
+`selectedTeam` is the panel's second source and `selectTeamAgentCount` — exported and unused since
+the slice was written — is the count. Resolution order is in `models/agentAvailability.ts`: this
+conversation's own roster, then the plan's flat list of names, then the roster this tab is holding,
+then nothing. A historical plan opened from the task list ran on its own team, and the team the tab
+happens to hold is not a claim about it — which is why `selectedTeam` is a fallback and never a
+replacement.
+
+What it says is **availability**, and nothing stronger. `AVAILABILITY_NOTE` is on screen under the
+names for the same reason the count says *available* rather than *identified*: on the
+boundary-probe beat the **Identity boundary gate** refuses above the **Lane router** and the number
+that participate is **zero**, which is exactly why the **Token meter** renders a measured `0` on
+that row. "3 agents identified" over that beat contradicts the panel directly beneath it. Who
+*did* answer is named one at a time, as each specialist speaks, by the **Progress narration**
+(ADR-023) and in each reply's header.
+
+The count is a real heading — `SUBSECTION_HEADING`, one level below the panel's own title — so the
+roster is reachable by heading navigation like everything else on the rail (#57). The empty state
+stays: a deployment with no store assistant is a real state and the panel is right to say so. It
+just may not say it about a team the app is already holding.
+
 ## Presenter alert
 
 Rendered as visibly a different object from a reply: `role="alert"`, its own icon, a "Proactive

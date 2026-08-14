@@ -14,6 +14,7 @@ import TransparencyRail from "../transparency/TransparencyRail";
 import SimulatedTicketCard from "../escalation/SimulatedTicketCard";
 import { useAppSelector } from "../../store/hooks";
 import { selectRaisedTicket } from "../../store/slices/ticketSlice";
+import { selectSelectedTeam, selectTeamAgentCount } from "../../store/slices/teamSlice";
 import "../../styles/planpanelright.css";
 import "../../styles/simulatedTicket.css";
 
@@ -29,6 +30,21 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   // at the moment the associate approves the plan, and threading it down from
   // the page would put a second copy of the same state one render behind.
   const raisedTicket = useAppSelector(selectRaisedTicket);
+
+  // Who is *available*, for the loading window (#65).
+  //
+  // This panel renders outside `PlanPage`'s `loading || !planData` branch, so
+  // it is on screen for the whole wait with `planData` still null — and it
+  // read "No agent roster loaded for this conversation." beside a spinner
+  // claiming the agents were being initialised. The **store assistant roster**
+  // has been in Redux since `HomePage`'s mount, so the window has something
+  // true to say with no dependency on the wire.
+  //
+  // The count is `selectTeamAgentCount`, not a `.length` beside it: the
+  // selector has been exported and unused since the slice was written, and a
+  // second count is a second thing to disagree with the first.
+  const availableTeam = useAppSelector(selectSelectedTeam);
+  const availableCount = useAppSelector(selectTeamAgentCount);
 
   if (!planData && !loading) {
     return <ContentNotFound subtitle="The requested page could not be found." />;
@@ -120,10 +136,18 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   // so the previous `planApprovalRequest.team` source left this panel empty for
   // the whole of the Fast lane — which is most of the walkthrough. The roster
   // also carries the per-agent model assignment, which is the point.
+  //
+  // `available` is the same claim one step earlier (#65): the roster this tab
+  // is already holding, for the window before the plan fetch returns. It is a
+  // fallback and never a replacement — a historical plan opened from the task
+  // list ran on its own team, and the team this tab happens to hold is not a
+  // claim about it.
   const renderAgentsSection = () => (
     <AgentTeamPanel
       team={planData?.team ?? null}
       plan={planApprovalRequest?.team ?? null}
+      available={availableTeam}
+      availableCount={availableCount}
     />
   );
 

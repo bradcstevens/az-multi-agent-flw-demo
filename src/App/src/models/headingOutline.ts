@@ -34,3 +34,12 @@ export const SURFACE_HEADING = 'h1';
  * so the outline descends without skipping.
  */
 export const SECTION_HEADING = 'h2';
+
+/**
+ * A named part *inside* a section — at present only the Agent Team panel's
+ * count of the specialists available (#65). One level below a section's, so
+ * the outline still descends without skipping, and a real heading rather than
+ * a styled span for the same reason every other title here is one: the count
+ * is how the rail's roster is skimmed.
+ */
+export const SUBSECTION_HEADING = 'h3';

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import PlanPanelRight from './PlanPanelRight';
 import transparencyReducer, {
@@ -9,9 +11,20 @@ import transparencyReducer, {
     tokenUsageReceived,
 } from '@/store/slices/transparencySlice';
 import ticketReducer, { ticketRaised } from '@/store/slices/ticketSlice';
+import teamReducer, { setSelectedTeam } from '@/store/slices/teamSlice';
+import { NO_ROSTER_MESSAGE } from '@/models/agentAvailability';
+import { SRC } from '@/testing/stylesheets';
 
 const makeStore = () =>
-    configureStore({ reducer: { transparency: transparencyReducer, ticket: ticketReducer } });
+    configureStore({
+        reducer: {
+            transparency: transparencyReducer,
+            ticket: ticketReducer,
+            team: teamReducer,
+        },
+        middleware: (getDefaultMiddleware) =>
+            getDefaultMiddleware({ serializableCheck: false }),
+    });
 
 const planData = {
     plan: { id: 'plan-1' },
@@ -189,5 +202,97 @@ describe('the Simulated ticket on the plan surface (issue #22)', () => {
         renderPanel(store);
 
         expect(screen.getAllByTestId('simulated-badge').length).toBeGreaterThan(0);
+    });
+});
+
+describe('the loading window names the specialists standing by (issue #65)', () => {
+    // `PlanPanelRight` is rendered outside `PlanPage`'s `loading || !planData`
+    // branch, so this panel is on screen for the whole wait. Sourced only from
+    // `planData?.team` it read "No agent roster loaded for this conversation."
+    // beside a spinner reading "Initializing AI agents…". The roster was in
+    // Redux the entire time.
+    const STORE_ASSISTANT = {
+        agents: [
+            { input_key: '', type: '', name: 'TroubleshootingAgent', deployment_name: 'o4-mini' },
+            { input_key: '', type: '', name: 'ShiftTasksAgent', deployment_name: 'gpt-4.1-mini' },
+            { input_key: '', type: '', name: 'EscalationAgent' },
+        ],
+    } as any;
+
+    const renderLoading = (store = makeStore()) =>
+        render(
+            <Provider store={store}>
+                <PlanPanelRight planData={null} loading planApprovalRequest={null} />
+            </Provider>,
+        );
+
+    it('names the roster the app is already holding, with no help from the wire', () => {
+        const store = makeStore();
+        store.dispatch(setSelectedTeam(STORE_ASSISTANT));
+
+        renderLoading(store);
+
+        expect(screen.getByTestId('agent-team-member-TroubleshootingAgent')).toBeInTheDocument();
+        expect(screen.getByTestId('agent-team-member-ShiftTasksAgent')).toBeInTheDocument();
+        expect(screen.getByTestId('agent-team-member-EscalationAgent')).toBeInTheDocument();
+    });
+
+    it('counts them in a heading over the names', () => {
+        const store = makeStore();
+        store.dispatch(setSelectedTeam(STORE_ASSISTANT));
+
+        renderLoading(store);
+
+        expect(screen.getByTestId('agent-team-availability')).toHaveTextContent(
+            '3 specialists available',
+        );
+    });
+
+    it('no longer claims no roster for a team it is holding', () => {
+        const store = makeStore();
+        store.dispatch(setSelectedTeam(STORE_ASSISTANT));
+
+        renderLoading(store);
+
+        expect(screen.queryByText(NO_ROSTER_MESSAGE)).not.toBeInTheDocument();
+    });
+
+    it('still says there is no roster when the app is holding none', () => {
+        // A deployment with the store assistant missing is a real state, and
+        // #25's whole argument is that the surface says so rather than
+        // quietly showing a stranger.
+        renderLoading();
+
+        expect(screen.getByTestId('agent-team-empty')).toHaveTextContent(NO_ROSTER_MESSAGE);
+    });
+
+    it('claims availability and not that any of them took the question', () => {
+        // The boundary probe is refused above the Lane router: three
+        // specialists are available and zero participate, which is what the
+        // Token meter's measured `0` on that row says.
+        const store = makeStore();
+        store.dispatch(setSelectedTeam(STORE_ASSISTANT));
+
+        renderLoading(store);
+
+        expect(screen.getByTestId('agent-team-note')).toBeInTheDocument();
+        expect(
+            screen.queryByText(/identified|assigned|selected|chosen|working on/i),
+        ).not.toBeInTheDocument();
+    });
+
+    it('takes the count from the roster selector rather than deriving a second one', () => {
+        // Read out of the source: `selectTeamAgentCount` has been exported and
+        // unused since the slice was written, and a `.length` beside it is a
+        // second count to keep in step with the first.
+        const source = readFileSync(
+            join(SRC, 'components', 'content', 'PlanPanelRight.tsx'),
+            'utf8',
+        );
+
+        expect(source).toContain('selectTeamAgentCount');
+        expect(source, 'recounts the roster beside the selector').not.toMatch(
+            /agents\??\.length/,
+        );
     });
 });

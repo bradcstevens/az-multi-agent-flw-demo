@@ -3,6 +3,8 @@ import { render, screen, within } from '@testing-library/react';
 
 import AgentTeamPanel from './AgentTeamPanel';
 import { modelsByExecutor } from '../../models/roster';
+import { AVAILABILITY_NOTE, NO_ROSTER_MESSAGE } from '../../models/agentAvailability';
+import { SUBSECTION_HEADING } from '../../models/headingOutline';
 import { TeamConfig } from '../../models/Team';
 
 const roster = {
@@ -50,6 +52,77 @@ describe('the Agent Team panel', () => {
         render(<AgentTeamPanel team={null} plan={null} />);
 
         expect(screen.getByTestId('agent-team-empty')).toBeInTheDocument();
+    });
+});
+
+describe('the Agent Team panel during the loading window (issue #65)', () => {
+    it('names the specialists standing by before the plan fetch returns', () => {
+        // `planData` is null for the whole wait, so this panel used to render
+        // "No agent roster loaded for this conversation." two inches from a
+        // spinner claiming the agents were being initialised. The roster was
+        // in Redux the whole time.
+        render(<AgentTeamPanel team={null} plan={null} available={roster} availableCount={3} />);
+
+        expect(screen.getAllByTestId(/^agent-team-member/)).toHaveLength(3);
+        expect(screen.queryByTestId('agent-team-empty')).not.toBeInTheDocument();
+    });
+
+    it('counts them in a heading over the names, not instead of them', () => {
+        render(<AgentTeamPanel team={null} plan={null} available={roster} availableCount={3} />);
+
+        const heading = screen.getByTestId('agent-team-availability');
+        expect(heading).toHaveTextContent('3 specialists available');
+        expect(heading.tagName.toLowerCase()).toBe(SUBSECTION_HEADING);
+        expect(screen.getByTestId('agent-team-member-ShiftTasksAgent')).toBeInTheDocument();
+    });
+
+    it('takes the count from the roster selector rather than from the rendered list', () => {
+        // The two cannot disagree in practice — `selectTeamAgentCount` is
+        // derived from the same team — but the panel must not be the place
+        // that recounts, or there are two counts to keep in step.
+        render(<AgentTeamPanel team={null} plan={null} available={roster} availableCount={7} />);
+
+        expect(screen.getByTestId('agent-team-availability')).toHaveTextContent(
+            '7 specialists available',
+        );
+    });
+
+    it('says availability, never that these three took the question', () => {
+        // The boundary probe is refused above the Lane router, so on that beat
+        // the number that participate is zero and the Token meter says so.
+        render(<AgentTeamPanel team={null} plan={null} available={roster} availableCount={3} />);
+
+        expect(screen.getByTestId('agent-team-note')).toHaveTextContent(AVAILABILITY_NOTE);
+        expect(screen.queryByText(/identified|assigned|selected|chosen/i)).not.toBeInTheDocument();
+    });
+
+    it('prefers this conversation\u2019s own roster once it has one', () => {
+        const conversation = {
+            agents: [{ input_key: '', type: '', name: 'EscalationAgent' }],
+        } as unknown as TeamConfig;
+
+        render(
+            <AgentTeamPanel
+                team={conversation}
+                plan={null}
+                available={roster}
+                availableCount={3}
+            />,
+        );
+
+        expect(screen.getAllByTestId(/^agent-team-member/)).toHaveLength(1);
+        expect(screen.getByTestId('agent-team-availability')).toHaveTextContent(
+            '1 specialist available',
+        );
+    });
+
+    it('still says there is no roster when there genuinely is none', () => {
+        // That state is real and the panel is right to say so. It just must
+        // not say it about a team the app is already holding.
+        render(<AgentTeamPanel team={null} plan={null} available={null} availableCount={0} />);
+
+        expect(screen.getByTestId('agent-team-empty')).toHaveTextContent(NO_ROSTER_MESSAGE);
+        expect(screen.queryByTestId('agent-team-availability')).not.toBeInTheDocument();
     });
 });
 
