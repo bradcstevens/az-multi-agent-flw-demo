@@ -20,6 +20,15 @@ check tooling below, none of which is inside an image's build context (`src/back
 `src/mcp_server`, `src/App`). The tag is a claim about what was built, not a stamp the image
 carries — see *Scope*.
 
+Re-observed 2026-08-14 (issue #53) after the frontend was rolled onto `macaefrontend:5758aa1c` —
+the one-tap Quick Task (#55) and the `data-testid="quick-tasks"` region the Demo validator aims at.
+Until that roll the running frontend was pre-#55: its card filled the question box and waited for
+send, while the harness taps once and expects a plan, so the walkthrough's opening beat timed out on
+a card it had found and tapped. The backend was concurrently on `macaebackend:834c82bf2db1` (#50's
+roll) and the MCP app still on `23d97b3dda59`. That tag *is* commit-shaped, and the commit it names
+is the one that added the attribute — which is only honest because a `data-testid` is inside the
+frontend's build context and this record's own prose is not.
+
 Re-check with `scripts/preflight/check-deployed-surface.sh` — it exits non-zero the moment any of
 the facts below stops being true.
 
