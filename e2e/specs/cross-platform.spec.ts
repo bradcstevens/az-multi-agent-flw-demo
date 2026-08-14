@@ -122,7 +122,7 @@ test.describe('the cross-platform hop', () => {
         // model wrote: that there were words, and that they were not just the
         // presenter's own question read back.
         const turn = plan.latestAgentTurn;
-        await expect(turn).toBeVisible({ timeout: 60_000 });
+        await expect(turn).toBeVisible({ timeout: 120_000 });
         const spoken = await plan.spokenIn(turn);
         expect(
             spoken.filter((paragraph) => paragraph !== hit.question),

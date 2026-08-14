@@ -75,10 +75,13 @@ jobs:
     env:
       AZURE_ENV_NAME: macae-flw-v1
       DEPLOY_INPUTS: infra/environments/macae-flw-v1.env
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       AZURE_DEV_COLLECT_TELEMETRY: 'no'
+      # `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` are deliberately *not* here.
+      # The seeding scripts authenticate with `DefaultAzureCredential`, and that
+      # pair present without a client secret makes its EnvironmentCredential leg
+      # look configured when it is not. They are scoped to the two steps that
+      # genuinely need them.
 
     steps:
       - name: Checkout code
@@ -107,6 +110,9 @@ jobs:
         uses: Azure/setup-azd@v2
 
       - name: Log in to azd
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           azd auth login \
             --client-id "$AZURE_CLIENT_ID" \
@@ -185,6 +191,34 @@ jobs:
         run: azd provision --no-prompt
 
       # Step 3. The store assistant's pack, and nothing else.
+      #
+      # A second login, not a redundant one. A GitHub OIDC assertion is
+      # short-lived and `azure/login` does not refresh it: by this point the
+      # builds and the provision have taken ten minutes, and the CLI can still
+      # use its cached ARM token but can no longer acquire a *new* token for
+      # another resource. The first run of this workflow failed exactly there —
+      # `az ad sp show` could not reach Microsoft Graph — and everything below
+      # needs fresh tokens for Storage, Search and Foundry. Requesting a new
+      # assertion costs a second and removes the whole class of failure.
+      - name: Refresh the Azure login before the data plane
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve the deploying principal
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          # Resolved here, while the assertion is fresh, and handed to
+          # `post_deploy.sh` so it never has to reach Graph itself.
+          principal="$(az ad sp show --id "$AZURE_CLIENT_ID" --query id -o tsv)"
+          test -n "$principal"
+          echo "MACAE_PRINCIPAL_ID=$principal" >> "$GITHUB_ENV"
+          echo "Deploying as principal $principal"
+
       - name: Seed the store assistant, and no stock content pack
         env:
           MACAE_USE_CASE: none

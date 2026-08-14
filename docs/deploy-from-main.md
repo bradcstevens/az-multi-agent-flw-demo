@@ -78,19 +78,39 @@ means adding a second federated credential as well as the `environment:` line.
 
 ### What it is allowed to do
 
-| Role | Scope | Why |
+| Role | Scope | Granted by |
 | --- | --- | --- |
-| Contributor | `rg-macae-flw-v1` | `azd provision` |
-| User Access Administrator | `rg-macae-flw-v1` | `post_deploy.sh` grants the Foundry User role for the KB MCP connection |
-| AcrPush | `crmacaeflwv1flrpd` | `az acr build` |
-| Storage Blob Data Contributor | `stmacaeflwv1flrpd` | content-pack blobs |
-| Search Index Data Contributor | `srch-macaeflwv1flrpd` | index creation and upload |
-| Search Service Contributor | `srch-macaeflwv1flrpd` | index creation |
-| Cognitive Services OpenAI User | `aif-macaeflwv1flrpd` | embeddings during indexing |
-| Foundry User | `aif-macaeflwv1flrpd` | knowledge-base MCP connection |
+| Contributor | `rg-macae-flw-v1` | by hand — `azd provision` |
+| User Access Administrator | `rg-macae-flw-v1` | by hand — the template creates role assignments |
+| AcrPush | `crmacaeflwv1flrpd` | by hand — `az acr build` |
+| Cognitive Services OpenAI User | `aif-macaeflwv1flrpd` | by hand — embeddings during indexing |
+| Cognitive Services User | `aif-macaeflwv1flrpd` | **the Bicep** |
+| AcrPull | `crmacaeflwv1flrpd` | **the Bicep** |
+| Foundry User | `aif-macaeflwv1flrpd` | **the Bicep** |
+| Search Index Data Contributor | `srch-macaeflwv1flrpd` | **the Bicep** |
+| Search Service Contributor | `srch-macaeflwv1flrpd` | **the Bicep** |
+| Storage Blob Data Contributor | `stmacaeflwv1flrpd` | **the Bicep** |
+| Cosmos DB Data Contributor | `cosmos-macaeflwv1flrpd` | **the Bicep** |
 
 Nothing is granted at subscription scope, and the identity holds **no Dataverse access at all** —
 see below.
+
+**Do not grant by hand anything the Bicep grants.** `infra/bicep/main.bicep` sets
+`deployingUserPrincipalId = deployer().objectId`, and
+`modules/identity/role-assignments.bicep` gives that principal the six roles marked above. Because
+the deployer is now this service principal, a hand-made assignment for the same
+(principal, role, scope) triple collides with the template's `guid()`-named one and ARM fails the
+**whole deployment** at the very end with:
+
+```
+RoleAssignmentExists: The role assignment already exists. The ID of the existing
+role assignment is 8ec283c188bd4eb0b8ae18e34076ff75.
+```
+
+That is what happened on the first run of this workflow — every resource provisioned, all three
+Container Apps rolled onto the new images, and then the deployment failed on four duplicate role
+assignments that had been created by hand an hour earlier. The fix is to delete the hand-made ones
+and let the template own them.
 
 ### Repository secrets
 
@@ -133,6 +153,20 @@ print(env.call(f\"bots({bot['botid']})/Microsoft.Dynamics.CRM.PvaGetDirectLineEn
 
 gh secret set COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT --body '<what that printed>'
 ```
+
+## The OIDC assertion expires mid-job
+
+The workflow logs in **twice**, and the second login is not redundant. A GitHub OIDC assertion is
+short-lived and `azure/login` does not refresh it. By the time `post_deploy.sh` runs, the builds and
+the provision have taken ten minutes: the Azure CLI can still use its **cached** ARM token — which
+is why the provision immediately before it succeeded — but it can no longer acquire a *new* token
+for a different resource. The first run failed exactly there, on a Microsoft Graph lookup, with a
+message claiming the login had no principal at all.
+
+So a second `azure/login` runs after the slow steps, and the one Graph call the deploy needs (the
+deploying principal's object id) is made right after it and handed to `post_deploy.sh` as
+`MACAE_PRINCIPAL_ID`. Anything added to this workflow that needs a token and runs late needs to be
+after that refresh. Two tests assert the ordering.
 
 ## When it goes red
 
