@@ -41,13 +41,12 @@ Read the two boxes below before anything else. They are the only two things you 
 | **Between beats** | Beats 1 to 4 open a task view — click **New task** in the left panel to get back to the six cards. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
 
 **Ask an engineer to clear the deployment before a customer session.** Ten Demo validator runs
-against the deployed surface ([demo-validator.md](demo-validator.md)), all green, and every run's
-`sop-tool-query.json` artifact carrying the corpus's own closing-store wording as its
-`retrievalQuery`. Ten because the opening beat misses roughly one run in four (#54) and a single
-green run cannot tell you that. Keep the video and HTML report from one of those runs — that is the
-recording at the bottom of the fallback ladder, and it only counts if it is from a green run. A
-direct probe of the procedure library is **not** a substitute: it answers whether Copilot Studio is
-up, not whether the Foundry orchestrator reaches it, and the hop is the whole claim.
+against the deployed surface ([demo-validator.md](demo-validator.md)), all green. Ten because the
+opening beat misses roughly one run in four (#54) and a single green run cannot tell you that. Keep
+the video and HTML report from one of those runs — that is the recording at the bottom of the
+fallback ladder, and it only counts if it is from a green run. A direct probe of the procedure
+library is **not** a substitute: it answers whether Copilot Studio is up, not whether the Foundry
+orchestrator reaches it, and the hop is the whole claim.
 
 **The demonstration opens with nobody signed in**, and that is deliberate — say so early. The
 header reads **Store 223** and **No user signed in**. This is a **shared store device**: one
