@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -111,6 +111,24 @@ describe('the walkthrough as one-tap tasks', () => {
         renderInput(walkthrough([{ ...SIX_TASKS[0], lane: 'fast lane' }]));
 
         expect(screen.queryByTestId('lane-badge')).not.toBeInTheDocument();
+    });
+
+    it('names the region, so a tap can be aimed at the cards alone', () => {
+        // The **Demo validator** taps a card by the title the pack authors, and
+        // an accessible-name lookup matches by substring: "Close the store" is
+        // inside "How do I close the store?", which is what the task rail calls
+        // every plan the walkthrough has ever raised. A page-wide tap is
+        // therefore unambiguous only on a store nobody has ever asked anything,
+        // and the loop rots by being run — which it did, on a strict-mode
+        // violation against twenty completed tasks, while the demonstration
+        // itself was working.
+        renderInput(walkthrough());
+
+        const region = screen.getByTestId('quick-tasks');
+
+        expect(
+            within(region).getAllByRole('button', { name: /Close the store/ }),
+        ).toHaveLength(1);
     });
 });
 

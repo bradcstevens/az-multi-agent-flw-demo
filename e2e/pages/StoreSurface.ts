@@ -29,9 +29,25 @@ export class StoreSurface {
         });
     }
 
+    /**
+     * The **Quick Tasks region**, and nothing else on the surface.
+     *
+     * Load-bearing, not tidiness. The cards are named by the store pack's card
+     * titles — "Close the store" — and every plan the walkthrough has ever
+     * raised is listed in the task rail beside them under the question that
+     * title asks: *How do I close the store?*. An accessible-name lookup
+     * matches by substring, so a page-wide one resolves to one card on a fresh
+     * deployment and to twenty-one elements after twenty runs. The loop would
+     * rot by being run, and it did: the beat went red on a strict-mode
+     * violation while the demonstration itself was working.
+     */
+    get quickTasks(): Locator {
+        return this.page.getByTestId('quick-tasks');
+    }
+
     /** The Quick Task card carrying a given title, by its authored name. */
     quickTask(name: string): Locator {
-        return this.page.getByRole('button', { name });
+        return this.quickTasks.getByRole('button', { name });
     }
 
     /** Tap a Quick Task, which asks its authored question in one interaction. */
