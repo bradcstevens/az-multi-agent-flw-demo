@@ -1677,3 +1677,151 @@ class TestTheApprovalIsTheTicketConfirmation:
 
         assert review.approved is True
         assert set(responses) == {"req-1"}
+
+
+# ---------------------------------------------------------------------------
+# The draft the approved plan makes is raised when that plan finishes (#50)
+# ---------------------------------------------------------------------------
+class LateDraftTicketStore:
+    """A store whose draft appears *during* execution, not before it.
+
+    Which is the live order: the plan review is presented before the plan runs,
+    and the EscalationAgent drafts the ticket while running it. A store that
+    already holds a draft when the associate approves is the rarer case — a
+    second approval in a conversation that already drafted one.
+    """
+
+    def __init__(self, ticket):
+        self.ticket = ticket
+        self.submitted = []
+
+    async def submit(self, session_id):
+        self.submitted.append(session_id)
+        return self.ticket if len(self.submitted) > 1 else None
+
+
+class TestTheDraftMadeWhileThePlanRanIsStillRaised:
+    """#50: the approval authorises the ticket the approved plan drafts.
+
+    Asserting the escalation beat through a browser found the card never
+    appearing: the only submission seam ran at plan-review time, and at plan
+    review time the draft does not exist yet — the plan whose third step is
+    "draft a simulated service-incident ticket" has not run. Every unit test
+    around the seam passed, because each handed the seam a store that already
+    held a draft.
+
+    So the approved run submits again when it finishes. It is the same single
+    confirmation: the associate approved a plan that says it will raise a
+    ticket, and no second gate is presented. A run nobody approved never
+    reaches this call, and a rejected plan never gets there at all.
+    """
+
+    def setup_method(self):
+        orchestration_config.plans.clear()
+        connection_config.send_status_update_async.reset_mock()
+        connection_config.send_status_update_async.side_effect = None
+        mock_wait_approval.reset_mock()
+        mock_convert.reset_mock()
+        mock_convert.return_value = MockMPlan()
+
+    def _workflow(self, *streams):
+        calls = [0]
+
+        def run(*args, **kwargs):
+            calls[0] += 1
+            return _async_iter(streams[min(calls[0], len(streams)) - 1])
+
+        workflow = Mock()
+        workflow.run = run
+        workflow._executors = {}
+        workflow.executors = {}
+        workflow.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = workflow
+        return workflow
+
+    async def _run(self, store, *streams, approved=True):
+        mock_wait_approval.return_value = MockPlanApprovalResponse(
+            approved=approved, m_plan_id="test-plan-id"
+        )
+        self._workflow(*streams)
+        with patch.object(
+            OrchestrationManager, "_ticket_store",
+            AsyncMock(return_value=(store, "s-1")),
+        ):
+            await OrchestrationManager().run_orchestration(
+                user_id="user-1", input_task="I can't fix it, raise a ticket"
+            )
+
+    def _raised(self):
+        return [
+            call for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "ticket_raised"
+        ]
+
+    @pytest.mark.asyncio
+    async def test_the_ticket_drafted_while_the_plan_ran_reaches_the_surface(self):
+        store = LateDraftTicketStore(_submitted_ticket())
+        review = _make_event(
+            "request_info", data=MockMagenticPlanReviewRequest(), request_id="req-1"
+        )
+        done = _make_event(
+            "executor_completed",
+            data=[MockMessage(text="Ticket raised")],
+            executor_id="magentic_orchestrator",
+        )
+
+        await self._run(store, [review], [done])
+
+        assert store.submitted == ["s-1", "s-1"]
+        assert self._raised()[0].args[0]["ticket_id"] == "SIM-223-0041"
+
+    @pytest.mark.asyncio
+    async def test_a_run_nobody_approved_raises_nothing(self):
+        """The Fast lane presents no plan review, and the EscalationAgent is in
+        the pool for every turn. A ticket raised at the end of a turn nobody
+        approved is the unconfirmed submission the gate exists to prevent."""
+        store = LateDraftTicketStore(_submitted_ticket())
+        done = _make_event(
+            "executor_completed",
+            data=[MockMessage(text="Try the reset")],
+            executor_id="magentic_orchestrator",
+        )
+
+        await self._run(store, [done])
+
+        assert store.submitted == []
+        assert self._raised() == []
+
+    @pytest.mark.asyncio
+    async def test_a_rejected_plan_raises_nothing_at_the_end_either(self):
+        store = LateDraftTicketStore(_submitted_ticket())
+        review = _make_event(
+            "request_info", data=MockMagenticPlanReviewRequest(), request_id="req-1"
+        )
+
+        with pytest.raises(RuntimeError, match="cancelled by user"):
+            await self._run(store, [review], approved=False)
+
+        assert store.submitted == []
+        assert self._raised() == []
+
+    @pytest.mark.asyncio
+    async def test_a_ticket_already_raised_in_this_run_is_not_raised_twice(self):
+        """The rarer order — a draft that already existed when the associate
+        approved — now passes two submissions. ``submit`` is idempotent and
+        returns the same ticket both times, so only the card would double.
+        One approval puts one ticket on the surface once."""
+        store = FakeTicketStore(ticket=_submitted_ticket())
+        review = _make_event(
+            "request_info", data=MockMagenticPlanReviewRequest(), request_id="req-1"
+        )
+        done = _make_event(
+            "executor_completed",
+            data=[MockMessage(text="Ticket raised")],
+            executor_id="magentic_orchestrator",
+        )
+
+        await self._run(store, [review], [done])
+
+        assert store.submitted == ["s-1", "s-1"]
+        assert len(self._raised()) == 1

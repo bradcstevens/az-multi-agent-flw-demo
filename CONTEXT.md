@@ -69,8 +69,11 @@ _Avoid_: bypass, direct agent call, single-agent path
 **Deliberate lane** — the request path taken by escalation and ticket creation: the full
 orchestration with **Plan review** on, where the approval step *is* the associate confirming the
 ticket before it is raised. Not instructed — `_handle_plan_reviews`' **approved** branch submits the
-draft and pushes the card, and the rejected branch does not (#22). The seam runs on every approved
-plan, which is why `TicketStore.read` is **not** total: see **Simulated ticket**.
+draft and pushes the card, and the rejected branch does not (#22). The plan review is presented
+*before* the plan runs, though, and the plan is what drafts the ticket, so an approved run submits
+again when it finishes (#50); it is the same one confirmation, and both submission and card are
+idempotent. The seam runs on every approved plan, which is why `TicketStore.read` is **not** total:
+see **Simulated ticket**.
 
 **Lane** — which of the two a request takes (`src/backend/lane/lane.py`). Declared as metadata on a
 **Quick Task** and carried on the wire as `InputTask.lane` — the **only** lane declaration on a
@@ -935,6 +938,44 @@ time, which is #48 and [ADR-018](docs/ADR/018-deployed-build-provenance-check.md
 _Avoid_: stale deployment, drift
 
 ## Confirmed findings
+
+### The approval raised no ticket, because the draft did not exist yet (confirmed 2026-08-13, issue #50)
+
+The escalation beat, asserted through a browser for the first time: the **Deliberate lane** was
+taken, the plan was presented, the associate approved it, the run completed — and no `ticket_raised`
+frame ever arrived. The **Simulated ticket** existed only in the model's prose.
+
+`_raise_confirmed_ticket` ran in `_handle_plan_reviews`' approved branch, which is **plan-review
+time** — before the plan executes. The plan's own last step is *"EscalationAgent: draft a simulated
+service-incident ticket"*, so at the moment of the approval there is no draft, `TicketStore.read`
+returns `None` exactly as designed, and the seam correctly does nothing. Every path was behaving as
+written; the order was wrong. An approved run now submits again when it finishes.
+
+That fix is proven by tests and **has never been observed live**, because a deeper fault sits
+underneath it: on the deployed system the **EscalationAgent never drafts at all**. A completed
+approved escalation turn — `final_result_message` on the wire, 2810 characters of answer — leaves
+`GET /api/v4/escalation/ticket` answering `{"drafted": false}`. `draft_service_ticket` is never
+called, so there is nothing for any submission seam to raise and the **Simulated ticket** remains
+prose. That a live turn calls the drafting tool was always *instructed, not measured*
+(`docs/escalation-ticket.md` said so); measuring it is what the browser added. The approved plan
+also asks twice in one pause — the `list_attempted_steps` tool-approval and a
+`request_user_clarification` — and the **Troubleshooting Agent** then improvises diagnostics until
+the turn ends in advice rather than an escalation. The beat is red on the deployment for that
+reason, and the red is the product's, not the validator's. It is #62.
+
+The tests around the seam — eight of them, specific and well-named — all passed, because each handed
+the seam a fake store that already held a draft. That is #47's mock lesson one layer in: a fake
+supplying what the real collaborator *cannot yet have* at that point in the turn agrees with the
+author, not with the system.
+
+Two more things the same beat found. The **rehearsed reply** chips outlived the question they
+answered: `clarificationMessage` was cleared only by `resetChat`, so after answering, one-tap chips
+stayed on screen carrying a resolved `request_id` — fixed at `PlanChat`, the seam both the chips and
+the text box pass through. And beats 3 and 4 are **two conversations**: the escalation **Quick Task**
+mints a new session, the **Troubleshooting record** is the memory of one session, and the plan page's
+box submits clarifications only — so the ticket reads `steps_attempted: not reported` and the
+demonstration's strongest claim, *the assistant remembers what you tried*, does not survive the beat
+boundary as the walkthrough is authored. That gap is #61.
 
 ### The centrepiece beat is intermittent, and only a browser saw it (confirmed 2026-08-13, issue #47)
 

@@ -47,6 +47,7 @@ import {
     selectAgentMessages,
     setInput,
     setSubmittingChatDisableInput,
+    setClarificationMessage,
     addAgentMessage,
 } from '../store/slices/chatSlice';
 import {
@@ -368,6 +369,17 @@ const PlanPage: React.FC = () => {
                 dismissToast(id);
                 dispatch(setSubmittingChatDisableInput(false));
                 showToast('Failed to submit clarification', 'error');
+                /*
+                  The answer never reached the backend, so the question is
+                  still standing (issue #50). `PlanChat` clears it optimistically
+                  as the answer is submitted — that is what takes the one-tap
+                  chips down with the question they answered — so a failed
+                  submit has to put it back, or the presenter is left retyping
+                  an answer the surface no longer offers.
+                */
+                if (clarificationMessage) {
+                    dispatch(setClarificationMessage(clarificationMessage));
+                }
             }
         },
         [planData, clarificationMessage, planApprovalRequest, showToast, dismissToast, dispatch, scrollToBottom],
