@@ -1,111 +1,210 @@
-body, html, :root {
-    min-height: 100vh;
+/*
+ * The global sheet: the things that are true of every surface.
+ *
+ * What used to be here was mostly inert. Four rule blocks tried to hide raw
+ * error JSON with `:contains()` and `:has-text()`, neither of which is CSS —
+ * they are jQuery and Playwright respectively, so the browser dropped each
+ * block at parse time and they had never hidden anything. The rest addressed a
+ * team-management dialog, a delete button and a chart that this fork does not
+ * render; `delete-team-button`, `chart-container`, `delete-dialog` and
+ * `json-error` appear nowhere else in the app.
+ *
+ * Everything below is scoped to what the surface actually has, and states
+ * colour through the theme rather than in hex. Colour is the theme's to state
+ * (#56), and a global sheet is the easiest place in the codebase to break that
+ * rule by accident.
+ */
+
+html,
+body,
+:root {
+    /*
+     * `dvh`, not `vh`. On iOS Safari `100vh` is the viewport as if the browser
+     * chrome were not there, so the shell stood a toolbar taller than the
+     * screen and shifted as that chrome collapsed on scroll. The associate this
+     * demo is about is holding a phone.
+     */
+    min-height: 100dvh;
     box-sizing: border-box;
     padding: 0;
     margin: 0;
 }
 
-
-/* Hide raw JSON errors  */
-body > div[style*="position: fixed"]:contains('"error_type"'),
-body > div[style*="bottom: 0"]:contains('RAI_VALIDATION_FAILED'),
-pre:contains('"message":'),
-.error-raw,
-.json-error {
-  display: none !important;
+*,
+*::before,
+*::after {
+    box-sizing: inherit;
 }
 
-/* Hide any pre-formatted JSON that might contain error messages */
-pre {
-  white-space: pre-wrap;
-}
-
-pre:has-text('error_type'),
-pre:has-text('RAI_VALIDATION_FAILED') {
-  display: none !important;
-}
-
-/* Global Custom Scrollbar */
-::-webkit-scrollbar {
-    overflow-y: auto; /* Ensure scrollable content */
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: rgba(100, 100, 100, 0.7) transparent; /* For Firefox */
-  }
-  
-  /* Webkit-based browsers */
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background-color: rgba(100, 100, 100, 0.7);
-    border-radius: 3px;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(100, 100, 100, 1);
-  }
-  
-  ::-webkit-scrollbar-track {
-    /* background: red; */
-  }
-  
-  * {
+body {
+    /*
+     * Named here as well as in the theme. Fluent scopes `--fontFamilyBase` to
+     * the provider's own element, so anything rendered outside it — the
+     * bootstrap "Starting…" state, and the `<noscript>` — fell back to the
+     * browser's default serif.
+     */
+    font-family: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    /*
+     * Geist is a variable face and renders heavy without this on macOS, which
+     * is the machine the walkthrough is presented from.
+     */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * Display type is set tight; body type is not.
+ *
+ * Fluent's ramp applies one tracking to every size, which leaves a 24px-plus
+ * heading looking loose and weightless. `text-wrap: balance` is the other half:
+ * the headings here are short enough to be balanced cheaply, and it is what
+ * stops "How can I help?" breaking one word onto a line of its own as the
+ * conversation column narrows.
+ */
+h1,
+h2,
+h3,
+h4 {
+    letter-spacing: -0.021em;
+    text-wrap: balance;
+}
+
+h1 {
+    letter-spacing: -0.028em;
+}
+
+/* Paragraph measure. Past about 70 characters the eye loses the line return. */
+p {
+    text-wrap: pretty;
+    max-width: 68ch;
+}
+
+/*
+ * Figures line up in columns.
+ *
+ * The Token meter is read by comparing one row's tokens and estimated Copilot
+ * Credits against another's — including a refused request's measured zero —
+ * and proportional digits make that comparison ragged. `tabular-nums` is set
+ * where figures are tabulated rather than globally, so running prose keeps its
+ * proportional numerals.
+ */
+table,
+[data-numeric] {
+    font-variant-numeric: tabular-nums;
+}
+
+/*
+ * A visible focus ring, everywhere, as a floor.
+ *
+ * Fluent draws its own on its own controls; this catches everything else. The
+ * surface is operated one-handed on a shared device and is presented on a
+ * projector, so the ring is the theme's focus stroke rather than the browser's
+ * hairline default.
+ */
+:focus-visible {
+    outline: 2px solid var(--colorStrokeFocus2);
+    outline-offset: 2px;
+    border-radius: var(--borderRadiusSmall);
+}
+
+/* Scrollbars, in the palette rather than in grey. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--colorNeutralStroke1) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--colorNeutralStroke1);
+    border-radius: 4px;
+    /* Inset, so the bar reads as riding in a gutter rather than on the edge. */
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--colorNeutralStroke1Hover);
+}
+
+html {
+    /*
+     * On `html` rather than on `*`. Declared universally it is inherited by
+     * every scroll container on the page, including the reply stream, where a
+     * smoothly animated programmatic scroll fights the stream's own
+     * scroll-to-bottom on each token that arrives.
+     */
     scroll-behavior: smooth;
-  }
-
-  .chart-container canvas {
-    --chartBarColor: var(--colorBrandBackground);
-    --chartHoverColor: var(--colorBrandBackgroundHover);
-    --chartBorderColor: var(--colorBrandForeground1);
-    --chartLineColor: var(--colorBrandForeground1);
-    --chartPointColor: var(--colorBrandBackground);
-    --chartPointBorderColor: var(--colorBrandForeground1);
 }
 
+/*
+ * Anything expensive is opt-out.
+ *
+ * A demonstration surface animates a good deal — the reply streams, the panels
+ * enter, the cards lift — and none of it is worth triggering motion sickness in
+ * somebody in the room.
+ */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
 
-/* Delete dialog layout override */
-.fui-Dialog__content[data-testid="delete-dialog"] {
-  display: flex !important;
-  flex-direction: column !important;
-  grid-template-columns: none !important;
-  grid-template-rows: none !important;
-  grid-template: none !important;
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
-.fui-Dialog__content[data-testid="delete-dialog"] .fui-DialogBody {
-  display: flex !important;
-  flex-direction: column !important;
-  grid-template-columns: none !important;
-  grid-template-rows: none !important;
-  grid-template: none !important;
+/*
+ * Wrapped, so a stack trace or a runbook step cannot push the column open.
+ * This is the one thing the old sheet did that was worth keeping.
+ */
+pre {
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
-/* Alternative approach - target all dialog content that contains delete buttons */
-/* .fui-Dialog__content:has(button[data-testid="delete-team-confirm"]) {
-  display: flex !important;
-  flex-direction: column !important;
-  grid-template-columns: none !important;
-  grid-template-rows: none !important;
+/*
+ * A z-index scale, so the next thing that needs to sit above something else has
+ * somewhere to be declared instead of reaching for 9999.
+ */
+:root {
+    --zIndexRaised: 1;
+    --zIndexSticky: 100;
+    --zIndexOverlay: 200;
+    --zIndexSkipLink: 900;
 }
 
-.fui-Dialog__content:has(button[data-testid="delete-team-confirm"]) .fui-DialogBody {
-  display: flex !important;
-  flex-direction: column !important;
-  grid-template-columns: none !important;
-  grid-template-rows: none !important;
-} */
-
-/* Delete button red color override */
-.delete-team-button,
-.delete-team-button .fui-Button__icon {
-  color: #d13438 !important;
-  background-color: transparent !important;
+/* Keyboard users reach the conversation without walking the task history. */
+.skip-to-content {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: var(--zIndexSkipLink);
+    padding: 12px 20px;
+    border-radius: var(--borderRadiusMedium);
+    background-color: var(--colorBrandBackground);
+    color: var(--colorNeutralForegroundOnBrand);
+    font-family: var(--fontFamilyBase);
+    font-size: var(--fontSizeBase300);
+    font-weight: var(--fontWeightSemibold);
+    text-decoration: none;
 }
 
-.delete-team-button:hover,
-.delete-team-button:hover .fui-Button__icon {
-  background-color: #fdf2f2 !important;
-  color: #a4262c !important;
+.skip-to-content:focus {
+    left: 12px;
+    top: 12px;
 }

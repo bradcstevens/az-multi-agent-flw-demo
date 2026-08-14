@@ -67,6 +67,8 @@ export interface StartingTaskBE {
     logo: string;
     /** The declared Lane (issue #16, ADR-013), absent on older definitions */
     lane?: string;
+    /** The Quick Task to offer inside this task's conversation (issue #61). */
+    follow_on?: string;
 }
 
 /**

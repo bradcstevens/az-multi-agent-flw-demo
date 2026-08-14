@@ -24,10 +24,22 @@
  * another are a tap that answers something nobody asked.
  */
 
-import { TeamConfig } from './Team';
+import { StartingTask, TeamConfig } from './Team';
 
 /** How a prompt is compared after its round trip through a text box. */
 const comparable = (text: string): string => text.trim().toLowerCase();
+
+const taskForGoal = (
+    team: TeamConfig | null | undefined,
+    goal: string | null | undefined,
+): StartingTask | undefined => {
+    if (!team || !goal) return undefined;
+
+    const wanted = comparable(goal);
+    return (team.starting_tasks ?? []).find(
+        (candidate) => comparable(candidate?.prompt ?? '') === wanted,
+    );
+};
 
 /**
  * The rehearsed replies for a plan, or none.
@@ -39,14 +51,20 @@ export const rehearsedRepliesFor = (
     team: TeamConfig | null | undefined,
     goal: string | null | undefined,
 ): string[] => {
-    if (!team || !goal) return [];
-
-    const wanted = comparable(goal);
-    const task = (team.starting_tasks ?? []).find(
-        (candidate) => comparable(candidate?.prompt ?? '') === wanted,
-    );
+    const task = taskForGoal(team, goal);
 
     return (task?.rehearsed_replies ?? []).filter(
         (reply): reply is string => typeof reply === 'string' && reply.trim() !== '',
     );
+};
+
+/** The follow-on task for a plan, or none when it began outside the roster. */
+export const followOnTaskFor = (
+    team: TeamConfig | null | undefined,
+    goal: string | null | undefined,
+): StartingTask | undefined => {
+    const followOnId = taskForGoal(team, goal)?.follow_on;
+    if (!followOnId) return undefined;
+
+    return (team?.starting_tasks ?? []).find((candidate) => candidate.id === followOnId);
 };

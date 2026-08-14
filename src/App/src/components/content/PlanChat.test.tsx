@@ -9,6 +9,15 @@ import chatReducer, { setClarificationMessage } from '@/store/slices/chatSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
 
 const REPLY = 'I switched it off at the wall and back on again.';
+const FOLLOW_ON = {
+    id: 'task-223-escalation',
+    name: "I can't fix it",
+    prompt: 'I have tried everything and I need someone to come out.',
+    created: '',
+    creator: '',
+    logo: 'Document',
+    lane: 'deliberate',
+};
 
 /**
  * The wiring, not the component (issue #26).
@@ -71,6 +80,17 @@ describe('the conversation offers the rehearsed replies', () => {
         renderChat();
 
         expect(screen.getByRole('button', { name: REPLY })).toBeInTheDocument();
+    });
+
+    describe('the conversation offers its follow-on task', () => {
+        it('renders the follow-on without waiting for a clarification and submits it on tap', () => {
+            const onFollowOnTask = vi.fn();
+            renderChat({ followOnTask: FOLLOW_ON, onFollowOnTask }, { pending: false });
+
+            fireEvent.click(screen.getByRole('button', { name: FOLLOW_ON.name }));
+
+            expect(onFollowOnTask).toHaveBeenCalledWith(FOLLOW_ON);
+        });
     });
 
     it('submits one through the same path a typed answer takes', () => {

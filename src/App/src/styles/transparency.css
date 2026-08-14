@@ -2,19 +2,28 @@
  * The transparency rail (issue #24) — the Grounding panel, the Token meter and
  * the Agent Team panel.
  *
- * Layout only. Everything that carries meaning — which platform answered, which
- * numbers are measurements and which are absences — is in the components, so
- * that a stylesheet can never be the reason a claim is or is not made.
+ * Layout and surface only. Everything that carries meaning — which platform
+ * answered, which numbers are measurements and which are absences — is in the
+ * components, so that a stylesheet can never be the reason a claim is or is not
+ * made.
  *
  * Sized to sit beside the conversation on a laptop and to fall below it on a
  * phone, because the associate's surface is a phone-sized screen on a shared
  * device.
+ *
+ * The rail used to be three runs of unbounded text down a tinted column, which
+ * made the demonstration's *evidence* the least designed thing on the surface:
+ * it is read from across a room, live, while the architecture works, and the
+ * audience has to see at a glance where one panel ends and the next begins.
+ * Each panel is now a card of its own — a surface, a hairline and a tinted
+ * shadow — so the rail reads as three separate instruments rather than as one
+ * column of prose.
  */
 
 .transparency-rail {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     width: 320px;
     min-width: 260px;
     padding: 16px;
@@ -30,16 +39,37 @@
     background-color: var(--colorNeutralBackground2);
 }
 
+/*
+ * A panel is a card.
+ *
+ * `background-clip: padding-box` because the border is a translucent hairline:
+ * without it the card's own background bleeds through its border and the
+ * hairline reads a shade lighter than it is.
+ */
 .transparency-panel {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--colorNeutralStroke2);
+    border-radius: var(--borderRadiusLarge);
+    background-color: var(--colorNeutralBackground1);
+    background-clip: padding-box;
+    box-shadow: var(--shadow2);
 }
 
+/*
+ * The panel's name, set as a label rather than as a heading.
+ *
+ * Small, letterspaced and in the secondary foreground: these three sit one
+ * above another down a narrow column, and at body weight and body colour they
+ * competed with the evidence underneath them — which is the thing that is
+ * actually meant to be read.
+ */
 .transparency-panel__title {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     /*
      * A section heading (#57), and a flex item of the panel, so it is
      * blockified and the user-agent's `margin: .83em 0` would otherwise apply
@@ -47,10 +77,23 @@
      * declare.
      */
     margin: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--colorNeutralStroke3);
+    color: var(--colorNeutralForeground2);
+    font-size: var(--fontSizeBase200);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* The icon keeps the brand hue; the label does not need it. */
+.transparency-panel__title svg {
+    color: var(--colorBrandForeground1);
+    flex-shrink: 0;
 }
 
 .transparency-panel__empty {
     color: var(--colorNeutralForeground3);
+    text-wrap: pretty;
 }
 
 .grounding-panel__platform,
@@ -61,12 +104,35 @@
     gap: 6px;
 }
 
+/*
+ * The route reads as a route: a chain of hops, quieter than the platform badge
+ * above it, with the arrows quieter still so the names carry it.
+ */
 .grounding-panel__route {
     color: var(--colorNeutralForeground2);
+    padding: 8px 10px;
+    border-radius: var(--borderRadiusMedium);
+    background-color: var(--colorNeutralBackground2);
 }
 
+.grounding-panel__route svg {
+    color: var(--colorNeutralForeground4);
+    flex-shrink: 0;
+}
+
+/*
+ * An honest miss is not an error, and must not be dressed as one (#24). It is
+ * marked with the neutral stroke rather than with a status colour — the
+ * audience has to be able to tell it apart from a Policy block *and* from a
+ * failure, and colour is the loudest way to say the wrong one of the three.
+ */
 .grounding-panel__miss {
     color: var(--colorNeutralForeground2);
+    padding: 10px 12px;
+    border-left: 3px solid var(--colorNeutralStroke1);
+    border-radius: var(--borderRadiusSmall);
+    background-color: var(--colorNeutralBackground2);
+    text-wrap: pretty;
 }
 
 .grounding-panel__citations {
@@ -75,16 +141,26 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
+/*
+ * A citation is the answer's receipt, so it is marked in the brand hue down its
+ * leading edge — the one place in the rail where a document that actually came
+ * back is distinguished from prose about documents.
+ */
 .grounding-panel__citation {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 8px;
-    border-radius: 4px;
-    background-color: var(--colorNeutralBackground1);
+    padding: 8px 10px;
+    border-radius: var(--borderRadiusMedium);
+    border-left: 3px solid var(--colorBrandStroke1);
+    background-color: var(--colorNeutralBackground2);
+}
+
+.grounding-panel__citation > :last-child {
+    color: var(--colorNeutralForeground3);
 }
 
 .token-meter {
@@ -124,8 +200,23 @@
 .token-meter th,
 .token-meter td {
     text-align: right;
-    padding: 4px 4px;
+    padding: 6px 4px;
     border-bottom: 1px solid var(--colorNeutralStroke3);
+}
+
+/* The column headings are labels, not data. */
+.token-meter thead th {
+    color: var(--colorNeutralForeground3);
+    font-size: 10px;
+    font-weight: var(--fontWeightSemibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom-color: var(--colorNeutralStroke2);
+}
+
+.token-meter tbody tr:last-child td,
+.token-meter tbody tr:last-child th {
+    border-bottom: none;
 }
 
 /*
@@ -146,9 +237,16 @@
  * the estimated Copilot Credits — the column the two-billing-models point is
  * made with. A wrapped *number* would break the side-by-side reading that point
  * depends on; a wrapped agent or model name costs nothing.
+ *
+ * Tabular figures, because the meter is read by comparing one row against
+ * another — including a refused request's measured zero — and proportional
+ * digits do not line up to be compared.
  */
 .token-meter__number {
     white-space: nowrap;
+    font-family: var(--fontFamilyNumeric);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
 }
 
 .token-meter thead th,
@@ -168,7 +266,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
 }
 
 /*
@@ -186,6 +284,7 @@
 .agent-team__note {
     color: var(--colorNeutralForeground3);
     overflow-wrap: anywhere;
+    text-wrap: pretty;
 }
 
 .agent-team__member {
@@ -193,17 +292,38 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--colorNeutralStroke3);
 }
 
+.agent-team__member:last-child {
+    border-bottom: none;
+}
+
+/* The model a member runs on is a figure, and reads as one. */
+.agent-team__member > :last-child {
+    color: var(--colorNeutralForeground3);
+    font-family: var(--fontFamilyNumeric);
+    font-size: var(--fontSizeBase100);
+    white-space: nowrap;
+}
+
+/*
+ * The presenter's alert. Marigold down the leading edge — the one warning hue
+ * in the palette, and deliberately the complement of the brand petrol, so it is
+ * the loudest thing in the rail when it appears and absent otherwise.
+ */
 .presenter-alert {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin: 12px 0;
-    padding: 12px 16px;
-    border-radius: 8px;
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: var(--borderRadiusLarge);
+    border: 1px solid var(--colorNeutralStroke2);
     border-left: 4px solid var(--colorPaletteMarigoldBorderActive, #dd9900);
-    background-color: var(--colorNeutralBackground3);
+    background-color: var(--colorNeutralBackground1);
+    box-shadow: var(--shadow2);
 }
 
 .presenter-alert__header {

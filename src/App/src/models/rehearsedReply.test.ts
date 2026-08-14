@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rehearsedRepliesFor } from './rehearsedReply';
+import { followOnTaskFor, rehearsedRepliesFor } from './rehearsedReply';
 import { TeamConfig } from './Team';
 
 const task = (overrides: Partial<TeamConfig['starting_tasks'][number]> = {}) => ({
@@ -25,6 +25,28 @@ describe('resolving the rehearsed replies for a plan', () => {
                 'The coffee brewer is down. It is not brewing on the left head.',
             ),
         ).toEqual(['I switched it off at the wall and back on again.']);
+    });
+
+    describe('resolving the follow-on task for a plan', () => {
+        it('finds the task authored as the matching task follow-on', () => {
+            const escalation = task({
+                id: 'task-223-escalation',
+                name: "I can't fix it",
+                follow_on: undefined,
+            });
+
+            expect(
+                followOnTaskFor(
+                    team([task({ follow_on: escalation.id }), escalation]),
+                    task().prompt,
+                ),
+            ).toEqual(escalation);
+        });
+
+        it('gives nothing when the plan did not start from a task with a follow-on', () => {
+            expect(followOnTaskFor(team(), task().prompt)).toBeUndefined();
+            expect(followOnTaskFor(team([task({ follow_on: 'missing-task' })]), task().prompt)).toBeUndefined();
+        });
     });
 
     it('gives nothing for a goal no Quick Task declares', () => {

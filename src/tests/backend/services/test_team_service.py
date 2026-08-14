@@ -97,6 +97,7 @@ class MockStartingTask:
     logo: str = ""
     lane: str = None
     rehearsed_replies: List[str] = field(default_factory=list)
+    follow_on: str = None
 
 @dataclass
 class MockTeamConfiguration:
@@ -367,6 +368,17 @@ class TestTeamConfigurationValidation:
         task_data = _valid_task_data(lane="fast")
 
         assert service._validate_and_parse_task(task_data).lane == "fast"
+
+    def test_a_declared_follow_on_survives_the_upload(self):
+        """The task that continues this conversation (issue #61, ADR-024)."""
+        service = TeamService()
+
+        assert (
+            service._validate_and_parse_task(
+                _valid_task_data(follow_on="task-223-escalation")
+            ).follow_on
+            == "task-223-escalation"
+        )
 
     def test_rehearsed_replies_survive_the_upload(self):
         """The one-tap answers to a Clarification (issue #26).

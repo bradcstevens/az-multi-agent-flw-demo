@@ -109,4 +109,20 @@ describe('creating a plan on a signed-in device', () => {
         expect(createPlan).toHaveBeenCalled();
         expect(signedInName()).toBeNull();
     });
+
+    it('keeps a follow-on task in the conversation session it follows', async () => {
+        await TaskService.createPlan(
+            'I have tried everything and I need someone to come out.',
+            'team-223',
+            'deliberate',
+            'session-223-troubleshooting',
+        );
+
+        expect(createPlan).toHaveBeenCalledWith({
+            session_id: 'session-223-troubleshooting',
+            description: 'I have tried everything and I need someone to come out.',
+            team_id: 'team-223',
+            lane: 'deliberate',
+        });
+    });
 });

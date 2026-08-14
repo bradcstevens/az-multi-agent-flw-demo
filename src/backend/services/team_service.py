@@ -174,6 +174,11 @@ class TeamService:
             # asks what has been tried, and the only symptom is a presenter
             # typing the answer on stage.
             rehearsed_replies=list(task_data.get("rehearsed_replies") or []),
+            # The follow-on is optional because most tasks begin and end their
+            # own conversation. It is nevertheless explicit: omitted here,
+            # it is silently lost during upload and the escalation returns to
+            # the home grid with a fresh session.
+            follow_on=task_data.get("follow_on"),
         )
 
     async def save_team_configuration(self, team_config: TeamConfiguration) -> str:

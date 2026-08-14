@@ -187,15 +187,18 @@ export class TaskService {
    * @param lane The Lane declared by the Quick Task that was tapped, if any.
    *   Omitted for free-typed input, which the backend's lane router then
    *   routes by its keyword fallback (issue #16, ADR-013).
+   * @param sessionId An existing conversation to continue. Omitted when a
+   *   task starts a new conversation.
    * @returns Promise with the response containing plan ID, status and the
    *   lane actually taken
    */
   static async createPlan(
     description: string,
     teamId?: string,
-    lane?: string
+    lane?: string,
+    sessionId?: string,
   ): Promise<InputTaskResponse> {
-    const sessionId = this.generateSessionId();
+    const requestSessionId = sessionId ?? this.generateSessionId();
 
     // The **Mocked unlock** (#27), materialised into this request's own
     // session. A session is one conversation — one **Simulated ticket**, one
@@ -213,14 +216,14 @@ export class TaskService {
     // associate the gate is about to decline to answer for.
     if (signedInName()) {
       try {
-        await apiService.signIn(sessionId);
+        await apiService.signIn(requestSessionId);
       } catch {
         forgetSignedInDevice();
       }
     }
 
     const inputTask: InputTask = {
-      session_id: sessionId,
+      session_id: requestSessionId,
       description: description,
       team_id: teamId,
       lane: lane,

@@ -38,6 +38,11 @@ export interface StartingTask {
      * for the same reason `lane` is.
      */
     rehearsed_replies?: string[];
+    /**
+     * The Quick Task to offer inside this task's conversation (issue #61,
+     * ADR-024). A follow-on is not offered from the home grid.
+     */
+    follow_on?: string;
 }
 
 export interface Team {

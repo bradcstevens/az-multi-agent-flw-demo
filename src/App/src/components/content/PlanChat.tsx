@@ -11,8 +11,10 @@ import renderAgentMessages from "./streaming/StreamingAgentMessage";
 import StreamingBufferMessage from "./streaming/StreamingBufferMessage";
 import PresenterAlertCard from "../transparency/PresenterAlertCard";
 import RehearsedReplies from "./RehearsedReplies";
+import FollowOnTask from "./FollowOnTask";
 import { useAppSelector } from "@/store/hooks";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
+import { StartingTask } from "@/models/Team";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
@@ -33,7 +35,10 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   processingApproval: boolean;
   /** The Rehearsed replies for this plan (issue #26), if it began as a tap. */
   rehearsedReplies: string[];
-
+  /** The task this conversation can lead to (issue #61, ADR-024). */
+  followOnTask?: StartingTask;
+  onFollowOnTask?: (task: StartingTask) => void;
+  followOnSubmitting?: boolean;
 }
 
 const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
@@ -59,7 +64,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   handleApprovePlan,
   handleRejectPlan,
   processingApproval,
-  rehearsedReplies
+  rehearsedReplies,
+  followOnTask,
+  onFollowOnTask,
+  followOnSubmitting = false,
 }) => {
   // Read before the early return: hooks may not sit behind a condition.
   const presenterAlerts = useAppSelector(selectPresenterAlerts);
@@ -131,6 +139,14 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         onReply={OnChatSubmit}
         disabled={submittingChatDisableInput}
       />
+
+      {followOnTask && onFollowOnTask && (
+        <FollowOnTask
+          task={followOnTask}
+          onSelect={onFollowOnTask}
+          disabled={followOnSubmitting}
+        />
+      )}
 
       {/* Chat Input - only show if no plan is waiting for approval */}
       <PlanChatBody

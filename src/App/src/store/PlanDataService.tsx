@@ -117,7 +117,8 @@ export class PlanDataService {
         created: taskBE.created,
         creator: taskBE.creator,
         logo: taskBE.logo,
-        lane: taskBE.lane
+        lane: taskBE.lane,
+        follow_on: taskBE.follow_on,
       }))
     };
   }

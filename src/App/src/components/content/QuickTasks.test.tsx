@@ -26,22 +26,24 @@ const renderInput = (team: any) =>
     );
 
 /**
- * The six Quick Tasks in the shape the backend sends them (issue #26). The
+ * The seven Quick Tasks in the shape the backend sends them (issues #26, #52).
  * lanes and the prompts are the store pack's business — `test_store_pack.py`
  * is what holds those to the corpus and the routers. What is asserted here is
- * that whatever the pack declares, the surface renders all of it, badges it
- * with the lane it declared, and carries that declaration into the request.
+ * that the surface renders every task the home screen offers, badges it with
+ * the lane it declared, and carries that declaration into the request.
  */
-const SIX_TASKS = [
+const SEVEN_TASKS = [
     { id: 'task-223-procedure', name: 'Close the store', prompt: 'How do I close the store?', created: '', creator: '', logo: 'BookMarked', lane: 'fast' },
     { id: 'task-223-honest-miss', name: 'Restart the car wash', prompt: 'How do I restart the car wash?', created: '', creator: '', logo: 'Search', lane: 'fast' },
-    { id: 'task-223-troubleshooting', name: 'The coffee brewer is down', prompt: 'The coffee brewer is down.', created: '', creator: '', logo: 'Wrench', lane: 'fast' },
+    { id: 'task-223-troubleshooting', name: 'The coffee brewer is down', prompt: 'The coffee brewer is down.', created: '', creator: '', logo: 'Wrench', lane: 'fast', follow_on: 'task-223-escalation' },
     { id: 'task-223-escalation', name: "I can't fix it", prompt: 'I have tried everything and I need someone to come out.', created: '', creator: '', logo: 'Document', lane: 'deliberate' },
     { id: 'task-223-identity', name: 'How much PTO do I have?', prompt: 'My name is Tanya, how much PTO do I have?', created: '', creator: '', logo: 'Shield', lane: 'fast' },
     { id: 'task-223-shift-tasks', name: 'What is due this shift?', prompt: 'What tasks are due on this shift?', created: '', creator: '', logo: '📋', lane: 'fast' },
+    { id: 'task-223-shift-swap', name: 'Swap a shift', prompt: 'How do I swap a shift with another associate?', created: '', creator: '', logo: 'People', lane: 'fast' },
 ];
+const HOME_TASKS = SEVEN_TASKS.filter((task) => task.id !== 'task-223-escalation');
 
-const walkthrough = (tasks: any[] = SIX_TASKS) => ({
+const walkthrough = (tasks: any[] = SEVEN_TASKS) => ({
     team_id: '00000000-0000-0000-0000-000000000223',
     name: ASSISTANT_NAME,
     agents: [],
@@ -56,16 +58,17 @@ beforeEach(() => {
 });
 
 describe('the walkthrough as one-tap tasks', () => {
-    it('renders every Quick Task the pack declares', () => {
+    it('renders every Quick Task the home screen offers', () => {
         // The presenter runs the whole script without typing, so a task that
         // is not on screen is a beat that has to be typed — and a typo or an
         // autocorrect in a stakeholder meeting is the failure this exists to
         // remove.
         renderInput(walkthrough());
 
-        for (const task of SIX_TASKS) {
+        for (const task of HOME_TASKS) {
             expect(screen.getByText(task.name)).toBeInTheDocument();
         }
+        expect(screen.queryByText("I can't fix it")).not.toBeInTheDocument();
     });
 
     it('lays the tasks out as the grid, not inside one cell of it', () => {
@@ -77,16 +80,16 @@ describe('the walkthrough as one-tap tasks', () => {
 
         const grid = container.querySelector('.home-input-quick-tasks');
         expect(grid).not.toBeNull();
-        expect(grid!.children).toHaveLength(SIX_TASKS.length);
+        expect(grid!.children).toHaveLength(HOME_TASKS.length);
     });
 
     it('badges each task with the lane it declared', () => {
         renderInput(walkthrough());
 
         const badges = screen.getAllByTestId('lane-badge');
-        expect(badges).toHaveLength(SIX_TASKS.length);
+        expect(badges).toHaveLength(HOME_TASKS.length);
         expect(badges.map((badge) => badge.getAttribute('data-lane'))).toEqual(
-            SIX_TASKS.map((task) => task.lane),
+            HOME_TASKS.map((task) => task.lane),
         );
         expect(badges.every((badge) => badge.getAttribute('data-lane-variant') === 'declared')).toBe(true);
     });
@@ -101,14 +104,14 @@ describe('the walkthrough as one-tap tasks', () => {
             .getAllByTestId('lane-badge')
             .filter((badge) => badge.getAttribute('data-lane') === 'deliberate');
 
-        expect(deliberate).toHaveLength(1);
+        expect(deliberate).toHaveLength(0);
     });
 
     it('renders no badge for a task whose declaration it cannot read', () => {
         // A surface may say nothing. An unreadable declaration falls open to
         // the Deliberate lane in the backend's router, so a badge guessed here
         // would be the surface claiming a lane nothing chose.
-        renderInput(walkthrough([{ ...SIX_TASKS[0], lane: 'fast lane' }]));
+        renderInput(walkthrough([{ ...SEVEN_TASKS[0], lane: 'fast lane' }]));
 
         expect(screen.queryByTestId('lane-badge')).not.toBeInTheDocument();
     });
@@ -182,7 +185,7 @@ describe('where the lane sits on a Quick Task', () => {
             .getAllByTestId('lane-badge')
             .map((badge) => badge.closest('button')!);
 
-        expect(cards).toHaveLength(SIX_TASKS.length);
+        expect(cards).toHaveLength(HOME_TASKS.length);
         for (const card of cards) {
             expect(card.style.alignItems).toBe('stretch');
             expect(card.style.justifyContent).toBe('flex-start');
@@ -208,15 +211,15 @@ describe('tapping a Quick Task', () => {
     it('submits from a semantic button when activated with the keyboard', async () => {
         renderInput(walkthrough());
 
-        const quickTask = screen.getByRole('button', { name: /I can't fix it/ });
+        const quickTask = screen.getByRole('button', { name: /Close the store/ });
         quickTask.focus();
         await userEvent.keyboard('{Enter}');
 
         await waitFor(() =>
             expect(TaskService.createPlan).toHaveBeenCalledWith(
-                'I have tried everything and I need someone to come out.',
+                'How do I close the store?',
                 '00000000-0000-0000-0000-000000000223',
-                'deliberate',
+                'fast',
             ),
         );
     });

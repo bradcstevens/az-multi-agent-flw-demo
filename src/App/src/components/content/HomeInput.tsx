@@ -289,9 +289,16 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
   }, [input]);
 
   // Convert team starting_tasks to ExtendedQuickTask format
+  const followOnTaskIds = new Set(
+    (selectedTeam?.starting_tasks ?? []).flatMap((task) =>
+      typeof task.follow_on === "string" ? [task.follow_on] : [],
+    ),
+  );
   const tasksToDisplay: ExtendedQuickTask[] =
     selectedTeam && selectedTeam.starting_tasks
-      ? selectedTeam.starting_tasks.map((task, index) => {
+      ? selectedTeam.starting_tasks
+          .filter((task) => !followOnTaskIds.has(task.id))
+          .map((task, index) => {
           // Handle both string tasks and StartingTask objects
           if (typeof task === "string") {
             return {
@@ -315,7 +322,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
               lane: startingTask.lane,
             };
           }
-        })
+          })
       : [];
 
   return (

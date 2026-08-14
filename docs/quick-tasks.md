@@ -3,7 +3,9 @@
 Issues #26 and #52. The presenter runs the whole scripted walkthrough by
 tapping. Seven tasks, one per beat, each declaring the **Lane** it takes — and each held to
 the corpus, the router and the gate it depends on by a test, because a Quick
-Task is a claim about what will happen when somebody taps it.
+Task is a claim about what will happen when somebody taps it. Six appear on
+the home grid: **I can't fix it** is a follow-on inside the troubleshooting
+conversation, so it carries that conversation's session into the escalation.
 
 ## The walkthrough
 
@@ -14,7 +16,7 @@ They render in this order, which is the order the demonstration runs in.
 | 1 | Close the store | *How do I close the store?* | fast | R2/R6 — the cross-platform hop, `Foundry orchestrator → Copilot Studio → Dataverse` |
 | 2 | Restart the car wash | *How do I restart the car wash after a vehicle stalls in the bay?* | fast | R2 — the rehearsed honest miss |
 | 3 | The coffee brewer is down | *The coffee brewer is down. It is not brewing on the left head.* | fast | R3 — multi-turn troubleshooting with **Attempted steps** |
-| 4 | I can't fix it | *I have tried everything and I can't fix it. I need someone to come out.* | **deliberate** | R4 — the approval *is* the **Simulated ticket** being raised |
+| 4 | I can't fix it (follow-on) | *I have tried everything and I can't fix it. I need someone to come out.* | **deliberate** | R4 — the approval *is* the **Simulated ticket** being raised |
 | 5 | How much PTO do I have? | *My name is Tanya, how much PTO do I have?* | fast | R5 — the **Identity boundary gate** refusing, and #27's sign-in |
 | 6 | What is due this shift? | *What tasks are due on this shift?* | fast | R8 — where the **Presenter alert** leads |
 | 7 | Swap a shift | *How do I swap a shift with another associate?* | fast | ADR-017 — the **Workforce agent**, an **HR process question**, and the gate admitting it |

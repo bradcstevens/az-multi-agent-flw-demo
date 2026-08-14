@@ -56,7 +56,9 @@ import {
 } from '../store/slices/streamingSlice';
 import { selectWsConnected } from '../store/slices/appSlice';
 import { selectSelectedTeam } from '../store/slices/teamSlice';
-import { rehearsedRepliesFor } from '../models/rehearsedReply';
+import { followOnTaskFor, rehearsedRepliesFor } from '../models/rehearsedReply';
+import { StartingTask } from '../models/Team';
+import { TaskService } from '../store/TaskService';
 
 /* ── Custom Hooks ────────────────────────────────────────────── */
 import { usePlanWebSocket } from '../hooks/usePlanWebSocket';
@@ -78,7 +80,7 @@ import ContentToolbar from '../commonComponents/components/Content/ContentToolba
 import StoreIdentity from '../components/branding/StoreIdentity';
 import { ASSISTANT_NAME } from '../models/storeSurface';
 import LaneBadge from '../components/lane/LaneBadge';
-import { isLane } from '../models/lane';
+import { isLane, LANE_LABELS } from '../models/lane';
 import { useInlineToaster } from '../components/toast/InlineToaster';
 import Octo from '../commonComponents/imports/Octopus.png';
 import LoadingMessage, { loadingMessages } from '../commonComponents/components/LoadingMessage';
@@ -160,6 +162,8 @@ const PlanPage: React.FC = () => {
     /* ── Cancellation alert hook ────────────────────────────── */
     const [pendingNavigation, setPendingNavigation] = React.useState<(() => void) | null>(null);
     const [processingElapsedSeconds, setProcessingElapsedSeconds] = React.useState<number>(0);
+    const [followOnSubmitting, setFollowOnSubmitting] = React.useState(false);
+    const followOnSubmissionRef = React.useRef(false);
     const processingStatusMessage = getPlanProcessingStatusMessage(processingElapsedSeconds);
 
     /* ── The Rehearsed replies for this plan (issue #26) ─────── */
@@ -171,9 +175,14 @@ const PlanPage: React.FC = () => {
       that matches no Quick Task prompt — which is what an edited prompt is —
       resolves to none, and the surface says nothing.
     */
+    const planTeam = planData?.team ?? selectedTeam;
     const rehearsedReplies = React.useMemo(
-        () => rehearsedRepliesFor(selectedTeam, planData?.plan?.initial_goal),
-        [selectedTeam, planData?.plan?.initial_goal],
+        () => rehearsedRepliesFor(planTeam, planData?.plan?.initial_goal),
+        [planTeam, planData?.plan?.initial_goal],
+    );
+    const followOnTask = React.useMemo(
+        () => followOnTaskFor(planTeam, planData?.plan?.initial_goal),
+        [planTeam, planData?.plan?.initial_goal],
     );
 
     /* ── The lane taken, recovered after a reload (issue #20) ─── */
@@ -323,6 +332,56 @@ const PlanPage: React.FC = () => {
             dispatch(planApprovalRejected());
         }
     }, [planApprovalRequest, planData, navigate, showToast, dismissToast, dispatch]);
+
+    const handleFollowOnTask = useCallback(async (task: StartingTask) => {
+        if (followOnSubmissionRef.current) return;
+        const sessionId = planData?.plan?.session_id;
+        if (!sessionId) {
+            showToast('Could not continue this conversation', 'error');
+            return;
+        }
+
+        followOnSubmissionRef.current = true;
+        setFollowOnSubmitting(true);
+        dispatch(requestStarted());
+        const id = showToast('Creating a plan', 'progress');
+        try {
+            const response = await TaskService.createPlan(
+                task.prompt,
+                planTeam?.team_id,
+                task.lane,
+                sessionId,
+            );
+            if (!response.plan_id) {
+                throw new Error('The follow-on task did not create a plan');
+            }
+
+            webSocketService.connect(response.plan_id).catch(() => {
+                // The plan page retries, and the surface degrades to polling.
+            });
+            dismissToast(id);
+            showToast(
+                isLane(response.lane)
+                    ? `Plan created — ${LANE_LABELS[response.lane]}`
+                    : 'Plan created!',
+                'success',
+            );
+            navigate(`/plan/${response.plan_id}`, { state: { lane: response.lane } });
+        } catch {
+            dismissToast(id);
+            showToast('Unable to create plan. Please try again.', 'error');
+        } finally {
+            followOnSubmissionRef.current = false;
+            setFollowOnSubmitting(false);
+        }
+    }, [
+        planData,
+        planTeam,
+        dispatch,
+        showToast,
+        dismissToast,
+        navigate,
+    ]);
 
     /* ── Chat submission ────────────────────────────────────── */
     const handleOnchatSubmit = useCallback(
@@ -509,6 +568,9 @@ const PlanPage: React.FC = () => {
                                 handleApprovePlan={handleApprovePlan}
                                 handleRejectPlan={handleRejectPlan}
                                 rehearsedReplies={rehearsedReplies}
+                                followOnTask={followOnTask}
+                                onFollowOnTask={handleFollowOnTask}
+                                followOnSubmitting={followOnSubmitting}
                             />
                         </>
                     )}

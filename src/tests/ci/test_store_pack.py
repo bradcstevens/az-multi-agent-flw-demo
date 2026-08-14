@@ -1412,6 +1412,24 @@ def test_given_the_troubleshooting_task_when_read_then_it_carries_rehearsed_repl
     assert task["rehearsed_replies"]
 
 
+def test_given_the_troubleshooting_task_when_read_then_its_follow_on_is_the_escalation(
+    store_pack,
+):
+    """The escalation is reached only from the conversation it continues."""
+    troubleshooting = next(
+        task
+        for task in store_pack.starting_tasks
+        if task["id"] == "task-223-troubleshooting"
+    )
+    escalation = next(
+        task
+        for task in store_pack.starting_tasks
+        if task["id"] == troubleshooting["follow_on"]
+    )
+
+    assert escalation["id"] == "task-223-escalation"
+
+
 def _rehearsed_replies(store_pack) -> List[str]:
     """Every rehearsed reply the pack authors, in the order they render."""
     return [

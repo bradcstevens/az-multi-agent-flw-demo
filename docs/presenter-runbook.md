@@ -38,7 +38,7 @@ Read the two boxes below before anything else. They are the only two things you 
 | **Screen** | Full screen, and wide enough for the panels on the right to be visible — they are the evidence. Below 900px wide they stack underneath, which is fine to *show* and awkward to *drive*. |
 | **Rehearse** | Run the eight taps once end to end before the meeting. It takes about ten minutes and it is the only way to know today's deployment is healthy. |
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
-| **Between beats** | Beats 1 to 4 open a task view — click **New task** in the left panel to get back to the seven cards. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
+| **Between beats** | Use **New task** between beats 1, 2 and 3. Beat 4 continues beat 3 from its follow-on card. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
 
 **Ask an engineer to clear the deployment before a customer session.** One command does it:
 `bash scripts/sop-rehearsal.sh` ([sop-rehearsal.md](sop-rehearsal.md)) — ten Demo validator runs
@@ -60,7 +60,7 @@ be a contrast with.
 
 ## The eight taps
 
-Tap the card, then send. Everything below is one conversation each; use **New task** between them.
+Tap the card, then send. Use **New task** between conversations, except where beat 4 continues beat 3.
 
 ### 1. Close the store — the cross-platform hop
 
@@ -120,8 +120,8 @@ until it offers to escalate.
 
 ### 4. I can't fix it — the approval *is* the ticket
 
-**Tap:** `I can't fix it` — *"I have tried everything and I can't fix it. I need someone to come
-out."*
+**Tap:** `I can't fix it` — the follow-on card above the message box — *"I have tried everything
+and I can't fix it. I need someone to come out."*
 
 **What happens:** this one takes the **deliberate lane** — a plan appears and waits for you. Press
 **Approve Task Plan**. A service ticket card appears, marked *Simulated*.

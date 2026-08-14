@@ -290,6 +290,11 @@ class StartingTask(BaseModel):
     # it has any.
     rehearsed_replies: List[str] = Field(default_factory=list)
 
+    # The next Quick Task in this conversation (issue #61, ADR-024). Like
+    # ``lane``, the pointer is authored configuration: a missing or unknown
+    # task simply produces no follow-on affordance in the surface.
+    follow_on: Optional[str] = None
+
 
 class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""

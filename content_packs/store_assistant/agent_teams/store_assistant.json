@@ -113,6 +113,7 @@
       "creator": "",
       "logo": "Wrench",
       "lane": "fast",
+      "follow_on": "task-223-escalation",
       "rehearsed_replies": [
         "I switched it off at the wall and back on again.",
         "I put a fresh paper filter in and rinsed the brew head.",
