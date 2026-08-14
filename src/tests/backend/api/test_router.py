@@ -1491,9 +1491,9 @@ class TestSopAsk:
         """
         monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
         tool_query = (
-            "Please look up the store closing procedure for Store 223 in the Store "
-            "SOP Assistant on Copilot Studio. Return the step-by-step closing "
-            "process and quote the SOP document it comes from."
+            "Please look up the Store 223 closing procedure in the Store SOP "
+            "Assistant on Copilot Studio and provide the exact closing steps, "
+            "quoting the SOP document it comes from."
         )
 
         response = self._post(rt, tool_query)

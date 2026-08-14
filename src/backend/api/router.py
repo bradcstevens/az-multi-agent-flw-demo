@@ -856,6 +856,11 @@ _REHEARSED_SOP_QUERY_ALIASES = frozenset(
             "sop assistant on copilot studio. return the step-by-step closing "
             "process and quote the sop document it comes from."
         ),
+        (
+            "please look up the store 223 closing procedure in the store sop "
+            "assistant on copilot studio and provide the exact closing steps, "
+            "quoting the sop document it comes from."
+        ),
     }
 )
 
