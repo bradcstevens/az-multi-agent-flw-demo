@@ -1315,3 +1315,34 @@ def test_given_the_rehearsed_replies_when_read_then_the_browser_reads_that_field
     assert field in task
     assert field in REHEARSED_REPLY_TS.read_text(encoding="utf-8")
     assert field in TEAM_TS.read_text(encoding="utf-8")
+
+
+def test_given_the_troubleshooter_when_read_then_it_defers_before_it_interrogates(
+    store_pack,
+):
+    # The residual #54 failure, and it is an ordering bug in prose. With
+    # `require_all_agents` off the manager usually routes "How do I close the
+    # store?" to the shift-tasks specialist alone, but not always — run 7 of a
+    # ten-run rehearsal put the troubleshooter in the plan too, and it asked
+    # which piece of equipment was blocking closing. Nothing was broken.
+    #
+    # The instruction to hand procedures over was already there; it was the
+    # last line, after "ask what they have already tried", so the model reached
+    # the interrogation first. Order is the whole fix, so order is what is
+    # pinned: a later edit that appends the deferral back at the bottom is the
+    # exact regression, and it would leave every other assertion here green.
+    message = next(
+        agent["system_message"]
+        for agent in store_pack.team["agents"]
+        if agent["name"] == "TroubleshootingAgent"
+    )
+    defers_at = message.find("nothing is broken and this is not your question")
+    interrogates_at = message.find("ask the associate what they have already tried")
+
+    assert defers_at > 0, "the troubleshooter no longer hands procedures over"
+    assert interrogates_at > 0, "the 'what have you tried' rule went missing"
+    assert defers_at < interrogates_at, (
+        "the troubleshooter asks what was tried before it decides whether "
+        "anything is broken — that is how the rehearsed beat came back as "
+        "'which equipment is blocking closing?' (#54)"
+    )

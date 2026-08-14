@@ -99,6 +99,35 @@ that had already cost the Quick Task lane (#16) and the rehearsed replies (#26).
 reaches the repository but not Cosmos is a fix that passes its own tests and changes nothing, so
 there is a round-trip test from the authored pack through the real validator.
 
+## The residual: the troubleshooter interrogating a question with no fault in it
+
+Turning the flag off did most of the work — six consecutive green runs, where the same beat had been
+failing two in eight. Run 7 failed anyway, `clarified`, and the ledger has what it said:
+
+> Which equipment is blocking closing right now: coffee brewer, hot food case, fuel dispensers,
+> walk-in cooler, self-checkout, handhelds, or something else?
+
+Nothing was blocking closing. Nothing was broken at all. `require_all_agents: false` lets the manager
+plan one step; it does not stop it planning two, and on run 7 it put the Troubleshooting Agent in the
+plan beside the Shift Tasks Agent. The lookup still worked — Copilot Studio, Dataverse, SOP-102 — and
+the turn the presenter would have been standing in front of was the interrogation.
+
+The instruction to hand procedures over was already in the troubleshooter's system message. It was
+the **last line**, four paragraphs after *"Before you give steps, ask the associate what they have
+already tried… list two or three likely things so they can answer quickly"* — which is precisely the
+sentence that produced the equipment menu above. The model reached the interrogation first because
+the interrogation came first.
+
+So the fix is ordering, in prose: deciding whether anything is broken is now the agent's **first**
+instruction, with the tools and the runbook search explicitly off the table when nothing is, and the
+"what have you tried" rule is conditioned on a reported fault. `test_store_pack.py` pins the order
+rather than the words, because appending the deferral back at the bottom is the exact regression and
+would leave every other assertion in that file green.
+
+That this was findable at all is the ledger's doing. A single red Playwright run says the beat is
+flaky; the ledger says it is flaky at run 7 of 10, with the retrieval green and the clarification
+verbatim, which names one agent's system message.
+
 ## The flag reaches Cosmos, and is still not read
 
 Carrying `require_all_agents` through the validator was necessary and not sufficient. The store team
