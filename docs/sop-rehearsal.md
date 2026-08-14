@@ -162,6 +162,31 @@ its own job on a request that did not ask for it, and the user is answered by th
 other doing its work, and a reader of either one alone would conclude the team plans minimally when
 it does not.
 
+## The third residual: the loop goes looking for someone unused
+
+Minimal plans did not settle it either — six green, red at run 6, and the cost table again showed the
+Troubleshooting Agent billed on a question with nothing broken in it. Which was the useful part: the
+plan was not the thing still putting it there.
+
+Magentic does not run a plan and stop. Each round it asks the **progress ledger** who should speak
+next, and the inherited execution rule is:
+
+> When selecting next_speaker, **prefer a work agent that has NOT yet been invoked.**
+
+That rule is not scoped to the plan. So after the Shift Tasks Agent answered, the next round went
+looking for an agent that had not spoken, and found the troubleshooter. This is why the two earlier
+fixes each *reduced* the failure rate without removing it: they changed how the plan was built, and
+this clause operates after the plan is built.
+
+On a pipeline team the rule is exactly right — an agent that has not run yet is the one the plan is
+waiting on. Under `minimal_plan` it is replaced by its opposite: select only from the agents in the
+approved plan, and do not select an agent because it has not been invoked yet, because an agent that
+is not a plan step is not part of this request.
+
+Three clauses, one inherited assumption — *every agent on the team runs on every request* — expressed
+in three places that fail independently. The order they were found in is the order the ledger found
+them, which is the argument for the ledger.
+
 ## The flag reaches Cosmos, and is still not read
 
 Carrying `require_all_agents` through the validator was necessary and not sufficient. The store team

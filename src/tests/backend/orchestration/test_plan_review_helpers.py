@@ -253,6 +253,29 @@ class TestGetMagenticPromptKwargs:
         assert "one step per agent" in plan_prompt
         assert "ONLY the agents" not in plan_prompt
 
+    def test_given_minimal_plan_when_called_then_the_loop_stays_inside_the_plan(self):
+        # The clause that survived both earlier fixes (#54). Dropping MANDATORY
+        # AGENTS and rewriting PLAN RULES got the plan down to one step, and the
+        # troubleshooter was still billed on every sixth run — because the
+        # progress ledger's own rule, "prefer a work agent that has NOT yet been
+        # invoked", is not scoped to the plan. After the shift-tasks specialist
+        # answered, the next round went looking for someone unused.
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=True, minimal_plan=True)
+
+        progress = result["progress_ledger_prompt"]
+        assert "prefer a work agent that has NOT yet been invoked" not in progress
+        assert "only from the agents in the approved plan" in progress
+
+    def test_given_no_minimal_plan_when_called_then_uninvoked_agents_are_preferred(self):
+        # A pipeline team's whole point: an agent that has not run yet is the
+        # one the plan is waiting on.
+        result = get_magentic_prompt_kwargs(
+            has_user_responses=True, participant_names=["TriageAgent"])
+
+        progress = result["progress_ledger_prompt"]
+        assert "prefer a work agent that has NOT yet been invoked" in progress
+
     def test_given_no_user_responses_when_called_then_final_has_answer_rules(self):
         # Act
         result = get_magentic_prompt_kwargs(has_user_responses=False)

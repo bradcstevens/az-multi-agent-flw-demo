@@ -286,10 +286,24 @@ FINAL ANSWER RULES:
     # user_responses=false — must actually run before the request can be marked
     # satisfied, and the orchestrator re-selects any uninvoked plan-step agent
     # instead of silently finishing early.
+    #
+    # The next_speaker rule flips under `minimal_plan`, and it is the clause that
+    # outlived both of the other #54 fixes: "prefer a work agent that has NOT yet
+    # been invoked" is not scoped to the plan, so a one-step plan still sent the
+    # next round looking for someone unused. On a pipeline team that is the point;
+    # on a team of alternatives it is how the store's troubleshooting specialist
+    # kept being billed for a question with nothing broken in it.
     progress_append = """
 
 EXECUTION RULES:
-- When selecting next_speaker, prefer a work agent that has NOT yet been invoked.
+- When selecting next_speaker, """ + (
+        """select only from the agents in the approved plan. Do NOT select an
+  agent because it has not been invoked yet: an agent that is not a plan step is
+  not part of this request, and invoking it answers the user with a specialist
+  they did not ask for."""
+        if minimal_plan
+        else "prefer a work agent that has NOT yet been invoked."
+    ) + """
 - MagenticManager MUST NOT generate answers or fabricate content on behalf of
   work agents. It only routes tasks and compiles the final output.
 
