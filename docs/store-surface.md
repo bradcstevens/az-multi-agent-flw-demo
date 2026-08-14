@@ -123,6 +123,34 @@ class something actually renders. A list of class names written in the test woul
 forever; a rename in a component while the breakpoint keeps the old name is a layout that silently
 stops applying, and it would be discovered on a phone, on stage.
 
+### Every column stacks, not only the rail
+
+The rail is a direct child of the shell on the home surface and a **grandchild** on the plan
+surface, where `PlanPanelRight` wraps it. Moving the breakpoint fixed the rail and left its
+container behind: `.plan-panel-right` kept `width: 280px`, `height: 100vh` and a `border-left`
+below the breakpoint, so on the plan surface the stacked rail was a 280px band, a viewport tall,
+with a left border on the outside and a top border on the inside. A side column wearing the styling
+of a stacked one — the ticket's own complaint, one level up.
+
+The rule the surface runs on now: **a fixed pixel width plus a `border-left` is what a side column
+looks like**, and every rendered class declaring both must be released by the stacking breakpoint —
+to `width: 100%` and `border-left: none`, or to `display: none`. `CoralShellRow.test.tsx` parses
+every stylesheet under `src/styles` for that pair and requires it, so a column added beside the
+conversation cannot quietly decline to stack. The `height: 100vh` pin is checked the same way: the
+stacked shell scrolls as one, and a column still a viewport tall puts a screen of furniture between
+the answer and the panels that explain it.
+
+`PlanPanelRight.test.tsx` carries the inline-style guard for that panel, for the same reason
+`CoralShellRow.test.tsx` carries it for the shell.
+
+A released column is also `box-sizing: border-box`. Both the panel and the rail carry their own
+padding and the shell clips horizontally, so a content-box column at `width: 100%` is the viewport
+*plus* its padding wide and the right-hand end of it is cut off with no scrollbar to say so — in
+the token meter, that end is the estimated Copilot Credits column. Measured in a headless Chromium
+against these stylesheets and a synthetic shell DOM: stacked, the panel and the rail now render
+exactly the viewport width at 320, 390, 768 and 900px, where before the fix the panel rendered
+430px into a 390px viewport.
+
 ## Labelling what is simulated
 
 `SimulatedBadge` marks anything whose content was authored for the walkthrough rather than produced
@@ -162,3 +190,6 @@ Nothing here has rendered against a deployed backend. In particular:
   `selectStoreAssistant` has never resolved against a real Cosmos team.
 - **The stacking breakpoint has not been seen on a phone.** jsdom does not evaluate media queries,
   so the tests prove the stylesheet can reach the elements, not that the result is usable at 390px.
+  The widths in the section above were measured in a headless Chromium against the stylesheets and
+  a synthetic shell DOM, which is a stronger claim than jsdom and a weaker one than a phone: it
+  proves the boxes are the size they say, not that the panels read well on a handset.

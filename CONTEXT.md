@@ -494,6 +494,18 @@ The associate is holding a phone in a store. `CoralShellRow`'s layout had to mov
 style to get there: an inline `flex-direction: row` beats a media query, so the breakpoint would
 have been present, correct and completely inert.
 
+Declared **once**, in `storeSurface.css`, for every column the shell puts beside the conversation —
+including the rail's *container* on the plan surface. A fixed pixel width and a `border-left` are
+what a side column looks like, and below the breakpoint there is nothing to its left, so both are a
+lie. `.plan-panel-right` kept them after the rail itself had given them up, which stacked the rail
+as a 280px band with a left border wrapping a rail with a top border: the same disagreement one
+level up. `CoralShellRow.test` now reads every such rule **out of the stylesheets** and requires
+the breakpoint to release it — to `width: 100%`, `box-sizing: border-box` and `border-left: none`,
+or to `display: none` — so the next column added beside the conversation cannot quietly decline to
+stack. The border box is part of the release rather than a detail: these columns are padded and the
+shell clips horizontally, so a content-box column at `width: 100%` is wider than the viewport and
+loses its right-hand end silently, which for the **Token meter** is the credits column.
+
 **Grounding panel** — the R6 surface showing where an answer came from. Driven by **two signals
 combined**: a "source used" event emitted server-side over the existing WebSocket, which proves
 *which platform* answered, and citation data parsed from the SOP agent's response, which supplies

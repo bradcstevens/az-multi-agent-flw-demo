@@ -156,11 +156,14 @@ Two findings that only six tasks expose, both of the shape #25 found in
   deliberate layout. With six it pushes the input box off the screen.
 * `HomeInput.css` set `flex-wrap` and `flex` inside its breakpoints, on an
   element declared `display: grid`, where neither property does anything at
-  all — and it declared them at 768px and 480px, neither of which is the
-  **Phone breakpoint** the shell stacks at.
+  all — and it declared them at 768px and 480px, neither of which is a width
+  anything else on the surface reflows at.
 
-The grid is now `repeat(auto-fit, minmax(200px, 1fr))` and collapses to one
-column at 640px, the same breakpoint as everything else on the surface.
+The grid is now `repeat(auto-fit, minmax(200px, 1fr))`, so it reflows
+continuously with the width it is given rather than at a breakpoint, and it
+pins to one column at 640px. That is narrower than the **Stacking breakpoint**
+and deliberately so: by 640px the shell has already stacked, so the floor is a
+minimum on a fluid grid rather than a second orientation for the surface (#58).
 
 ## What is not covered here
 

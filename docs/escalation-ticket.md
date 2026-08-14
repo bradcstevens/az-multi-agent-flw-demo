@@ -106,7 +106,7 @@ used to decide *which* things carry it: label the invented things, and only thos
 
 ## Where it renders and when it clears
 
-The card renders in `PlanPanelRight`, which is the surface that survives the 640px **Phone
+The card renders in `PlanPanelRight`, which is the surface that survives the **Stacking
 breakpoint** — the associate's screen is a phone, and a ticket they cannot see is a ticket they did
 not confirm.
 

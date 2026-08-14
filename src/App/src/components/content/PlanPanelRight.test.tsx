@@ -135,10 +135,25 @@ describe('the plan surface on the deliberate lane', () => {
         expect(screen.getByTestId('agent-team-member-ShiftTasksAgent')).toBeInTheDocument();
         expect(screen.getByTestId('transparency-rail')).toBeInTheDocument();
     });
+
+    it('leaves its own orientation to the stacking breakpoint', () => {
+        // This panel is a shell column, and it contains the rail. An inline
+        // `width` or `border-left` here beats a media query, so the shared
+        // stacking breakpoint would be present, correct and inert for the whole
+        // plan surface — the failure #25 already found once on the shell
+        // itself, and the reason the rail stacked while its container did not.
+        renderPanel();
+
+        const panel = screen.getByTestId('plan-panel-right');
+        expect(panel).toHaveClass('plan-panel-right');
+        expect(panel.style.width).toBe('');
+        expect(panel.style.height).toBe('');
+        expect(panel.style.borderLeft).toBe('');
+    });
 });
 
 describe('the Simulated ticket on the plan surface (issue #22)', () => {
-    // The rail is the one surface that survives the 640px breakpoint — #25
+    // The rail is the one surface that survives the stacking breakpoint — #25
     // drops the left panel and keeps this one — and the associate's screen is
     // a phone. A ticket rendered only where a phone cannot reach it is a
     // ticket the person holding the broken equipment never sees.

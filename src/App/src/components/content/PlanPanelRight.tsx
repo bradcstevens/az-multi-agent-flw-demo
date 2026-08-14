@@ -128,12 +128,19 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
 
   // Main render
   return (
-    <div className="plan-panel-right">
+    <div className="plan-panel-right" data-testid="plan-panel-right">
       {/*
         The ticket the approval raised, above the plan it was raised from.
         This panel rather than the reply stream, and deliberately: it is the
-        one surface that survives the 640px breakpoint (#25 drops the left
+        one surface that survives the stacking breakpoint (#25 drops the left
         panel and keeps the rail), and the associate's screen is a phone.
+
+        The panel's own orientation is the shell's to decide (#58): a column
+        beside the conversation above the breakpoint, a band beneath it below,
+        declared in `storeSurface.css` in the one place that declares it for
+        the rail this panel contains. Nothing here may pin a width, a height or
+        a side border inline — an inline declaration beats a media query, and
+        the breakpoint would be inert for the whole plan surface.
       */}
       {raisedTicket && <SimulatedTicketCard ticket={raisedTicket} />}
 

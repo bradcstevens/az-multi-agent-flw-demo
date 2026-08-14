@@ -42,6 +42,14 @@
  * scrolls as one, and the task-history panel is dropped rather than squeezed —
  * 280px of it beside a 390px viewport leaves the conversation unusable, which
  * is the one thing that must still work here.
+ *
+ * Every column the shell puts beside the conversation is released here, and
+ * only here. A fixed width and a left border are what a side column looks like;
+ * below this breakpoint there is nothing to its left, so both are a lie. That
+ * includes the *container* of the rail on the plan surface as well as the rail
+ * itself — the rail is a child of `.plan-panel-right` there, and a 280px band
+ * with a left border wrapping a rail with a top border is the same disagreement
+ * this breakpoint exists to end.
  */
 @media (max-width: 900px) {
     .coral-shell-row {
@@ -53,10 +61,28 @@
         display: none;
     }
 
-    .coral-shell-row .transparency-rail {
+    .coral-shell-row .transparency-rail,
+    .coral-shell-row .plan-panel-right {
         width: 100%;
         min-width: 0;
+        /*
+         * Both carry their own padding, and the shell clips horizontally. A
+         * content-box column at `width: 100%` is the viewport plus its padding
+         * wide, so the last of it — in the token meter, the estimated Copilot
+         * Credits — is cut off the right-hand edge with no scrollbar to say so.
+         * (What either declares *above* the breakpoint is #60's.)
+         */
+        box-sizing: border-box;
         border-left: none;
         border-top: 1px solid var(--colorNeutralStroke2);
+    }
+
+    /*
+     * The stacked shell scrolls as one, so the plan panel is as tall as what it
+     * holds. Pinned to `100vh` it would put a viewport of furniture between the
+     * answer and the panels that explain it.
+     */
+    .coral-shell-row .plan-panel-right {
+        height: auto;
     }
 }

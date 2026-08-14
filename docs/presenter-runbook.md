@@ -35,7 +35,7 @@ Read the two boxes below before anything else. They are the only two things you 
 | | |
 | --- | --- |
 | **What you need** | The URL you were sent, and a laptop. Chrome or Edge. Nothing to install, nothing to sign into. |
-| **Screen** | Full screen, and wide enough for the panels on the right to be visible — they are the evidence. Below 640px wide they stack underneath, which is fine to *show* and awkward to *drive*. |
+| **Screen** | Full screen, and wide enough for the panels on the right to be visible — they are the evidence. Below 900px wide they stack underneath, which is fine to *show* and awkward to *drive*. |
 | **Rehearse** | Run the seven taps once end to end before the meeting. It takes about ten minutes and it is the only way to know today's deployment is healthy. |
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
 | **Between beats** | Beats 1 to 4 open a task view — click **New task** in the left panel to get back to the six cards. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
