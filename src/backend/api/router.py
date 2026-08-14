@@ -882,6 +882,20 @@ async def sop_ask(request: Request):
     if not question:
         raise HTTPException(status_code=400, detail="question is required")
     retrieval_query = _retrieval_query(question)
+    # What the orchestrator actually wrote (#54). The tool call is the only
+    # place the rephrasing is visible, and until it was recorded, a missed
+    # rehearsed hit could be blamed on the orchestrator, the tool or the
+    # Dataverse index with equal confidence and no evidence. The Demo
+    # validator keeps this per run in `e2e/artifacts/sop-evidence.jsonl`;
+    # this line is how a presenter's own rehearsal leaves the same trace in
+    # the container log, where `az containerapp logs` can read it back.
+    logger.info(
+        "sop/ask: the orchestrator asked %r; retrieving against %r%s",
+        question,
+        retrieval_query,
+        "" if retrieval_query == question
+        else " — the rehearsed turn's corpus wording",
+    )
 
     try:
         answer = await sop_client().ask(retrieval_query)

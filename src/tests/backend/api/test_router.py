@@ -7,6 +7,7 @@ interpreter state for other test files that import the same real modules.
 """
 
 import contextlib
+import logging
 import os
 import sys
 from pathlib import Path
@@ -1535,6 +1536,54 @@ class TestSopAsk:
         rt.sop.ask.assert_awaited_once_with("How do I close the store?")
         assert response.json()["tool_query"] == tool_query
         assert response.json()["retrieval_query"] == "How do I close the store?"
+        rehearsal["forget_rehearsals"]()
+        turn["forget_turns"]()
+
+    def test_the_rephrasing_is_recorded_where_an_operator_can_read_it(
+        self, rt, monkeypatch, caplog
+    ):
+        """#54's first acceptance criterion, in the one place that sees it.
+
+        The orchestrator's rephrasing is invisible everywhere else: the plan
+        shows the agent's intent, the Grounding panel shows the answer, and
+        neither shows the string the tool was actually called with. Recording
+        it here is what turned "the SOP lookup sometimes misses" from three
+        equally plausible stories into one attributable layer.
+        """
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        tool_query = (
+            "Please look up the Store 223 closing procedure in the Store SOP "
+            "Assistant on Copilot Studio."
+        )
+
+        with caplog.at_level(logging.INFO, logger=router_mod.logger.name):
+            self._post(rt, tool_query)
+
+        logged = "\n".join(record.getMessage() for record in caplog.records)
+        assert tool_query in logged
+
+    def test_a_canonicalized_rehearsal_logs_both_strings_not_just_one(
+        self, rt, monkeypatch, caplog
+    ):
+        # The interesting row is the one where they differ: it says the
+        # rephrasing happened *and* that it was caught. A log of only the
+        # retrieved wording would read identically on a turn that was never
+        # rephrased at all.
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        tool_query = "the closing checklist for store 223, please"
+        turn = router_mod.sole_turn.__globals__
+        rehearsal = router_mod.note_rehearsal.__globals__
+        turn["forget_turns"]()
+        rehearsal["forget_rehearsals"]()
+        turn["note_turn"]("user-1", "session-1")
+        router_mod.note_rehearsal("session-1")
+
+        with caplog.at_level(logging.INFO, logger=router_mod.logger.name):
+            self._post(rt, tool_query)
+
+        logged = "\n".join(record.getMessage() for record in caplog.records)
+        assert tool_query in logged
+        assert "How do I close the store?" in logged
         rehearsal["forget_rehearsals"]()
         turn["forget_turns"]()
 

@@ -1,0 +1,310 @@
+"""The rehearsal that proves the centrepiece beat is not intermittent (#54).
+
+One green Demo validator run is what the intermittent state already produces
+three times in four, so the beat is proved by **ten consecutive** runs or not at
+all. The runs need a deployment; the arithmetic over what they observed does
+not, and that is the seam under test here.
+
+Two things are asserted, and both of them are the issue's own acceptance
+criteria made executable rather than written down:
+
+- **The rephrasing is measured.** Every run appends what the orchestrator
+  actually handed ``search_store_procedures`` to a ledger, so the distinct
+  phrasings are read off the evidence instead of being guessed at.
+- **A failure is attributed to a layer.** Routing, rephrasing and the agent's
+  Dataverse index each have a different fix, and guessing wrong leaves the beat
+  intermittent. `attribution` decides which one a red run implicates from what
+  that run saw, and it is a function precisely so it can be argued with.
+"""
+
+import json
+
+from sop_rehearsal import (GROUNDED, HONEST_MISS, NO_TOOL_CALL, UNKNOWN,
+                           WANTED_RUNS, attribution, format_report, main,
+                           read_evidence, rephrasings, summarise)
+
+CORPUS_QUESTION = "How do I close the store?"
+SOP_102 = "SOP-102 Store Closing Procedure.docx"
+
+
+def row(**overrides):
+    """One validator run's evidence, as the spec appends it."""
+    base = {
+        "at": "2026-08-14T07:00:00.000Z",
+        "target": "deployed",
+        "baseURL": "https://app.example",
+        "commit": "0eb208cb",
+        "passed": True,
+        "outcome": GROUNDED,
+        "toolQuery": CORPUS_QUESTION,
+        "retrievalQuery": CORPUS_QUESTION,
+        "citations": [SOP_102],
+    }
+    base.update(overrides)
+    return base
+
+
+def ledger(tmp_path, rows):
+    path = tmp_path / "sop-evidence.jsonl"
+    path.write_text(
+        "".join(json.dumps(entry) + "\n" for entry in rows), encoding="utf-8"
+    )
+    return path
+
+
+# ---------------------------------------------------------------------------
+# Reading the evidence
+# ---------------------------------------------------------------------------
+
+def test_given_no_ledger_when_read_then_no_rows():
+    # A rehearsal whose first run never reached the beat leaves nothing behind.
+    # That is zero evidence, which must read as zero rather than as an error a
+    # caller has to distinguish from a bad run.
+    assert read_evidence("/nowhere/at/all.jsonl") == []
+
+
+def test_given_a_ledger_when_read_then_every_row_comes_back(tmp_path):
+    path = ledger(tmp_path, [row(), row(passed=False, outcome=HONEST_MISS)])
+
+    rows = read_evidence(path)
+
+    assert [entry["outcome"] for entry in rows] == [GROUNDED, HONEST_MISS]
+
+
+def test_given_a_half_written_line_when_read_then_the_rest_survives(tmp_path):
+    # The ledger is appended to by a browser suite that can be killed mid-run.
+    # A torn last line must not cost the nine runs in front of it.
+    path = ledger(tmp_path, [row(), row()])
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write('{"at": "2026-08-14T07:0')
+
+    assert len(read_evidence(path)) == 2
+
+
+def test_given_an_offset_when_read_then_earlier_rows_are_skipped(tmp_path):
+    # A rehearsal reports on its own runs. The ledger accumulates across every
+    # validator run ever made against this checkout, and that is the point of
+    # it — but yesterday's reds are not this rehearsal's.
+    path = ledger(tmp_path, [row(passed=False), row(), row()])
+
+    assert len(read_evidence(path, skip=1)) == 2
+
+
+# ---------------------------------------------------------------------------
+# The measurement
+# ---------------------------------------------------------------------------
+
+def test_given_runs_when_rephrasings_then_distinct_tool_queries_in_order():
+    # The orchestrator's wording is model prose and is never asserted on. It is
+    # *recorded*, because "some rephrasings miss" is a claim about a
+    # distribution and this is the only place the distribution exists.
+    rows = [
+        row(toolQuery=CORPUS_QUESTION),
+        row(toolQuery="What is the store closing procedure?"),
+        row(toolQuery=CORPUS_QUESTION),
+    ]
+
+    assert rephrasings(rows) == [
+        CORPUS_QUESTION,
+        "What is the store closing procedure?",
+    ]
+
+
+def test_given_a_run_with_no_tool_call_when_rephrasings_then_it_is_not_counted():
+    # A turn the orchestrator never called the tool on contributes no phrasing.
+    # Counting its absent query as a phrasing would report the routing failure
+    # as a rephrasing, which is the wrong layer.
+    rows = [row(), row(outcome=NO_TOOL_CALL, toolQuery=None, passed=False)]
+
+    assert rephrasings(rows) == [CORPUS_QUESTION]
+
+
+# ---------------------------------------------------------------------------
+# The attribution
+# ---------------------------------------------------------------------------
+
+def test_given_a_green_run_when_attributed_then_nothing_is_blamed():
+    assert attribution(row()) is None
+
+
+def test_given_no_tool_call_when_attributed_then_the_orchestrators_routing():
+    # No Grounding panel at all: the Group Chat Manager answered from context,
+    # or another specialist took the turn. Nothing reached Copilot Studio, so
+    # neither the tool's instructions nor the index can be at fault.
+    verdict = attribution(row(passed=False, outcome=NO_TOOL_CALL,
+                              toolQuery=None, retrievalQuery=None,
+                              citations=[]))
+
+    assert verdict is not None
+    assert "routing" in verdict.layer
+    assert "never called" in verdict.detail
+
+
+def test_given_a_miss_on_the_orchestrators_own_wording_then_the_rephrasing():
+    # The hop completed and the corpus was searched for something the corpus
+    # was never rehearsed against. The fix is at the query, not at the index.
+    verdict = attribution(row(
+        passed=False,
+        outcome=HONEST_MISS,
+        toolQuery="Please look up Store 223's end-of-night lockup steps.",
+        retrievalQuery="Please look up Store 223's end-of-night lockup steps.",
+        citations=[],
+    ))
+
+    assert verdict is not None
+    assert "rephrasing" in verdict.layer
+    assert "was not normalised" in verdict.detail
+
+
+def test_given_a_miss_on_the_corpus_wording_then_the_dataverse_index():
+    # The one attribution that means the demonstration's content is wrong
+    # rather than its plumbing: the corpus's own words were retrieved against
+    # and Dataverse still found nothing.
+    verdict = attribution(row(
+        passed=False,
+        outcome=HONEST_MISS,
+        toolQuery="What are the steps for closing the store tonight?",
+        retrievalQuery=CORPUS_QUESTION,
+        citations=[],
+    ))
+
+    assert verdict is not None
+    assert "index" in verdict.layer
+    assert CORPUS_QUESTION in verdict.detail
+
+
+def test_given_a_grounded_answer_that_failed_then_the_layer_is_not_guessed():
+    # Grounded, cited, and the beat still red — a selector, a timeout or an
+    # assertion this file knows nothing about. Naming a layer here would be the
+    # guess the issue exists to forbid.
+    verdict = attribution(row(passed=False, outcome=GROUNDED))
+
+    assert verdict is not None
+    assert verdict.layer == UNKNOWN
+
+
+# ---------------------------------------------------------------------------
+# The verdict
+# ---------------------------------------------------------------------------
+
+def test_given_ten_green_runs_when_summarised_then_the_beat_is_proved():
+    summary = summarise([row() for _ in range(WANTED_RUNS)], WANTED_RUNS)
+
+    assert summary.ok
+    assert summary.consecutive == WANTED_RUNS
+
+
+def test_given_nine_green_runs_when_summarised_then_it_is_not_proved():
+    # The whole shape of the criterion. Nine is what the intermittent state
+    # produces often enough to be believed, which is why the number is ten and
+    # why "mostly green" is not a verdict this reports.
+    summary = summarise([row() for _ in range(WANTED_RUNS - 1)], WANTED_RUNS)
+
+    assert not summary.ok
+    assert summary.consecutive == WANTED_RUNS - 1
+
+
+def test_given_a_red_run_when_summarised_then_the_streak_starts_after_it():
+    # Consecutive means consecutive. A rehearsal that went red on run four and
+    # green afterwards has not proved anything about the four in front of it.
+    rows = [row(), row(), row(), row(passed=False, outcome=HONEST_MISS)] + [
+        row() for _ in range(3)
+    ]
+
+    summary = summarise(rows, WANTED_RUNS)
+
+    assert not summary.ok
+    assert summary.consecutive == 3
+    assert summary.first_red is not None
+
+
+def test_given_no_runs_when_summarised_then_it_is_not_proved():
+    # A rehearsal nobody ran proves nothing, and must not read as ten greens
+    # by an empty-streak accident.
+    summary = summarise([], WANTED_RUNS)
+
+    assert not summary.ok
+    assert summary.consecutive == 0
+
+
+def test_given_a_red_run_when_reported_then_the_layer_is_named(tmp_path):
+    rows = [row(), row(passed=False, outcome=NO_TOOL_CALL, toolQuery=None)]
+
+    report = format_report(summarise(rows, WANTED_RUNS))
+
+    assert "routing" in report
+    assert "1 of 10" in report or "1/10" in report
+
+
+def test_given_a_proof_when_reported_then_the_phrasings_are_shown():
+    # The report is the evidence a reader is asked to trust, so the queries the
+    # orchestrator actually used are in it — including on a run that passed,
+    # where they are the record of what the fix had to survive.
+    rows = [row(toolQuery=f"phrasing {index}") for index in range(WANTED_RUNS)]
+
+    report = format_report(summarise(rows, WANTED_RUNS))
+
+    assert "phrasing 0" in report
+    assert "phrasing 9" in report
+
+
+# ---------------------------------------------------------------------------
+# The runner
+# ---------------------------------------------------------------------------
+
+def test_given_every_run_green_when_main_then_it_exits_zero(tmp_path):
+    path = tmp_path / "sop-evidence.jsonl"
+    written = []
+
+    def fake_run(index):
+        written.append(index)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row()) + "\n")
+        return True
+
+    code = main(["--runs", "3", "--ledger", str(path)], run=fake_run)
+
+    assert code == 0
+    assert written == [1, 2, 3]
+
+
+def test_given_a_red_run_when_main_then_it_stops_there(tmp_path):
+    # A rehearsal is over the moment it goes red: the streak is broken, and
+    # nine more live conversations spend Copilot Credits proving nothing.
+    path = tmp_path / "sop-evidence.jsonl"
+    written = []
+
+    def fake_run(index):
+        written.append(index)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(row(passed=index == 2 and False or True,
+                               outcome=HONEST_MISS if index == 2 else GROUNDED))
+                + "\n"
+            )
+        return index != 2
+
+    code = main(["--runs", "5", "--ledger", str(path)], run=fake_run)
+
+    assert code == 1
+    assert written == [1, 2]
+
+
+def test_given_an_earlier_rehearsal_when_main_then_its_rows_are_not_counted(
+        tmp_path):
+    # The ledger is append-only across every run ever made from this checkout.
+    # A rehearsal that counted the rows already in it would report ten greens
+    # after running once.
+    path = tmp_path / "sop-evidence.jsonl"
+    path.write_text(
+        "".join(json.dumps(row()) + "\n" for _ in range(WANTED_RUNS)),
+        encoding="utf-8",
+    )
+
+    def fake_run(index):
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row(passed=False,
+                                        outcome=NO_TOOL_CALL)) + "\n")
+        return False
+
+    assert main(["--runs", "10", "--ledger", str(path)], run=fake_run) == 1

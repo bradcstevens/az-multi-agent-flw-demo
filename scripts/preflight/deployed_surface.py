@@ -41,7 +41,6 @@ TOKEN_ENDPOINT_SETTING = "COPILOT_STUDIO_DIRECT_LINE_TOKEN_ENDPOINT"
 # asked for is the authored one, read from the pack — never a copy kept
 # here, which would ask for a team the repository has since renumbered.
 ANONYMOUS_PRINCIPAL = "00000000-0000-0000-0000-000000000000"
-PROCEDURE_QUESTION = "How do I close the store?"
 
 # The two facts the Grounding panel is a claim about. They live in
 # `src/backend/sop/provenance.py`; repeated here because this check runs
@@ -206,19 +205,33 @@ def _direct_line_endpoint_check(endpoint):
     )
 
 
-def grounded_answer_check(reply, expected):
+def direct_sop_answer_check(reply, expected):
     """Return the `Check` for one real procedure question. Pure.
 
-    The centrepiece beat's whole claim is that the answer arrived from
-    Dataverse *through Copilot Studio*, so what is graded is the provenance and
-    the citations, never the prose — a fluent answer is precisely what an
-    ungrounded fallback produces. An unasked question is reported as unproven
-    and fails, because a run that gathered no evidence must not report the
-    cross-platform hop as working.
+    **Named for what it asks, because it asks the easier question** (#54). This
+    probe puts the corpus's *own wording* to `/api/v4/sop/ask` directly, with no
+    orchestrator in front of it. The presenter's tap does not: the Foundry
+    orchestrator writes the tool call, and it hands
+    ``search_store_procedures`` whatever it rephrased the question into. Two
+    runs in eight came back as the honest miss for that reason while this check
+    was green on every attempt over the same afternoon — the check and the
+    browser were asking different questions of the same agent, and only the
+    browser was asking the presenter's.
+
+    A name like `grounded-answer` cannot say that. It reads as *the grounded
+    answer works*, which is the claim only the **Demo validator** can make, so
+    the name says `direct` and every detail below says it again. What is proved
+    here is the **agent, its index and the hop** — everything except the
+    routing.
+
+    What is graded is the provenance and the citations, never the prose: a
+    fluent answer is precisely what an ungrounded fallback produces. An unasked
+    question is reported as unproven and fails, because a run that gathered no
+    evidence must not report the cross-platform hop as working.
     """
     if not reply:
         return Check(
-            "grounded-answer",
+            "direct-sop-answer",
             False,
             "no procedure question was asked — an unprobed SOP agent is not a "
             "reachable one (drop --no-probe)",
@@ -247,12 +260,16 @@ def grounded_answer_check(reply, expected):
                 "author — the agent that answered is grounded in another corpus"
             )
     if problems:
-        return Check("grounded-answer", False, "; ".join(problems))
+        return Check("direct-sop-answer", False, "; ".join(problems))
     return Check(
-        "grounded-answer",
+        "direct-sop-answer",
         True,
-        f"{reply.get('question')!r} was answered from {SOP_SOURCE} through "
-        f"{SOP_PLATFORM}, citing {', '.join(reply['citations'])}",
+        f"{reply.get('question')!r} — the corpus's own wording, asked "
+        f"directly with no orchestrator in front of it — was answered from "
+        f"{SOP_SOURCE} through {SOP_PLATFORM}, citing "
+        f"{', '.join(reply['citations'])}. This is the easier question: the "
+        "orchestrator rephrases it, and the rehearsed beat is proved by "
+        "scripts/sop-rehearsal.sh, not here (#54)",
     )
 
 
@@ -263,18 +280,26 @@ def format_report(verdict, expected):
     shippable" is a claim about a real question having been answered from
     Dataverse, so a run that only read the control plane reports it as unproven
     rather than the surface as ready.
+
+    And even a fully green run does not claim the walkthrough works. Every
+    check here asks the deployment a question the presenter never asks; the one
+    that comes closest asks it in the corpus's own words, past the orchestrator
+    that rephrases it. That gap is #54, and the consequence line names the loop
+    that closes it rather than leaving a reader to infer it from a row of
+    PASSes.
     """
     checks = list(verdict.checks)
-    if not any(check.name == "grounded-answer" for check in checks):
-        checks.append(grounded_answer_check(None, expected))
+    if not any(check.name == "direct-sop-answer" for check in checks):
+        checks.append(direct_sop_answer_check(None, expected))
     lines = [
         f"  {'PASS' if c.ok else 'FAIL'}  {c.name}: {c.detail}" for c in checks
     ]
     ready = all(check.ok for check in checks)
     lines.append(
         "  ----  the walkthrough (#46, #47): "
-        + ("the direct SOP probe passed; run the Demo validator to prove "
-           "orchestrator routing" if ready
+        + ("the direct SOP probe passed — it asked the corpus's own wording "
+           "and the orchestrator does not, so this is not the beat. Run "
+           "scripts/sop-rehearsal.sh to prove the routing (#54)" if ready
            else "blocked on the failures above")
     )
     return "\n".join(lines)
@@ -294,6 +319,36 @@ STORE_PACK = os.path.join(
     REPO_ROOT, "content_packs", "store_assistant", "agent_teams",
     "store_assistant.json")
 SOP_CORPUS = os.path.join(REPO_ROOT, "content", "sop", "docx")
+SOP_MANIFEST = os.path.join(REPO_ROOT, "content", "sop", "corpus.toml")
+
+
+def rehearsed_question(manifest=SOP_MANIFEST):
+    """The question the walkthrough opens with, from the corpus that answers it.
+
+    Never pinned here. `[rehearsed_hit]` names the question *and* the SOP-NNN
+    that answers it precisely so that renaming the document away goes red
+    instead of quietly becoming an honest miss, and a check carrying its own
+    copy of the question asks one the corpus no longer guarantees.
+
+    Read **section-scoped**, exactly as `e2e/authored.ts` reads it and for the
+    same reason: `question` is a key under both `[rehearsed_hit]` and
+    `[honest_miss]`, so a whole-file match would probe the deployment with the
+    question the corpus deliberately cannot answer and report a working agent
+    as broken.
+    """
+    with open(manifest, encoding="utf-8") as handle:
+        source = handle.read()
+    start = source.find("[rehearsed_hit]")
+    if start < 0:
+        raise RuntimeError(f"{manifest} has no [rehearsed_hit] section")
+    section = source[start + len("[rehearsed_hit]"):]
+    end = re.search(r"^\[", section, re.MULTILINE)
+    if end:
+        section = section[: end.start()]
+    match = re.search(r'^question\s*=\s*"([^"]*)"', section, re.MULTILINE)
+    if not match:
+        raise RuntimeError(f"{manifest} names no rehearsed question")
+    return match.group(1)
 
 
 def authored_expectation(surface=SURFACE_MODULE, pack=STORE_PACK,
@@ -429,8 +484,10 @@ def main(argv=None, read=None, ask=None):
     parser.add_argument("--frontend-app", default=FRONTEND_CONTAINER_APP)
     parser.add_argument(
         "--question",
-        default=PROCEDURE_QUESTION,
-        help="the procedure question to ask the deployed SOP tool",
+        default=None,
+        help="the procedure question to ask the deployed SOP tool. Defaults "
+             "to the corpus manifest's own [rehearsed_hit] question — the "
+             "easier question, which the orchestrator does not ask (#54).",
     )
     parser.add_argument(
         "--no-probe",
@@ -449,12 +506,13 @@ def main(argv=None, read=None, ask=None):
     )
     verdict = evaluate(observed, expected)
     if args.no_probe:
-        verdict.checks.append(grounded_answer_check(None, expected))
+        verdict.checks.append(direct_sop_answer_check(None, expected))
     else:
         asker = ask or ask_procedure_question
         verdict.checks.append(
-            grounded_answer_check(
-                asker(observed.get("backendUrl"), args.question), expected))
+            direct_sop_answer_check(
+                asker(observed.get("backendUrl"),
+                      args.question or rehearsed_question()), expected))
 
     print(f"Deployed surface: {args.resource_group}")
     print(format_report(verdict, expected))

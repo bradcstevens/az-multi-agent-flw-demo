@@ -19,9 +19,10 @@ import json
 from preflight.deployed_surface import (
     Expected,
     authored_expectation,
+    direct_sop_answer_check,
     evaluate,
-    grounded_answer_check,
     main,
+    rehearsed_question,
 )
 
 EXPECTED = Expected(
@@ -208,26 +209,46 @@ def answer(**overrides):
 
 
 class TestGroundedAnswer:
-    """One real procedure question, all the way to Copilot Studio and back."""
+    """One real procedure question, all the way to Copilot Studio and back.
+
+    Named `direct-sop-answer` rather than `grounded-answer` because it asks the
+    **easier** question (#54): the corpus's own wording, straight at
+    `/api/v4/sop/ask`, with no orchestrator in front of it. The presenter's tap
+    goes through one that rephrases. This check was green on every attempt over
+    the afternoon the browser saw the beat fail twice in eight, and a name that
+    reads as *the grounded answer works* is what let both be true at once.
+    """
 
     def test_a_cited_answer_from_dataverse_passes(self):
-        check = grounded_answer_check(answer(), EXPECTED)
+        check = direct_sop_answer_check(answer(), EXPECTED)
 
         assert check.ok
         assert "SOP-102 Store Closing Procedure.docx" in check.detail
+
+    def test_a_pass_says_out_loud_that_it_asked_the_easier_question(self):
+        # The acceptance criterion, as a test. This check must stop being able
+        # to pass while the browser fails *silently* — so a green one names the
+        # gap between what it asked and what the presenter asks, and names the
+        # loop that closes it.
+        check = direct_sop_answer_check(answer(), EXPECTED)
+
+        assert check.ok
+        assert "directly" in check.detail
+        assert "orchestrator" in check.detail
+        assert "sop-rehearsal.sh" in check.detail
 
     def test_an_unasked_question_is_unproven_rather_than_passed(self):
         # The centrepiece claim is that the answer came from Dataverse through
         # Copilot Studio. A run that asked nothing has no evidence of that, and
         # reporting it as a pass is how the deployment shipped unreachable in
         # the first place.
-        check = grounded_answer_check(None, EXPECTED)
+        check = direct_sop_answer_check(None, EXPECTED)
 
         assert not check.ok
         assert "not" in check.detail
 
     def test_the_fixed_failure_message_fails(self):
-        check = grounded_answer_check(answer(failed=True, citations=[]), EXPECTED)
+        check = direct_sop_answer_check(answer(failed=True, citations=[]), EXPECTED)
 
         assert not check.ok
 
@@ -235,7 +256,7 @@ class TestGroundedAnswer:
         # There is no fallback to model knowledge by design, but an answer with
         # no citations is exactly what a fallback would look like, and the
         # Grounding panel would have nothing to render.
-        check = grounded_answer_check(answer(citations=[]), EXPECTED)
+        check = direct_sop_answer_check(answer(citations=[]), EXPECTED)
 
         assert not check.ok
 
@@ -245,7 +266,7 @@ class TestGroundedAnswer:
         # in the same tenant would answer, cite something, and pass. The
         # citation naming a document out of `content/sop/` is what ties the
         # answer back to the corpus this repository uploaded.
-        check = grounded_answer_check(
+        check = direct_sop_answer_check(
             answer(citations=["HR-201 Benefits Enrolment.docx"]), EXPECTED)
 
         assert not check.ok
@@ -255,7 +276,7 @@ class TestGroundedAnswer:
         # Platform and source are the two facts the Grounding panel is a claim
         # about. An answer the orchestrator produced itself is a working demo
         # of the wrong thing.
-        check = grounded_answer_check(answer(platform="Azure AI Foundry"), EXPECTED)
+        check = direct_sop_answer_check(answer(platform="Azure AI Foundry"), EXPECTED)
 
         assert not check.ok
         assert "Copilot Studio" in check.detail
@@ -264,7 +285,7 @@ class TestGroundedAnswer:
 class TestTheReport:
     """What the operator is told, and what the exit code says."""
 
-    def test_a_healthy_deployment_reports_the_walkthrough_as_shippable(self, capsys):
+    def test_a_healthy_deployment_passes_every_check(self, capsys):
         exit_code = main(
             argv=[],
             read=lambda *_: observed(),
@@ -277,9 +298,38 @@ class TestTheReport:
             "store-surface",
             "quick-tasks",
             "direct-line-endpoint",
-            "grounded-answer",
+            "direct-sop-answer",
         ):
             assert f"PASS  {name}" in out
+
+    def test_a_green_run_does_not_claim_the_walkthrough_works(self, capsys):
+        # Every check here asks the deployment a question the presenter never
+        # asks, and the closest one asks it past the orchestrator that
+        # rephrases it. A row of PASSes that ended with "shippable" is how the
+        # centrepiece beat came to be believed while it failed one run in four.
+        main(
+            argv=[],
+            read=lambda *_: observed(),
+            ask=lambda backend, question: answer(question=question),
+        )
+        out = capsys.readouterr().out
+
+        assert "sop-rehearsal.sh" in out
+        assert "#54" in out
+
+    def test_the_probe_asks_the_corpus_its_own_rehearsed_question(self, capsys):
+        # Never a copy pinned in this module. `[rehearsed_hit]` names the
+        # question the walkthrough opens with, and a probe carrying its own
+        # copy asks one the corpus no longer guarantees an answer to.
+        asked = []
+        main(
+            argv=[],
+            read=lambda *_: observed(),
+            ask=lambda backend, question: (
+                asked.append(question) or answer(question=question)),
+        )
+
+        assert asked == [rehearsed_question()]
 
     def test_no_probe_reports_the_grounded_answer_as_unproven_and_exits_nonzero(
         self, capsys
@@ -290,7 +340,7 @@ class TestTheReport:
         out = capsys.readouterr().out
 
         assert exit_code == 1
-        assert "FAIL  grounded-answer" in out
+        assert "FAIL  direct-sop-answer" in out
 
     def test_a_pre_rebrand_deployment_exits_nonzero(self, capsys):
         exit_code = main(
@@ -331,3 +381,43 @@ class TestWhatCountsAsAuthored:
 
         assert authored.assistant == "Renamed Assistant"
         assert authored.quick_tasks == (("task-999-only", "deliberate"),)
+
+
+class TestTheRehearsedQuestion:
+    """Which question the probe asks, read out of the corpus that answers it."""
+
+    def test_the_repositorys_own_manifest_names_the_opening_question(self):
+        assert rehearsed_question() == "How do I close the store?"
+
+    def test_the_honest_misss_question_is_never_the_one_asked(self, tmp_path):
+        # The sharpest way to get this wrong, and the reason the read is
+        # section-scoped rather than a search of the whole file: `question` is
+        # a key under **both** sections, and a last-key-wins parse probes the
+        # deployment with the question the corpus deliberately cannot answer —
+        # reporting a working SOP agent as a broken one.
+        manifest = tmp_path / "corpus.toml"
+        manifest.write_text(
+            '[rehearsed_hit]\n'
+            'question = "How do I close the store?"\n'
+            'doc_id = "SOP-102"\n'
+            '\n'
+            '[honest_miss]\n'
+            'question = "How do I restart the car wash?"\n',
+            encoding="utf-8",
+        )
+
+        assert rehearsed_question(str(manifest)) == "How do I close the store?"
+
+    def test_a_manifest_without_the_section_is_an_error_rather_than_a_guess(
+        self, tmp_path
+    ):
+        manifest = tmp_path / "corpus.toml"
+        manifest.write_text('[honest_miss]\nquestion = "anything"\n',
+                            encoding="utf-8")
+
+        try:
+            rehearsed_question(str(manifest))
+        except RuntimeError as error:
+            assert "rehearsed_hit" in str(error)
+        else:
+            raise AssertionError("a corpus with no rehearsed hit was accepted")

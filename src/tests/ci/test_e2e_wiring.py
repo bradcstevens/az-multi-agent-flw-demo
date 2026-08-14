@@ -23,6 +23,7 @@ What they defend is narrow and specific:
 """
 
 from pathlib import Path
+import os
 import re
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -246,3 +247,98 @@ def test_the_beat_fails_when_the_evidence_is_absent():
             f"the beat never requires {name} to be present, so a deployment "
             "that renders no evidence attribute passes on a null"
         )
+
+
+# ---------------------------------------------------------------------------
+# The evidence ledger and the ten-run proof (#54).
+# ---------------------------------------------------------------------------
+
+
+def test_the_ledger_is_written_on_every_run_not_only_on_failures():
+    """A red-only ledger cannot measure an intermittent beat.
+
+    Two runs in eight is a property of the *sequence*, and the denominator is
+    the runs that passed. A ledger written from a failure handler records the
+    numerator and silently discards the rest, which is how "it usually works"
+    survived as a description for as long as it did.
+    """
+    spec = _code(CROSS_PLATFORM_SPEC)
+
+    assert "recordRehearsal" in spec, "no run leaves any evidence behind"
+    assert "test.afterEach" in spec, (
+        "the evidence is not recorded from an afterEach hook, so a run that "
+        "threw before the end of the test body records nothing — and those "
+        "are the runs worth measuring"
+    )
+    for handler in ("test.afterAll", "onlyOnFailure", "if (testInfo.status"):
+        assert handler not in spec or "recordRehearsal" not in spec.split(
+            handler, 1)[1].split("});", 1)[0], (
+            f"the ledger row is written under {handler}, so passing runs are "
+            "missing from the denominator"
+        )
+
+
+def test_the_ledger_never_fails_a_run_it_only_observes():
+    """Measurement that can break the thing it measures is not measurement.
+
+    The validator's verdict is the browser's, and a full disk or a read-only
+    artifacts directory must not turn a green beat red — nor a red one green.
+    """
+    evidence = _code(E2E / "evidence.ts")
+
+    assert "catch" in evidence, (
+        "evidence.ts has no catch: a write failure would propagate into the "
+        "test result and the ledger would be able to fail the run"
+    )
+
+
+def test_the_outcome_distinguishes_no_tool_call_from_an_honest_miss():
+    # The two failure modes are different bugs in different layers, and they
+    # look identical in a screenshot: no answer from the corpus. One says the
+    # orchestrator never called the tool; the other says it called it and the
+    # index missed. A ledger that recorded only "failed" would have kept them
+    # indistinguishable.
+    evidence = _code(E2E / "evidence.ts")
+
+    for outcome in ("grounded", "honest-miss", "no-tool-call"):
+        assert f"'{outcome}'" in evidence or f'"{outcome}"' in evidence, (
+            f"the ledger cannot record the {outcome!r} outcome"
+        )
+
+
+def test_the_ten_run_proof_has_a_harness_and_it_is_not_a_loop():
+    """`scripts/sop-rehearsal.sh` exists, runs, and stays out of CI.
+
+    It drives the Demo validator ten times against a **running deployment**,
+    holding ten real conversations with the agent pool. It is the Demo
+    validator's own rule (see `docs/demo-validator.md`) multiplied by ten: a
+    pull request cannot run it, and a scheduled run would spend Copilot
+    Credits on nobody's behalf.
+    """
+    harness = REPO_ROOT / "scripts" / "sop-rehearsal.sh"
+
+    assert harness.exists(), "nothing runs the ten-run proof"
+    assert os.access(harness, os.X_OK), f"{harness.name} is not executable"
+
+    workflows = (REPO_ROOT / ".github" / "workflows").glob("*.yml")
+    for workflow in workflows:
+        assert "sop-rehearsal" not in _text(workflow), (
+            f"{workflow.name} runs the ten-run proof: it drives a real "
+            "browser through ten conversations with the deployed agent pool"
+        )
+
+
+def test_the_proof_runs_the_loop_repeatedly_rather_than_repeat_each():
+    # `--repeat-each` is in the walkthrough reporter's `filteredBy` list, so a
+    # repeated run refuses to replace the Recorded fallback — and the recording
+    # is what the presenter falls back to when the live demo fails. Ten runs of
+    # the loop keep each run a whole, recordable walkthrough.
+    harness = _text(REPO_ROOT / "scripts" / "sop-rehearsal.sh")
+
+    assert "--repeat-each" not in harness, (
+        "the proof uses --repeat-each, which the walkthrough reporter treats "
+        "as a filter — ten runs would leave the Recorded fallback stale"
+    )
+    assert "e2e-tests.sh" in _text(REPO_ROOT / "scripts" / "sop_rehearsal.py"), (
+        "the proof does not run the Demo validator itself"
+    )

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { quickTaskNamed, rehearsedHit } from '../authored';
+import { outcomeOf, recordRehearsal } from '../evidence';
 import { PlanSurface } from '../pages/PlanSurface';
 import { StoreSurface } from '../pages/StoreSurface';
 
@@ -21,6 +22,57 @@ import { StoreSurface } from '../pages/StoreSurface';
 /** Where the platform badge's own attribute must land (`sop/provenance.py`). */
 const SOP_PLATFORM = 'Copilot Studio';
 const SOP_SOURCE = 'Dataverse';
+
+/**
+ * What this run saw, for the evidence ledger (#54).
+ *
+ * Filled the moment the Grounding panel arrives rather than as each assertion
+ * needs it, so a beat that goes red on the *first* assertion still records what
+ * the panel said. Evidence gathered only up to the point of failure attributes
+ * every failure to whatever is checked first.
+ */
+interface Observed {
+    grounded: boolean;
+    honestMiss: boolean;
+    toolQuery: string | null;
+    retrievalQuery: string | null;
+    citations: string[];
+}
+
+let observed: Observed;
+
+test.beforeEach(() => {
+    observed = {
+        grounded: false,
+        honestMiss: false,
+        toolQuery: null,
+        retrievalQuery: null,
+        citations: [],
+    };
+});
+
+/**
+ * One line per run, passing runs included.
+ *
+ * The intermittency this beat exists to catch is a property of a *sequence* of
+ * runs, and the run in front of you cannot show it. `scripts/sop-rehearsal.sh`
+ * reads the ledger back for the ten-consecutive-run proof and for the
+ * attribution — which layer a red run implicates — and neither is answerable
+ * from a green run's silence.
+ */
+test.afterEach(async () => {
+    const info = test.info();
+    const metadata = (info.config.metadata ?? {}) as Record<string, string>;
+    recordRehearsal({
+        target: metadata.target ?? 'unknown',
+        baseURL: metadata.baseURL ?? 'unknown',
+        passed: info.status === info.expectedStatus,
+        outcome: outcomeOf(observed.grounded, observed.honestMiss),
+        toolQuery: observed.toolQuery,
+        retrievalQuery: observed.retrievalQuery,
+        citations: observed.citations,
+    });
+});
 
 test.describe('the cross-platform hop', () => {
     test('is answered by Copilot Studio out of Dataverse, citing the corpus', async ({
@@ -53,18 +105,27 @@ test.describe('the cross-platform hop', () => {
         // `source_used`, which it does not do for a failed Direct Line reply —
         // so a fixed failure message wearing the agent's voice times out here
         // rather than passing.
-        let toolQuery: string | null = null;
-        let retrievalQuery: string | null = null;
+        //
+        // Everything the panel says is read here, in one place, the moment it
+        // says it: the whole of `source_used` arrives in one WebSocket frame
+        // and renders in one pass, and reading it as each assertion needs it
+        // would mean a run that failed the *first* assertion recorded nothing
+        // about the rest — attributing every failure to whatever is checked
+        // first.
         try {
             await plan.rail.waitForGrounding(270_000);
-            toolQuery = await plan.rail.toolQuery();
-            retrievalQuery = await plan.rail.retrievalQuery();
+            observed.grounded = true;
+            observed.toolQuery = await plan.rail.toolQuery();
+            observed.retrievalQuery = await plan.rail.retrievalQuery();
+            observed.honestMiss = await plan.rail.honestMiss.isVisible();
+            observed.citations = await plan.rail.citedDocuments();
         } finally {
             await test.info().attach('sop-tool-query', {
-                body: JSON.stringify({ toolQuery, retrievalQuery }, null, 2),
+                body: JSON.stringify(observed, null, 2),
                 contentType: 'application/json',
             });
         }
+        const { retrievalQuery, toolQuery } = observed;
         expect(await plan.rail.platformNamed()).toBe(SOP_PLATFORM);
         await expect(plan.rail.route).toContainText(SOP_SOURCE);
 
@@ -104,7 +165,7 @@ test.describe('the cross-platform hop', () => {
         // the corpus rehearses. Asserting only on the citation reports that as
         // an empty string, which reads like a broken selector.
         expect(
-            await plan.rail.honestMiss.isVisible(),
+            observed.honestMiss,
             'the Grounding panel reported an honest miss for the rehearsed ' +
                 'question: the SOP agent searched Dataverse and found no ' +
                 'matching procedure. The hop worked and the retrieval did not, ' +
@@ -113,8 +174,7 @@ test.describe('the cross-platform hop', () => {
                 "the agent's index has drifted.",
         ).toBe(false);
 
-        const cited = await plan.rail.citedDocuments();
-        expect(cited.join(' | ')).toContain(hit.docId);
+        expect(observed.citations.join(' | ')).toContain(hit.docId);
 
         // And the answer arrived — in the agent's own turn, not merely
         // somewhere on a page that also holds a turn from an agent this beat
