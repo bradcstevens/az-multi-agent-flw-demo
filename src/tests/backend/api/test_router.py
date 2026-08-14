@@ -1512,6 +1512,19 @@ class TestSopAsk:
         assert response.json()["tool_query"] == question
         assert response.json()["retrieval_query"] == question
 
+    def test_a_qualified_closing_question_is_not_normalized_to_the_rehearsed_hit(
+        self, rt, monkeypatch
+    ):
+        """Only explicit closing-procedure aliases are safe to normalize."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        question = "How do I close the store after a gas leak?"
+
+        response = self._post(rt, question)
+
+        assert response.status_code == 200
+        rt.sop.ask.assert_awaited_once_with(question)
+        assert response.json()["retrieval_query"] == question
+
     def test_an_empty_question_is_rejected(self, rt, monkeypatch):
         monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
 

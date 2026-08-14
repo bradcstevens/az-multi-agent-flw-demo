@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import re
 import uuid
 from typing import Optional
 
@@ -836,13 +835,19 @@ _sop_client: Optional[DirectLineClient] = None
 
 # The presenter opens the walkthrough with this corpus-authored query. The
 # orchestrator can rephrase it before it calls the MCP tool, while the Copilot
-# Studio index was rehearsed against these exact words. This is an input alias,
-# not an answer fallback: all other procedure questions, including the
-# out-of-corpus demonstration, still reach the agent unchanged.
+# Studio index was rehearsed against these exact words. Each alias is an
+# equivalent closing-procedure request; this deliberately is not a keyword
+# match, so a qualified request still gets an honest retrieval result.
 REHEARSED_SOP_QUERY = "How do I close the store?"
-_CLOSING_STORE_QUERY = re.compile(
-    r"\bclos(?:e|ing)\b.*\bstore\b|\bstore\b.*\bclos(?:e|ing)\b",
-    re.IGNORECASE,
+_REHEARSED_SOP_QUERY_ALIASES = frozenset(
+    {
+        REHEARSED_SOP_QUERY.casefold(),
+        "what are the steps for closing the store tonight?",
+        "what are the steps for closing the store?",
+        "how do i close the store at the end of the night?",
+        "what is the store closing procedure?",
+        "provide the store closing procedure.",
+    }
 )
 
 
@@ -856,7 +861,7 @@ def sop_client() -> DirectLineClient:
 
 def _retrieval_query(tool_query: str) -> str:
     """Return the corpus query for the one explicitly rehearsed procedure."""
-    if _CLOSING_STORE_QUERY.search(tool_query):
+    if tool_query.casefold() in _REHEARSED_SOP_QUERY_ALIASES:
         return REHEARSED_SOP_QUERY
     return tool_query
 

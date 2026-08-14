@@ -53,21 +53,21 @@ test.describe('the cross-platform hop', () => {
         // `source_used`, which it does not do for a failed Direct Line reply —
         // so a fixed failure message wearing the agent's voice times out here
         // rather than passing.
-        await plan.rail.waitForGrounding(240_000);
+        let toolQuery: string | null = null;
+        let retrievalQuery: string | null = null;
+        try {
+            await plan.rail.waitForGrounding(240_000);
+            toolQuery = await plan.rail.toolQuery();
+            retrievalQuery = await plan.rail.retrievalQuery();
+        } finally {
+            await test.info().attach('sop-tool-query', {
+                body: JSON.stringify({ toolQuery, retrievalQuery }, null, 2),
+                contentType: 'application/json',
+            });
+        }
         expect(await plan.rail.platformNamed()).toBe(SOP_PLATFORM);
         await expect(plan.rail.route).toContainText(SOP_SOURCE);
-        expect(await plan.rail.retrievalQuery()).toBe(hit.question);
-        await test.info().attach('sop-tool-query', {
-            body: JSON.stringify(
-                {
-                    toolQuery: await plan.rail.toolQuery(),
-                    retrievalQuery: await plan.rail.retrievalQuery(),
-                },
-                null,
-                2,
-            ),
-            contentType: 'application/json',
-        });
+        expect(retrievalQuery).toBe(hit.question);
 
         // The citation's document identifier, read out of the corpus manifest
         // rather than written down here. `[rehearsed_hit]` names the SOP-NNN
