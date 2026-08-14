@@ -403,7 +403,18 @@ def test_given_probe_is_the_default_when_main_runs_then_the_roster_is_probed(cap
         probed["models"] = models
         return {name: 200 for name in models}
 
-    exit_code = main(argv=[], read=lambda *_: deployment(), probe=probe)
+    # `retrieve` is stubbed even though this test is about the roster: left to
+    # its default, `main` runs a real agent against the live project, so the
+    # CI-tooling loop would dial a tenant and go red on a transient empty
+    # retrieval. A unit test that needs a subscription is not a unit test.
+    exit_code = main(
+        argv=[],
+        read=lambda *_: deployment(),
+        probe=probe,
+        retrieve=lambda project, endpoint, topics: {
+            name: grounded() for name in topics
+        },
+    )
 
     assert exit_code == 0
     assert "text-embedding-3-small" in probed["models"]
@@ -417,6 +428,9 @@ def test_given_a_model_that_will_not_answer_when_main_probes_then_it_exits_nonze
         argv=[],
         read=lambda *_: deployment(),
         probe=lambda foundry, models: {name: 404 for name in models},
+        retrieve=lambda project, endpoint, topics: {
+            name: grounded() for name in topics
+        },
     )
 
     assert exit_code == 1
