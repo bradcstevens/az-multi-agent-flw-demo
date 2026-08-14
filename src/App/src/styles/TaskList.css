@@ -92,13 +92,37 @@
   opacity: 1;
 }
 
-.task-tab .task-menu-button {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
+/*
+  The hide control sits beside the accordion's own toggle rather than inside
+  it: `AccordionHeader` renders its children *inside* a button, and a button
+  inside a button is not markup a screen reader can offer as two things to do.
+*/
+.task-list-completed-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.task-tab:hover .task-menu-button {
-  opacity: 1;
+.task-list-completed-header .fui-AccordionHeader {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-list-hide-completed {
+  flex-shrink: 0;
+}
+
+/*
+  Nothing about the row's trailing edge belongs here any more. The
+  `.task-menu-button` rules this replaces styled the hover state of a Fluent
+  `MenuTrigger` with no `MenuPopover` — a control that, on this version of
+  Fluent, never reached the DOM at all (#66).
+*/
+
+.task-list-empty {
+  display: block;
+  padding: 8px 0 8px 16px;
+  color: var(--colorNeutralForeground3);
 }
 
 

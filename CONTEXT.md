@@ -766,7 +766,9 @@ never deletes**, and the control is named for that, because a label saying *dele
 that survives is the identity form of the rule the transparency panels run on. `sessionStorage`,
 following the **Signed-in device** precedent — within a run the clear survives a reload, and a
 fresh tab is a fresh demonstration with the whole history back. A set of plan ids rather than a
-flag, so a task completing *after* a clear still appears.
+flag, so a task completing *after* a clear still appears. The tab's memory of it is
+`src/App/src/models/hiddenCompletedTasks.ts`, which also carries the two strings, because ADR-022
+makes the label load-bearing rather than a copy detail.
 
 `delete_plan_by_plan_id` is implemented in `cosmosdb.py` and reachable from exactly one caller, the
 human-feedback rejection path; there is **no REST route** and this does not add one. That unrouted
@@ -774,6 +776,12 @@ method is the trap — it reads as wiring nobody finished — which is why an ot
 decision is written down as [ADR-022](docs/ADR/022-completed-tasks-are-hidden-never-deleted.md).
 The panel is only ever seen on a laptop: the **Stacking breakpoint** drops the task history rather
 than squeezing it, because the associate is holding a phone.
+
+The row's dead `MenuTrigger` went with it, and was dead twice over: measured while removing it, a
+`Menu` with no `MenuPopover` renders **nothing** on `@fluentui/react-components` 9.64 — the trigger
+never reached the DOM, so no test and no screen reader could see it and no browser could click it.
+A DOM assertion for that pattern is therefore inert, which is the failure #25 already found once,
+so `TaskList.test` guards it by reading the component's source.
 _Avoid_: delete task, clear history, archive
 
 ## Licensing and capacity
