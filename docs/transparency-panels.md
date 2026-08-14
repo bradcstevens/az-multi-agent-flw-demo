@@ -159,6 +159,14 @@ roster is reachable by heading navigation like everything else on the rail (#57)
 stays: a deployment with no store assistant is a real state and the panel is right to say so. It
 just may not say it about a team the app is already holding.
 
+The window is asserted twice, from both sides, because each side passes on its own while the other
+is broken. `AgentTeamPanel.test.tsx` and `PlanPanelRight.test.tsx` hand the panel
+`planData={null} loading` directly; `pages/loadingWindow.test.tsx` renders `PlanPage` with the plan
+fetch left in flight and reads the roster off the surface, which is the only place the panel's
+*position* — outside the `loading || !planData` branch — is load-bearing. Moving the panel inside
+that branch, the shape the rest of the render suggests, leaves every panel-level assertion green
+and puts the audience back in front of a spinner with nothing beside it.
+
 ## Presenter alert
 
 Rendered as visibly a different object from a reply: `role="alert"`, its own icon, a "Proactive
