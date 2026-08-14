@@ -320,18 +320,37 @@ say which platform answered. The runbooks are a different corpus reached by a di
 `content/sop/corpus.toml`'s `absent_terms` are asserted against them too — a car-wash runbook would
 answer the rehearsed **honest miss** and the SOP corpus' own verifier could not see it.
 
-**Store assistant roster** — the three Foundry participants in
+**Store assistant roster** — the four Foundry participants in
 `content_packs/store_assistant/agent_teams/store_assistant.json`, uploaded under
 `00000000-0000-0000-0000-000000000223`, which is the identifier `selectStoreAssistant` looks for.
 `TroubleshootingAgent` (`gpt-5.4`, the runbook knowledge base, `user_responses: true`),
-`ShiftTasksAgent` (`gpt-5.4-mini`, the `sop` toolbox) and `EscalationAgent` (`gpt-5.4`, the
-operations knowledge base). The manager runs on `ORCHESTRATOR_MODEL_NAME` (ADR-003).
+`ShiftTasksAgent` (`gpt-5.4-mini`, the `sop` toolbox), `EscalationAgent` (`gpt-5.4`, the
+operations knowledge base) and the **Workforce agent** (`gpt-5.4-mini`, the `workforce` toolbox).
+The manager runs on `ORCHESTRATOR_MODEL_NAME` (ADR-003).
 
-**Workforce agent** — `WorkforceAgent`, a fourth participant, decided 2026-08-13 and not yet built.
-It answers an **HR process question** and never an individual's record. Named for its function
-rather than for Workday because the surface would otherwise claim an integration that does not
-exist, which is the rule every other simulated thing here is held to.
+**Workforce agent** — `WorkforceAgent`, the fourth participant, decided 2026-08-13 (ADR-017) and
+built in #52. It answers an **HR process question** and never an individual's record. Named for its
+function rather than for Workday because the surface would otherwise claim an integration that does
+not exist, which is the rule every other simulated thing here is held to.
+
+Its grounding is the **Workforce procedure library** and it holds `toolbox_filter: "workforce"` and
+no knowledge base — the shift-tasks agent's shape, and for the shift-tasks agent's reason. On
+`gpt-5.4-mini`, because looking a procedure up and quoting what came back is not reasoning work and
+the **Token meter** renders that claim on screen.
 _Avoid_: WorkdayAgent, HR agent
+
+**Workforce procedure library** — `src/mcp_server/services/workforce_library.py`, four authored
+procedures (`WF-401` and up) about swapping a shift, changing availability, reporting an absence
+and picking up an open shift. **Mocked, and it says so on every answer**: there is no employment
+system behind this deployment and a surface may say nothing but may not say something that is not
+so. Pure — no MCP, no network — so the store pack's own suite can ask whether the seventh tap
+resolves to a procedure that exists, which is the check `[rehearsed_hit]` gives the opening tap.
+
+It holds nobody's balance, rate, hours or entitlement, and neither tool takes an individual to look
+one up: `list_workforce_procedures` takes nothing and `get_workforce_procedure` takes a topic. That
+is ADR-017's boundary drawn in the vocabulary rather than in a prompt, and it is asserted from both
+sides — the library's own text against the record vocabulary, and `DOMAIN_ALLOWED_TOOLS["workforce"]`
+against anything that reads one.
 
 **HR process question** — a question about how an employment task is performed ("how do I swap a
 shift with another associate?"), as against a **personal question**, which is about an individual's
@@ -339,7 +358,9 @@ own record ("how much PTO do I have?"). Only the second is the **Identity bounda
 business. The first has to clear both of the gate's tiers, which is why the wording of the beat that
 asks one is a design decision and not copy: the **Keyword fast path** is deterministic and
 inspectable, but the similarity tier is a live model call that can refuse a process question on
-stage.
+stage. Since #52 the beat's question is the **Guardrail corpus**' eleventh
+`NEGATIVE_CONTROL`, so that tier is measured against it rather than trusted — ADR-017's second
+negative consequence, closed.
 
 **The SOP tool has one holder, and it has nothing else** — `ShiftTasksAgent` declares
 `toolbox_filter: "sop"` and **no** `knowledge_base_name`. An agent holding both a Foundry knowledge
@@ -382,6 +403,15 @@ reads back as *nothing tried*, which offers the whole runbook) and a write is a 
 a first turn recorded are exactly the ones a later turn must not repeat). Every method swallows
 failure — the record is memory of one shift and the answer is the associate's, so an unreachable
 container costs a repeated step where raising would cost the turn.
+
+**The session is the conversation, and the conversation is what the shift had.** This entry and its
+document — [docs/troubleshooting-memory.md](docs/troubleshooting-memory.md), *"The memory of one
+shift"* — read as though they disagreed, and #61 is where the gap was load-bearing rather than
+verbal. What the surface had wrong was not the key but its boundary: an associate who tries three
+things and then asks for help is having **one** conversation, and the surface ended it at the home
+screen. **Follow-on task** joins them. Re-keying the record to the shift was the obvious repair and
+is rejected in ADR-024, because the requirement above runs one way and a wider key is exactly how
+one fault's steps reach another fault's ticket.
 
 **The clarification seam** — `OrchestrationManager._handle_tool_approvals`, where the manager already
 intercepts the associate's answer before approving `request_user_clarification`. Both halves of the
@@ -707,19 +737,42 @@ All three signals are recorded in full in
 [docs/transparency-panels.md](docs/transparency-panels.md). The rebrand that surrounds them is
 recorded in [docs/store-surface.md](docs/store-surface.md).
 
-**Quick Task** — a starting task the presenter taps instead of typing. **Six of them since #26**,
+**Quick Task** — a starting task the presenter taps instead of typing. **Seven of them since #52**,
 one per beat of the walkthrough and rendered in the order it runs: the cross-platform hop, the
 rehearsed out-of-corpus probe, the troubleshooting fault, the escalation that declares the
-**Deliberate lane**, the boundary probe, and the shift-task query. Carries **Lane** metadata as
+**Deliberate lane**, the boundary probe, the shift-task query, and the **HR process question** the
+**Workforce agent** answers. Carries **Lane** metadata as
 `StartingTask.lane` (#16) — an unvalidated `str` rather than the `Lane` enum, so an unrecognised
 lane in an uploaded team definition fails open in the **Lane router** instead of rejecting the
 whole upload. That is the right failure mode and a silent one, so every declared lane is put
 through the real `parse_lane`. Tapping one fills the box; typing over the prompt clears the
 declaration, because edited text is free-typed input and belongs to the **Lane keyword fallback** —
 which is why each prompt is asserted to reach the lane it declares **through the fallback too**.
-Three of the six prompts are read out of the corpus they were written against rather than restated:
-the **rehearsed hit** and the **honest miss** from `content/sop/corpus.toml`, and the boundary
-probe from the **Guardrail corpus**' measured `POSITIVE_PROBES`.
+Four of the seven prompts are read out of the corpus they were written against rather than
+restated: the **rehearsed hit** and the **honest miss** from `content/sop/corpus.toml`, the boundary
+probe from the **Guardrail corpus**' measured `POSITIVE_PROBES`, and the shift-swap question from
+the same corpus' `NEGATIVE_CONTROLS` — the one it is measured *not* to refuse.
+
+**Follow-on task** — a **Quick Task** that another Quick Task leads to, named by `StartingTask.follow_on`
+and rendered *inside* the conversation it follows rather than on the home grid (#61, ADR-024). One
+user today: the troubleshooting fault names the escalation. It exists because beats 3 and 4 are one
+conversation — an associate trying things and then asking for help with the same fault — and the
+only route back to the home screen is **New task**, which starts a new one by construction, so the
+**Simulated ticket** read an empty **Troubleshooting record** and said `not reported`. Tapping it
+submits the authored prompt and the authored **Lane** with *the current plan's* `session_id`, which
+needs no backend change: a Lane is a property of the request, so the escalation keeps its
+**Deliberate lane** and its own approval gate while sharing the session.
+
+**A task named as a follow-on is not a home card** — the roster still declares six and the grid
+renders five. The rule is derived from the pointer rather than being a second flag, and it is what
+stops the cold tap that produces the empty ticket, because *a Quick Task is a claim about what will
+happen when somebody taps it* and that claim may not depend on where it was tapped. **The card is
+ungated**: the gate is the agent's offer, driven by `escalation_due`, where the audience can watch
+it fire — a second copy in the UI would ride a flag this subsystem writes best-effort and would
+fail **closed**, mid-beat. It sits above the chat box and below the **Rehearsed reply** chips'
+slot, not in the rail, which stacks *beneath* the conversation below the **Stacking breakpoint**.
+
+_Avoid_: next task, chained task, escalation button
 
 Recorded in [docs/quick-tasks.md](docs/quick-tasks.md).
 
@@ -781,7 +834,7 @@ Recorded in [docs/escalation-ticket.md](docs/escalation-ticket.md).
 **Attempted steps** — what the associate has already tried, persisted explicitly to the Cosmos
 memory container. Framework checkpoint state is in-memory and must not be relied on for this.
 
-**Presenter runbook** — the walkthrough written for the person who will drive it: seven taps, what
+**Presenter runbook** — the walkthrough written for the person who will drive it: eight taps, what
 to say at each, what the audience should be looking at, and a per-beat decision about whether to
 continue when one fails. It exists because two of the affordances the demonstration depends on
 have **no representation on screen at all** — the **Presenter chord** and the **Rehearsed reply**
@@ -1116,6 +1169,32 @@ another commit. See [docs/preflight/deployed-build.md](docs/preflight/deployed-b
 _Avoid_: stale deployment, drift
 
 ## Confirmed findings
+
+### The two hardest beats have never been asserted on `main`, and #50 is closed (confirmed 2026-08-14, issue #61)
+
+`e2e/specs/escalation.spec.ts` and `e2e/specs/troubleshooting.spec.ts` **have never existed on
+`main`.** Their three commits — `834c82bf`, `038f5e6c` and `b095186e` — live only on
+`git-loopy/…/integrate/issue-50`, which `git merge-base --is-ancestor` confirms is not an ancestor
+of `main`. The branch is 7 ahead and **21 behind**, and `e2e/` has moved on both sides:
+`deployedBuild.ts` and `evidence.ts` exist on `main` and not on the branch, `backend.ts` and
+`wire.ts` the reverse.
+
+Issue #50 is **closed**. Its specs ran live against `rg-macae-flw-v1`, found two real defects and
+filed them — #61, the escalation that cannot reach the attempted steps, and #62, the ticket that is
+never drafted at all. Both issues cite *"the Demo validator's escalation beat (#50)"* as the thing
+that found them. Neither the beat nor the spec is on `main`. So the **Demo validator** on `main`
+covers exactly one beat, the cross-platform hop, and the two hardest ones — the pair #50 itself
+called *"the demonstration's strongest single claim"* — are asserted nowhere.
+
+This is invisible in the way that matters here: every **Feedback loop** is green, `main` deploys on
+every commit (ADR-020), and the deploy gate asks a procedure question, which is beat 1. Nothing that
+runs would notice the absence. It was found only by reading #61's fourth acceptance criterion —
+*"`e2e/specs/escalation.spec.ts` loses its `not reported` branch"* — against the file tree, and
+discovering there was no such file.
+
+It is the same shape as the transparency-signal finding below and the deployment-drift one after it:
+the check that would have caught it is not the one that was running. A closed issue is evidence that
+work was *done*, never that it **landed**.
 
 ### The centrepiece beat is intermittent, and only a browser saw it (confirmed 2026-08-13, issue #47)
 

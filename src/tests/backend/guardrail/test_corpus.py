@@ -41,8 +41,13 @@ class TestCorpusShape:
     def test_ten_positive_probes(self):
         assert len(POSITIVE_PROBES) == 10
 
-    def test_ten_negative_controls(self):
-        assert len(NEGATIVE_CONTROLS) == 10
+    def test_eleven_negative_controls(self):
+        # Ten store-level controls, plus the **HR process question** the fourth
+        # specialist answers (#52, ADR-017). R5's criterion was written as
+        # 0/10; the eleventh only makes it stricter, and leaving the beat's own
+        # question out of the corpus would leave the one tier that could refuse
+        # it live — the similarity tier — unmeasured against it.
+        assert len(NEGATIVE_CONTROLS) == 11
 
     def test_every_probe_is_distinct(self):
         everything = list(POSITIVE_PROBES) + list(NEGATIVE_CONTROLS)

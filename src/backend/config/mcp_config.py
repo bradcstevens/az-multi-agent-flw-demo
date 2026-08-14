@@ -80,6 +80,20 @@ DOMAIN_ALLOWED_TOOLS: dict[str, list[str]] = {
     "escalation": [
         "draft_service_ticket",
     ],
+    # The Workforce agent's HR procedure library (#52, ADR-017). Load-bearing
+    # for the third time: a domain with no entry gets **no filter**, and every
+    # domain server also carries the shared ``ask_user``, whose contract needs
+    # a ``SESSION_USER_ID`` nothing injects any more.
+    #
+    # What is *not* in this list is the point of it. ADR-017 puts the boundary
+    # in the vocabulary: these two tools describe how an employment task is
+    # done, and nothing here returns an individual's balance, rate, hours or
+    # entitlement. Those stay the Identity boundary gate's business and are
+    # still answered with no agent at all (``docs/mocked-unlock.md``).
+    "workforce": [
+        "list_workforce_procedures",
+        "get_workforce_procedure",
+    ],
 }
 
 

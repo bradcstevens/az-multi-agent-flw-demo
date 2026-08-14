@@ -263,19 +263,24 @@ def test_the_simulated_sign_in_is_said_out_loud():
 
 
 def test_every_beat_has_a_failure_playbook_row():
-    """Seven beats, and for each one: what it looks like, continue or not, what to say.
+    """Every tap, and for each one: what it looks like, continue or not, what to say.
 
     A presenter alone in the room cannot diagnose. The only useful form of this
     is a decision already made for them, beat by beat.
+
+    The taps are the Quick Tasks **plus the door in the wall** — the sign-in
+    affordance is rendered inside the refusal rather than on a card, and it is
+    a beat the presenter drives like any other. Counted rather than written
+    down, so a card added to the pack without a row here is red.
     """
     runbook = _runbook()
     playbook = runbook[runbook.index("## If a beat fails") :]
 
-    for index, task in enumerate(_quick_tasks(), start=1):
+    for index in range(1, len(_quick_tasks()) + 2):
         assert re.search(rf"^\| {index} \|", playbook, re.MULTILINE), (
-            f"beat {index} ({task['name']}) has no row in the failure playbook"
+            f"beat {index} has no row in the failure playbook"
         )
-    assert re.search(r"^\| 7 \|", playbook, re.MULTILINE), (
+    assert re.search(r"^\|[^|]*\|[^|]*chord", playbook, re.MULTILINE | re.IGNORECASE), (
         "the shift-task alert — the beat with no affordance on screen — has no "
         "row in the failure playbook"
     )

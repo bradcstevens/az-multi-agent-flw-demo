@@ -98,3 +98,36 @@ The boundary is drawn in the vocabulary, not in a prompt:
 - [docs/mocked-unlock.md](../mocked-unlock.md) — why the personal answer runs no agent
 - `src/backend/guardrail/keywords.py` — the Keyword fast path's terms
 - `CONTEXT.md` — **Workforce agent**, **HR process question**, **Silent agent skip**
+
+## Amendment — 2026-08-14 (#52), as built
+
+The decision above is unchanged. Four things about it are now facts rather than intentions, and one
+consequence was closed differently from the way it was written.
+
+- **The tools are two, and they take a topic.** `list_workforce_procedures` takes nothing;
+  `get_workforce_procedure` takes a topic. There is no argument a model could fill with an
+  associate, which is the boundary expressed as a signature rather than as a sentence — the shape
+  the **Simulated ticket** already uses to make a second confirmation step unreachable.
+- **The library is a module of its own**, `src/mcp_server/services/workforce_library.py`, pure and
+  with no MCP import. That is not tidiness: it lets the store pack's own suite ask, without a
+  running container, whether the seventh Quick Task resolves to a procedure that **exists**. A tap
+  the library does not cover answers *that is not in the workforce procedure library* — honestly,
+  with nothing going red, and the fourth specialist's beat quietly becomes a second honest miss.
+  `[rehearsed_hit]` guards the opening tap against exactly that decay; this is the same guard.
+- **The negative consequence about the corpus is closed, and it cost a number.** The shift-swap
+  question is the Guardrail corpus' **eleventh** `NEGATIVE_CONTROL`. R5's acceptance criterion was
+  written as *10/10 refused and 0/10 admitted*; it is now 10/11 admitted, which is strictly
+  stricter, and the sweep is length-agnostic so no threshold machinery changed. It is the hardest
+  control in the set — a question about a shift, between two people, on a device where *"when is my
+  next shift?"* is refused — and that is the point of including it rather than an easier one.
+- **The Silent agent skip was closed by the check that already existed.** `check_roster` compares
+  the authored roster with the deployed one, in both directions, so the fourth agent was verified
+  after deployment by adding it to the pack. No new check was written, and `INTENDED_MODELS` gained
+  one line.
+- **What the browser beat does not assert.** `e2e/specs/workforce.spec.ts` grades the **cost
+  table** — which agent was billed — and the **Policy block**'s absence, and asserts of the reply
+  only that words arrived. It deliberately does *not* require `WF-401` to appear: the workforce
+  library is reached as a tool with no `source_used` behind it, so its identifier exists only
+  inside prose a model wrote, and `docs/demo-validator.md`'s rule is that model prose is asserted
+  only to have arrived. **This beat proves the routing, not the grounding.** A Grounding-panel
+  signal for the workforce tool is the follow-up that would close it.

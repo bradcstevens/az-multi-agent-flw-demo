@@ -114,6 +114,25 @@ remains a routing failure: no tool query exists because the orchestrator did not
 The suite also asserts the Grounding panel is **empty before the question is asked**. Without it, a
 panel left lit by a previous conversation satisfies every other assertion in the spec.
 
+### The workforce beat proves the routing, not the grounding
+
+`workforce.spec.ts` (#52) is the second spec file, and it is graded on the **cost table** — that
+`WorkforceAgent` appears among the agents billed — and on the **Policy block** staying hidden, which
+is the **Identity boundary gate** admitting an **HR process question** rather than refusing it. The
+reply is asserted only to have arrived.
+
+It deliberately does **not** require `WF-401` in the answer. The **Workforce procedure library** is
+reached as a tool with no `source_used` behind it, so unlike `SOP-102` its identifier never becomes
+a deterministic signal on the surface — it exists only inside prose a model wrote, and the rule
+above applies. So a run in which the right agent answered from nothing would still be green here.
+A Grounding-panel signal for the workforce tool is what would close that, and until it exists the
+library's coverage of the tap is asserted offline instead, by the store pack's own suite.
+
+A second spec file is not a second Playwright **project**, which matters: the walkthrough reporter
+refuses to replace the **Recorded fallback** for a multi-project run. Specs run in filename order,
+so `cross-platform.spec.ts` precedes `workforce.spec.ts` and the recording still opens on the beat
+the walkthrough opens on.
+
 ## Selectors
 
 Only `data-testid`s that the **currently deployed image** carries. Adding an attribute to the

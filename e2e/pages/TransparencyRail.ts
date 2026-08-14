@@ -113,4 +113,22 @@ export class TransparencyRail {
         const names = await this.citations.locator('li').allInnerTexts();
         return names.map((name) => name.split('\n')[0].trim());
     }
+
+    get agentTeam(): Locator {
+        return this.page.getByTestId('agent-team-panel');
+    }
+
+    /**
+     * One roster member's row, by the name the team definition gives it.
+     *
+     * The **Store assistant roster** is what the **Silent agent skip** takes
+     * from without saying so: an agent whose `deployment_name` is outside the
+     * environment's allowlist is dropped with a `logger.warning`, the upload
+     * still succeeded, the surface still shows the assistant, and one member of
+     * the cast never arrives. The panel is where that is visible from outside
+     * the container, so it is where the validator looks.
+     */
+    rosterMember(name: string): Locator {
+        return this.agentTeam.getByTestId(`agent-team-member-${name}`);
+    }
 }

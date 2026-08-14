@@ -1,7 +1,7 @@
-# The six Quick Tasks
+# The seven Quick Tasks
 
-Issue #26. The presenter runs the whole scripted walkthrough by tapping. Six
-tasks, one per beat, each declaring the **Lane** it takes — and each held to
+Issues #26 and #52. The presenter runs the whole scripted walkthrough by
+tapping. Seven tasks, one per beat, each declaring the **Lane** it takes — and each held to
 the corpus, the router and the gate it depends on by a test, because a Quick
 Task is a claim about what will happen when somebody taps it.
 
@@ -17,6 +17,7 @@ They render in this order, which is the order the demonstration runs in.
 | 4 | I can't fix it | *I have tried everything and I can't fix it. I need someone to come out.* | **deliberate** | R4 — the approval *is* the **Simulated ticket** being raised |
 | 5 | How much PTO do I have? | *My name is Tanya, how much PTO do I have?* | fast | R5 — the **Identity boundary gate** refusing, and #27's sign-in |
 | 6 | What is due this shift? | *What tasks are due on this shift?* | fast | R8 — where the **Presenter alert** leads |
+| 7 | Swap a shift | *How do I swap a shift with another associate?* | fast | ADR-017 — the **Workforce agent**, an **HR process question**, and the gate admitting it |
 
 The opening tap is the cross-platform hop **deliberately**: it is the claim the
 whole demonstration exists to make, and the honest miss that follows it only
@@ -24,7 +25,7 @@ reads as honesty once the audience has watched the same surface answer.
 
 ## Nothing here is a list this repository keeps twice
 
-Three of the six prompts are read out of the corpus they were written against
+Four of the seven prompts are read out of the corpus they were written against
 rather than restated, because the Quick Tasks are authored in `content_packs/`
 and the SOP corpus in `content/sop/`, by different tools, and a prompt that
 drifted a word away from the corpus would go unnoticed on both sides.
@@ -34,6 +35,7 @@ drifted a word away from the corpus would go unnoticed on both sides.
 | Close the store | `corpus.toml` `[rehearsed_hit]` | `test_given_the_opening_task_when_read_then_it_is_the_cross_platform_hop` |
 | Restart the car wash | `corpus.toml` `[honest_miss]` | `test_given_the_honest_miss_task_when_read_then_it_is_the_corpus_own_question` |
 | How much PTO do I have? | `guardrail.corpus.POSITIVE_PROBES` | `test_given_the_boundary_probe_when_read_then_it_is_a_measured_probe` |
+| Swap a shift | `guardrail.corpus.NEGATIVE_CONTROLS` | `test_given_the_shift_swap_task_when_read_then_it_is_the_measured_control` |
 
 `[rehearsed_hit]` is new, and it is the mirror image of `[honest_miss]`. The
 honest miss has always been guarded — the corpus keeps its `absent_terms` out
@@ -114,7 +116,7 @@ submitted for you to confirm."*
 
 `TroubleshootingAgent` is instructed to *ask the associate what they have
 already tried*, so R3 is multi-turn by design and answering a Clarification is
-free text in the chat box. Six taps on the home screen do not reach it, and a
+free text in the chat box. Seven taps on the home screen do not reach it, and a
 walkthrough that is tap-only up to the third beat is a walkthrough with a
 keyboard in it.
 
@@ -165,11 +167,21 @@ pins to one column at 640px. That is narrower than the **Stacking breakpoint**
 and deliberately so: by 640px the shell has already stacked, so the floor is a
 minimum on a fluid grid rather than a second orientation for the surface (#58).
 
+The seventh card (#52) needed no layout change for that reason: `auto-fit` over
+a `minmax` track reflows with the width it is given, so the row that held six
+holds seven. That is what a rule fixed at a breakpoint would not have done, and
+it is why the finding above was worth fixing rather than working around.
+
 ## What is not covered here
 
 * **Nothing has run against a deployment.** That tapping *Close the store*
   actually produces a Copilot Studio hop is asserted about the corpus and the
   roster, not measured against a live Direct Line conversation.
+* **The seventh tap proves routing, not grounding.** The browser beat grades the
+  **cost table** — that `WorkforceAgent` was billed — and the **Policy block**'s
+  absence. It does not require `WF-401` in the reply: the **Workforce procedure
+  library** is reached as a tool with no `source_used` behind it, so its
+  identifier lives only in prose a model wrote. See ADR-017's amendment.
 * **Fast-lane latency is still unmeasured**, so "a few seconds with no approval
   prompt" is proven only in its second half — the approval step's absence is
   the Lane, and the Lane is asserted end to end.

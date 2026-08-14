@@ -455,3 +455,69 @@ def test_the_opt_out_is_a_deliberate_act_and_says_what_was_not_proved():
         "the opt-out is silent: a run that skipped the check looks exactly "
         "like one that passed it"
     )
+
+
+# ---------------------------------------------------------------------------
+# The fourth specialist's beat (#52, ADR-017).
+# ---------------------------------------------------------------------------
+
+WORKFORCE_SPEC = E2E / "specs" / "workforce.spec.ts"
+
+
+def test_the_fourth_specialist_has_a_beat_of_its_own():
+    """#52: "The beat is asserted by the browser suite."
+
+    A specialist nothing drives is a specialist nobody has watched answer. The
+    spec is a spec rather than another assertion inside the hop's, because the
+    two beats fail for unrelated reasons and a shared one would attribute
+    either failure to whichever ran first — the mistake #54 spent a day on.
+    """
+    assert WORKFORCE_SPEC.exists(), (
+        "the fourth specialist's beat is asserted by no browser spec"
+    )
+
+
+def test_the_beat_reads_its_question_out_of_the_store_pack():
+    # Never restated. The Quick Task's title and prompt are authored in
+    # `content_packs/`, and a spec carrying its own copy passes a rename it
+    # never saw — `authored.ts` exists precisely so no spec has to.
+    spec = _code(WORKFORCE_SPEC)
+
+    assert "quickTaskNamed" in spec or "quickTasks" in spec, (
+        "the beat does not read its Quick Task out of the store pack"
+    )
+    assert "How do I swap a shift" not in spec, (
+        "the beat restates the prompt the store pack authors; a reworded card "
+        "would leave it tapping a button that is not there"
+    )
+
+
+def test_the_beat_asserts_the_boundary_it_was_allowed_to_cross():
+    # ADR-017's whole risk, and the only assertion here that is about safety
+    # rather than about the feature. The **Identity boundary gate** has a live
+    # similarity tier, and a process question phrased near the personal probes
+    # can be refused on stage. A refusal renders as the **Policy block**, so
+    # the beat watches for it by name rather than timing out on an answer that
+    # was never going to come.
+    spec = _code(WORKFORCE_SPEC)
+
+    assert "policyBlock" in spec, (
+        "the beat does not check that the gate admitted the question, so a "
+        "refusal on stage reads as a slow surface"
+    )
+
+
+def test_the_beat_grades_the_meter_rather_than_the_answer():
+    # The same rule the hop's beat follows: model prose is asserted only to
+    # have arrived. What says the *fourth specialist* answered is the cost
+    # table — the panel the presenter is looking at — not the wording of the
+    # reply.
+    spec = _code(WORKFORCE_SPEC)
+
+    assert "agentsBilled" in spec, (
+        "the beat never reads which agents the turn billed, so it passes when "
+        "the manager routes the question to somebody else"
+    )
+    assert "WorkforceAgent" in spec, (
+        "the beat does not name the agent it exists to watch answer"
+    )

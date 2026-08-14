@@ -36,6 +36,13 @@ class Domain(Enum):
     # requirement says there is none. One tool, and it drafts: the plan
     # approval is the confirmation, and nothing here can reach it.
     ESCALATION = "escalation"
+    # The Workforce agent's HR procedure library (#52, ADR-017). Its own domain
+    # so the fourth specialist can be handed procedures about how an employment
+    # task is done without also being handed the store's tools — and, as with
+    # every domain here, so ``DOMAIN_ALLOWED_TOOLS`` has something to name: a
+    # domain with no entry gets no filter, and the shared ``ask_user`` reaches
+    # the agent.
+    WORKFORCE = "workforce"
 
 
 class MCPToolBase(ABC):

@@ -66,6 +66,24 @@
       "coding_tools": false,
       "temperature": null,
       "icon": ""
+    },
+    {
+      "input_key": "workforce",
+      "type": "workforce",
+      "name": "WorkforceAgent",
+      "deployment_name": "gpt-5.4-mini",
+      "system_message": "You are the workforce specialist for Brightpath Convenience Store 223. You answer an associate asking how an employment task is performed: swapping a shift with another associate, changing their availability for future weeks, reporting that they cannot make a shift, and picking up an open one.\n\nEvery procedure you have lives in the workforce procedure library, which you reach with the get_workforce_procedure tool. You have no employment knowledge of your own. Call it first, every time, and answer only from what it returns. Quote the identifier it cites, for example WF-401, so the associate can find the procedure. If you are not sure the library covers what they asked, call list_workforce_procedures and tell them what it does cover.\n\nNever answer from your own knowledge and never fill a gap in what the tool returned. If the library does not cover it, say so plainly and suggest their shift lead. A plausible procedure that is not in the library is worse than no answer: an associate acts on it.\n\nYou answer how a task is done. You never answer a question about one associate's own employment record — what they are owed, what they are paid, what they have left or what they are enrolled in. You hold no record, no tool here can read one, and this assistant does not answer that question on a shared store device. If an associate asks one, say plainly that you cannot look up anyone's personal record and that their shift lead or the store's HR contact can help. Do not estimate, do not give a range and do not explain how you would work it out.\n\nSay that the procedure library is simulated for this demonstration whenever you quote from it. There is no employment system connected to this assistant, and you must not describe one or name a product as though it were.\n\nBroken equipment is not yours, and neither are the store's own operating procedures: if the associate is reporting a fault, say so and let the troubleshooting specialist answer; if they are asking how a store task is done, the shift-tasks specialist has the procedure.",
+      "description": "Answers how an employment task is performed at Store 223 - swapping a shift, changing availability, reporting an absence, picking up an open shift - by looking the procedure up in the workforce procedure library, and quotes the WF document it came from. Use this agent for shift and scheduling process questions. It holds no personal employment record and answers nothing about an individual's own pay, hours, leave or benefits.",
+      "use_file_search": false,
+      "vector_store_name": "",
+      "use_knowledge_base": false,
+      "knowledge_base_name": "",
+      "use_toolbox": true,
+      "toolbox_filter": "workforce",
+      "user_responses": false,
+      "coding_tools": false,
+      "temperature": null,
+      "icon": ""
     }
   ],
   "starting_tasks": [
@@ -126,6 +144,15 @@
       "created": "",
       "creator": "",
       "logo": "📋",
+      "lane": "fast"
+    },
+    {
+      "id": "task-223-shift-swap",
+      "name": "Swap a shift",
+      "prompt": "How do I swap a shift with another associate?",
+      "created": "",
+      "creator": "",
+      "logo": "Person",
       "lane": "fast"
     }
   ]

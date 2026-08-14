@@ -76,6 +76,23 @@ class TestMCPConfigFromEnv:
         assert cfg.url == "https://host/sop/mcp"
         assert cfg.allowed_tools == ["search_store_procedures"]
 
+    def test_from_env_workforce_domain_is_filtered_to_its_procedures(self):
+        """Issue #52, ADR-017: the fourth specialist's tools, and only those.
+
+        Load-bearing for the third time. **A domain with no entry gets no
+        filter**, and every domain server also carries the shared ``ask_user``
+        — whose contract needs a ``SESSION_USER_ID`` nothing injects any more.
+        #21 and #22 each found that by writing this test rather than by reading
+        the code.
+        """
+        with patch.object(mcp_config_module, "config", _mcp_config_stub()):
+            cfg = MCPConfig.from_env(domain="workforce")
+        assert cfg.url == "https://host/workforce/mcp"
+        assert cfg.allowed_tools == [
+            "list_workforce_procedures",
+            "get_workforce_procedure",
+        ]
+
     def test_from_env_domain_unknown_has_no_allowed_tools(self):
         with patch.object(mcp_config_module, "config", _mcp_config_stub()):
             cfg = MCPConfig.from_env(domain="does_not_exist")

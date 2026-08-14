@@ -36,9 +36,9 @@ Read the two boxes below before anything else. They are the only two things you 
 | --- | --- |
 | **What you need** | The URL you were sent, and a laptop. Chrome or Edge. Nothing to install, nothing to sign into. |
 | **Screen** | Full screen, and wide enough for the panels on the right to be visible — they are the evidence. Below 900px wide they stack underneath, which is fine to *show* and awkward to *drive*. |
-| **Rehearse** | Run the seven taps once end to end before the meeting. It takes about ten minutes and it is the only way to know today's deployment is healthy. |
+| **Rehearse** | Run the eight taps once end to end before the meeting. It takes about ten minutes and it is the only way to know today's deployment is healthy. |
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
-| **Between beats** | Beats 1 to 4 open a task view — click **New task** in the left panel to get back to the six cards. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
+| **Between beats** | Beats 1 to 4 open a task view — click **New task** in the left panel to get back to the seven cards. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
 
 **Ask an engineer to clear the deployment before a customer session.** One command does it:
 `bash scripts/sop-rehearsal.sh` ([sop-rehearsal.md](sop-rehearsal.md)) — ten Demo validator runs
@@ -58,7 +58,7 @@ be a contrast with.
 
 ---
 
-## The seven taps
+## The eight taps
 
 Tap the card, then send. Everything below is one conversation each; use **New task** between them.
 
@@ -196,6 +196,33 @@ that was going to explain it.
 
 ---
 
+### 8. Swap a shift — the fourth specialist
+
+**Tap:** `Swap a shift` — *"How do I swap a shift with another associate?"*
+
+**Say:** *"This one is not about the store at all. It is about employment — the thing an associate
+would otherwise take to a manager, or to a portal they have to be at a desk to use."*
+
+**What lands:** an answer about offering the swap, the other associate accepting it and the shift
+lead approving it, quoting `WF-401`, and saying out loud that the procedure library is simulated.
+On the right, the **Agent Team** panel shows **four** specialists and the cost table bills the
+**Workforce Agent** for the turn — a different specialist from the one that answered beat 1.
+
+**Say:** *"Four specialists, and the orchestrator picked the right one. Nobody wrote a rule that
+said 'shift swap goes here' — it chose from what each one says it does."*
+
+**The claim:** the routing story, made legible. And the boundary: this specialist answers **how a
+thing is done**, never **what somebody is owed**. Beat 5 is the other half of that sentence, and
+this beat is what makes it a boundary rather than a limitation — *"it will tell you how to swap a
+shift; it will not tell you Tanya's leave balance on a shared device."*
+
+**Do not claim an HR integration.** There is no employment system behind this. The procedure
+library is mocked and says so on every answer. If somebody asks, *"this is where Workday or UKG
+would sit, and that is a connector, not a rewrite"* — say it out loud rather than letting the
+screen imply it.
+
+---
+
 ## What the three panels prove
 
 They are on the right, on both screens. Point at them; they are the evidence, not decoration.
@@ -254,6 +281,7 @@ beat 2; it is not a failure.
 | 5 | The personal question is answered instead of refused | **Stop and re-run it once** | This is the one beat with nothing to fall back on. If it answers again, move to beat 6 and be straight: the boundary is the piece to prove in a pilot |
 | 6 | The header does not change, or the same refusal appears again | **Yes** | Tap it once more. If it still refuses, describe the delta rather than showing it, and keep the argument — the argument is what they came for |
 | 7 | The chord does nothing | **Yes** | Check you are on a task view and not the home screen — the key is dead there — and press it again. If nothing arrives, describe the alert instead of showing it |
+| 8 | The question is **refused** as a personal one, or another specialist answers it | **Yes** | A refusal is the identity boundary being over-cautious, not the assistant being broken — say *"it is treating a shift question as a personal one; that is the boundary erring on the safe side, and it is the direction you want it to err in"* and move on. If the answer arrives from another specialist, the answer is still right; make the routing point from the **Agent Team** panel, which shows four, rather than from the cost table |
 
 ---
 

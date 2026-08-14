@@ -893,12 +893,199 @@ def test_given_an_escalation_request_when_routed_then_it_takes_the_deliberate_la
 
 
 # ---------------------------------------------------------------------------
-# The six Quick Tasks (issue #26)
+# The Workforce agent (issue #52, ADR-017)
 # ---------------------------------------------------------------------------
 
 
-def test_given_the_roster_when_read_then_there_are_six_quick_tasks(store_pack):
-    assert len(store_pack.starting_tasks) == 6
+def test_given_the_roster_when_read_then_the_workforce_specialist_is_present(
+    store_pack,
+):
+    # The fourth specialist. `INTENDED_MODELS` is the specification and the
+    # team definition is the artefact; the two are asserted to agree above, so
+    # this is the claim that the specification itself gained a fourth name.
+    assert "WorkforceAgent" in roster_mod.INTENDED_MODELS
+    assert store_pack.agent("WorkforceAgent")
+
+
+def test_given_the_workforce_agent_when_read_then_it_is_named_for_its_function(
+    store_pack,
+):
+    # ADR-017's naming decision, asserted over the whole team definition rather
+    # than over the agent's name alone: the roster, the plan steps and the
+    # token meter all render text authored here, and a vendor named in any of
+    # them is the surface claiming an integration this build does not have.
+    definition = json.dumps(store_pack.team).lower()
+
+    for vendor in ("workday", "kronos", "ukg", "adp"):
+        assert vendor not in definition, vendor
+
+
+def test_given_the_workforce_agent_when_read_then_it_holds_only_its_own_toolbox(
+    store_pack,
+):
+    agent = store_pack.agent("WorkforceAgent")
+
+    assert agent["use_toolbox"] is True
+    assert agent["toolbox_filter"] == "workforce"
+    assert agent.get("use_knowledge_base", False) is False
+    assert agent.get("use_file_search", False) is False
+
+
+def test_given_the_workforce_agent_when_read_then_only_it_holds_that_toolbox(
+    store_pack,
+):
+    holders = [
+        agent["name"]
+        for agent in store_pack.agents
+        if agent.get("use_toolbox") and agent.get("toolbox_filter") == "workforce"
+    ]
+
+    assert holders == ["WorkforceAgent"]
+
+
+def test_given_the_workforce_agent_when_read_then_it_does_not_ask_the_associate(
+    store_pack,
+):
+    # `user_responses` is the clarification tool, and this beat is one tap and
+    # one answer. An agent that can ask is an agent that can ask *who is
+    # asking*, which is the question ADR-017 exists to keep it away from.
+    assert store_pack.agent("WorkforceAgent").get("user_responses", False) is False
+
+
+def test_given_the_workforce_prompt_when_read_then_it_refuses_the_personal_question(
+    store_pack,
+):
+    # ADR-017's boundary in the agent's own words, behind the allowlist that
+    # enforces it. The tools cannot return an individual's record; this is the
+    # half that stops the agent *answering* one from its own knowledge.
+    message = store_pack.agent("WorkforceAgent")["system_message"].lower()
+
+    assert "record" in message
+    assert "shift lead" in message or "cannot" in message
+
+
+def test_given_the_workforce_tools_when_named_then_the_container_registers_them(
+    store_pack,
+):
+    # The same seam the troubleshooting pair and the ticket draft are spanned
+    # at. A rename on either side is an agent calling a tool that is not there,
+    # and the framework's answer to that is silence.
+    service = (
+        REPO_ROOT / "src" / "mcp_server" / "services" / "workforce_service.py"
+    ).read_text(encoding="utf-8")
+    message = store_pack.agent("WorkforceAgent")["system_message"]
+
+    for tool in ("list_workforce_procedures", "get_workforce_procedure"):
+        assert f"async def {tool}(" in service, f"{tool} is not registered"
+        assert tool in message
+
+    domain = (
+        REPO_ROOT / "src" / "mcp_server" / "core" / "factory.py"
+    ).read_text(encoding="utf-8")
+    assert 'WORKFORCE = "workforce"' in domain, (
+        "the roster's toolbox_filter names a domain the container does not serve"
+    )
+
+
+def test_given_the_workforce_allowlist_when_read_then_nothing_in_it_reads_a_record(
+    store_pack,
+):
+    # The tools are named explicitly, and what is *not* named is the point.
+    # ADR-014 and the Mocked unlock keep a language model away from stating an
+    # associate's pay; an allowlist entry naming a lookup would hand it back.
+    source = (
+        REPO_ROOT / "src" / "backend" / "config" / "mcp_config.py"
+    ).read_text(encoding="utf-8")
+    block = source.split('"workforce": [')[1].split("]")[0]
+
+    assert "get_workforce_procedure" in block
+    assert "list_workforce_procedures" in block
+    for forbidden in ("balance", "pto", "pay", "hours", "ask_user"):
+        assert forbidden not in block, forbidden
+
+
+# ---------------------------------------------------------------------------
+# The seven Quick Tasks (issues #26, #52)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def workforce_library():
+    """The container's own procedure library, imported by path.
+
+    Pure — no MCP, no network — which is why it is a module of its own
+    (`services/workforce_library.py`). Loaded by path rather than by dotted
+    name because the container's `services` package shares its name with the
+    backend's, and this file already has the backend's on `sys.path`.
+    """
+    import importlib.util
+
+    path = REPO_ROOT / "src" / "mcp_server" / "services" / "workforce_library.py"
+    spec = importlib.util.spec_from_file_location("_workforce_library", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _shift_swap_task(store_pack):
+    """The beat's own Quick Task, found by the agent that answers it."""
+    return next(
+        task
+        for task in store_pack.starting_tasks
+        if task["id"] == "task-223-shift-swap"
+    )
+
+
+def test_given_the_shift_swap_task_when_read_then_the_library_answers_it(
+    store_pack, workforce_library
+):
+    # The seam the opening beat has (`[rehearsed_hit]`) and this one would
+    # otherwise not: a one-tap question the library does not cover resolves —
+    # honestly — as *that is not in the workforce procedure library*, and the
+    # fourth specialist's whole beat becomes a second honest miss with nothing
+    # going red. Put through the container's real lookup, not read.
+    task = _shift_swap_task(store_pack)
+    procedure = workforce_library.find_procedure(task["prompt"])
+
+    assert procedure is not None, task["prompt"]
+    assert procedure is workforce_library.SHIFT_SWAP
+
+
+def test_given_the_shift_swap_task_when_routed_then_it_takes_the_fast_lane(
+    store_pack, lane_mod
+):
+    # Declared and typed, the way the other six are asserted. An HR process
+    # question that grows an approval step is a beat that got slower for no
+    # reason the audience can see, and the Deliberate lane is where the
+    # keyword fallback sends anything it does not recognise.
+    task = _shift_swap_task(store_pack)
+
+    assert lane_mod.select_lane(task["lane"], task["prompt"]) is lane_mod.Lane.FAST
+    assert lane_mod.select_lane(None, task["prompt"]) is lane_mod.Lane.FAST
+
+
+def test_given_the_shift_swap_task_when_read_then_it_is_the_measured_control(
+    store_pack, guardrail_corpus, gate_keywords
+):
+    # ADR-017's second negative consequence, closed. The gate's similarity tier
+    # is a live model call, and a process question phrased near the personal
+    # probes can be refused **on stage**. The Guardrail corpus is the only
+    # thing in this build that has ever run against the real embedding
+    # deployment, so the beat's question has to be one of the things it scores
+    # — otherwise its safety is an assumption.
+    task = _shift_swap_task(store_pack)
+    measured = {
+        gate_keywords.normalise(text) for text in guardrail_corpus.NEGATIVE_CONTROLS
+    }
+
+    assert gate_keywords.normalise(task["prompt"]) in measured
+
+
+
+
+
+def test_given_the_roster_when_read_then_there_are_seven_quick_tasks(store_pack):
+    assert len(store_pack.starting_tasks) == 7
 
 
 def test_given_the_rehearsed_hit_when_read_then_it_names_a_document_that_exists():

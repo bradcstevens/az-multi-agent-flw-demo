@@ -30,6 +30,7 @@ from services.product_service import ProductService
 from services.sop_service import SopService
 from services.tech_support_service import TechSupportService
 from services.troubleshooting_service import TroubleshootingService
+from services.workforce_service import WorkforceService
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -51,6 +52,10 @@ factory.register_service(TroubleshootingService())
 # The Simulated ticket (#22). One tool, and it drafts — the plan approval is
 # the confirmation, and nothing in this container can reach it.
 factory.register_service(EscalationService())
+# The Workforce agent's HR procedure library (#52, ADR-017). Mocked in this
+# container and holding nobody's record: it answers how an employment task is
+# done, and an individual's own numbers stay the Identity boundary gate's.
+factory.register_service(WorkforceService())
 
 # Shared services — registered on every domain server
 factory.register_shared_service(AskUserService())

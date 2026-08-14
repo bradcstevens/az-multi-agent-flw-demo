@@ -952,8 +952,8 @@ class TestStoreAssistantPackUploads:
 
         assert team.name == "Circle K Frontline Store Assistant"
         assert team.status == "visible"
-        assert len(team.agents) == 3
-        assert len(team.starting_tasks) == 6
+        assert len(team.agents) == 4
+        assert len(team.starting_tasks) == 7
 
     @pytest.mark.asyncio
     async def test_authored_pack_keeps_its_declared_lanes(self):
@@ -1000,6 +1000,7 @@ class TestStoreAssistantPackUploads:
             "TroubleshootingAgent": "gpt-5.4",
             "ShiftTasksAgent": "gpt-5.4-mini",
             "EscalationAgent": "gpt-5.4",
+            "WorkforceAgent": "gpt-5.4-mini",
         }
 
     @pytest.mark.asyncio

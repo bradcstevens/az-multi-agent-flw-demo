@@ -27,7 +27,7 @@ deliberately unlike the SOP corpus under `content/sop/`, which must be built to
 
 ## The roster
 
-Three Foundry participants, plus the orchestrator, plus the Store SOP Assistant
+Four Foundry participants, plus the orchestrator, plus the Store SOP Assistant
 reached as a tool rather than as a participant.
 
 | Agent | `input_key` | Model | Grounding |
@@ -35,6 +35,7 @@ reached as a tool rather than as a participant.
 | `TroubleshootingAgent` | `troubleshooting` | `gpt-5.4` | `store-troubleshooting-kb`, `user_responses: true` |
 | `ShiftTasksAgent` | `shift_tasks` | `gpt-5.4-mini` | `sop` toolbox — **no Foundry knowledge base** |
 | `EscalationAgent` | `escalation` | `gpt-5.4` | `store-operations-kb` |
+| `WorkforceAgent` | `workforce` | `gpt-5.4-mini` | `workforce` toolbox — **no Foundry knowledge base** |
 | the manager | — | `ORCHESTRATOR_MODEL_NAME`, `gpt-5.4-mini` | — |
 
 ### The shift-tasks agent owns the SOP tool and nothing else
@@ -48,6 +49,29 @@ stage. So the agent that answers procedure questions has no procedure knowledge
 of its own; the tool is its only source, and its system message says so in as
 many words.
 
+### The workforce agent is the same shape, for a different boundary
+
+`WorkforceAgent` (#52, [ADR-017](ADR/017-workforce-agent-answers-process-never-record.md)) holds
+`toolbox_filter: "workforce"` and no knowledge base, for the shift-tasks agent's
+reason: its answers must be traceable to something authored. What it is
+authored from is the **Workforce procedure library**, four procedures about how
+an employment task is performed — swapping a shift, changing availability,
+reporting an absence, picking up an open shift — every one of which says it is
+simulated.
+
+The boundary is in the signatures. `list_workforce_procedures` takes nothing;
+`get_workforce_procedure` takes a topic. Neither takes an associate, so there is
+no argument a model could fill with one, and nothing behind them holds a
+balance, a rate, hours or an entitlement. `DOMAIN_ALLOWED_TOOLS["workforce"]`
+names exactly those two — a domain with **no** entry gets no filter at all,
+which is how the shared `ask_user` tool reached an agent twice before (#21,
+#22).
+
+An **HR process question** is therefore answered by an agent, and a **personal
+question** is still refused by the **Identity boundary gate** and answered with
+no agent at all. That the gate admits the beat's wording is measured, not
+assumed: it is the eleventh `NEGATIVE_CONTROL` in the **Guardrail corpus**.
+
 The same reasoning runs the other way for troubleshooting. Runbooks are the
 store's own, they are not procedures, and they are indexed into their own
 knowledge base rather than merged into anything — a shared source would make
@@ -58,8 +82,8 @@ claims it.
 
 `gpt-5.4` for the two agents that reason over retrieved material and have to
 decide what *not* to say — a runbook branch to skip because the associate
-already tried it, a ticket field with no answer anywhere. `gpt-5.4-mini` for
-the agent whose job is to call a tool and quote what came back, and for the
+already tried it, a ticket field with no answer anywhere. `gpt-5.4-mini` for the
+two whose job is to call a tool and quote what came back, and for the
 orchestrator (ADR-003).
 
 Both are in `SUPPORTED_MODELS`, which matters more than it looks — see below.
@@ -185,6 +209,12 @@ a live signal, which is why `SimulatedBadge` goes on them.
   created and the knowledge bases registered, not that retrieval returns.
 - The PowerShell entry point is asserted by reading the file. There is no pwsh
   in CI.
-- The two placeholder starting tasks are gone: #26 replaced them with the six
-  Quick Tasks, one per beat of the walkthrough, recorded in
+- The two placeholder starting tasks are gone: #26 replaced them with the Quick
+  Tasks, one per beat of the walkthrough — seven of them since #52 — recorded in
   [docs/quick-tasks.md](quick-tasks.md).
+- That the orchestrator actually routes an **HR process question** to
+  `WorkforceAgent` is asserted by the browser suite against a running
+  deployment, not by any loop here. What the loops assert is that the agent is
+  authored, filtered to its own two tools, present in the roster the deploy
+  reads back, and that its beat's wording is one the gate is measured not to
+  refuse.

@@ -39,6 +39,10 @@ INTENDED_MODELS: Dict[str, str] = {
     "TroubleshootingAgent": REASONING_MODEL,
     "ShiftTasksAgent": CHEAP_MODEL,
     "EscalationAgent": REASONING_MODEL,
+    # The fourth specialist (#52, ADR-017). Relay work like the shift-tasks
+    # agent's — look a procedure up in a library and quote what came back — so
+    # it takes the cheaper model, and the meter says so on screen.
+    "WorkforceAgent": CHEAP_MODEL,
 }
 
 
