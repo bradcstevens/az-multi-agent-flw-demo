@@ -70,11 +70,19 @@ failure.
 
 Each run also attaches `sop-tool-query.json` to its Playwright artifact. It records both the query
 the Foundry orchestrator actually gave `search_store_procedures` and the query the backend used for
-the SOP corpus. The latter must be the corpus's `[rehearsed_hit]` question. A difference between
-the two is evidence of an orchestrator rephrasing; it is captured rather than guessed, and the
-closing-store alias makes that one rehearsed hit retrieve against its authored corpus wording. A
-missing Grounding panel remains a routing failure: no tool query exists because the orchestrator did
-not call the tool.
+the SOP corpus. A difference between the two is evidence of an orchestrator rephrasing; it is
+captured rather than guessed, and the closing-store alias in `_retrieval_query` makes the rehearsed
+hit retrieve against its authored corpus wording **when it recognises the rephrasing verbatim**.
+
+What is graded is that the retrieval query is **one of those two** — the corpus wording or the
+orchestrator's own — because `_retrieval_query` is an *input alias, not an answer fallback*, and a
+third value would mean the backend retrieved against something nobody asked for. What is
+deliberately **not** graded is that the alias fired. The orchestrator writes the tool call; its
+wording is model prose, and the rule above applies to it exactly as it applies to the answer. An
+earlier revision required the corpus wording and reported a run where the platform, the route and
+`SOP-102` all landed as a failed beat, because the orchestrator had phrased the call a sixth way —
+the alias list is a determinism aid, not a grammar the model agreed to. A missing Grounding panel
+remains a routing failure: no tool query exists because the orchestrator did not call the tool.
 
 The suite also asserts the Grounding panel is **empty before the question is asked**. Without it, a
 panel left lit by a previous conversation satisfies every other assertion in the spec.
@@ -131,9 +139,12 @@ named Copilot Studio and Dataverse — and the answer was the **honest miss**: *
 found no matching procedure."* Two runs in eight ended this way while
 `check-deployed-surface.sh`'s `grounded-answer` check, which asks the backend directly, passed every
 time. The difference was the question: the check asked the corpus's own words, and the orchestrator
-handed the SOP tool whatever the model rephrased them into. The validator now records both values and
-requires the retrieved closing-store query to be the authored one. The ten-run rehearsal is the
-proof that the fix has reached the deployment; do not replace it with a direct SOP probe.
+handed the SOP tool whatever the model rephrased them into. The validator now records both values;
+the alias normalises the rephrasings it recognises, and what the spec *grades* is the honest miss
+itself, which is the symptom. Grading the retrieved wording instead was tried and withdrawn — the
+orchestrator promptly produced a seventh phrasing and the beat went red on a run that named Copilot
+Studio, reported Dataverse and cited SOP-102. The ten-run rehearsal is the proof that the fix has
+reached the deployment; do not replace it with a direct SOP probe.
 
 The spec checks for the honest miss **before** it checks the citation, and fails with a message
 saying which of the two happened. Asserting only on the citation reports a miss as an empty string,

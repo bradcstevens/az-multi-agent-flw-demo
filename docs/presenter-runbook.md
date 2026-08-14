@@ -1,36 +1,5 @@
 # The presenter runbook
 
-## Rehearse the closing-store beat
-
-Before a customer session, run the Demo validator ten times against the
-deployed surface. Every run must be green and its artifact must include
-`sop-tool-query.json`: the `retrievalQuery` must be the corpus's
-closing-store question. Keep the video and report from one green run as the
-recorded fallback. A direct SOP probe is not a substitute because it does not
-exercise the Foundry orchestrator.
-
-## If the closing-store beat misses
-
-The first Quick Task should show **Copilot Studio → Dataverse** and cite
-`SOP-102`. If the Grounding panel instead says no matching procedure, say:
-
-> "That is an honest miss: the published procedure library did not return a
-> match, so the assistant will not invent closing steps. On shift, the associate
-> asks the shift lead rather than acting on an answer it cannot ground."
-
-Do not describe a citation that did not arrive, and do not substitute procedure
-steps from memory. The customer has just seen the system's safety boundary,
-not a successful cross-platform answer.
-
-If the Grounding panel stays empty, say:
-
-> "The procedure tool was not invoked on this run, so the system is not making
-> a cross-platform grounding claim."
-
-Continue only if the remaining beat is independent. For the full walkthrough,
-use the recording from a green validator run rather than retrying live in front
-of the customer.
-
 Issue #53. Everything you need to run the **Circle K Frontline Store Assistant** demonstration
 from a URL, alone, in front of the customer. You do not need to know how it is built.
 
@@ -70,6 +39,14 @@ Read the two boxes below before anything else. They are the only two things you 
 | **Rehearse** | Run the seven taps once end to end before the meeting. It takes about ten minutes and it is the only way to know today's deployment is healthy. |
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
 | **Between beats** | Beats 1 to 4 open a task view — click **New task** in the left panel to get back to the six cards. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
+
+**Ask an engineer to clear the deployment before a customer session.** Ten Demo validator runs
+against the deployed surface ([demo-validator.md](demo-validator.md)), all green. Ten because the
+opening beat misses roughly one run in four (#54) and a single green run cannot tell you that. Keep
+the video and HTML report from one of those runs — that is the recording at the bottom of the
+fallback ladder, and it only counts if it is from a green run. A direct probe of the procedure
+library is **not** a substitute: it answers whether Copilot Studio is up, not whether the Foundry
+orchestrator reaches it, and the hop is the whole claim.
 
 **The demonstration opens with nobody signed in**, and that is deliberate — say so early. The
 header reads **Store 223** and **No user signed in**. This is a **shared store device**: one
@@ -268,7 +245,7 @@ beat 2; it is not a failure.
 
 | Beat | What failure looks like | Continue? | What to say |
 | --- | --- | --- | --- |
-| 1 | The Grounding panel never lights at all, or it lights and says *found no matching procedure* for the closing question, or the answer says it could not reach the store procedure assistant | **No** — continue only with an independent beat | If the panel is empty, say *"the procedure tool was not invoked on this run, so the system is not making a cross-platform grounding claim."* If it says it found nothing, say *"that is an honest miss: the published procedure library did not return a match, so the assistant will not invent closing steps."* Do not retry it live or describe a citation that did not arrive; use the recorded green validator run for the full walkthrough. |
+| 1 | The Grounding panel never lights at all, or it lights and says *found no matching procedure* for the closing question, or the answer says it could not reach the store procedure assistant | **Yes** — re-ask once by typing the same words; it is intermittent, roughly one run in four (#54) | If the panel is empty, another agent answered from what it already had and never called out to Copilot Studio — say *"the procedure tool was not invoked on this run, so the system is not making a cross-platform grounding claim"* and re-ask once. If it says it found nothing, say *"that is an honest miss: the published procedure library did not return a match, so the assistant will not invent closing steps"*. If it misses twice, stop re-asking — go to beat 2, which makes the same point about grounding, and come back to beat 1 afterwards or fall back to the recording. Whatever you say, **do not describe a citation that did not arrive** and do not fill in the closing steps from memory — a narrated `SOP-102` is the one failure the customer cannot see and cannot forgive |
 | 2 | It answers the car-wash question with plausible steps | **Yes** | Say plainly that the library has no such procedure and that an answer here would be the failure. Do not pretend it went well |
 | 3 | No chips appear, or the assistant asks for something else | **Yes** — type a short answer naming one thing you tried | *"It is asking what I have already tried."* The beat survives typing; only the ticket in beat 4 gets thinner |
 | 4 | No plan appears, or the ticket has no attempted steps | **Yes** | If the steps are missing, say so — *"those should be carried across, and that is the claim I would want you to test in a pilot"* — and do not read the empty rows out as if they were full |

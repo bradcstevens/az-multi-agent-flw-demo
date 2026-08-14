@@ -33,6 +33,7 @@ AUTHORED = E2E / "authored.ts"
 AGENTS = REPO_ROOT / "AGENTS.md"
 INHERITED = REPO_ROOT / "tests" / "e2e-test"
 STORE_SURFACE = E2E / "pages" / "StoreSurface.ts"
+CROSS_PLATFORM_SPEC = E2E / "specs" / "cross-platform.spec.ts"
 HOME_INPUT = (
     REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
 )
@@ -54,6 +55,15 @@ def _code(path: Path) -> str:
     """
     source = re.sub(r"/\*.*?\*/", "", _text(path), flags=re.DOTALL)
     return re.sub(r"^\s*//.*$", "", source, flags=re.MULTILINE)
+
+
+def _flat(path: Path) -> str:
+    """Return a TypeScript file's code with its whitespace collapsed.
+
+    So an assertion pinned here is pinned as the matcher it is, not as the line
+    the formatter happened to wrap it onto.
+    """
+    return re.sub(r"\s+", " ", _code(path))
 
 
 def test_the_validator_has_a_loop_script():
@@ -154,3 +164,78 @@ def test_the_quick_task_tap_is_aimed_at_the_quick_tasks_region():
         "StoreSurface looks a Quick Task up across the whole page; the task "
         "rail carries the same words and the tap is ambiguous"
     )
+
+
+def test_the_beat_does_not_grade_the_orchestrators_wording():
+    # The rule this file's own subject states, applied to the one signal that
+    # slipped past it. `docs/demo-validator.md` says model prose is asserted
+    # only to have arrived, because "an empty answer and a paraphrased one look
+    # identical to a suite that greps for a sentence, and only one of them is a
+    # failure". The **retrieval query** is model prose: the orchestrator writes
+    # the question the MCP tool is called with, and the backend's alias rewrites
+    # it only when it recognises the wording verbatim.
+    #
+    # So an assertion that the retrieval query *equals* the corpus question is
+    # an assertion that the orchestrator phrased itself in one of a handful of
+    # rehearsed ways. It went red on a run where the hop, the route and
+    # SOP-102 all landed — the demonstration working, reported as the
+    # demonstration broken, which is the one thing this loop must never do.
+    #
+    # What is left is the invariant the backend actually guarantees, and it is
+    # worth asserting: `_retrieval_query` is an **input alias, not an answer
+    # fallback**, so the query it retrieves against is either the corpus's own
+    # wording or the orchestrator's, and never a third thing. A null fails it
+    # too, which is the routing failure the panel's absence already reports.
+    spec = _code(CROSS_PLATFORM_SPEC)
+
+    retrieval_expectations = [
+        line for line in spec.splitlines()
+        if "expect(" in line and "retrievalQuery" in line
+    ]
+    assert retrieval_expectations, (
+        "the beat no longer says anything about the retrieval query; the "
+        "evidence is captured and never read"
+    )
+    assert not any(
+        re.search(r"expect\(retrievalQuery\)\.toBe\(hit\.question\)", line)
+        for line in retrieval_expectations
+    ), (
+        "the beat grades the orchestrator's wording: it requires the retrieval "
+        "query to be the corpus question, which only happens when the "
+        "orchestrator's rephrasing is one the backend alias recognises "
+        "verbatim. A green demonstration goes red on the sixth phrasing"
+    )
+    # Pinned as the whole matcher, not as "the word toolQuery appears
+    # somewhere". A check that only forbids the old assertion is satisfied by
+    # `.not.toContain(...)` — the invariant inverted — and one that only looks
+    # for a substring is satisfied by a line that mentions it. Read from the
+    # whitespace-normalised source so wrapping the call across lines, which is
+    # what the formatter does to it, is not a failure.
+    assert "expect([hit.question, toolQuery]).toContain(retrievalQuery);" in _flat(
+        CROSS_PLATFORM_SPEC
+    ), (
+        "the beat does not accept the orchestrator's own query as a retrieval "
+        "query: an un-aliased phrasing that retrieved SOP-102 anyway fails, "
+        "and a third query the backend invented would pass"
+    )
+
+
+def test_the_beat_fails_when_the_evidence_is_absent():
+    # The hole the invariant assertion leaves open on its own. Both queries are
+    # read with `getAttribute`, which returns **null** for an attribute the
+    # rendered panel does not carry — and a backend rolled back to before the
+    # evidence fields existed renders neither. "One of the corpus wording or
+    # the orchestrator's" is then "one of the corpus wording or null", which
+    # null satisfies: the beat would pass against a deployment that cannot say
+    # what it retrieved against.
+    #
+    # ADR-018's lesson, at this seam: an assertion that degrades to green when
+    # the deployed build is older than the assertion is worse than no
+    # assertion, because it is read as proof.
+    spec = _code(CROSS_PLATFORM_SPEC)
+
+    for name in ("retrievalQuery", "toolQuery"):
+        assert f"expect({name}).toBeTruthy();" in _flat(CROSS_PLATFORM_SPEC), (
+            f"the beat never requires {name} to be present, so a deployment "
+            "that renders no evidence attribute passes on a null"
+        )

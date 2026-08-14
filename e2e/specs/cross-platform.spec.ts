@@ -67,7 +67,31 @@ test.describe('the cross-platform hop', () => {
         }
         expect(await plan.rail.platformNamed()).toBe(SOP_PLATFORM);
         await expect(plan.rail.route).toContainText(SOP_SOURCE);
-        expect(retrievalQuery).toBe(hit.question);
+
+        // The retrieval query is **evidence**, and it is graded as the
+        // invariant the backend guarantees rather than as a sentence.
+        //
+        // `_retrieval_query` is an *input alias, not an answer fallback*: it
+        // rewrites the orchestrator's question to the corpus's own wording when
+        // it recognises that question verbatim, and otherwise passes it
+        // through. So exactly two values are correct here, and a third would
+        // mean the backend answered from somewhere this beat never asked.
+        //
+        // What must **not** be asserted is that the alias fired. The
+        // orchestrator writes the tool call, its wording is model prose, and
+        // this file's governing rule — stated in `docs/demo-validator.md` — is
+        // that model prose is asserted only to have arrived. Requiring the
+        // corpus wording requires the orchestrator to have phrased itself in
+        // one of a handful of rehearsed ways; it reported a run where the hop,
+        // the route and SOP-102 all landed as a failed beat.
+        // The evidence arrived at all. `getAttribute` returns null for a panel
+        // that carries no such attribute, and the model maps a field the
+        // backend omits to `''` — and both satisfy "one of two" below for
+        // free. Without these two lines the beat passes against a deployment
+        // that cannot say what it retrieved against.
+        expect(toolQuery).toBeTruthy();
+        expect(retrievalQuery).toBeTruthy();
+        expect([hit.question, toolQuery]).toContain(retrievalQuery);
 
         // The citation's document identifier, read out of the corpus manifest
         // rather than written down here. `[rehearsed_hit]` names the SOP-NNN
