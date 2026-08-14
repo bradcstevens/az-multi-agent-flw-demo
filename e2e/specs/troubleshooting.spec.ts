@@ -33,6 +33,25 @@ import { recordWire } from '../wire';
 /** The clarification, in the vocabulary both ends of the socket share. */
 const CLARIFICATION = 'user_clarification_request';
 
+/**
+ * What a red on the chips-go-with-the-question assertion means.
+ *
+ * Hiding them is the fix #50 made at `PlanChat`, so this assertion is the one
+ * in the beat that a deployment can fail for its **age** rather than for its
+ * behaviour: rolled before that commit, the chips outlive every question and
+ * the beat is red on an image, not on the code. Playwright would otherwise
+ * report only that a locator stayed visible for thirty seconds, which is "the
+ * beat is broken" and "the image is old" arriving as the same red — the
+ * confusion #48 exists to remove, and the one this beat produced first.
+ */
+const CHIPS_OUTLIVED_THE_QUESTION =
+    'the rehearsed reply chips outlived the question they answered, so a ' +
+    'one-tap answer is still on offer carrying a request_id the backend has ' +
+    'already answered. Hiding them is the PlanChat fix of #50: check the ' +
+    'running image tag against HEAD before reading this as a regression, ' +
+    'because a deployment rolled before that commit is red here for the ' +
+    'image rather than for the code (#48)';
+
 test.describe('the troubleshooting beat', () => {
     test('asks what has already been tried, and a tap records it', async ({ page }) => {
         const task = troubleshootingTask();
@@ -78,7 +97,9 @@ test.describe('the troubleshooting beat', () => {
         await plan.tapRehearsedReply(answer);
 
         // The question has been answered, so the one-tap answers go with it.
-        await expect(plan.rehearsedReplies).toBeHidden({ timeout: 30_000 });
+        await expect(plan.rehearsedReplies, CHIPS_OUTLIVED_THE_QUESTION).toBeHidden({
+            timeout: 30_000,
+        });
 
         // And the tap left a record. Read out of the container the clarification
         // seam writes to, not out of the conversation the browser is holding:

@@ -66,6 +66,18 @@ def _flat(path: Path) -> str:
     return re.sub(r"\s+", " ", _code(path))
 
 
+def _named_string(path: Path, name: str) -> str:
+    """Return the sentence a spec's named string constant is declared as.
+
+    Read flat and re-joined, so a message the formatter wrapped over five lines
+    and four `+` is asserted here as the one sentence its reader sees rather
+    than as the fragments it is written in.
+    """
+    declaration = re.search(rf"const {re.escape(name)} = (.*?);", _flat(path))
+    assert declaration, f"{path.name} declares no string constant named {name}"
+    return "".join(re.findall(r"'((?:[^'\\]|\\.)*)'", declaration.group(1)))
+
+
 def test_the_validator_has_a_loop_script():
     assert LOOP.exists(), "no script runs the Demo validator"
     assert LOOP.stat().st_mode & 0o111, f"{LOOP.name} is not executable"
@@ -316,6 +328,41 @@ def test_the_rejected_branch_is_asserted():
     escalation = _code(ESCALATION)
 
     assert "rejected" in escalation, "nothing asserts what a rejected plan raises"
+
+
+def test_the_chips_going_with_the_question_says_what_its_red_means():
+    # The one assertion in either hard beat that went red with nothing to read.
+    # Against `rg-macae-flw-v1` on 2026-08-14 it reported only that a locator
+    # resolved to a visible `<div class="rehearsed-replies">` for thirty
+    # seconds — while the escalation beat beside it named its defect and its
+    # issue number.
+    #
+    # Hiding those chips *is* #50's `PlanChat` fix, so every deployment rolled
+    # before that commit is red here for the image rather than for the code.
+    # That is exactly "the beat is broken" and "the image is old" arriving as
+    # the same red, which is the confusion #48 exists to remove; until the
+    # provenance check lands, the assertion carries the explanation itself.
+    flat = _flat(TROUBLESHOOTING)
+
+    match = re.search(
+        r"expect\(\s*plan\.rehearsedReplies,\s*([A-Za-z_][A-Za-z0-9_]*),?\s*\)"
+        r"\s*\.toBeHidden\(",
+        flat,
+    )
+    assert match, (
+        "the assertion that the chips go with the question they answered "
+        "carries no message, so its red says only that a locator was visible"
+    )
+
+    message = _named_string(TROUBLESHOOTING, match.group(1))
+    assert "PlanChat" in message, (
+        "the message does not name the seam that hides the chips, so a reader "
+        "cannot tell which commit a deployment has to carry to go green"
+    )
+    assert "image" in message, (
+        "the message does not offer the deployment as an explanation, so an "
+        "un-rolled image still reads as a regression in the code"
+    )
 
 
 def test_the_walkthrough_is_never_retried():

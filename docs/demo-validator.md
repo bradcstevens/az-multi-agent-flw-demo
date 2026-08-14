@@ -134,6 +134,15 @@ replies stayed on screen offering one-tap answers to a resolved `request_id`. Fi
 the submit failed. Every panel test passed throughout, because each fed the component the state it
 expected rather than the state a conversation produces.
 
+That fix also makes the assertion above the **one in either beat a deployment can fail for its age**.
+Hiding the chips is a frontend change, so any image rolled before it leaves them on screen and the
+beat goes red for the image rather than for the code — which is why the assertion carries
+`CHIPS_OUTLIVED_THE_QUESTION` rather than leaving Playwright to report that a locator stayed visible
+for thirty seconds. It was read that way once already, on 2026-08-14: the integration branch carrying
+this fix was gated against a deployment serving `a96b4481`, and the beat's anonymous red sat beside
+the escalation beat's named one. Same rule as **Selectors** below, one layer in — until #48 lands,
+the assertion says which commit a deployment has to carry.
+
 **The ticket was never raised, because the draft did not exist yet.** The confirmation seam ran
 inside `_handle_plan_reviews` — at plan-review time, which is *before* the plan runs, and the plan
 whose last step is *"draft a simulated service-incident ticket"* has not drafted one. `TicketStore.read`
