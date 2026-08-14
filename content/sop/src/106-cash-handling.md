@@ -2,13 +2,13 @@
 doc_id = "SOP-106"
 title = "Cash Handling and Safe Drops"
 version = "2.4"
-owner = "Brightpath Convenience - Loss Prevention"
+owner = "Circle K - Loss Prevention"
 effective = "2026-01-05"
 +++
 
 ## Purpose
 
-Keep the cash on hand at Brightpath Convenience Store 223 low, counted and traceable, so that no
+Keep the cash on hand at Circle K Store 223 low, counted and traceable, so that no
 associate is ever standing behind a drawer holding more money than the store can account for.
 
 ## Scope

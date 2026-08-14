@@ -2,13 +2,13 @@
 doc_id = "SOP-110"
 title = "Shift Handover and Task Board"
 version = "1.2"
-owner = "Brightpath Convenience - Northgate District Operations"
+owner = "Circle K - Northgate District Operations"
 effective = "2026-02-02"
 +++
 
 ## Purpose
 
-Hand a shift over at Brightpath Convenience Store 223 in a fixed 10 minutes so that nothing
+Hand a shift over at Circle K Store 223 in a fixed 10 minutes so that nothing
 in-flight is lost between two associates, and so the incoming associate starts knowing what is
 already broken, already counted and already promised to a customer.
 

@@ -2,7 +2,7 @@
 doc_id = "SOP-101"
 title = "Store Opening Procedure"
 version = "1.4"
-owner = "Brightpath Convenience - Northgate District Operations"
+owner = "Circle K - Northgate District Operations"
 effective = "2026-03-02"
 +++
 
@@ -13,7 +13,7 @@ the first customer of the day is served by a store that is lit, stocked, priced 
 
 ## Scope
 
-Applies to the opening associate and the shift lead at Brightpath Convenience Store 223. The
+Applies to the opening associate and the shift lead at Circle K Store 223. The
 opening routine starts 45 minutes before the posted opening time.
 
 ## Before You Start

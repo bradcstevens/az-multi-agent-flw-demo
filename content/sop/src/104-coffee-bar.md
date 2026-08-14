@@ -2,13 +2,13 @@
 doc_id = "SOP-104"
 title = "Coffee Bar Setup and Shutdown"
 version = "1.3"
-owner = "Brightpath Convenience - Food and Beverage Standards"
+owner = "Circle K - Food and Beverage Standards"
 effective = "2026-01-19"
 +++
 
 ## Purpose
 
-Set up, hold and shut down the coffee bar at Brightpath Convenience Store 223 so that every cup is
+Set up, hold and shut down the coffee bar at Circle K Store 223 so that every cup is
 brewed fresh, held within its holding window, and served from clean equipment.
 
 ## Scope

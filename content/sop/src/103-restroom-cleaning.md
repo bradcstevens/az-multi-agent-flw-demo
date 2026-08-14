@@ -2,13 +2,13 @@
 doc_id = "SOP-103"
 title = "Restroom Cleaning and Inspection"
 version = "2.1"
-owner = "Brightpath Convenience - Facilities Standards"
+owner = "Circle K - Facilities Standards"
 effective = "2026-02-16"
 +++
 
 ## Purpose
 
-Keep the customer restrooms at Brightpath Convenience Store 223 clean, stocked and inspected on a
+Keep the customer restrooms at Circle K Store 223 clean, stocked and inspected on a
 fixed schedule, and record every inspection so the standard is provable rather than assumed.
 
 ## Scope

@@ -28,6 +28,7 @@ from copilot_studio.sop_agent import (
     INSTRUCTIONS,
     NOT_PROBED,
     Probe,
+    upload_reason,
 )
 
 
@@ -195,6 +196,49 @@ def test_the_whole_corpus_uploaded_passes():
                     corpus=CORPUS).check("corpus-uploaded").ok
 
 
+CLOSING = "SOP-102 Store Closing Procedure.docx"
+
+
+def attached(filename=CLOSING):
+    return {"botcomponentid": "b1", "schemaname": "cr48b_StoreSopAssistant.file.sop102",
+            "name": filename, "componenttype": 14, "filedata_name": filename}
+
+
+def test_a_document_whose_bytes_already_match_is_not_uploaded_again():
+    assert upload_reason(attached(), CLOSING, b"built", b"built") is None
+
+
+def test_a_rebranded_document_is_uploaded_even_though_its_filename_is_unchanged():
+    """The rebrand (ADR-019) rewrites the body of all ten documents and renames none
+    of them, because the filename is the citation the associate reads. A provision
+    that decides on the filename alone therefore reports every document present and
+    uploads nothing, and the agent goes on answering out of the old corpus.
+    """
+    reason = upload_reason(attached(), CLOSING, b"Circle K", b"Brightpath Convenience")
+
+    assert reason is not None
+    assert "content" in reason
+
+
+def test_a_component_with_no_file_attached_is_uploaded():
+    row = attached()
+    row["filedata_name"] = None
+
+    assert upload_reason(row, CLOSING, b"built", None) is not None
+
+
+def test_a_file_that_cannot_be_read_back_is_uploaded_rather_than_assumed_current():
+    """Unknown is not current. Skipping on a failed read is the same silent hole as
+    skipping on the filename: nothing fails, and the old document keeps answering.
+    """
+    assert upload_reason(attached(), CLOSING, b"built", None) is not None
+
+
+def test_a_file_attached_under_another_name_is_uploaded():
+    assert upload_reason(attached("SOP-102 Store Closing.docx"), CLOSING,
+                         b"built", b"built") is not None
+
+
 def authored(filenames=CORPUS):
     """The agent exactly as this repository authors it."""
     return [{"schemaname": c.schemaname, "name": c.name,
@@ -258,12 +302,71 @@ MISS = reply(
     "missing so it can be added.", citations=())
 
 
-def probed(procedure=None, miss=MISS, greeting=GREETING_REPLY):
+def probed(procedure=None, miss=MISS, greeting=GREETING_REPLY,
+           branding=None):
     return Probe(
         greeting=[greeting] if greeting else [],
         procedure=[procedure if procedure is not None else reply(ANSWER)],
         miss=[miss] if miss else [],
+        branding=[branding if branding is not None else reply(BRANDED_ANSWER)],
     )
+
+
+BRANDED_ANSWER = (
+    "SOP-102 Store Closing Procedure is owned by Circle K - Northgate District "
+    "Operations and applies to the closing associate and the shift lead at "
+    "Circle K Store 223."
+)
+
+
+def test_an_answer_that_quotes_the_banner_out_of_the_document_proves_the_content_is_live():
+    """The rebrand (ADR-019) changed the documents' bytes and not their names, so
+    the corpus check — which reads names — passes either way. Only the banner
+    coming back out of a live conversation proves the index holds the rebuilt
+    documents rather than the ones it held before.
+    """
+    check = evaluate(bot_row(), uploaded(), probe=probed(), corpus=CORPUS,
+                     banner="Circle K").check("corpus-content-current")
+
+    assert check.ok, check.detail
+
+
+def test_an_answer_still_carrying_the_previous_banner_fails():
+    stale = reply(
+        "SOP-102 Store Closing Procedure is owned by Brightpath Convenience - "
+        "Northgate District Operations and applies to Brightpath Convenience "
+        "Store 223."
+    )
+
+    check = evaluate(bot_row(), uploaded(), probe=probed(branding=stale),
+                     corpus=CORPUS, banner="Circle K").check(
+                         "corpus-content-current")
+
+    assert not check.ok
+    assert "Circle K" in check.detail
+
+
+def test_a_branding_answer_that_cites_nothing_fails_even_when_it_says_the_banner():
+    """The model knows the customer's name without reading a document, so an
+    uncited answer naming the banner is exactly what a stale index produces once
+    the question has told it what to say.
+    """
+    uncited = reply(f"That procedure applies to Circle K Store 223.",
+                    citations=())
+
+    check = evaluate(bot_row(), uploaded(), probe=probed(branding=uncited),
+                     corpus=CORPUS, banner="Circle K").check(
+                         "corpus-content-current")
+
+    assert not check.ok
+
+
+def test_a_run_that_did_not_read_the_corpus_banner_reports_no_evidence():
+    check = evaluate(bot_row(), uploaded(), probe=probed(), corpus=CORPUS,
+                     banner=None).check("corpus-content-current")
+
+    assert not check.ok
+    assert NOT_PROBED in check.detail
 
 
 def test_a_run_that_never_opened_a_conversation_reports_no_evidence():

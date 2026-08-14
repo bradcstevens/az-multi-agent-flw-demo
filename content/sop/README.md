@@ -1,8 +1,13 @@
 # SOP corpus
 
-The standard-operating-procedure knowledge the Copilot Studio SOP agent is grounded on. Everything
-here is **invented**: a fictional banner (Brightpath Convenience), a fictional site (Store 223),
-fictional roles and invented procedures. No customer content is used anywhere.
+The standard-operating-procedure knowledge the Copilot Studio SOP agent is grounded on. Every
+procedure here is **invented**: a fictional site (Store 223), fictional roles and invented
+procedures. No customer content is used anywhere. Only the banner is the customer's own — the
+corpus is branded **Circle K** by [ADR-019](../../docs/adr/019-rebrand-the-sop-corpus-to-circle-k.md),
+which reversed the fictional banner (Brightpath Convenience) it carried before, so that the
+Grounding panel's snippet reads coherently under the Circle K header at the cross-platform beat.
+Rebranding changes whose name is on the procedures, not whether they are real: the presenter says
+out loud that they are authored, not the customer's.
 
 ## Layout
 

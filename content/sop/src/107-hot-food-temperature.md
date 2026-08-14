@@ -2,13 +2,13 @@
 doc_id = "SOP-107"
 title = "Hot Food Case Temperature Control"
 version = "2.2"
-owner = "Brightpath Convenience - Food and Beverage Standards"
+owner = "Circle K - Food and Beverage Standards"
 effective = "2026-02-16"
 +++
 
 ## Purpose
 
-Hold prepared food at Brightpath Convenience Store 223 at a safe temperature, discard it on time,
+Hold prepared food at Circle K Store 223 at a safe temperature, discard it on time,
 and keep a temperature record that shows both what was measured and what was done about it.
 
 ## Scope

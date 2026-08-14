@@ -2,13 +2,13 @@
 doc_id = "SOP-108"
 title = "Age-Restricted Sales Verification"
 version = "4.0"
-owner = "Brightpath Convenience - Loss Prevention"
+owner = "Circle K - Loss Prevention"
 effective = "2026-03-02"
 +++
 
 ## Purpose
 
-Make every age-restricted sale at Brightpath Convenience Store 223 the same sale: identification
+Make every age-restricted sale at Circle K Store 223 the same sale: identification
 checked, identification scanned, refusal recorded when the check fails.
 
 ## Scope

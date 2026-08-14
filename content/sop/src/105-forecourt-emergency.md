@@ -2,13 +2,13 @@
 doc_id = "SOP-105"
 title = "Forecourt Emergency Stop and Fuel Spill Response"
 version = "3.0"
-owner = "Brightpath Convenience - Safety and Compliance"
+owner = "Circle K - Safety and Compliance"
 effective = "2026-02-02"
 +++
 
 ## Purpose
 
-Give every associate at Brightpath Convenience Store 223 one memorised order of actions for a fuel
+Give every associate at Circle K Store 223 one memorised order of actions for a fuel
 emergency on the forecourt, so that the pumps are stopped before anything else is attempted.
 
 ## Scope

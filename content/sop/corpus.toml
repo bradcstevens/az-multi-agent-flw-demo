@@ -1,8 +1,8 @@
 # Corpus manifest for the SOP knowledge the Copilot Studio agent is grounded on.
-# Everything named here is invented. There is no real store, no real employee and no real
-# procedure in this corpus.
+# Every procedure here is invented. There is no real store, no real employee and no real
+# procedure in this corpus - only the banner is the customer's own, by ADR-019.
 
-banner = "Brightpath Convenience"
+banner = "Circle K"
 store = "Store 223"
 locale = "en-US"
 

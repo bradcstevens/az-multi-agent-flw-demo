@@ -88,6 +88,32 @@ class Component:
         return f"Component({self.schemaname!r})"
 
 
+def upload_reason(row, filename, local_bytes, remote_bytes):
+    """Why `filename` has to be uploaded to `row`, or None if it is already there.
+
+    Decided on the document's **content**, not on its name. The filename is the
+    citation the associate reads, so a document is rewritten far more often than
+    it is renamed — the Circle K rebrand (ADR-019) rewrote all ten and renamed
+    none. A provision that skips a file whose `filedata_name` already matches
+    therefore reports the whole corpus present, uploads nothing, and leaves the
+    agent answering out of the previous corpus with nothing red anywhere.
+
+    `remote_bytes` is None when nothing is attached or the attachment could not
+    be read back, and both mean upload: unknown is not current.
+    """
+    if row is None:
+        return "the component does not exist yet"
+    attached = (row or {}).get("filedata_name")
+    if attached != filename:
+        return (f"the attached file is {attached!r}" if attached
+                else "no file is attached")
+    if remote_bytes is None:
+        return "the attached file could not be read back"
+    if remote_bytes != local_bytes:
+        return "the attached file's content is not the built document"
+    return None
+
+
 def document_key(filename):
     """Return the stable component key for a corpus filename.
 
@@ -184,7 +210,7 @@ class Verdict:
         raise KeyError(name)
 
 
-def evaluate(bot, components, probe, corpus):
+def evaluate(bot, components, probe, corpus, banner=None):
     """Return the `Verdict` for the SOP agent. Pure."""
     return Verdict([
         _exists_check(bot),
@@ -195,6 +221,7 @@ def evaluate(bot, components, probe, corpus):
         _greeting_check(probe),
         _procedure_check(probe, corpus),
         _honest_miss_check(probe),
+        _branding_check(probe, banner),
     ])
 
 
@@ -343,15 +370,17 @@ MINIMUM_STEPS = 2
 class Probe:
     """What a live Direct Line conversation answered, by beat.
 
-    Three beats, because they are three different claims: the agent greets an
+    Four beats, because they are four different claims: the agent greets an
     explicit conversation-start event, answers a procedure question in numbered
-    steps from a named source, and refuses an out-of-corpus question plainly.
+    steps from a named source, refuses an out-of-corpus question plainly, and
+    reads back a line of the document's own branding.
     """
 
-    def __init__(self, greeting=(), procedure=(), miss=()):
+    def __init__(self, greeting=(), procedure=(), miss=(), branding=()):
         self.greeting = list(greeting)
         self.procedure = list(procedure)
         self.miss = list(miss)
+        self.branding = list(branding)
 
 
 def _spoken(activities):
@@ -441,7 +470,51 @@ def _honest_miss_check(probe):
                  "the out-of-corpus question is refused plainly")
 
 
-INSTRUCTIONS = """You are the Store SOP Assistant for Brightpath Convenience \
+def _branding_check(probe, banner):
+    """Whether the document that comes back out of the index is the built one.
+
+    The corpus check reads filenames, and the rebrand (ADR-019) rewrote every
+    document's body while renaming none of them — the filename is the citation
+    the associate reads. So a stale index passes every other check in this
+    verdict: ten documents present, published, answering in numbered steps, out
+    of content weeks old. The banner is the one line of the document that a live
+    conversation can read back, and the citation beside it is what separates
+    reading it from knowing it: the model can name the customer's chain without
+    opening a file, so an uncited answer is no evidence at all.
+    """
+    if banner is None:
+        return Check("corpus-content-current", False,
+                     f"{NOT_PROBED}: the corpus banner could not be read from "
+                     "content/sop/corpus.toml, so there is nothing to compare "
+                     "the answer against")
+    if probe is None:
+        return Check("corpus-content-current", False,
+                     f"{NOT_PROBED}: the document's own branding was not asked "
+                     "for")
+    text = _spoken(probe.branding)
+    documents = [name for activity in probe.branding
+                 for name in cited_documents(activity)]
+    if not documents:
+        return Check(
+            "corpus-content-current", False,
+            "the answer cites no source document, so naming the banner proves "
+            "the model knows the customer, not that the index holds the "
+            "rebuilt corpus",
+        )
+    if banner.lower() not in text.lower():
+        return Check(
+            "corpus-content-current", False,
+            f"the answer never says {banner!r} — the published index is "
+            f"serving content this repository did not build; it said "
+            f"{text.strip()[:160]!r}",
+        )
+    return Check(
+        "corpus-content-current", True,
+        f"the live answer reads {banner!r} back out of " + ", ".join(documents),
+    )
+
+
+INSTRUCTIONS = """You are the Store SOP Assistant for Circle K \
 Store 223. You answer questions about store standard operating procedures using \
 only the SOP documents in your knowledge.
 
@@ -791,6 +864,28 @@ class Environment:
                         token=self._token, raw=raw, content_type=content_type,
                         headers=headers)
 
+    def download(self, path):
+        """Return a file column's bytes, or None if they cannot be read back.
+
+        None is what a component with nothing attached returns, and it is also
+        what a read that failed returns. The caller treats both the same way —
+        uploads — because the two are indistinguishable from here and guessing
+        current is the failure this exists to prevent.
+        """
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+
+        url = urllib.parse.quote(f"{self.base}/{path}/$value",
+                                 safe="/?$=&,'()*+:%~")
+        request = urllib.request.Request(
+            url, headers={"Authorization": f"Bearer {self._token}"})
+        try:
+            with urllib.request.urlopen(request) as response:
+                return response.read()
+        except urllib.error.HTTPError:
+            return None
+
 
 def resolve_environment(environment_id=None):
     """Return the Dataverse `Environment` for the tenant's Default environment.
@@ -895,17 +990,21 @@ def provision(environment, repo_root, solution=DEFAULT_SOLUTION):
             print(f"  updated {component.schemaname}")
         if component.filename is None:
             continue
-        if row.get("filedata_name") == component.filename and (
-                component.schemaname in existing):
-            continue
         path = os.path.join(repo_root, CORPUS_DIR, component.filename)
+        local = open(path, "rb").read()
+        reason = upload_reason(
+            row, component.filename, local,
+            environment.download(f"botcomponents({row['botcomponentid']})/filedata"),
+        )
+        if reason is None:
+            continue
         environment.call(
             f"botcomponents({row['botcomponentid']})/filedata", "PATCH",
-            raw=open(path, "rb").read(),
+            raw=local,
             content_type="application/octet-stream",
             headers={"x-ms-file-name": component.filename},
         )
-        print(f"  uploaded {component.filename}")
+        print(f"  uploaded {component.filename} - {reason}")
     return read_bot(environment)
 
 

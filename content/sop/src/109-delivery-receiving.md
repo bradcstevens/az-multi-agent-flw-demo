@@ -2,13 +2,13 @@
 doc_id = "SOP-109"
 title = "Delivery Receiving and Backroom Stocking"
 version = "1.8"
-owner = "Brightpath Convenience - Supply Chain"
+owner = "Circle K - Supply Chain"
 effective = "2026-01-19"
 +++
 
 ## Purpose
 
-Receive deliveries at Brightpath Convenience Store 223 so that the store is charged only for what
+Receive deliveries at Circle K Store 223 so that the store is charged only for what
 arrived, cold stock never sits warm, and the backroom stays walkable.
 
 ## Scope

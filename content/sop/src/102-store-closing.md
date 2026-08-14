@@ -2,7 +2,7 @@
 doc_id = "SOP-102"
 title = "Store Closing Procedure"
 version = "1.6"
-owner = "Brightpath Convenience - Northgate District Operations"
+owner = "Circle K - Northgate District Operations"
 effective = "2026-03-02"
 +++
 
@@ -13,7 +13,7 @@ opening associate, and the building is locked and armed with nobody left inside.
 
 ## Scope
 
-Applies to the closing associate and the shift lead at Brightpath Convenience Store 223. The
+Applies to the closing associate and the shift lead at Circle K Store 223. The
 closing routine starts 60 minutes before the posted closing time and must not be started earlier.
 
 ## Before You Start

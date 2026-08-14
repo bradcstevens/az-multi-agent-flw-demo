@@ -16,9 +16,15 @@ DOCX_DIR = CONTENT_DIR / "docx"
 
 REQUIRED_TITLES = ("store opening", "store closing", "restroom cleaning")
 
-# Real-world names would break the "fictional throughout" criterion if they appeared in the
-# procedures themselves. The demo's own branding lives in the app, never in the corpus.
-REAL_WORLD_TERMS = ("circle k", "microsoft", "azure", "copilot", "dataverse", "sharepoint")
+# The banner the corpus is written under. Pinned here because ADR-019 reversed the previous
+# position and the reasoning for the previous one survives in the corrections record, so a
+# future reader has every reason to change it back without knowing a presenter decided this.
+BANNER = "Circle K"
+
+# The banner is the customer's own (ADR-019); the procedures under it are still invented. What
+# must never appear in a procedure is the platform the demonstration runs on — a document that
+# names Copilot or Dataverse is describing the demo rather than the store.
+PLATFORM_TERMS = ("microsoft", "azure", "copilot", "dataverse", "sharepoint")
 
 # Function words that dominate any English prose and are absent from other languages, so a
 # document translated or drafted in another language fails even though it stays ASCII.
@@ -53,12 +59,22 @@ def test_every_document_answers_as_numbered_steps_from_a_named_source(corpus):
         assert document.title in document.filename
 
 
-def test_content_is_fictional(corpus):
+def test_every_document_carries_the_banner_and_never_names_the_platform(corpus):
     for document in corpus.documents:
         text = corpus.text_of(document)
-        assert corpus.banner.lower() in text, f"{document.doc_id} never names the fictional banner"
-        for term in REAL_WORLD_TERMS:
-            assert term not in text, f"{document.doc_id} mentions the real-world term '{term}'"
+        assert corpus.banner.lower() in text, f"{document.doc_id} never names the banner"
+        for term in PLATFORM_TERMS:
+            assert term not in text, f"{document.doc_id} mentions the platform term '{term}'"
+
+
+def test_the_corpus_is_branded_circle_k_in_the_body_and_not_the_titles_alone(corpus):
+    """ADR-019. The Grounding panel renders a snippet of the body, so the owner field and the
+    banner line are what the customer reads at the cross-platform beat — not the title."""
+    assert corpus.banner == BANNER
+    for document in corpus.documents:
+        assert document.owner.startswith(BANNER), (
+            f"{document.doc_id} is owned by '{document.owner}', not by {BANNER}"
+        )
 
 
 def test_content_is_english_only(corpus):
