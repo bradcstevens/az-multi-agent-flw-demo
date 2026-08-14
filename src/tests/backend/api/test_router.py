@@ -2010,6 +2010,59 @@ class TestSourceUsedSignal:
         assert response.json()["text"] == "1. Count the drawer."
         assert _pushes(rt, WebsocketMessageType.SOURCE_USED) == []
 
+    def test_a_bystander_socket_does_not_darken_the_panel(
+            self, rt, monkeypatch):
+        """The user **asking** outranks the count of who is connected.
+
+        Measured by the Routing probe (issue #54), and it is a stage hazard
+        rather than a theoretical one: with a second socket registered —
+        a presenter's other tab, a colleague's screen, a reconnect the backend
+        has not noticed yet — ``sole_user()`` refuses to guess and the
+        Grounding panel stays dark on a turn that retrieved and cited
+        ``SOP-102``. The probe graded exactly that as ``no-tool-call``, which
+        is the demonstration's centrepiece failing while the retrieval worked.
+
+        ``sole_turn()`` is the sharper question and was already being asked one
+        module away: a bystander has no request in flight, and the presenter
+        does. It refuses to guess between two of *those* the same way, so the
+        recipient is still resolved server-side and is still never a UUID a
+        model copied.
+        """
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        rt.connection_config.sole_user.return_value = None
+        monkeypatch.setattr(
+            router_mod, "sole_turn", lambda: ("the-presenter", "session-1"))
+
+        self._post(rt)
+
+        (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
+        assert push.kwargs["user_id"] == "the-presenter"
+
+    def test_two_turns_in_flight_still_refuses_to_guess(
+            self, rt, monkeypatch):
+        """Pushing one associate's provenance onto another's screen is worse
+        than a dark panel, so neither question guessing is allowed."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        rt.connection_config.sole_user.return_value = None
+        monkeypatch.setattr(router_mod, "sole_turn", lambda: None)
+
+        self._post(rt)
+
+        assert _pushes(rt, WebsocketMessageType.SOURCE_USED) == []
+
+    def test_the_turn_in_flight_outranks_the_sole_socket(
+            self, rt, monkeypatch):
+        """Both resolvable and they disagree: the socket count is the weaker
+        evidence, because a connection is not a question."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        monkeypatch.setattr(
+            router_mod, "sole_turn", lambda: ("the-presenter", "session-1"))
+
+        self._post(rt)
+
+        (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
+        assert push.kwargs["user_id"] == "the-presenter"
+
 
 class TestPresenterAlert:
     """R8's beat, fired on demand and never on a clock.

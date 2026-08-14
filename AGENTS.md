@@ -133,6 +133,15 @@ Notes:
   export GUARDRAIL_EMBEDDING_ENDPOINT="$(grep AZURE_OPENAI_ENDPOINT .azure/macae-flw-v1/.env | cut -d= -f2- | tr -d '"')"
   .venv/bin/python -m pytest src/tests/backend/guardrail/test_guardrail_corpus.py -m integration -s
   ```
+- **The Routing probe** is the centrepiece turn measured without a browser — `bash
+  scripts/measure-routing.sh --samples 12`. It is not a loop and is not in the table: every
+  sample is a live conversation with the deployed agent pool. It drives *"How do I close the
+  store?"* over plain HTTP and the transparency WebSocket, one turn at a time, and reports
+  which agents took part and at what rate — the instrument #54's routing residual went seven
+  iterations without, each of them a guessed prompt clause costing a deploy. Its record is
+  `docs/routing-probe.md`, its pure half is unit-tested by `src/tests/ci/test_routing_probe.py`,
+  and that file fails if a workflow ever runs it. Read `e2e/artifacts/routing-evidence.jsonl`
+  after a run: the rate is not the diagnosis.
 - **Fast-lane latency** is measured by `scripts/measure_fast_lane_latency.py`, not by a loop —
   it needs a live Foundry project and an agent pool to orchestrate. ADR-013 makes the number
   the sole trigger for reopening the orchestrator-bypass question, so run it and read it before

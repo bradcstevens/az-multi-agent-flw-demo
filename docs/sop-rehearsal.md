@@ -505,6 +505,62 @@ So AC3 is unmet, and it is unmet for a reason the record can now name precisely 
 reason it was opened about. Ten distinct rephrasings reached the SOP tool over the ten runs and every
 one of them retrieved — the rephrasing question (AC1) stays answered.
 
+## The residual gets an instrument instead of an eighth guess
+
+Seven prompt clauses had been forked on `minimal_plan` chasing the troubleshooter, each costing a
+twenty-minute deploy, each reducing the rate without removing it. The reason is above, in the table:
+the only thing that could see the fault was **ten browser runs that stop at the first red one**, and
+a rate cannot be measured one run at a time.
+
+So the eighth change was not a prompt clause. It was the [Routing probe](routing-probe.md) —
+`bash scripts/measure-routing.sh`, the same Fast-lane turn driven over plain HTTP and the
+transparency WebSocket with no browser, one sample at a time, about two minutes each. This is
+`bf7792a7`'s move one layer up: the honest miss was chased through the orchestrator for six
+iterations and found in an afternoon by asking the agent directly sixty-nine times.
+
+Twelve serial samples against build `8f0b77c7`:
+
+```
+   10  grounded
+    2  no-tool-call
+  FAIL  Troubleshooting Agent took part in 2 of 12 turns, on a question with nothing broken in
+        it, and spoke on 2 of them
+```
+
+**The residual reproduces without a browser** — the same one-run-in-five as the ten-run rehearsal,
+at a twentieth of the cost of observing it. That is the thing the next iteration has that the last
+seven did not, and `e2e/artifacts/routing-evidence.jsonl` now carries, per sample, which agents were
+billed, which spoke, and the wording that actually reached the SOP tool.
+
+## The panel goes dark if anyone else is watching
+
+The probe's own two `no-tool-call` samples were the more expensive finding, and they cost one
+experiment rather than one deploy.
+
+`_push_source_used` — the frame the Grounding panel renders — resolves its recipient server-side, and
+the resolution was `sole_user()`: *the* connected user, when there is exactly one. A **positive
+control**, one sample taken with a single idle bystander socket registered beside it:
+
+```
+  "outcome": "no-tool-call",
+  "agents_billed": ["Shift Tasks Agent"],
+  "citations": [],
+  "answer": "Here's the Store 223 closing procedure from **SOP-102 Store Closing Procedure**: ..."
+```
+
+The retrieval worked, `SOP-102` was cited in the prose, and the panel stayed dark. This is not a
+probe artefact: a presenter's second tab, a colleague's screen, or a reconnect the backend has not
+noticed closing yet is enough to produce it on stage — the centrepiece panel empty on a turn that
+retrieved correctly, for a reason nothing on the screen explains. It is also, exactly, the coarser
+variant this issue describes in its own words: *"No tool call, no `source_used`, an honestly empty
+panel."* Some of those may never have been the routing at all.
+
+The fix asks the sharper question first: `sole_turn()`, the one user with a request **in flight**,
+which was already being asked one module away for the troubleshooting tools, falling back to
+`sole_user()`. Both refuse to guess between two, so the recipient is still resolved server-side and
+is still never a UUID a model copied. They differ only in what they count, and **a connection is not
+a question**.
+
 ## The deploy gate asked once, and once is a coin flip
 
 The last thing measuring the fault changed is the check that had been green throughout it.

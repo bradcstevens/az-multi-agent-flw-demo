@@ -1170,6 +1170,33 @@ _Avoid_: stale deployment, drift
 
 ## Confirmed findings
 
+### One extra socket darkens the Grounding panel (confirmed 2026-08-14, issue #54)
+
+`_push_source_used` — the frame the demonstration's centrepiece panel renders — resolved its
+recipient with `sole_user()`, *the* connected user when there is exactly one. With a **second**
+socket registered, the push is dropped and the panel stays dark on a turn that retrieved and cited
+`SOP-102`.
+
+Measured with a positive control by the [Routing probe](docs/routing-probe.md): one Fast-lane turn
+taken with a single idle bystander socket open beside it graded `no-tool-call` with an answer that
+opened *"Here's the Store 223 closing procedure from **SOP-102 Store Closing Procedure**"*. The
+retrieval worked; only the provenance was lost.
+
+The second socket does not have to be another associate. A presenter's other tab, a colleague's
+screen, or a reconnect the backend has not yet noticed closing is enough — and the failure is
+indistinguishable, on the screen and in the browser ledger, from the orchestrator never having
+called the SOP tool. Issue #54's coarser variant, *"No tool call, no `source_used`, an honestly
+empty panel"*, may partly have been this rather than the routing.
+
+`_panel_recipient()` now asks `sole_turn()` first — the one user with a request **in flight**, which
+the troubleshooting tools were already asking one module away — and falls back to `sole_user()`.
+Both refuse to guess between two, so the recipient is still resolved server-side and is still never
+a UUID a model copied. A connection is not a question.
+
+The general lesson is the one this repository keeps re-buying: **an ambient singleton is a
+correlation ID with no error case.** Any bridge that resolves *who* by counting what is connected
+works perfectly until something else connects, and then fails silently, on stage.
+
 ### The two hardest beats have never been asserted on `main`, and #50 is closed (confirmed 2026-08-14, issue #61)
 
 `e2e/specs/escalation.spec.ts` and `e2e/specs/troubleshooting.spec.ts` **have never existed on

@@ -1006,7 +1006,7 @@ async def _push_source_used(reply: dict) -> None:
         signal = source_used(reply)
         if signal is None:
             return
-        recipient = connection_config.sole_user()
+        recipient = _panel_recipient()
         if not recipient:
             logger.debug("sop/ask: nobody connected to tell about the source used")
             return
@@ -1017,6 +1017,29 @@ async def _push_source_used(reply: dict) -> None:
         )
     except Exception as exc:
         logger.error("sop/ask: could not report the source used: %s", exc)
+
+
+def _panel_recipient() -> Optional[str]:
+    """Whose Grounding panel a bridge-originated push belongs on.
+
+    **The user asking outranks the count of who is connected.** Both questions
+    refuse to guess, so neither can put one associate's provenance on another's
+    screen; they differ only in what they are counting, and a request in flight
+    is the stronger evidence. A second socket — the presenter's other tab, a
+    colleague's screen, a reconnect the backend has not noticed closing yet —
+    is not a second question.
+
+    Measured before it was believed. The Routing probe (issue #54) took one
+    Fast-lane turn with a single idle bystander socket registered and graded it
+    ``no-tool-call``: the answer cited ``SOP-102`` and listed its steps, and
+    the panel stayed dark, because ``sole_user()`` counted two and stopped. On
+    stage that is the demonstration's centrepiece failing on a retrieval that
+    worked, for a reason nothing on the screen explains.
+    """
+    turn = sole_turn()
+    if turn:
+        return turn[0]
+    return connection_config.sole_user()
 
 
 # ------------------------------------------------------------------
