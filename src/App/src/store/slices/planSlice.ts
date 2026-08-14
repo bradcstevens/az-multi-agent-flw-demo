@@ -36,8 +36,6 @@ export interface PlanState {
     loading: boolean;
     /** Did the plan load fail? */
     errorLoading: boolean;
-    /** Waiting for the backend to produce a plan */
-    waitingForPlan: boolean;
     /** Plan-approval payload received from WebSocket */
     planApprovalRequest: MPlanData | null;
     /** Is an approval/reject API call in progress? */
@@ -68,7 +66,6 @@ const initialState: PlanState = {
     planData: null,
     loading: true,
     errorLoading: false,
-    waitingForPlan: true,
     planApprovalRequest: null,
     processingApproval: false,
     showApprovalButtons: true,
@@ -95,9 +92,6 @@ const planSlice = createSlice({
         },
         setErrorLoading(state, action: PayloadAction<boolean>) {
             state.errorLoading = action.payload;
-        },
-        setWaitingForPlan(state, action: PayloadAction<boolean>) {
-            state.waitingForPlan = action.payload;
         },
         setPlanApprovalRequest(state, action: PayloadAction<MPlanData | null>) {
             state.planApprovalRequest = action.payload as any;
@@ -161,13 +155,11 @@ const planSlice = createSlice({
         /** Single dispatch when PLAN_APPROVAL_REQUEST arrives via WebSocket */
         approvalRequestReceived(state, action: PayloadAction<MPlanData>) {
             state.planApprovalRequest = action.payload as any;
-            state.waitingForPlan = false;
             state.showProcessingPlanSpinner = false;
             state.showApprovalButtons = true;
         },
         /** Single dispatch when FINAL_RESULT_MESSAGE arrives and plan is complete */
         planCompletedFinal(state) {
-            state.waitingForPlan = false;
             state.showProcessingPlanSpinner = false;
             if (state.planData?.plan) {
                 (state.planData as any).plan.overall_status = PlanStatus.COMPLETED;
@@ -176,7 +168,6 @@ const planSlice = createSlice({
 
         /** Single dispatch when an error occurs during plan execution */
         planFailedFinal(state) {
-            state.waitingForPlan = false;
             state.showProcessingPlanSpinner = false;
             if (state.planData?.plan) {
                 (state.planData as any).plan.overall_status = PlanStatus.FAILED;
@@ -202,7 +193,6 @@ const planSlice = createSlice({
                     state.showApprovalButtons = true;
                 } else {
                     state.showApprovalButtons = false;
-                    state.waitingForPlan = false;
                 }
 
                 if (planResult?.plan?.overall_status !== PlanStatus.COMPLETED) {
@@ -235,7 +225,6 @@ export const {
     setPlanData,
     setLoading,
     setErrorLoading,
-    setWaitingForPlan,
     setPlanApprovalRequest,
     setProcessingApproval,
     setShowApprovalButtons,
@@ -261,7 +250,6 @@ export const {
 export const selectPlanData = (s: RootState) => s.plan.planData;
 export const selectPlanLoading = (s: RootState) => s.plan.loading;
 export const selectErrorLoading = (s: RootState) => s.plan.errorLoading;
-export const selectWaitingForPlan = (s: RootState) => s.plan.waitingForPlan;
 export const selectPlanApprovalRequest = (s: RootState) => s.plan.planApprovalRequest;
 export const selectProcessingApproval = (s: RootState) => s.plan.processingApproval;
 export const selectShowApprovalButtons = (s: RootState) => s.plan.showApprovalButtons;

@@ -47,7 +47,7 @@ _Sample operation:_
   > _Observe: It will trigger the "Generating Plan Action" and give the Proposed Plan with 4 or more Steps_
 - Task: Click on **"Approve Task Plan"** Button
   > _Note: Average response time is around 01 minute._ <br>
-  > _Observe: It goes into "Thinking Process" and observe a spinner "Processing your plan and coordinating with AI Agents"._ <br>
+  > _Observe: It goes into "Thinking Process" and the **Progress narration** names each specialist as it responds — "Troubleshooting Agent is responding…" — rather than a scripted sequence (ADR-023)._ <br>
   > _Review the output._
 
 ### **HR Onboarding Scenario**

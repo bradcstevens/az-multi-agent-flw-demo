@@ -52,6 +52,7 @@ import teamReducer from '../store/slices/teamSlice';
 import streamingReducer from '../store/slices/streamingSlice';
 import transparencyReducer from '../store/slices/transparencySlice';
 import ticketReducer from '../store/slices/ticketSlice';
+import progressReducer from '@/store/slices/progressSlice';
 import { FakeSocket } from '@/testing/fakeSocket';
 import {
     InputTaskResponse,
@@ -130,6 +131,7 @@ const makeStore = () => {
             streaming: streamingReducer,
             transparency: transparencyReducer,
             ticket: ticketReducer,
+            progress: progressReducer,
         },
         middleware: (getDefaultMiddleware) =>
             getDefaultMiddleware({ serializableCheck: false }),

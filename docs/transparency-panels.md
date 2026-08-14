@@ -127,8 +127,10 @@ Populated from the **workflow roster** (`planData.team.agents`), not from the pl
 off there is no plan object at all (ADR-013), and the panel previously read
 `planApprovalRequest.team` — behind an early return that rendered the entire right-hand panel as
 "No plan available". On the Fast lane, which is most of the walkthrough, the audience saw no agents
-and no panels. The early return is gone, and "Plan is being generated…" is now shown only when a
-plan is actually coming; a Fast-lane request says "No plan to review on this request."
+and no panels. The early return is gone, and `PLAN_ARRIVING` — *"Plan is being generated…"*, owned
+by `models/progressNarration.ts` since #64 along with every other string shown while a request is in
+flight — is now rendered only when a plan is actually coming; a Fast-lane request says "No plan to
+review on this request."
 
 ### It states availability, never participation
 
@@ -136,7 +138,9 @@ The panel is on screen for the whole loading window — `PlanPanelRight` renders
 `PlanPage`'s `loading || !planData` branch — and `planData` is `null` for all of it. Sourced only
 from the plan fetch, it therefore rendered its honest empty state, **"No agent roster loaded for
 this conversation."**, two inches from a spinner reading *"Initializing AI agents…"*. One of those
-was wrong and it was not the panel.
+was wrong and it was not the panel — and the spinner no longer says it, because #64 deleted the
+four authored stages outright. What that position shows now is the **Progress narration**, which
+names one agent at a time as each speaks, and nothing at all before any of them has (ADR-023).
 
 Nothing was missing. The **store assistant roster** is in Redux from `HomePage`'s mount, so
 `selectedTeam` is the panel's second source and `selectTeamAgentCount` — exported and unused since

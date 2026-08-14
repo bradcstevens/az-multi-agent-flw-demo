@@ -16,6 +16,7 @@ vi.mock('../../store/TaskService', () => ({
 import HomeInput from './HomeInput';
 import { TaskService } from '../../store/TaskService';
 import transparencyReducer from '@/store/slices/transparencySlice';
+import progressReducer, { selectProgressNarration } from '@/store/slices/progressSlice';
 import webSocketService from '@/store/WebSocketService';
 import { WebsocketMessageType } from '@/models';
 import { FakeSocket, frame } from '@/testing/fakeSocket';
@@ -57,14 +58,22 @@ const ANSWER = {
     },
 } as any;
 
-const renderInput = (team: any = TEAM) =>
-    render(
-        <Provider store={configureStore({ reducer: { transparency: transparencyReducer } })}>
-            <MemoryRouter>
-                <HomeInput selectedTeam={team} />
-            </MemoryRouter>
-        </Provider>,
-    );
+const renderInput = (team: any = TEAM) => {
+    const store = configureStore({
+        reducer: { transparency: transparencyReducer, progress: progressReducer },
+    });
+    return {
+        store,
+        narration: () => selectProgressNarration(store.getState() as never),
+        ...render(
+            <Provider store={store}>
+                <MemoryRouter>
+                    <HomeInput selectedTeam={team} />
+                </MemoryRouter>
+            </Provider>,
+        ),
+    };
+};
 
 const ask = async (question: string) => {
     await userEvent.type(screen.getByRole('textbox'), question);
@@ -434,3 +443,71 @@ const rulesNaming = (cls: string): [string, string][] => {
                 .map((rule) => [entry, rule[2]] as [string, string]);
         });
 };
+
+/**
+ * The **Progress narration** as the home surface arms it (issue #64, ADR-023).
+ *
+ * The two phases that happen before any plan page exists, which is exactly why
+ * the phase is held in a slice: the story used to run backwards across this
+ * navigation — *"Plan created — Fast lane"* here, then *"Loading plan data..."*
+ * over *"Initializing AI agents..."* on the page that follows.
+ */
+describe('what the home surface says about a question it has just sent', () => {
+    it('says nothing until a question has been asked', () => {
+        const { narration } = renderInput();
+
+        expect(narration()).toBeNull();
+    });
+
+    it('names the lane the router reported, in the Lane badge\'s own words', async () => {
+        createPlan.mockResolvedValue({ plan_id: 'plan-1', lane: 'fast' } as never);
+        const { narration } = renderInput();
+
+        await ask('how do I close the store?');
+
+        await waitFor(() => expect(narration()).toBe('Routed — Fast lane'));
+    });
+
+    it('holds the question being sent when the response reported no lane', async () => {
+        // The router failing to say is not the router saying "fast". A lane
+        // this surface invented would be the Lane badge's claim made by
+        // something that never read the response.
+        createPlan.mockResolvedValue({ plan_id: 'plan-1' } as never);
+        const { narration } = renderInput();
+
+        await ask('how do I close the store?');
+
+        await waitFor(() => expect(narration()).toBe('Sending your question...'));
+    });
+
+    it('stops narrating a question the gate refused', async () => {
+        // A refusal is an answer. Nothing is in flight behind it, and there is
+        // no plan page to arrive at that could ever stop the narration.
+        createPlan.mockRejectedValue(REFUSAL);
+        const { narration } = renderInput();
+
+        await ask('my name is Tanya, how much PTO do I have?');
+
+        await screen.findByTestId('policy-block');
+        expect(narration()).toBeNull();
+    });
+
+    it('stops narrating a question answered without a plan', async () => {
+        createPlan.mockResolvedValue(ANSWER);
+        const { narration } = renderInput();
+
+        await ask('how much PTO do I have?');
+
+        await screen.findByTestId('personal-answer');
+        expect(narration()).toBeNull();
+    });
+
+    it('stops narrating when no plan could be created at all', async () => {
+        createPlan.mockResolvedValue({ plan_id: null } as never);
+        const { narration } = renderInput();
+
+        await ask('how do I close the store?');
+
+        await waitFor(() => expect(narration()).toBeNull());
+    });
+});

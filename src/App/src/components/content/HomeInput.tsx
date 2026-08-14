@@ -19,6 +19,12 @@ import { PersonalAnswer, parsePersonalAnswer } from "../../models/personalAnswer
 import { forgetSignedInDevice } from "../../models/signedInDevice";
 import PersonalAnswerCard from "../identity/PersonalAnswerCard";
 import { isLane, LANE_LABELS } from "../../models/lane";
+import { SENDING } from "../../models/progressNarration";
+import {
+  laneRouted,
+  requestSent,
+  requestSettled,
+} from "../../store/slices/progressSlice";
 import LaneBadge from "../lane/LaneBadge";
 import { NewTaskService } from "../../store/NewTaskService";
 import webSocketService from "@/store/WebSocketService";
@@ -147,7 +153,12 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
     // question answered inside Foundry emits no source_used at all, and a
     // stale panel would credit Copilot Studio with an answer it never gave.
     dispatch(requestStarted());
-    let id = showToast("Creating a plan", "progress");
+    // The **Progress narration**'s first phase, and its only authored words
+    // (#64, ADR-023): the POST is in flight, and that is all anything knows.
+    // The toast reads them out of the same module the plan page will, so the
+    // two surfaces cannot disagree across the navigation between them.
+    dispatch(requestSent());
+    let id = showToast(SENDING, "progress");
 
     try {
       const response = ticketOnApproval
@@ -176,6 +187,9 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       // a null plan here is not a failure to create one.
       const answer = parsePersonalAnswer(response);
       if (answer) {
+        // Answered here, with no plan and no plan page. Nothing downstream
+        // could ever stop a narration left running.
+        dispatch(requestSettled());
         dismissToast(id);
         setPersonalAnswer(answer);
         setSubmitting(false);
@@ -189,6 +203,13 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       // carried to the plan page, where the answer (or the approval step)
       // arrives, so it outlives this toast.
       if (response.plan_id && response.plan_id !== null) {
+        // The lane the router decided, read from the same `response.lane` the
+        // `LaneBadge` reads. Recorded before the navigation, because the phase
+        // outliving that navigation is the whole reason it lives in a slice.
+        if (isLane(response.lane)) {
+          dispatch(laneRouted({ lane: response.lane, planId: response.plan_id }));
+        }
+
         // The socket opens here, on the response, and not on the plan page
         // (ADR-021). `process_request` schedules the orchestration *before* it
         // returns this response, so every frame emitted between now and the
@@ -218,10 +239,12 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
           state: { lane: response.lane },
         });
       } else {
+        dispatch(requestSettled());
         showToast("Failed to create plan", "error");
         dismissToast(id);
       }
     } catch (error: any) {
+      dispatch(requestSettled());
       dismissToast(id);
 
       // A Policy block is the Identity boundary gate working, so it gets its

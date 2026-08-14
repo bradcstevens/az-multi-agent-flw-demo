@@ -14,21 +14,25 @@ import RehearsedReplies from "./RehearsedReplies";
 import FollowOnTask from "./FollowOnTask";
 import { useAppSelector } from "@/store/hooks";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
+import { selectProgressNarration } from "@/store/slices/progressSlice";
 import { StartingTask } from "@/models/Team";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
   initialTask?: string;
   planApprovalRequest: MPlanData | null;
-  waitingForPlan: boolean;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   finalResultRef: React.RefObject<HTMLDivElement>;
   streamingMessageBuffer: string;
   showBufferingText: boolean;
   agentMessages: AgentMessageData[];
+  /**
+   * Whether the in-flight indicator belongs below the replies rather than
+   * above them — where an approved plan runs. Placement only: what it *says*,
+   * and whether it says anything at all, is the **Progress narration**'s.
+   */
   showProcessingPlanSpinner: boolean;
   processingElapsedSeconds: number;
-  processingStatusMessage: string;
   showApprovalButtons: boolean;
   handleApprovePlan: () => Promise<void>;
   handleRejectPlan: () => Promise<void>;
@@ -51,7 +55,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   onPlanReceived,
   initialTask,
   planApprovalRequest,
-  waitingForPlan,
   messagesContainerRef,
   finalResultRef,
   streamingMessageBuffer,
@@ -59,7 +62,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   agentMessages,
   showProcessingPlanSpinner,
   processingElapsedSeconds,
-  processingStatusMessage,
   showApprovalButtons,
   handleApprovePlan,
   handleRejectPlan,
@@ -71,6 +73,13 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 }) => {
   // Read before the early return: hooks may not sit behind a condition.
   const presenterAlerts = useAppSelector(selectPresenterAlerts);
+  /*
+    What the surface says while this request is in flight (#64, ADR-023). Read
+    from the slice rather than passed in, because the narration is one claim
+    made in one place: a component holding its own copy is how six of them came
+    to disagree about what the system was doing.
+  */
+  const narration = useAppSelector(selectProgressNarration);
 
   if (!planData)
     return (
@@ -103,7 +112,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         {renderUserPlanMessage(planApprovalRequest, initialTask, planData)}
 
         {/* AI thinking state */}
-        {renderThinkingState(waitingForPlan)}
+        {!showProcessingPlanSpinner && renderThinkingState(narration)}
 
         {/* Plan response with all information */}
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
@@ -119,7 +128,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           <PresenterAlertCard key={`${alert.timestamp}-${index}`} alert={alert} />
         ))}
 
-        {showProcessingPlanSpinner && renderPlanExecutionMessage(processingElapsedSeconds, processingStatusMessage)}
+        {showProcessingPlanSpinner && renderPlanExecutionMessage(narration, processingElapsedSeconds)}
         {/* Streaming plan updates — hidden while an approval prompt is pending so
             the approval action is presented at the appropriate step instead of
             after the thinking process visibly completes. */}
@@ -158,7 +167,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         setInput={setInput}
         submittingChatDisableInput={submittingChatDisableInput}
         OnChatSubmit={OnChatSubmit}
-        waitingForPlan={waitingForPlan}
         loading={false} />
 
     </div>

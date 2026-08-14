@@ -884,9 +884,13 @@ timer keyed to a GET-in-flight boolean. Nothing scaffolded and nothing optimised
 stages the system does not have, three inches from a **Token meter** whose whole discipline is
 **Not reported vs measured**. It also replaces six components each carrying their own copy, which
 had already drifted into telling the story backwards — *"Plan created — Fast lane"* on the home
-surface, then *"Loading plan data…"* on the plan surface. One module owns the strings, on the
-**Store surface**'s pattern, and one Redux slice holds the phase **across the navigation**, because
-across two components "only advances" is a coincidence and not a property.
+surface, then *"Loading plan data…"* on the plan surface. `models/progressNarration.ts` owns the
+strings, on the **Store surface**'s pattern — and a test reads the source tree, because six
+components each holding a copy is a fault about the repository that no render can see —
+while `store/slices/progressSlice.ts` holds the phase **across the navigation**, because across two
+components "only advances" is a coincidence and not a property. The slice carries the **plan the
+narration is about** as well, so opening an earlier task from the left panel mid-request does not
+leave *"Shift Tasks Agent is responding…"* over a conversation that finished last week.
 
 **And it stops.** Reaching Done removes the in-flight indicator from the screen, on the **Fast
 lane** — which has no `plan_approval_request` at all — as well as the Deliberate one and the error
@@ -894,7 +898,9 @@ path. Stated separately because every other rule here governs what the surface *
 them governs it ever *finishing*: #69 was a narration that claimed only what a signal reported and
 then ran for the rest of the conversation. Its guard drives raw wire text through
 `WebSocketService` into the real `PlanChat` and asserts no `progressbar` remains — by role, not by
-copy, so that rewriting these strings does not delete it. See
+copy, so that rewriting these strings did not delete it. It is pointed at the phase now, and
+`waitingForPlan` is gone: nothing on the surface reads a second boolean about whether a request is
+in flight. See
 [ADR-023](docs/ADR/023-progress-narration-claims-only-what-a-signal-reports.md).
 _Avoid_: loading message, progress indicator, spinner copy
 

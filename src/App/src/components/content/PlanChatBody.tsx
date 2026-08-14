@@ -9,7 +9,6 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
     setInput: (input: string) => void;
     submittingChatDisableInput: boolean;
     OnChatSubmit: (input: string) => void;
-    waitingForPlan: boolean;
 }
 
 const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
@@ -18,7 +17,6 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
     setInput,
     submittingChatDisableInput,
     OnChatSubmit,
-    waitingForPlan
 }) => {
     return (
         <div

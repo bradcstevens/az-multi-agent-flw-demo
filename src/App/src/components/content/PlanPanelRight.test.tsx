@@ -14,6 +14,7 @@ import ticketReducer, { ticketRaised } from '@/store/slices/ticketSlice';
 import teamReducer, { setSelectedTeam } from '@/store/slices/teamSlice';
 import { NO_ROSTER_MESSAGE } from '@/models/agentAvailability';
 import { SRC } from '@/testing/stylesheets';
+import { PLAN_ARRIVING } from '@/models/progressNarration';
 
 const makeStore = () =>
     configureStore({
@@ -139,7 +140,7 @@ describe('the plan surface on the deliberate lane', () => {
     it('promises a plan only while one is actually coming', () => {
         renderPanel(makeStore(), { steps: [], team: { agents: [] } } as any);
 
-        expect(screen.getByText(/Plan is being generated/i)).toBeInTheDocument();
+        expect(screen.getByText(PLAN_ARRIVING)).toBeInTheDocument();
     });
 
     it('still shows the roster and the rail beside the plan', () => {

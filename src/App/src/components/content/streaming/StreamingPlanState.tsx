@@ -1,9 +1,17 @@
 import { Spinner } from "@fluentui/react-components";
 import ProcessingStatusIndicator from "../../common/ProcessingStatusIndicator.tsx";
 
-// Simple thinking message to show while creating plan
-const renderThinkingState = (waitingForPlan: boolean) => {
-    if (!waitingForPlan) return null;
+/**
+ * The in-flight indicator above the reply, showing the **Progress narration**
+ * (issue #64, ADR-023).
+ *
+ * It takes the words rather than a boolean, and `null` means say nothing —
+ * which is also what makes it *stop*. Under the boolean it took before, the
+ * Fast lane had nothing that could ever clear it, so "Creating your plan..."
+ * ran under the answer for the rest of the conversation (#69).
+ */
+const renderThinkingState = (narration: string | null) => {
+    if (!narration) return null;
 
     return (
         <div style={{
@@ -16,26 +24,6 @@ const renderThinkingState = (waitingForPlan: boolean) => {
                 alignItems: 'flex-start',
                 gap: '16px'
             }}>
-                {/* Bot Avatar */}
-                {/* <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--colorNeutralBackground3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                }}>
-                    <div style={{
-                        width: '16px',
-                        height: '16px',
-                        backgroundColor: 'var(--colorBrandBackground)',
-                        borderRadius: '2px'
-                    }} />
-                </div> */}
-
-                {/* Thinking Message */}
                 <div style={{ flex: 1, maxWidth: 'calc(100% - 48px)' }}>
                     <div style={{
                         display: 'flex',
@@ -46,7 +34,7 @@ const renderThinkingState = (waitingForPlan: boolean) => {
                         fontSize: '14px'
                     }}>
                         <Spinner size="small" />
-                        <span>Creating your plan...</span>
+                        <span>{narration}</span>
                     </div>
                 </div>
             </div>
@@ -54,14 +42,21 @@ const renderThinkingState = (waitingForPlan: boolean) => {
     );
 };
 
-// Simple message to show while executing the plan
+/**
+ * The same narration, in the position an approved plan runs in.
+ *
+ * The elapsed time beside it is measured, not narrated — it is the one number
+ * here nobody authored.
+ */
 const renderPlanExecutionMessage = (
+    narration: string | null,
     processingElapsedSeconds?: number,
-    processingStatusMessage = 'Processing your plan and coordinating with AI agents...',
 ) => {
+    if (!narration) return null;
+
     return (
         <ProcessingStatusIndicator
-            message={processingStatusMessage}
+            message={narration}
             elapsedSeconds={processingElapsedSeconds}
         />
     );

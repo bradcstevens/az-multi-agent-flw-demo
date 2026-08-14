@@ -12,6 +12,7 @@ import {
 } from "@fluentui/react-icons";
 import React, { useState } from 'react';
 import { getAgentIcon, getAgentDisplayNameWithSuffix } from '@/utils/agentIconUtils';
+import { PLAN_ARRIVING } from '@/models/progressNarration';
 
 // Updated styles to match consistent spacing and remove brand colors from bot elements
 const useStyles = makeStyles({
@@ -377,7 +378,7 @@ const renderPlanResponse = (
 
                 {/* Plan Title */}
                 <div className={styles.planTitle}>
-                    {isCreatingPlan ? 'Creating plan...' : `Proposed Plan for ${planApprovalRequest.user_request || 'Task'}`}
+                    {isCreatingPlan ? PLAN_ARRIVING : `Proposed Plan for ${planApprovalRequest.user_request || 'Task'}`}
                 </div>
 
                 {/* Plan Steps */}

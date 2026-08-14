@@ -25,9 +25,7 @@ import {
     selectShowProcessingPlanSpinner,
     selectShowCancellationDialog,
     selectCancellingPlan,
-    selectLoadingMessage,
     selectReloadLeftList,
-    selectWaitingForPlan,
     selectShowTimeoutDialog,
     selectTimeoutMessage,
     setReloadLeftList,
@@ -35,7 +33,6 @@ import {
     setShowProcessingPlanSpinner,
     setShowCancellationDialog,
     setCancellingPlan,
-    setLoadingMessage,
     setErrorLoading,
     planApprovalAccepted,
     planApprovalRejected,
@@ -81,39 +78,23 @@ import StoreIdentity from '../components/branding/StoreIdentity';
 import { ASSISTANT_NAME } from '../models/storeSurface';
 import LaneBadge from '../components/lane/LaneBadge';
 import { isLane, LANE_LABELS } from '../models/lane';
+import { LOADING_PLAN, SENDING } from '../models/progressNarration';
+import {
+    laneRouted,
+    planOpened,
+    requestSent,
+    requestSettled,
+    selectProgressNarration,
+} from '../store/slices/progressSlice';
 import { useInlineToaster } from '../components/toast/InlineToaster';
 import Octo from '../commonComponents/imports/Octopus.png';
-import LoadingMessage, { loadingMessages } from '../commonComponents/components/LoadingMessage';
+import LoadingMessage from '../commonComponents/components/LoadingMessage';
 import PlanCancellationDialog from '../components/common/PlanCancellationDialog';
 import TimeoutDialog from '../components/common/TimeoutDialog';
 import '../styles/PlanPage.css';
 
 // Singleton API service
 const apiService = new APIService();
-
-const getPlanProcessingStatusMessage = (elapsedSeconds: number): string => {
-    if (elapsedSeconds < 8) {
-        return 'Processing your plan and coordinating with AI agents...';
-    }
-
-    if (elapsedSeconds < 20) {
-        return 'Assigning tasks to specialized agents...';
-    }
-
-    if (elapsedSeconds < 35) {
-        return 'Agents are analyzing and researching...';
-    }
-
-    if (elapsedSeconds < 50) {
-        return 'Compiling results from agents...';
-    }
-
-    if (elapsedSeconds < 90) {
-        return 'Finalizing responses...';
-    }
-
-    return 'Still processing, please wait...';
-};
 
 /* ================================================================
  *  PlanPage — refactored to use Redux + extracted hooks
@@ -144,9 +125,9 @@ const PlanPage: React.FC = () => {
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const showCancellationDialog = useAppSelector(selectShowCancellationDialog);
     const cancellingPlan = useAppSelector(selectCancellingPlan);
-    const loadingMessage = useAppSelector(selectLoadingMessage);
     const reloadLeftList = useAppSelector(selectReloadLeftList);
-    const waitingForPlan = useAppSelector(selectWaitingForPlan);
+    /* What the surface says while this request is in flight (#64, ADR-023). */
+    const narration = useAppSelector(selectProgressNarration);
     const input = useAppSelector(selectInput);
     const submittingChatDisableInput = useAppSelector(selectSubmittingChatDisable);
     const clarificationMessage = useAppSelector(selectClarificationMessage);
@@ -164,7 +145,6 @@ const PlanPage: React.FC = () => {
     const [processingElapsedSeconds, setProcessingElapsedSeconds] = React.useState<number>(0);
     const [followOnSubmitting, setFollowOnSubmitting] = React.useState(false);
     const followOnSubmissionRef = React.useRef(false);
-    const processingStatusMessage = getPlanProcessingStatusMessage(processingElapsedSeconds);
 
     /* ── The Rehearsed replies for this plan (issue #26) ─────── */
     /*
@@ -344,7 +324,8 @@ const PlanPage: React.FC = () => {
         followOnSubmissionRef.current = true;
         setFollowOnSubmitting(true);
         dispatch(requestStarted());
-        const id = showToast('Creating a plan', 'progress');
+        dispatch(requestSent(sessionId ? planData?.plan?.id : undefined));
+        const id = showToast(SENDING, 'progress');
         try {
             const response = await TaskService.createPlan(
                 task.prompt,
@@ -357,6 +338,9 @@ const PlanPage: React.FC = () => {
                 throw new Error('The follow-on task did not create a plan');
             }
 
+            if (isLane(response.lane)) {
+                dispatch(laneRouted({ lane: response.lane, planId: response.plan_id }));
+            }
             webSocketService.connect(response.plan_id).catch(() => {
                 // The plan page retries, and the surface degrades to polling.
             });
@@ -369,6 +353,7 @@ const PlanPage: React.FC = () => {
             );
             navigate(`/plan/${response.plan_id}`, { state: { lane: response.lane } });
         } catch {
+            dispatch(requestSettled());
             dismissToast(id);
             showToast('Unable to create plan. Please try again.', 'error');
         } finally {
@@ -422,8 +407,12 @@ const PlanPage: React.FC = () => {
                 dispatch(addAgentMessage(agentMessageData));
                 dispatch(setSubmittingChatDisableInput(true));
                 dispatch(setShowProcessingPlanSpinner(true));
+                // The associate answered, so the turn is in flight again — the
+                // pause for a **Clarification** settled it (#64, ADR-023).
+                dispatch(requestSent(planData.plan.id));
                 scrollToBottom();
             } catch {
+                dispatch(requestSettled());
                 dispatch(setShowProcessingPlanSpinner(false));
                 dismissToast(id);
                 dispatch(setSubmittingChatDisableInput(false));
@@ -441,18 +430,6 @@ const PlanPage: React.FC = () => {
     const resetReload = useCallback(() => {
         dispatch(setReloadLeftList(false));
     }, [dispatch]);
-
-    /* ── Loading message rotation ───────────────────────────── */
-    useEffect(() => {
-        if (!loading) return;
-        let index = 0;
-        dispatch(setLoadingMessage(loadingMessages[0]));
-        const interval = setInterval(() => {
-            index = (index + 1) % loadingMessages.length;
-            dispatch(setLoadingMessage(loadingMessages[index]));
-        }, 3000);
-        return () => clearInterval(interval);
-    }, [loading, dispatch]);
 
     /* ── Plan execution elapsed timer ───────────────────────── */
     useEffect(() => {
@@ -479,6 +456,13 @@ const PlanPage: React.FC = () => {
         // safe at this point: any signal for *this* plan arrives later, over a
         // socket that has not connected yet.
         dispatch(conversationStarted());
+        /*
+          The narration follows the request that made this navigation and
+          nothing else (#64, ADR-023). Opening an earlier task from the left
+          panel while a request is in flight would otherwise leave "Shift Tasks
+          Agent is responding..." over a conversation that finished last week.
+        */
+        dispatch(planOpened(planId));
 
         if (!planId) {
             resetPlanVariables();
@@ -525,9 +509,16 @@ const PlanPage: React.FC = () => {
                         <>
                             <div className="plan-loading-spinner">
                                 <Spinner size="medium" />
-                                <Text>Loading plan data...</Text>
+                                <Text>{LOADING_PLAN}</Text>
                             </div>
-                            <LoadingMessage loadingMessage={loadingMessage} iconSrc={Octo} />
+                            {/*
+                              What a signal has reported about the request
+                              itself, which is a different claim from the plan
+                              record being fetched — and nothing at all when
+                              nothing has reported anything, as on a reload
+                              (#64, ADR-023).
+                            */}
+                            {narration && <LoadingMessage loadingMessage={narration} iconSrc={Octo} />}
                         </>
                     ) : (
                         <>
@@ -555,7 +546,6 @@ const PlanPage: React.FC = () => {
                                 streamingMessages={streamingMessages}
                                 wsConnected={wsConnected}
                                 planApprovalRequest={planApprovalRequest}
-                                waitingForPlan={waitingForPlan}
                                 messagesContainerRef={messagesContainerRef}
                                 finalResultRef={finalResultRef}
                                 streamingMessageBuffer={streamingMessageBuffer}
@@ -563,7 +553,6 @@ const PlanPage: React.FC = () => {
                                 agentMessages={agentMessages}
                                 showProcessingPlanSpinner={showProcessingPlanSpinner}
                                 processingElapsedSeconds={processingElapsedSeconds}
-                                processingStatusMessage={processingStatusMessage}
                                 showApprovalButtons={showApprovalButtons}
                                 processingApproval={processingApproval}
                                 handleApprovePlan={handleApprovePlan}

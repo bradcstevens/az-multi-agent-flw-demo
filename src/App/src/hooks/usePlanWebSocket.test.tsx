@@ -11,9 +11,9 @@ import { WebsocketMessageType } from '@/models';
 import planReducer, {
     planApprovalAccepted,
     selectShowProcessingPlanSpinner,
-    selectWaitingForPlan,
     setContinueWithWebsocketFlow,
 } from '@/store/slices/planSlice';
+import progressReducer, { laneRouted, requestSent } from '@/store/slices/progressSlice';
 import chatReducer from '@/store/slices/chatSlice';
 import appReducer from '@/store/slices/appSlice';
 import teamReducer from '@/store/slices/teamSlice';
@@ -53,7 +53,6 @@ const Host = ({
         formatErrorMessage: (content: string) => content,
         showToast: () => 0,
     });
-    const waitingForPlan = useAppSelector(selectWaitingForPlan);
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const ref = React.useRef<HTMLDivElement>(null);
     return (
@@ -65,7 +64,6 @@ const Host = ({
             loading={false}
             OnChatSubmit={() => {}}
             planApprovalRequest={null}
-            waitingForPlan={waitingForPlan}
             messagesContainerRef={ref as never}
             finalResultRef={ref as never}
             streamingMessageBuffer=""
@@ -73,7 +71,6 @@ const Host = ({
             agentMessages={[]}
             showProcessingPlanSpinner={showProcessingPlanSpinner}
             processingElapsedSeconds={0}
-            processingStatusMessage="Processing your plan and coordinating with AI agents..."
             showApprovalButtons={false}
             handleApprovePlan={async () => {}}
             handleRejectPlan={async () => {}}
@@ -93,6 +90,7 @@ const makeStore = () =>
             streaming: streamingReducer,
             transparency: transparencyReducer,
             ticket: ticketReducer,
+            progress: progressReducer,
         },
         middleware: (getDefault) => getDefault({ serializableCheck: false }),
     });
@@ -213,6 +211,86 @@ describe('the plan page mounted twice, as StrictMode mounts it', () => {
  */
 const inFlightIndicators = () => screen.queryAllByRole('progressbar');
 
+/**
+ * The narration as the home surface arms it, before the navigation (ADR-023).
+ *
+ * `HomeInput` dispatches both: the POST going out, and the lane the response
+ * reported. The plan page inherits the phase because one slice holds it — which
+ * is the whole reason there is a slice.
+ */
+const askAQuestion = (store: ReturnType<typeof makeStore>, planId: string) => {
+    act(() => {
+        store.dispatch(requestSent());
+        store.dispatch(laneRouted({ lane: 'fast', planId }));
+    });
+};
+
+describe('the agent that is responding, named from the frame that names it', () => {
+    it('names the executor an agent_message_streaming frame carries', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        expect(screen.getByText('Routed — Fast lane')).toBeInTheDocument();
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Troubleshooting Agent',
+                    content: 'Let me check the closing procedure.',
+                    is_final: false,
+                }),
+            );
+        });
+
+        await waitFor(() =>
+            expect(screen.getByText('Troubleshooting Agent is responding...')).toBeInTheDocument(),
+        );
+    });
+
+    it('names the next specialist when the question is handed on', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', { agent_name: 'shift_tasks_agent', content: 'a' }),
+            );
+        });
+        await waitFor(() =>
+            expect(screen.getByText('Shift Tasks Agent is responding...')).toBeInTheDocument(),
+        );
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', { agent_name: 'Troubleshooting Agent', content: 'b' }),
+            );
+        });
+
+        await waitFor(() =>
+            expect(screen.getByText('Troubleshooting Agent is responding...')).toBeInTheDocument(),
+        );
+    });
+
+    it('says an agent is responding when the frame names none', async () => {
+        // Generic only where the name cannot be resolved. "Assistant Agent" —
+        // what the display-name pipeline returns for an empty string — would be
+        // an agent nobody configured, on screen as though a frame had named it.
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(frame('agent_message_streaming', { content: 'a' }));
+        });
+
+        await waitFor(() =>
+            expect(screen.getByText('An agent is responding...')).toBeInTheDocument(),
+        );
+    });
+});
+
 describe('a final result arriving on the socket', () => {
     const deliverFinalResult = (socket: FakeSocket, status: string) => {
         act(() => {
@@ -226,7 +304,8 @@ describe('a final result arriving on the socket', () => {
     };
 
     const expectNothingInFlightAfter = async (status: string) => {
-        renderHost('plan-1');
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
         const socket = await openedOnTheResponse('plan-1');
 
         expect(inFlightIndicators()).not.toHaveLength(0);
@@ -240,7 +319,8 @@ describe('a final result arriving on the socket', () => {
         // ADR-013: no `plan_approval_request` arrives on this lane, so the final
         // result is the only thing that can ever stop the narration.
         const scrollToFinalResult = vi.fn();
-        renderHost('plan-1', { scrollToFinalResult });
+        const { store } = renderHost('plan-1', { scrollToFinalResult });
+        askAQuestion(store, 'plan-1');
         const socket = await openedOnTheResponse('plan-1');
 
         expect(inFlightIndicators()).not.toHaveLength(0);
@@ -253,10 +333,11 @@ describe('a final result arriving on the socket', () => {
 
     it('leaves nothing in flight once an approved plan has been running', async () => {
         // The Deliberate lane's second indicator, reached the way the lane
-        // reaches it: `approvalRequestReceived` clears the thinking state, and
-        // the approval starts the plan-execution message. A guard watching only
-        // the thinking state sees an empty screen from here on either way.
+        // reaches it: the approval request settles the first request, and the
+        // approval starts a second. A guard watching only the thinking state
+        // sees an empty screen from here on either way.
         const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
         const socket = await openedOnTheResponse('plan-1');
         act(() => {
             socket.deliver(
@@ -269,7 +350,7 @@ describe('a final result arriving on the socket', () => {
                 }),
             );
         });
-        expect(inFlightIndicators()).toHaveLength(0);
+        await waitFor(() => expect(inFlightIndicators()).toHaveLength(0));
 
         act(() => {
             store.dispatch(planApprovalAccepted());
@@ -290,5 +371,19 @@ describe('a final result arriving on the socket', () => {
         // The `status === 'completed'` guard's else branch: any other terminal
         // status hangs the indicator unless it clears them too.
         await expectNothingInFlightAfter('failed');
+    });
+
+    it('leaves nothing in flight after an error frame of its own', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        expect(inFlightIndicators()).not.toHaveLength(0);
+
+        act(() => {
+            socket.deliver(frame('error_message', { content: 'The orchestration failed.' }));
+        });
+
+        await waitFor(() => expect(inFlightIndicators()).toHaveLength(0));
     });
 });

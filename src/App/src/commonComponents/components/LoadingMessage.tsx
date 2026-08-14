@@ -3,13 +3,13 @@ import {
     Text,
 } from "@fluentui/react-components";
 
-export const loadingMessages = [
-    "Initializing AI agents...",
-    "Generating plan scaffolds...",
-    "Optimizing task steps...",
-    "Applying finishing touches...",
-];
-
+/**
+ * The words are the caller's, and the caller reads them from
+ * `models/progressNarration.ts` (issue #64, ADR-023). This module used to
+ * export four of its own — *"Initializing AI agents..."* and three more — that
+ * `PlanPage` rotated on a 3000ms timer keyed to a GET being in flight. Nothing
+ * scaffolded and nothing optimised.
+ */
 export interface LoadingMessageProps {
     loadingMessage: string;
     iconSrc?: string;

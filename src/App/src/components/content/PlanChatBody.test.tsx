@@ -13,7 +13,6 @@ const renderBody = (input: string, submitting = false) =>
             setInput={() => {}}
             submittingChatDisableInput={submitting}
             OnChatSubmit={vi.fn()}
-            waitingForPlan={false}
             {...({} as any)}
         />,
     );

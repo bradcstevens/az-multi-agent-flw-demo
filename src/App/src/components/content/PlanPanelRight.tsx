@@ -7,6 +7,7 @@ import {
 } from "@fluentui/react-icons";
 import { PlanDetailsProps } from "../../models";
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
+import { PLAN_ARRIVING } from '../../models/progressNarration';
 import { SECTION_HEADING } from '../../models/headingOutline';
 import ContentNotFound from "../NotFound/ContentNotFound";
 import AgentTeamPanel from "../transparency/AgentTeamPanel";
@@ -92,7 +93,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
               spinner that never resolves.
             */}
             {planApprovalRequest
-              ? 'Plan is being generated...'
+              ? PLAN_ARRIVING
               : 'No plan to review on this request.'}
           </div>
         ) : (

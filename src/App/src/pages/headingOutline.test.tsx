@@ -42,6 +42,7 @@ import teamReducer from '@/store/slices/teamSlice';
 import streamingReducer from '@/store/slices/streamingSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
+import progressReducer from '@/store/slices/progressSlice';
 
 /**
  * The surface's heading outline (issue #57).
@@ -94,6 +95,7 @@ const makeStore = () =>
             streaming: streamingReducer,
             transparency: transparencyReducer,
             ticket: ticketReducer,
+            progress: progressReducer,
         },
         middleware: (getDefaultMiddleware) =>
             getDefaultMiddleware({ serializableCheck: false }),

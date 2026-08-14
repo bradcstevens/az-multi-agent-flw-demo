@@ -7,6 +7,7 @@ import React from 'react';
 import PlanChat from './PlanChat';
 import chatReducer, { setClarificationMessage } from '@/store/slices/chatSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
+import progressReducer from '@/store/slices/progressSlice';
 
 const REPLY = 'I switched it off at the wall and back on again.';
 const FOLLOW_ON = {
@@ -33,7 +34,11 @@ const renderChat = (
     { pending = true }: { pending?: boolean } = {},
 ) => {
     const store = configureStore({
-        reducer: { chat: chatReducer, transparency: transparencyReducer },
+        reducer: {
+            chat: chatReducer,
+            transparency: transparencyReducer,
+            progress: progressReducer,
+        },
     });
     if (pending) {
         store.dispatch(
@@ -55,7 +60,6 @@ const renderChat = (
                 loading={false}
                 OnChatSubmit={vi.fn()}
                 planApprovalRequest={null}
-                waitingForPlan={false}
                 messagesContainerRef={ref as never}
                 finalResultRef={ref as never}
                 streamingMessageBuffer=""
@@ -63,7 +67,6 @@ const renderChat = (
                 agentMessages={[]}
                 showProcessingPlanSpinner={false}
                 processingElapsedSeconds={0}
-                processingStatusMessage=""
                 showApprovalButtons={false}
                 handleApprovePlan={vi.fn()}
                 handleRejectPlan={vi.fn()}

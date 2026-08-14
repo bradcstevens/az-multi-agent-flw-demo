@@ -63,13 +63,13 @@ answer, indefinitely, three inches from a rail reading *"No plan to review on th
 narration that claims only what a signal reports and then never stops is still making a false
 claim — that the request is in flight — and it makes it for the rest of the conversation.
 
-#69 is fixed ahead of this machine, and its guard is written to **survive** being rebased into it:
-it drives raw wire text through `WebSocketService` into the real `PlanChat`, and asserts that no
-`progressbar` remains. Asserted by role rather than by copy, because this ADR rewrites every one of
-those strings — a guard pinned to the words is deleted along with the words, exactly when it is
-needed — and against the whole conversation rather than one indicator, because the surface has two
-and a stand-in rendering one can only agree with itself. Re-point it at the phase slice; do not
-drop it.
+#69 was fixed ahead of this machine, and its guard **survived** being rebased into it: it drives
+raw wire text through `WebSocketService` into the real `PlanChat`, and asserts that no `progressbar`
+remains. Asserted by role rather than by copy, because this ADR rewrote every one of those strings —
+a guard pinned to the words is deleted along with the words, exactly when it is needed — and against
+the whole conversation rather than one indicator, because the surface has two and a stand-in
+rendering one can only agree with itself. It is now pointed at the phase slice, and `waitingForPlan`
+is gone: nothing on the surface reads a second boolean about whether a request is in flight.
 
 Every phase is an observable event:
 
@@ -92,7 +92,10 @@ Three structural commitments follow:
   pattern. Six places to disagree becomes one place to be correct.
 - **One Redux slice holds the phase, and it survives the navigation** from home to plan. Across two
   independent components "only advances" is a coincidence, not a property; monotonicity is the
-  entire safety guarantee and it has to be enforceable in one place.
+  entire safety guarantee and it has to be enforceable in one place. It also carries the **plan the
+  narration is about**, so that opening an earlier task from the left panel while a request is in
+  flight does not leave *"Shift Tasks Agent is responding..."* over a conversation that finished
+  last week.
 - **The phase machine is asserted through `WebSocketService` with raw wire text.** A machine keyed
   to frames, tested against hand-fed payloads, is the exact configuration that let #47 ship.
 
@@ -130,8 +133,13 @@ with it — see **Available vs participating** in `CONTEXT.md`.
 - **Negative:** It depends on [ADR-021](./021-connect-the-socket-before-navigation.md). Over the
   previous connect ordering the later phases key off frames that are dropped, and the machine would
   stall silently — a worse failure than the fiction it replaces.
-- **Negative:** `PlanPanelRight.test.tsx` and `docs/transparency-panels.md` both carry
-  *"Plan is being generated..."* and must move with the change.
+- **Negative:** `PlanPanelRight.test.tsx` and `docs/transparency-panels.md` both carried
+  *"Plan is being generated..."* and moved with the change; it is `PLAN_ARRIVING` now, and both
+  read it from the module. `docs/SampleQuestions.md` carried the elapsed-keyed copy and moved too.
+- **Negative:** A reload of `/plan/:id` mid-request narrates **nothing** until the next
+  `agent_message_streaming` frame, because no signal has reported anything to that browser. That is
+  the honest amount, and it is what "holds the last true statement" costs when there is no last true
+  statement.
 - **Risk accepted:** Someone will later want to make the loading screen "nicer" and re-add authored
   copy. This ADR is the answer to that, and the rule itself is in `CONTEXT.md` as **Progress
   narration** so it is reachable without finding this file.

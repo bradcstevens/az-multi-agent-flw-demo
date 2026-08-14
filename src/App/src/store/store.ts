@@ -12,6 +12,7 @@ import teamReducer from './slices/teamSlice';
 import streamingReducer from './slices/streamingSlice';
 import transparencyReducer from './slices/transparencySlice';
 import ticketReducer from './slices/ticketSlice';
+import progressReducer from './slices/progressSlice';
 
 export const store = configureStore({
     reducer: {
@@ -22,6 +23,7 @@ export const store = configureStore({
         streaming: streamingReducer,
         transparency: transparencyReducer,
         ticket: ticketReducer,
+        progress: progressReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({

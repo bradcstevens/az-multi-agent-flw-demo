@@ -13,7 +13,6 @@ import {
     setShowProcessingPlanSpinner,
     setShowApprovalButtons,
     setReloadLeftList,
-    setWaitingForPlan,
     selectPlanData,
     selectContinueWithWebsocketFlow,
     selectPlanApproved,
@@ -24,6 +23,11 @@ import {
     planCompletedFinal,
     planFailedFinal,
 } from '@/store/slices/planSlice';
+import {
+    agentResponding,
+    requestSettled,
+    socketConnected,
+} from '@/store/slices/progressSlice';
 import {
     setSubmittingChatDisableInput,
     setClarificationMessage,
@@ -154,6 +158,10 @@ export function usePlanWebSocket({
                 if (mPlanData) {
                     /* P0: single compound action replaces 4 separate dispatches */
                     dispatch(approvalRequestReceived(mPlanData));
+                    // The Deliberate lane's Done: the plan is on screen, so the
+                    // request is no longer in flight (#64, ADR-023). The
+                    // approval starts a second one.
+                    dispatch(requestSettled());
                     scrollToBottom();
                 }
             },
@@ -175,6 +183,10 @@ export function usePlanWebSocket({
         const unsub = webSocketService.on(
             WebsocketMessageType.AGENT_MESSAGE_STREAMING,
             (msg: any) => {
+                // The one signal that names *which* specialist is responding
+                // (#64, ADR-023). Taken from the frame rather than from the
+                // plan, which the Fast lane does not have.
+                dispatch(agentResponding(msg.data?.agent ?? null));
                 const line = PlanDataService.simplifyHumanClarification(msg.data?.content || msg.content || '');
                 streamingChunkQueueRef.current.push(line);
                 if (streamingFlushHandleRef.current === null) {
@@ -216,6 +228,9 @@ export function usePlanWebSocket({
                 dispatch(addAgentMessage(agentMessageData));
                 dispatch(setShowBufferingText(false));
                 dispatch(setShowProcessingPlanSpinner(false));
+                // A question put to the associate is the turn waiting on them,
+                // not a request in flight (#64, ADR-023).
+                dispatch(requestSettled());
                 processingStartedAtRef.current = null;
                 dispatch(setSubmittingChatDisableInput(false));
                 scrollToBottom();
@@ -245,6 +260,10 @@ export function usePlanWebSocket({
                     : '';
                 const messageStatus = finalMessage?.status ?? finalMessage?.data?.status;
                 const finalContent = finalMessage?.content ?? finalMessage?.data?.content ?? '';
+                // Done, on every terminal status rather than on the one the
+                // handler recognises. Any other status used to hang the
+                // indicator with the answer already on screen (#69).
+                dispatch(requestSettled());
 
                 if (messageStatus === PlanStatus.COMPLETED) {
                     const agentMessageData: AgentMessageData = {
@@ -301,7 +320,6 @@ export function usePlanWebSocket({
                         dispatch(addAgentMessage(terminalMessage));
                     }
                     dispatch(setShowBufferingText(false));
-                    dispatch(setWaitingForPlan(false));
                     dispatch(setShowProcessingPlanSpinner(false));
                     processingStartedAtRef.current = null;
                     scrollToBottom();
@@ -342,6 +360,7 @@ export function usePlanWebSocket({
                 };
                 dispatch(addAgentMessage(errorAgent));
                 dispatch(planFailedFinal());
+                dispatch(requestSettled());
                 processingStartedAtRef.current = null;
                 dispatch(setShowBufferingText(false));
                 dispatch(setSubmittingChatDisableInput(true));
@@ -362,6 +381,7 @@ export function usePlanWebSocket({
                     'Session timed out. Please go back to home and try again.';
                 dispatch(setTimeoutMessage(message));
                 dispatch(setShowTimeoutDialog(true));
+                dispatch(requestSettled());
                 dispatch(setShowProcessingPlanSpinner(false));
                 dispatch(setShowApprovalButtons(false));
                 webSocketService.disconnect();
@@ -413,6 +433,9 @@ export function usePlanWebSocket({
     useEffect(() => {
         const handleConnectionChange = (connected: boolean) => {
             dispatch(setWsConnected(connected));
+            // Plumbing. It moves the phase on and says nothing of its own, so
+            // the surface holds the last true statement (#64, ADR-023).
+            if (connected) dispatch(socketConnected());
         };
 
         const handleStreamingMessage = (message: StreamMessage) => {
