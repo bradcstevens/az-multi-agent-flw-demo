@@ -32,8 +32,9 @@ from services.team_service import TeamService
 from session.store import SessionStateStore
 from sop.direct_line import DIRECT_LINE_FAILURE, DirectLineClient, SopAnswer
 from sop.provenance import SOP_PLATFORM, SOP_SOURCE
-from sop.rehearsal import (forget_rehearsal, note_rehearsal,
-                           take_rehearsal_for_current_turn)
+from sop.rehearsal import (end_rehearsal_turn, forget_rehearsal,
+                           note_rehearsal,
+                           rehearsal_stands_for_current_turn)
 from transparency.alert import REHEARSED_ALERT, REHEARSED_ALERTS  # noqa: F401  (the rehearsed copy, asserted on in tests)
 from transparency.alert import presenter_alert as build_presenter_alert
 from transparency.source import source_used
@@ -431,9 +432,16 @@ async def process_request(
     # fault. Left above the plan so a tool call made anywhere in the turn can
     # be attributed.
     note_turn(user_id, input_task.session_id)
-    if input_task.description == REHEARSED_SOP_QUERY:
-        note_rehearsal(input_task.session_id)
-    else:
+    # The rehearsal marker (#54) is **disarmed here and armed later**, and the
+    # asymmetry is deliberate: both failure directions have to be the safe one.
+    # A request that is not the rehearsal disarms immediately, because a marker
+    # left standing would answer the honest-miss beat's car-wash question with
+    # the closing checklist. A request that *is* the rehearsal arms only once
+    # its orchestration task is about to be scheduled, because the disarm lives
+    # in that task's `finally` — arming here would strand the marker for the
+    # full TTL on any request that failed before the task existed.
+    is_rehearsal = input_task.description == REHEARSED_SOP_QUERY
+    if not is_rehearsal:
         forget_rehearsal(input_task.session_id)
 
     # Attach session_id to current span for Application Insights
@@ -562,10 +570,18 @@ async def process_request(
 
     try:
 
-        async def run_orchestration_task():
+        async def run_orchestration_task(rehearsal_token):
             try:
                 await OrchestrationManager().run_orchestration(user_id, input_task)
             finally:
+                # The rehearsal marker's bound (#54). It stands for every SOP
+                # tool call this turn makes rather than only the first, so the
+                # turn's own end is what disarms it; the next request calling
+                # `forget_rehearsal` is the backstop, not the bound. Held to
+                # this turn's token because a cancelled turn is cleaned up
+                # asynchronously and could otherwise outlive its successor's
+                # arming — the presenter asking the rehearsed question twice.
+                end_rehearsal_turn(input_task.session_id, rehearsal_token)
                 # Clear our slot if we're still the registered active task
                 current = orchestration_config.active_tasks.get(user_id)
                 if current is not None and current.done():
@@ -585,7 +601,13 @@ async def process_request(
             orchestration_config.active_tasks.pop(user_id, None)
 
         # Schedule new task and register it so subsequent requests can cancel it
-        new_task = asyncio.create_task(run_orchestration_task())
+        # The marker is armed here, after the prior turn's cancellation has had
+        # its chance to clean up, so this turn's arming is the last word.
+        new_task = asyncio.create_task(
+            run_orchestration_task(
+                note_rehearsal(input_task.session_id) if is_rehearsal else None
+            )
+        )
         orchestration_config.active_tasks[user_id] = new_task
 
         return {
@@ -843,7 +865,7 @@ _sop_client: Optional[DirectLineClient] = None
 
 # The presenter opens the walkthrough with this corpus-authored query. The
 # orchestrator can rephrase it before it calls the MCP tool, so /process_request
-# arms a one-shot, session-scoped marker for this exact presenter request.
+# arms a turn-scoped, session-scoped marker for this exact presenter request.
 # This is not a keyword match: a direct or qualified question is left unchanged.
 REHEARSED_SOP_QUERY = "How do I close the store?"
 
@@ -858,7 +880,7 @@ def sop_client() -> DirectLineClient:
 
 def _retrieval_query(tool_query: str) -> str:
     """Return the corpus query for the one explicitly rehearsed procedure."""
-    if tool_query == REHEARSED_SOP_QUERY or take_rehearsal_for_current_turn():
+    if tool_query == REHEARSED_SOP_QUERY or rehearsal_stands_for_current_turn():
         return REHEARSED_SOP_QUERY
     return tool_query
 

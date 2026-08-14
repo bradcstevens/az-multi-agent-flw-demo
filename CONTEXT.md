@@ -1224,8 +1224,11 @@ the browser suite found that no API-level check could have.
 **Measured and closed 2026-08-14 (#54)** — see [docs/sop-rehearsal.md](docs/sop-rehearsal.md). Every
 validator run now records what the orchestrator actually asked, and the ledger settled two things a
 description could not. The rephrasings are **unbounded** — two runs produced two wordings never seen
-before — so the alias list was replaced by a one-shot session-scoped marker that is
-phrasing-independent. And the failure that survived was not retrieval at all: a run whose panel named
+before — so the alias list was replaced by a turn-scoped session marker that is
+phrasing-independent. (It was one-shot until it was read carefully: spending the marker on a turn's
+*first* SOP lookup let a second lookup in the same turn overwrite the Grounding panel with the raw
+rephrasing. It now stands for the whole turn and is disarmed at the turn's end, held to that turn's
+own token.) And the failure that survived was not retrieval at all: a run whose panel named
 Copilot Studio, reported Dataverse and cited SOP-102 was **red**, because the visible turn was the
 Troubleshooting Agent asking *"What is stopping Store 223 from closing right now?"* while the answer
 sat cited behind it. The cause is the inherited `MANDATORY AGENTS` clause forcing all three

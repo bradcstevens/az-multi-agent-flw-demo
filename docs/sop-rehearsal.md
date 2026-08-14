@@ -46,16 +46,51 @@ property of a sequence and the denominator is the runs that worked.
 
 Both differ from all eight recorded earlier. An earlier fix — an alias `frozenset` of observed
 rephrasings — was correct about the mechanism and wrong about the shape of the problem: there is no
-list to complete. It was replaced by a **one-shot, session-scoped marker**
-(`src/backend/sop/rehearsal.py`): `/process_request` arms the exact presenter question, and the next
+list to complete. It was replaced by a **turn-scoped, session-scoped marker**
+(`src/backend/sop/rehearsal.py`): `/process_request` arms the exact presenter question, and every
 SOP tool call in that turn retrieves against the corpus's wording whatever the model wrote. Both runs
 above retrieved correctly.
 
 **The marker is armed by an exact question and disarmed by anything else.** That is what keeps the
 **honest miss** honest: the presenter taps "Restart the car wash" seconds later in the same session,
-and a marker still set would answer a car-wash question with the closing checklist. One-shot alone is
-not enough — the hit's own turn may never reach the SOP tool — so any other request calls
-`forget_rehearsal`.
+and a marker still set would answer a car-wash question with the closing checklist. So any other
+request calls `forget_rehearsal` — including one that arrives while the hit's own turn is still in
+flight, and one that follows a turn which never reached the SOP tool at all.
+
+### It was one-shot, and one-shot was a latent failure of the centrepiece
+
+Reading the marker was a `pop` until 2026-08-14, which spent it on the **first**
+`search_store_procedures` call of the turn. The Grounding panel is a claim about whichever SOP call
+answered **last**, so a second lookup in the rehearsed turn retrieved against the raw rephrasing and
+overwrote a correct retrieval with whatever that returned — the beat failing with nothing in the
+panel to say which call it was showing. Only the Shift Tasks Agent holds the tool today, so it takes
+one agent calling it twice; that is a routing accident away, not an architecture change away.
+
+Consuming the marker was never what kept the honest miss honest — `forget_rehearsal` is. So the read
+stopped consuming, and the marker's bound moved to **the end of the turn that armed it**, in
+`run_orchestration_task`'s `finally`. Two things follow from putting the disarm there, and both were
+found by review rather than by the tests:
+
+- **Arming is now the last thing `/process_request` does**, immediately before the orchestration task
+  is scheduled, while disarming stays the first. A request that failed earlier — Cosmos refusing the
+  plan, the workflow refusing to build — would otherwise strand an armed marker for the full
+  900-second TTL, and the next SOP question in that session, honest miss included, would come back as
+  the closing checklist. Both failure directions are now the safe one.
+- **The disarm is held to the turn's own token.** `/process_request` cancels the prior turn and gives
+  it one event-loop iteration to unwind before arming — one iteration, not a guarantee. Without the
+  token, a cleanup that took longer would clear the marker of the turn that cancelled it: the
+  presenter asking the rehearsed question twice, and the beat working only the first time.
+
+The 900-second TTL stays as the bound for a turn that never reached its `finally` at all.
+
+**What the marker cannot tell apart, stated rather than engineered around.** `sole_turn()` resolves
+the session from the one user with a request in flight, so a *direct* `/api/v4/sop/ask` call is
+indistinguishable from the orchestrator's tool call and is canonicalised too if it lands inside a
+rehearsed turn. One-shot narrowed that to the first such call, not to none of them — and for the case
+#54 is actually about the turn-scoped bound is the *shorter* one, because a rehearsed turn that never
+reached the SOP tool used to leave the marker standing until the session's next request. No check
+probes `/sop/ask` with a question the corpus cannot answer: `check-deployed-surface.sh` asks the
+corpus's own wording, and `check-sop-agent.sh`'s out-of-corpus probe goes through Direct Line.
 
 ## What the ledger could not name, and now can
 

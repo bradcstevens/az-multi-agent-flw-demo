@@ -407,9 +407,12 @@ class TestProcessRequest:
         about a car wash with the store closing checklist, and making the one
         honest thing in the walkthrough dishonest.
 
-        One-shot is not sufficient on its own: the hit's own turn may never
-        reach the SOP tool (that is the other half of #54), leaving the marker
-        set for whatever comes next.
+        One-shot was never what did it, and since #54 the marker is not
+        one-shot at all: it stands for its whole turn, so that a second SOP
+        lookup in the rehearsed turn is canonicalised too. What keeps the
+        beat honest is this line — any other request in the session disarms
+        it outright, including one arriving while the hit's own turn is still
+        in flight, or after a turn that never reached the SOP tool.
         """
         rt.store.get_team_by_id.return_value = MagicMock()
         rt.rai_success.return_value = True
@@ -429,6 +432,90 @@ class TestProcessRequest:
 
         assert response.status_code == 200
         forget_rehearsal.assert_called_once_with("sess-1")
+
+    def test_the_rehearsed_turn_disarms_its_own_marker_when_it_ends(
+        self, rt, monkeypatch
+    ):
+        """The marker stands for the turn and no longer than it (#54).
+
+        It stopped being one-shot so that a *second* `search_store_procedures`
+        call in the rehearsed turn is canonicalised too — the Grounding panel
+        shows whichever SOP call answered last, so a spent marker let the
+        second call overwrite a correct retrieval with the raw rephrasing. A
+        read that never consumes needs an end, and the turn's own end is it:
+        the next request disarming it is the backstop, not the bound.
+
+        The token is what a cancelled turn's cleanup is held to — it runs
+        after its successor has already armed, and must not disarm that.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        monkeypatch.setattr(router_mod, "note_rehearsal", lambda _s: 7)
+        end_rehearsal_turn = MagicMock()
+        monkeypatch.setattr(router_mod, "end_rehearsal_turn", end_rehearsal_turn)
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-1",
+                "description": router_mod.REHEARSED_SOP_QUERY,
+            },
+        )
+
+        assert response.status_code == 200
+        end_rehearsal_turn.assert_called_once_with("sess-1", 7)
+
+    def test_a_turn_that_armed_no_marker_disarms_nothing_when_it_ends(
+        self, rt, monkeypatch
+    ):
+        """Every request ends, and most are not the rehearsal.
+
+        A non-rehearsal request disarms the marker *on the way in*, which is
+        what keeps the honest-miss beat honest. What it must not do is disarm
+        again on the way out: its own turn can still be finishing — or being
+        cancelled — long after the rehearsed request that followed it armed,
+        and a second, untokened clearing there takes the marker with it.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        end_rehearsal_turn = MagicMock()
+        monkeypatch.setattr(router_mod, "end_rehearsal_turn", end_rehearsal_turn)
+
+        response = rt.client.post(
+            "/api/v4/process_request", json=self._payload()
+        )
+
+        assert response.status_code == 200
+        end_rehearsal_turn.assert_called_once_with("sess-1", None)
+
+    def test_a_request_that_never_starts_arms_no_marker_to_strand(
+        self, rt, monkeypatch
+    ):
+        """Arming is the last thing the request does, and for this reason.
+
+        The marker's disarm lives in the orchestration task's `finally`, so a
+        request that fails before that task is *scheduled* would strand an
+        armed marker for the full 900-second TTL — and the next SOP question
+        in the session, including the honest miss, would be answered with the
+        closing checklist. Disarming is done early and arming late, so the two
+        failure directions are the safe ones.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        rt.store.add_plan.side_effect = RuntimeError("Cosmos is down")
+        note_rehearsal = MagicMock(return_value=7)
+        monkeypatch.setattr(router_mod, "note_rehearsal", note_rehearsal)
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-1",
+                "description": router_mod.REHEARSED_SOP_QUERY,
+            },
+        )
+
+        assert response.status_code == 500
+        note_rehearsal.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1575,6 +1662,42 @@ class TestSopAsk:
         assert response.json()["retrieval_query"] == "How do I close the store?"
         rehearsal["forget_rehearsals"]()
         turn["forget_turns"]()
+
+    def test_a_second_lookup_in_the_rehearsed_turn_is_canonicalized_too(
+        self, rt, monkeypatch
+    ):
+        """The marker stands for the turn, not for its first tool call (#54).
+
+        The Grounding panel is written by whichever `search_store_procedures`
+        call answered **last**, so a marker consumed by the first call hands
+        the second one the raw rephrasing — and a rehearsed hit that retrieved
+        correctly is overwritten by one that may not have. One agent calling
+        the tool twice is all it takes, and the panel gives no sign which call
+        it is showing.
+        """
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        first = (
+            "Please look up the Store 223 closing procedure in the Store SOP "
+            "Assistant on Copilot Studio."
+        )
+        second = "and the required order of the closing tasks, please"
+        turn = router_mod.sole_turn.__globals__
+        rehearsal = router_mod.note_rehearsal.__globals__
+        turn["forget_turns"]()
+        rehearsal["forget_rehearsals"]()
+        turn["note_turn"]("user-1", "session-1")
+        router_mod.note_rehearsal("session-1")
+
+        try:
+            assert self._post(rt, first).json()["retrieval_query"] == (
+                "How do I close the store?"
+            )
+            assert self._post(rt, second).json()["retrieval_query"] == (
+                "How do I close the store?"
+            )
+        finally:
+            rehearsal["forget_rehearsals"]()
+            turn["forget_turns"]()
 
     def test_the_rephrasing_is_recorded_where_an_operator_can_read_it(
         self, rt, monkeypatch, caplog

@@ -202,7 +202,7 @@ Every validator run now records **both** strings — what the orchestrator asked
 retrieved against — to `e2e/artifacts/sop-evidence.jsonl`, passing runs included, and
 `scripts/sop-rehearsal.sh` reads them back. That ledger is what settled it: the rephrasings are
 **unbounded**. See [sop-rehearsal.md](sop-rehearsal.md) for the measurement and what it ruled out.
-The fix is a one-shot session-scoped marker, not a list of phrasings, and what the spec *grades* is
+The fix is a turn-scoped session marker, not a list of phrasings, and what the spec *grades* is
 still the honest miss itself, which is the symptom. Grading the retrieved wording instead was tried
 and withdrawn — the orchestrator promptly produced a seventh phrasing and the beat went red on a run
 that named Copilot Studio, reported Dataverse and cited SOP-102. The ten-run rehearsal is the proof
