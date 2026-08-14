@@ -508,7 +508,12 @@ class OrchestrationManager:
                         len(tool_approvals),
                     )
                     approval_responses = await self._handle_tool_approvals(
-                        tool_approvals, user_id=user_id,
+                        tool_approvals,
+                        user_id=user_id,
+                        # The same authored fact that makes the approval raise
+                        # the ticket bounds what the turn may ask about it
+                        # (#62): read once, carried, never derived twice.
+                        asks_the_associate_nothing=ticket_on_approval,
                     )
                     responses.update(approval_responses)
 
@@ -992,34 +997,94 @@ class OrchestrationManager:
         tool_approvals: dict[str, object],
         *,
         user_id: str,
+        asks_the_associate_nothing: bool = False,
     ) -> dict:
         """Handle pending tool approval requests (HITL clarification).
 
         For each approval request:
-        1. Extract the questions from the function call arguments.
+        1. Decide whether it is a question for the associate at all.
         2. Send a USER_CLARIFICATION_REQUEST to the frontend via WebSocket.
         3. Wait for the user's answer via the clarification event infrastructure.
         4. Store the answer so the tool body can read it after approval.
         5. Approve the tool call and return the response.
+
+        Steps 2 to 4 are skipped, and the call approved with nothing asked,
+        when the pause puts no question to the associate — see
+        ``orchestration.clarification`` — or when the whole turn asks them
+        nothing.
+
+        Args:
+            asks_the_associate_nothing: this turn's questions are bounded at
+                **zero** (#62). A **ticket-on-approval** task raises the
+                **Simulated ticket** deterministically from the session's
+                record at the approval seam, so nothing the associate could
+                answer changes what the ticket says: the attempted steps run
+                one way out of the record and every unreported field is
+                written ``not reported``. A question whose answer changes
+                nothing the associate can see implies the ticket is waiting on
+                it, and on stage it is an interview nobody can rehearse.
 
         Returns:
             A ``{request_id: approval_response}`` dict.
         """
         import threading
 
+        from orchestration.clarification import (NOT_ASKED,
+                                                 clarification_questions)
         from tools.clarification_tool import store_answer
 
         responses = {}
 
         for request_id, content in tool_approvals.items():
-            # Extract the questions from function call arguments
             fn_call = content.function_call  # type: ignore[attr-defined]
-            fn_args_raw = getattr(fn_call, "arguments", None) or "{}"
-            try:
-                fn_args = json.loads(fn_args_raw) if isinstance(fn_args_raw, str) else fn_args_raw
-            except (json.JSONDecodeError, TypeError):
-                fn_args = {}
-            questions = fn_args.get("questions", "The agent needs clarification.")
+            questions = clarification_questions(fn_call)
+
+            # The framework pauses on every approval-gated tool call, and only
+            # one of them is a question. A pause that asks nobody anything is
+            # approved here and the associate never hears of it — which is
+            # what ``require_approval="never"`` would have done, and is the
+            # only reading under which the answer that comes back belongs to
+            # the question that was asked.
+            if questions is None:
+                self.logger.info(
+                    "[TOOL_APPROVAL] Approving '%s' without asking the "
+                    "associate — it puts no question to them (request_id=%s)",
+                    getattr(fn_call, "name", "?"),
+                    request_id,
+                )
+                responses[request_id] = content.to_function_approval_response(  # type: ignore[attr-defined]
+                    approved=True
+                )
+                continue
+
+            # A real question, on a turn that asks none. The agent is *told*
+            # the associate was not asked rather than left with the tool
+            # body's "no answer was provided", which reads as a failure worth
+            # retrying — and it is told nothing that could pass for something
+            # the associate said.
+            #
+            # Stored under the thread key alone, which is the one the tool body
+            # pops and therefore the one that is consumed. The clarification
+            # path below also stores under ``request_id``, which nothing in the
+            # backend reads: that copy survives its turn, and the body's last
+            # resort pops *any* entry left in the store. One more such copy is
+            # this turn's answer reaching a later question — and this copy says
+            # the associate was not asked, on a turn where they were.
+            if asks_the_associate_nothing:
+                self.logger.info(
+                    "[TOOL_APPROVAL] This turn asks the associate nothing — "
+                    "the ticket is raised from the session's record "
+                    "(request_id=%s, unasked=%s)",
+                    request_id, questions[:120],
+                )
+                store_answer(
+                    f"_clarification_{threading.current_thread().ident}",
+                    NOT_ASKED,
+                )
+                responses[request_id] = content.to_function_approval_response(  # type: ignore[attr-defined]
+                    approved=True
+                )
+                continue
 
             self.logger.info(
                 "[TOOL_APPROVAL] Sending clarification to user (request_id=%s): %s",

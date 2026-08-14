@@ -21,6 +21,7 @@ finds out.
 | Service ticket | `common/models/messages.py`, `escalation/store.py` | One `DataType` member and one model in the schemaless memory container. No migration. |
 | The wire shape | `escalation/payloads.py` | `TicketRaised` — the ordered rows the browser renders. |
 | The seam | `orchestration_manager._handle_plan_reviews` | An approved escalation drafts from the session record, submits it and pushes the card. The rejected branch does none of those things. |
+| What is a question | `orchestration/clarification.py` | Pure. Which of the framework's pauses is a **Clarification**, and what the agent is told on a turn that asks nothing. |
 | The bridge | `GET`/`POST /api/v4/escalation/ticket` | What the MCP container calls. |
 | The tool | `src/mcp_server/services/escalation_service.py` | `draft_service_ticket`, on the `escalation` domain. One tool. |
 | The card | `src/App/src/components/escalation/SimulatedTicketCard.tsx` | Every row, and the `SimulatedBadge`. |
@@ -38,6 +39,46 @@ lane** in the first place.
 
 That is #21's move at a different seam, and for the same reason. It happens on every approved plan
 whether or not the model remembers anything.
+
+## The approved escalation asks the associate nothing
+
+Issue #62. A live approved escalation turn ran to completion — 2810 characters of answer — and
+`GET /api/v4/escalation/ticket` said `{"drafted": false}`. The drafting is deterministic now, which
+is the first half; the second half is what the turn did *instead*. It stopped twice in one pause and
+then kept improvising diagnostics — *"Is the left-head display lit? … FILL, HEATING, or an error
+code starting with E?"* — and ended in troubleshooting advice. A presenter cannot improvise answers
+to a diagnostic interview on stage, and an associate who has already approved the ticket is being
+asked about a fault the ticket has already recorded.
+
+So the number of questions the approved escalation puts to the associate is **bounded, at zero**,
+and the bound is taken at the clarification seam rather than asked for in a prompt. Two rules, both
+in `orchestration/clarification.py` and its caller:
+
+- **Only a `request_user_clarification` with words in it is a question.** The framework pauses on
+  every approval-gated tool call. `_handle_tool_approvals` presented all of them, and one that
+  carries no `questions` argument — the observed `list_attempted_steps` — reached the associate as
+  the placeholder *"The agent needs clarification."* and held the turn for the full 300-second
+  wait. Three things were wrong with that and only the first is cosmetic: a question with no words
+  cannot be answered; a **Rehearsed reply** tapped into it is spent on a call that will not read it;
+  and the answer was written into the troubleshooting record, which is the field `steps_attempted`
+  is filled from — so a pause nobody was asked about could put words in the associate's mouth on a
+  ticket. Any other gated call is now approved without the associate hearing of it, which is what
+  `require_approval="never"` would have done.
+- **A ticket-on-approval turn asks nothing at all.** Not a preference about pacing: on this task the
+  ticket is drafted and submitted from the session's record at the approval seam, and nothing the
+  associate could answer afterwards changes what it says — `steps_attempted` runs one way out of the
+  record in the three places above, and every field nobody reported is written `not reported` rather
+  than asked for. A question whose answer changes nothing the associate can see is worse than no
+  question: it implies the ticket is waiting on it.
+
+The agent is *told* the associate was not asked, rather than left with the tool body's *"No answer
+was provided by the user"*, which reads as a failure worth retrying. What it is told invents no
+answer on the associate's behalf — that is the one thing a ticket may never carry.
+
+The bound is read off the running team's **authored** task, the same `ticket_on_approval` fact that
+makes the approval raise the ticket, and carried to the seam by the turn. Reading it twice from two
+places is how the two would come to disagree: a turn that raises the ticket deterministically *and*
+interviews the associate about it.
 
 ## There is no submit tool
 
@@ -119,11 +160,18 @@ for the same reason — asking a question does not unraise a ticket.
 
 ## What is not proven here
 
-- **Nothing has run against a deployment.** That a live `gpt-5.4` turn calls `draft_service_ticket`
-  before presenting a ticket is *instructed*, not measured. The deterministic half — submission at
-  the approval seam — does not depend on it, which is why it is the half that raises.
+- **The drafting no longer depends on a live turn, and that was measured.** It used to: the
+  `EscalationAgent` was *instructed* to call `draft_service_ticket` before presenting a ticket, and
+  a live `gpt-5.4` turn did not (#62) — an approved escalation that ran to completion left
+  `{"drafted": false}`. The draft is taken at the approval seam now, from the session's record, and
+  the agent is told not to call the tool at all.
+- **Nothing here has run against a deployment since.** The seam, the bound and the join are asserted
+  against fakes; `e2e/specs/escalation.spec.ts` asserts them through a browser and needs a
+  deployment, `az login` and real Copilot Credits.
 - **A failed submit is silent.** If the write fails the plan is still approved and no card is
   pushed, but the model's own words on that turn are outside this code's reach and may still say a
   ticket was raised.
+- **The turn's prose is still the model's.** The bound stops the escalation *asking* the associate
+  anything; it cannot stop an agent narrating a question it will never receive an answer to.
 - **The Cosmos round-trip is asserted against a fake store**, as the rest of the memory container's
   tests are.

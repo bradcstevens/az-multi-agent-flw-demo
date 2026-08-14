@@ -420,6 +420,17 @@ every clarification turn rather than whenever a model remembers; and the **read*
 body returns exactly what was stored, so an agent cannot proceed without having been told what it
 must not repeat. Fetching would have been a tool call the model could skip.
 
+**Only a clarification is a question** — the framework pauses on *every* approval-gated tool call and
+the seam handed all of them to the associate, so a gated call that asks nobody anything arrived as
+the placeholder *"The agent needs clarification."* and held the turn for the full wait (#62).
+`orchestration.clarification` decides which pause is one: the clarification tool, with words in its
+`questions`. Pure and no I/O, like `troubleshooting.steps` beside it, and its requirement runs the
+**one way** the record's does — it may leave a real question unasked, and the agent is told so, but
+it may never put a question to the associate that nothing will read the answer to. The lesson is
+`ask_user`'s again at a different seam: **a pause is not a question**, and treating every pause as
+one is how a **Rehearsed reply** is spent on a call that will not read it and an unasked answer is
+written into the record the **Simulated ticket** is filled from.
+
 **Current turn** — the process-local note of which session a user's request in flight belongs to
 (`troubleshooting.turn`), left by `process_request` and read by the troubleshooting bridge. Nothing
 on the wire between the MCP container and the backend names a session or a user: `ask_user`'s pattern
@@ -829,6 +840,15 @@ ticket caller is the approval seam, which runs on every approved plan on the **D
 a total read would raise a blank ticket every time anybody approved anything. Nothing recorded must
 stay distinguishable from a record of nothing.
 
+**Ticket on approval** — the authored `StartingTask.ticket_on_approval` flag (#62), read off the
+running team's configuration rather than off the browser's request, which may name a task but may
+not decide what its approval does. It settles two things at once and is read **once** and carried:
+the approval **drafts** from the session's record before it submits, so the ticket does not depend
+on a model electing to call `draft_service_ticket` — a live approved turn that ran to completion did
+not — and the turn asks the associate **nothing**, because nothing they could answer changes what
+the ticket says. Deriving it twice would let the two halves disagree: a turn that raises the ticket
+deterministically and interviews the associate about it anyway.
+
 Recorded in [docs/escalation-ticket.md](docs/escalation-ticket.md).
 
 **Attempted steps** — what the associate has already tried, persisted explicitly to the Cosmos
@@ -1169,6 +1189,34 @@ another commit. See [docs/preflight/deployed-build.md](docs/preflight/deployed-b
 _Avoid_: stale deployment, drift
 
 ## Confirmed findings
+
+### The escalation drafts nothing and interviews the associate instead (confirmed 2026-08-14, issue #62)
+
+An approved escalation turn ran to completion against `rg-macae-flw-v1` — `final_result_message` on
+the wire, 2810 characters of answer — and `GET /api/v4/escalation/ticket` answered
+`{"drafted": false}`. The `EscalationAgent` never called `draft_service_ticket`. There was no draft,
+so the submission seam #22 built had nothing to submit and had **never once fired live**, and the
+**Simulated ticket** the demonstration promises existed only in the prose the model wrote.
+[docs/escalation-ticket.md](docs/escalation-ticket.md) had named the risk out loud — *"that a live
+`gpt-5.4` turn calls `draft_service_ticket` before presenting a ticket is **instructed**, not
+measured"* — and measuring it is what found it.
+
+What the same run showed about *why* is the more general half. After the approval the plan stopped
+twice in one pause — a `list_attempted_steps` tool approval rendered to the associate as *"The agent
+needs clarification."*, and a `request_user_clarification` asking what was failing — and then kept
+improvising diagnostics until the turn ended in troubleshooting advice. The plan's step made the
+drafting conditional on a judgement (*"if the fault cannot be resolved on shift"*) the model never
+reached.
+
+Both halves are the same repeated lesson at two seams: **anything the demonstration promises, a
+model may decline to do.** The draft is taken at the approval seam from the session's record, and
+the questions are bounded at zero there too. The placeholder question was the sharper defect of the
+two, because it was not confined to the escalation: every approval-gated tool call became a
+**Clarification**, so a **Rehearsed reply** could be spent on a call that would not read it and the
+substituted answer was written into the record the ticket's attempted steps are filled from.
+
+Still unproven live: `e2e/specs/escalation.spec.ts` asserts the beat through a browser and needs a
+deployment, `az login` and real Copilot Credits, so it is run deliberately and not by any workflow.
 
 ### One extra socket darkens the Grounding panel (confirmed 2026-08-14, issue #54)
 

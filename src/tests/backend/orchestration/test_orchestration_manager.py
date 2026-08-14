@@ -1346,10 +1346,36 @@ class MockToolApproval:
     """A pending ``request_user_clarification`` approval, as the framework
     hands it over: a function call whose arguments carry the questions."""
 
+    # ``type`` is what ``_process_event_stream`` dispatches on, so the same
+    # object serves as the framework's content and as an event's data.
+    type = "function_approval_request"
+
     def __init__(self, questions="What have you already tried?"):
         self.function_call = Mock()
         self.function_call.name = "request_user_clarification"
         self.function_call.arguments = json.dumps({"questions": questions})
+        self.approved = None
+
+    def to_function_approval_response(self, approved=True):
+        self.approved = approved
+        return Mock(approved=approved)
+
+
+class MockGatedToolApproval:
+    """A pending approval for a tool that is **not** the clarification tool, as
+    the framework hands it over.
+
+    The observed one is ``list_attempted_steps``: its arguments are the tool's
+    own and carry no questions for anybody, because it asks the associate
+    nothing.
+    """
+
+    type = "function_approval_request"
+
+    def __init__(self, name="list_attempted_steps", arguments="{}"):
+        self.function_call = Mock()
+        self.function_call.name = name
+        self.function_call.arguments = arguments
         self.approved = None
 
     def to_function_approval_response(self, approved=True):
@@ -1486,6 +1512,311 @@ class TestAttemptedStepsMemory:
 
         assert approval.approved is True
         assert set(responses) == {"req-1"}
+
+
+# ---------------------------------------------------------------------------
+# What the associate is asked, and how many times (issue #62)
+# ---------------------------------------------------------------------------
+class TestOnlyAClarificationIsAQuestion:
+    """The clarification seam hands the associate a **Clarification**. It is
+    handed every pending tool approval.
+
+    The framework gates more than one tool, and a gated tool that is not
+    ``request_user_clarification`` carries no questions — so the seam
+    substituted *"The agent needs clarification."* and blocked the turn for
+    five minutes on an answer to a question nobody asked. A **Rehearsed reply**
+    tapped into it is spent on the wrong call, and the answer is written into
+    the **Troubleshooting record** the **Simulated ticket** is filled from.
+    """
+
+    def setup_method(self):
+        connection_config.send_status_update_async.reset_mock()
+        orchestration_config.set_clarification_pending.reset_mock()
+        orchestration_config.wait_for_clarification = AsyncMock(
+            return_value="I reseated the brew basket"
+        )
+
+    def _questions_put_to_the_associate(self):
+        return [
+            call.args[0]["data"]["questions"]
+            for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type")
+            == MockWebsocketMessageType.USER_CLARIFICATION_REQUEST
+        ]
+
+    @pytest.mark.asyncio
+    async def test_a_gated_tool_that_is_not_a_clarification_asks_nothing(self):
+        approval = MockGatedToolApproval()
+
+        await OrchestrationManager()._handle_tool_approvals(
+            {"req-1": approval}, user_id="user-1"
+        )
+
+        assert self._questions_put_to_the_associate() == []
+
+    @pytest.mark.asyncio
+    async def test_that_tool_call_is_still_approved_so_the_turn_resumes(self):
+        """Approving without asking is what ``require_approval="never"`` would
+        have done. Not asking may not cost the turn its tool."""
+        approval = MockGatedToolApproval()
+
+        responses = await OrchestrationManager()._handle_tool_approvals(
+            {"req-1": approval}, user_id="user-1"
+        )
+
+        assert approval.approved is True
+        assert set(responses) == {"req-1"}
+
+    @pytest.mark.asyncio
+    async def test_no_answer_is_recorded_against_a_question_nobody_asked(self):
+        """Whatever came back from a pause the associate never saw is not a
+        report of an **Attempted step**.
+
+        The record runs one way — it may miss a step, but it may never claim
+        one that was not tried, because a claimed step is silently skipped and
+        the equipment stays broken. Before the seam knew which pauses were
+        questions, this path ran ``_remember_attempted_steps`` over the
+        placeholder's answer on every gated tool call.
+        """
+        store = FakeTroubleshootingStore()
+
+        with patch.object(
+            OrchestrationManager,
+            "_troubleshooting_store",
+            AsyncMock(return_value=(store, "s-1")),
+        ):
+            await OrchestrationManager()._handle_tool_approvals(
+                {"req-1": MockGatedToolApproval()}, user_id="user-1"
+            )
+
+        assert store.recorded == []
+
+    @pytest.mark.asyncio
+    async def test_no_answer_is_left_for_the_clarification_tool_to_pop(self):
+        """The tool body's fallback pops *any* stored answer, so an answer
+        stored under an approval that was not a clarification is read by the
+        next one that is — the associate's words arriving at a call they were
+        never said to."""
+        from tools.clarification_tool import _pending_answers
+
+        _pending_answers.clear()
+
+        await OrchestrationManager()._handle_tool_approvals(
+            {"req-1": MockGatedToolApproval()}, user_id="user-1"
+        )
+
+        assert _pending_answers == {}
+
+
+class TestTheEscalationTurnAsksNothing:
+    """AC4 (#62): the number of questions the approved escalation puts to the
+    associate is bounded and rehearsable. The bound is **zero**.
+
+    Not a preference about pacing. On a **ticket-on-approval** task the
+    **Simulated ticket** is drafted and submitted at the approval seam from the
+    session's **Troubleshooting record**, and nothing the associate could
+    answer afterwards can change it: ``steps_attempted`` runs one way out of
+    the record in three places, and every field nobody reported is written
+    ``not reported`` by ``TKT-001`` rather than asked for. A question whose
+    answer changes nothing the associate can see is worse than no question —
+    it implies the ticket is waiting on it — and on stage it is a diagnostic
+    interview a presenter cannot rehearse.
+    """
+
+    def setup_method(self):
+        connection_config.send_status_update_async.reset_mock()
+        orchestration_config.set_clarification_pending.reset_mock()
+        orchestration_config.wait_for_clarification = AsyncMock(
+            return_value="the left head is showing FILL"
+        )
+
+    async def _approve(self, approval, store=None):
+        from tools.clarification_tool import _pending_answers
+
+        _pending_answers.clear()
+        with patch.object(
+            OrchestrationManager,
+            "_troubleshooting_store",
+            AsyncMock(return_value=(store, "s-1") if store else (None, None)),
+        ):
+            responses = await OrchestrationManager()._handle_tool_approvals(
+                {"req-1": approval},
+                user_id="user-1",
+                asks_the_associate_nothing=True,
+            )
+        return responses, dict(_pending_answers)
+
+    def _questions_put_to_the_associate(self):
+        return [
+            call.args[0]["data"]["questions"]
+            for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type")
+            == MockWebsocketMessageType.USER_CLARIFICATION_REQUEST
+        ]
+
+    @pytest.mark.asyncio
+    async def test_a_real_clarification_still_reaches_nobody(self):
+        """The observed turn's second stop: a ``request_user_clarification``
+        asking what is failing, after the ticket had already been raised."""
+        await self._approve(MockToolApproval("What is failing, exactly?"))
+
+        assert self._questions_put_to_the_associate() == []
+
+    @pytest.mark.asyncio
+    async def test_the_agent_is_told_the_associate_was_not_asked(self):
+        """It is told, rather than left with the tool body's *"No answer was
+        provided"*, which reads as a failure worth retrying. What it is told
+        invents no answer on the associate's behalf: the ticket is a claim made
+        to somebody outside the room, in their name."""
+        from orchestration.clarification import NOT_ASKED
+
+        _responses, stored = await self._approve(
+            MockToolApproval("What is failing, exactly?")
+        )
+
+        assert set(stored.values()) == {NOT_ASKED}
+
+    @pytest.mark.asyncio
+    async def test_it_is_left_only_where_the_tool_body_consumes_it(self):
+        """The tool body pops the thread key, and its last resort pops *any*
+        entry left in the store. A second copy under the request id — which
+        nothing in the backend reads — outlives this turn and reaches a later
+        question, saying the associate was not asked on a turn where they
+        were."""
+        import threading
+
+        _responses, stored = await self._approve(
+            MockToolApproval("What is failing, exactly?")
+        )
+
+        assert set(stored) == {
+            f"_clarification_{threading.current_thread().ident}"
+        }
+
+    @pytest.mark.asyncio
+    async def test_nothing_is_written_to_the_record_the_ticket_reads(self):
+        """The words substituted for an associate who was never asked are not
+        an **Attempted step**, and this is the record the ticket is filled
+        from."""
+        store = FakeTroubleshootingStore()
+
+        await self._approve(MockToolApproval("What is failing?"), store)
+
+        assert store.recorded == []
+
+    @pytest.mark.asyncio
+    async def test_the_turn_still_gets_its_tool_call_approved(self):
+        """A bounded turn is not a stalled one. The escalation still runs to
+        its acknowledgement — and the ticket is already in the container."""
+        approval = MockToolApproval("What is failing?")
+
+        responses, _stored = await self._approve(approval)
+
+        assert approval.approved is True
+        assert set(responses) == {"req-1"}
+
+    @pytest.mark.asyncio
+    async def test_no_clarification_is_registered_as_pending(self):
+        """The **Rehearsed reply** chips and the browser's own gate hang off
+        the pending clarification. A pause registered but never shown leaves
+        the surface waiting for an answer to nothing."""
+        await self._approve(MockToolApproval("What is failing?"))
+
+        orchestration_config.set_clarification_pending.assert_not_called()
+
+
+class TestTheBoundReachesTheTurnItIsAbout:
+    """The composition, not the seam: the bound is read off the running team's
+    **authored** task and carried to the clarification seam by the turn itself.
+
+    ``ticket_on_approval`` already decides whether the approval raises the
+    ticket. It is the same fact that decides whether the turn asks anything,
+    and reading it twice from two places is how the two would come to disagree
+    — a turn that raises the ticket deterministically *and* interviews the
+    associate about it.
+    """
+
+    def setup_method(self):
+        orchestration_config.plans.clear()
+        orchestration_config.set_approval_pending.reset_mock()
+        connection_config.send_status_update_async.reset_mock()
+        connection_config.send_status_update_async.side_effect = None
+        mock_wait_approval.reset_mock()
+        mock_wait_approval.return_value = MockPlanApprovalResponse(
+            approved=True, m_plan_id="test-plan-id"
+        )
+        mock_convert.reset_mock()
+        mock_convert.return_value = MockMPlan()
+        orchestration_config.wait_for_clarification = AsyncMock(
+            return_value="the left head is showing FILL"
+        )
+
+    async def _run(self, *, authored_ticket_on_approval):
+        """One turn: a plan the associate approves, then an agent asking a
+        question, then the turn ending."""
+        events = [
+            [_make_event("request_info", data=MockMagenticPlanReviewRequest(),
+                         request_id="plan-1")],
+            [_make_event("request_info", data=MockToolApproval("What is failing?"),
+                         request_id="ask-1")],
+            [_make_event("executor_completed", data=[MockMessage(text="Done")],
+                         executor_id="magentic_orchestrator")],
+        ]
+        runs = iter(events)
+
+        workflow = Mock()
+        workflow.run = lambda *a, **k: _async_iter(next(runs))
+        workflow._executors = {}
+        workflow.executors = {}
+        workflow.get_executors_list.return_value = []
+        workflow._team_config = Mock(
+            starting_tasks=[
+                Mock(
+                    id="task-223-escalation",
+                    ticket_on_approval=authored_ticket_on_approval,
+                ),
+            ]
+        )
+        orchestration_config.get_current_orchestration.return_value = workflow
+
+        input_task = Mock(
+            description="I have tried everything and I can't fix it.",
+            starting_task_id="task-223-escalation",
+        )
+
+        with patch.object(
+            OrchestrationManager, "_ticket_store",
+            AsyncMock(return_value=(None, None)),
+        ), patch.object(
+            OrchestrationManager, "_troubleshooting_store",
+            AsyncMock(return_value=(None, None)),
+        ):
+            await OrchestrationManager().run_orchestration(
+                user_id="user-1", input_task=input_task
+            )
+
+    def _questions_put_to_the_associate(self):
+        return [
+            call.args[0]["data"]["questions"]
+            for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type")
+            == MockWebsocketMessageType.USER_CLARIFICATION_REQUEST
+        ]
+
+    @pytest.mark.asyncio
+    async def test_an_authored_escalation_turn_asks_the_associate_nothing(self):
+        await self._run(authored_ticket_on_approval=True)
+
+        assert self._questions_put_to_the_associate() == []
+
+    @pytest.mark.asyncio
+    async def test_every_other_turn_still_asks_what_has_already_been_tried(self):
+        """The bound is the escalation's, and only the escalation's. The
+        troubleshooting beat *is* a question and its **Rehearsed reply** chips
+        are the answer."""
+        await self._run(authored_ticket_on_approval=False)
+
+        assert self._questions_put_to_the_associate() == ["What is failing?"]
 
 
 # ---------------------------------------------------------------------------
