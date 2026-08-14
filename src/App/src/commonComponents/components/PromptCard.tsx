@@ -29,6 +29,14 @@ const PromptCard: React.FC<PromptCardProps> = ({
         flex: "1",
         display: "flex",
         flexDirection: "column",
+        // Fluent's Button centres its children on the cross axis, which in a
+        // column is horizontal — so a card's content block is only as wide as
+        // its own longest line, and short cards centre while long ones fill.
+        // The lane badge is the first thing that made that visible: an eyebrow
+        // that starts in a different place on every card is not a column
+        // anyone can scan.
+        alignItems: "stretch",
+        textAlign: "left",
         padding: "16px",
         margin: 0,
         backgroundColor: disabled
@@ -59,7 +67,32 @@ const PromptCard: React.FC<PromptCardProps> = ({
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {/*
+            The badge leads the card, on a row of its own.
+ 
+            Beside the title it had neither room nor a fixed position: a grid
+            column is ~237px wide at the surface's 728px, and a two-word pill
+            took most of what was left after the padding, so the title wrapped
+            a word at a time and the badge — vertically centred against a title
+            of one line or two — sat at a different height on every card. Six
+            badges at six heights cannot be scanned, and scanning them is the
+            entire reason five cards say one thing and one says another.
+ 
+            A row of its own fixes both: full width, so the label never wraps
+            inside its own pill, and an identical position on all six cards.
+          */}
+          {badge && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginBottom: "2px",
+              }}
+            >
+              {badge}
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
             {icon && (
               <div
                 style={{
@@ -73,7 +106,6 @@ const PromptCard: React.FC<PromptCardProps> = ({
               </div>
             )}
             <Body1Strong>{title}</Body1Strong>
-            {badge}
           </div>
           <Body1 style={{ color: "var(--colorNeutralForeground3)" }}>
             {description}
