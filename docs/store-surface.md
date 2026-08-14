@@ -108,14 +108,15 @@ The associate is holding a phone, in a store, on a shared device. The accelerato
 columns — task history, conversation, transparency rail — which is roughly 900px of furniture
 before the conversation gets any width at all.
 
-At **640px** the columns stack and the task-history panel is dropped rather than squeezed: 280px of
-it beside a 390px viewport leaves the conversation unusable, and the conversation is the one thing
-that must still work here. The panel is presenter furniture, not associate furniture.
+At **900px** the columns stack, the transparency rail moves beneath the conversation, and the
+task-history panel is dropped rather than squeezed. That prevents the 641-900px band from leaving
+the conversation narrow beside a rail styled as a stacked band. The panel is presenter furniture,
+not associate furniture.
 
 Getting there required moving `CoralShellRow`'s layout out of an inline style, and that is the
-whole reason it has a test: **an inline `flex-direction: row` beats a media query**, so the phone
-breakpoint would have been present, correct and completely inert. `CoralShellRow.test.tsx` asserts
-the element carries no inline `display` or `flexDirection` at all.
+whole reason it has a test: **an inline `flex-direction: row` beats a media query**, so the shared
+stacking breakpoint would have been present, correct and completely inert.
+`CoralShellRow.test.tsx` asserts the element carries no inline `display` or `flexDirection` at all.
 
 That test also reads the breakpoint's selectors **out of the stylesheet** and checks each one is a
 class something actually renders. A list of class names written in the test would agree with itself
@@ -159,5 +160,5 @@ Nothing here has rendered against a deployed backend. In particular:
   use-case selection is. Recorded in [store-content-pack.md](store-content-pack.md). What is still
   unverified is that the upload lands: nothing here has been run against a deployment, so
   `selectStoreAssistant` has never resolved against a real Cosmos team.
-- **The phone breakpoint has not been seen on a phone.** jsdom does not evaluate media queries, so
-  the tests prove the stylesheet can reach the elements, not that the result is usable at 390px.
+- **The stacking breakpoint has not been seen on a phone.** jsdom does not evaluate media queries,
+  so the tests prove the stylesheet can reach the elements, not that the result is usable at 390px.

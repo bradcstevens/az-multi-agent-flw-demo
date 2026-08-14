@@ -130,12 +130,3 @@
     align-items: center;
     gap: 8px;
 }
-
-@media (max-width: 900px) {
-    .transparency-rail {
-        width: 100%;
-        min-width: 0;
-        border-left: none;
-        border-top: 1px solid var(--colorNeutralStroke2);
-    }
-}

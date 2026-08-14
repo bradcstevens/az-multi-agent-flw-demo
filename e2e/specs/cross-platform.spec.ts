@@ -45,8 +45,6 @@ test.describe('the cross-platform hop', () => {
         await expect(store.rail.groundingEmpty).toBeVisible();
 
         await store.tapQuickTask(task.name);
-        await expect(store.questionBox).toHaveValue(hit.question);
-        await store.send();
 
         const plan = new PlanSurface(page);
         await plan.waitForArrival(120_000);

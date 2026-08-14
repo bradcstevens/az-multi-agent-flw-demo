@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -114,25 +115,26 @@ describe('the walkthrough as one-tap tasks', () => {
 });
 
 describe('tapping a Quick Task', () => {
-    const send = (container: HTMLElement) =>
-        fireEvent.click(container.querySelector('.home-input-send-button')!);
-
-    it('fills the box with the task prompt', () => {
+    it('submits the task prompt and its declared lane in one pointer interaction', async () => {
         renderInput(walkthrough());
 
         fireEvent.click(screen.getByText('Close the store'));
 
-        expect(screen.getByRole('textbox')).toHaveValue('How do I close the store?');
+        await waitFor(() =>
+            expect(TaskService.createPlan).toHaveBeenCalledWith(
+                'How do I close the store?',
+                '00000000-0000-0000-0000-000000000223',
+                'fast',
+            ),
+        );
     });
 
-    it('carries the declared lane into the request', async () => {
-        // The declaration is the whole point of the metadata: the presenter's
-        // scripted taps are routed by what the pack says, never by the wording
-        // of the prompt.
-        const { container } = renderInput(walkthrough());
+    it('submits from a semantic button when activated with the keyboard', async () => {
+        renderInput(walkthrough());
 
-        fireEvent.click(screen.getByText("I can't fix it"));
-        send(container);
+        const quickTask = screen.getByRole('button', { name: /I can't fix it/ });
+        quickTask.focus();
+        await userEvent.keyboard('{Enter}');
 
         await waitFor(() =>
             expect(TaskService.createPlan).toHaveBeenCalledWith(
@@ -142,34 +144,17 @@ describe('tapping a Quick Task', () => {
             ),
         );
     });
-
-    it('gives the declaration up once the presenter edits the prompt', async () => {
-        // Edited text is free-typed input and belongs to the backend's keyword
-        // fallback. A declaration that survived an edit would outrank the words
-        // actually submitted.
-        const { container } = renderInput(walkthrough());
-
-        fireEvent.click(screen.getByText("I can't fix it"));
-        fireEvent.change(screen.getByRole('textbox'), {
-            target: { value: 'I have tried everything and I need someone to come out today.' },
-        });
-        send(container);
-
-        await waitFor(() =>
-            expect(TaskService.createPlan).toHaveBeenCalledWith(
-                expect.stringContaining('today'),
-                '00000000-0000-0000-0000-000000000223',
-                undefined,
-            ),
-        );
-    });
 });
 
 describe('six Quick Tasks on a phone-sized screen', () => {
-    it('collapses the task grid at the same breakpoint the shell stacks at', () => {
-        // 640px, as #25 fixed it. A second breakpoint somewhere else is a
-        // surface that reflows twice, and the associate this is for is holding
-        // a phone: six four-across cards at 390px are six unreadable slivers.
+    it('shows a focus indicator when a Quick Task is reached by keyboard', () => {
+        const css = readFileSync(STYLESHEET, 'utf8');
+
+        expect(css).toContain('.home-input-quick-tasks .fui-Button:focus-visible');
+    });
+
+    it('collapses the task grid on a phone-sized screen', () => {
+        // At 640px six four-across cards on a phone are six unreadable slivers.
         const css = readFileSync(STYLESHEET, 'utf8');
 
         expect(css).toContain('@media (max-width: 640px)');

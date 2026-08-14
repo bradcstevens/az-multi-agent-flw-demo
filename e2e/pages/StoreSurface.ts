@@ -31,27 +31,12 @@ export class StoreSurface {
 
     /** The Quick Task card carrying a given title, by its authored name. */
     quickTask(name: string): Locator {
-        return this.page.getByText(name, { exact: true });
+        return this.page.getByRole('button', { name });
     }
 
-    /**
-     * Tap a Quick Task and send it, which is the whole of beat 1's interaction.
-     *
-     * Tapping fills the box; it does not submit. The presenter then presses
-     * send — and the two steps are kept separate here because typing over the
-     * filled text is what clears the declared **Lane**, so a page object that
-     * fused them would hide the seam the lane beats need.
-     */
+    /** Tap a Quick Task, which asks its authored question in one interaction. */
     async tapQuickTask(name: string): Promise<void> {
         await this.quickTask(name).click();
-    }
-
-    get questionBox(): Locator {
-        return this.page.getByRole('textbox');
-    }
-
-    async send(): Promise<void> {
-        await this.questionBox.press('Enter');
     }
 
     /**

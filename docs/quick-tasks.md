@@ -55,15 +55,13 @@ one. `parse_lane("Fast lane")` returns `None`, the router falls open to the
 Deliberate lane, and the only visible symptom is a procedure lookup that grew
 an approval step. So every declared lane goes through the real `parse_lane`.
 
-**And the declaration does not survive an edit.** Tapping a Quick Task fills the
-box; typing over that text clears the declaration, because edited text is
-free-typed input and belongs to the **Lane keyword fallback**. A presenter who
-taps the escalation task and adds a word has just handed the routing decision
-to the keywords — so the escalation prompt is asserted to route Deliberate
-through the fallback *as well as* by declaration, and every other prompt that
-reaches the router is asserted to route Fast. That is what makes consecutive
-runs identical in the strong sense: the walkthrough behaves the same whether
-the presenter taps the task or types the words on it.
+**A Quick Task submits in one interaction.** Its native button sends its
+authored prompt with its declared Lane, so there is no filled box between the
+tap and the request. A presenter who needs to adapt a prompt types it as a
+free-text question; that request declares no Lane and belongs to the **Lane
+keyword fallback**. The escalation prompt is therefore asserted to route
+Deliberate through the fallback *as well as* by declaration, and every other
+prompt that reaches the router is asserted to route Fast.
 
 The keyword fallback defaults to **Deliberate**, so a prompt carrying no fast
 vocabulary at all is the trap here, and it is not hypothetical: *"Walk me

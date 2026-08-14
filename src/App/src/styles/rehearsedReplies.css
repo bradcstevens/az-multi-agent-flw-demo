@@ -28,9 +28,8 @@
 }
 
 /*
- * Phone. The same 640px the shell stacks at (#25) and the Quick Tasks collapse
- * at (#26) — a third breakpoint is a surface that reflows three times. Full
- * width, so each rehearsed answer is one readable line rather than three
+ * Phone. At 640px, match the Quick Tasks' readable one-column presentation.
+ * Full width, so each rehearsed answer is one readable line rather than three
  * slivers.
  */
 @media (max-width: 640px) {

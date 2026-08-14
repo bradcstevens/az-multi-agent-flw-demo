@@ -39,7 +39,7 @@ surface ends up saying something that is not so:
 
 | State | Scope | Cleared by |
 | --- | --- | --- |
-| `source` | **One answer** | `requestStarted` — `HomeInput.handleSubmit` and `PlanPage.handleOnchatSubmit` |
+| `source` | **One answer** | `requestStarted` — HomeInput submission, Quick Task activation, and `PlanPage.handleOnchatSubmit` |
 | `alerts` | **One conversation** | `conversationStarted` — the `planId` effect, and `resetPlanVariables` |
 | `meter` | **The whole walkthrough** | nothing but `transparencyReset` |
 
@@ -55,8 +55,8 @@ the guardrail's zero beside a row that cost something — which is the entire co
 make.
 
 Both clearing points are dispatched from more than one place, because there is more than one way to
-start each. A question is started by `HomeInput.handleSubmit` (which Quick Tasks route through, so
-they need nothing of their own) **and** by `PlanPage.handleOnchatSubmit`, the clarification path — a
+start each. A question is started by `HomeInput.handleSubmit`, its Quick Task
+activation, **and** by `PlanPage.handleOnchatSubmit`, the clarification path — a
 follow-up produces a new answer just as much as a first question does. A conversation is started by
 the `planId` effect and not only by `resetPlanVariables`, which runs on the no-planId error path
 alone: wiring the reset there and nowhere else would have left it firing almost never.
