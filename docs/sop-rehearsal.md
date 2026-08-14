@@ -99,6 +99,35 @@ that had already cost the Quick Task lane (#16) and the rehearsed replies (#26).
 reaches the repository but not Cosmos is a fix that passes its own tests and changes nothing, so
 there is a round-trip test from the authored pack through the real validator.
 
+## The flag reaches Cosmos, and is still not read
+
+Carrying `require_all_agents` through the validator was necessary and not sufficient. The store team
+is `is_default`, and `delete_team` refuses to delete a default team; `upload_team_config.py` warns
+and uploads anyway, writing a **second document with the same `team_id` under a new partition key**.
+Every deploy since the pack was authored had left another one behind. Asking the deployment directly,
+the morning the routing fix landed:
+
+```
+$ curl -s "$BACKEND/api/v4/team_configs" | ...
+00000000-...-223 | Circle K Frontline Store Assistant | require_all_agents= False
+00000000-...-223 | Circle K Frontline Store Assistant | require_all_agents= True
+00000000-...-223 | Circle K Frontline Store Assistant | require_all_agents= True
+00000000-...-223 | Circle K Frontline Store Assistant | require_all_agents= True
+00000000-...-223 | Circle K Frontline Store Assistant | require_all_agents= True
+00000000-...-223 | Circle K Frontline Store Assistant | require_all_agents= True
+```
+
+Five predate the field, so the backend defaults them to on. `get_team` selected `teams[0]` from an
+**unordered** query, which made the routing fix a one-in-six chance of being the one Cosmos handed
+back first — and non-reproducible either way, because nothing in the repository decides it. The query
+now ends `ORDER BY c._ts DESC`.
+
+That is a read fix, not a cleanup: the duplicates are still there, and the next deploy adds another.
+It is safe because the newest is always the one this repository just wrote, and it is *visible*
+because `check-deployed-surface.sh` now carries a `mandatory-agents` row that asks the deployment
+what flag it is actually running under. A revert, a stale read, or a team document that predates the
+field fails the deploy gate rather than the walkthrough.
+
 ## Running the proof
 
 ```bash

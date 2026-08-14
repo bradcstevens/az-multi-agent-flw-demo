@@ -48,6 +48,7 @@ EXPECTED = Expected(
         "SOP-109 Delivery Receiving and Backroom Stocking.docx",
         "SOP-110 Shift Handover and Task Board.docx",
     ),
+    require_all_agents=False,
 )
 
 ACCELERATOR_TITLE = "Multi-Agent - Custom Automation Engine"
@@ -64,6 +65,7 @@ def observed(**overrides):
                 {"id": identifier, "lane": lane}
                 for identifier, lane in EXPECTED.quick_tasks
             ],
+            "require_all_agents": EXPECTED.require_all_agents,
         },
         "tokenEndpoint": (
             "https://powervamg.us-il102.gateway.prod.island.powerapps.com"
@@ -159,6 +161,46 @@ class TestQuickTasks:
         check = verdict.check("quick-tasks")
         assert not check.ok
         assert "deliberate" in check.detail
+
+
+class TestMandatoryAgents:
+    """The flag that decides whether one agent may answer the opening question.
+
+    A default team cannot be deleted, so every re-deploy leaves another
+    document with the same team_id behind. Six were live when this was
+    written and five of them predated the flag. Which one the backend reads
+    is not visible from the repository, so it is asked (#54).
+    """
+
+    def test_the_authored_value_passes(self):
+        verdict = evaluate(observed(), EXPECTED)
+
+        assert verdict.check("mandatory-agents").ok
+
+    def test_a_team_predating_the_flag_fails(self):
+        # This is the live failure: a document written before the field
+        # existed. The backend defaults it to on, and the opening question
+        # goes back through three specialists.
+        team = dict(observed()["team"])
+        del team["require_all_agents"]
+
+        check = evaluate(observed(team=team), EXPECTED).check("mandatory-agents")
+
+        assert not check.ok
+        assert "require_all_agents" in check.detail
+
+    def test_a_reverted_flag_fails(self):
+        team = dict(observed()["team"], require_all_agents=True)
+
+        check = evaluate(observed(team=team), EXPECTED).check("mandatory-agents")
+
+        assert not check.ok
+        assert "older than the pack" in check.detail
+
+    def test_the_expectation_is_read_out_of_the_pack(self):
+        # Never pinned here: the pack is where the flag is authored, and a
+        # check carrying its own copy passes a revert it never saw.
+        assert authored_expectation().require_all_agents is False
 
 
 class TestDirectLineEndpoint:
@@ -297,6 +339,7 @@ class TestTheReport:
         for name in (
             "store-surface",
             "quick-tasks",
+            "mandatory-agents",
             "direct-line-endpoint",
             "direct-sop-answer",
         ):

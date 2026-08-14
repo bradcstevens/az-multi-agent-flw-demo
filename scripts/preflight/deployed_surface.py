@@ -54,11 +54,13 @@ TITLE = re.compile(r"<title>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 class Expected:
     """What this repository authored, read out of the repository."""
 
-    def __init__(self, assistant, team_id, quick_tasks, documents=()):
+    def __init__(self, assistant, team_id, quick_tasks, documents=(),
+                 require_all_agents=None):
         self.assistant = assistant
         self.team_id = team_id
         self.quick_tasks = tuple(quick_tasks)
         self.documents = tuple(documents)
+        self.require_all_agents = require_all_agents
 
 
 class Check:
@@ -94,6 +96,7 @@ def evaluate(observed, expected):
         [
             _store_surface_check(observed.get("title"), expected),
             _quick_tasks_check(observed.get("team"), expected),
+            _mandatory_agents_check(observed.get("team"), expected),
             _direct_line_endpoint_check(observed.get("tokenEndpoint")),
         ]
     )
@@ -172,6 +175,56 @@ def _quick_tasks_check(team, expected):
         True,
         f"all {len(expected.quick_tasks)} Quick Tasks are on the deployed "
         "surface, each declaring the lane it was authored with",
+    )
+
+
+def _mandatory_agents_check(team, expected):
+    """Whether the deployed team still lets one agent answer alone.
+
+    This asks the same endpoint `_quick_tasks_check` does, but it is a
+    different failure and deserves its own row: the tasks can all be present
+    and correct while the opening beat still comes back as a clarifying
+    question, because `require_all_agents` puts every store specialist into a
+    plan that needs one lookup and the Troubleshooting Agent's job is to ask
+    what you already tried (#54).
+
+    It is checked on the deployed surface rather than trusted from the pack
+    because a default team cannot be deleted: `delete_team` refuses, and the
+    post-provision upload warns and writes a *second* document under a new
+    partition key. Six of them were live when this check was written, five
+    predating the flag and defaulting it back to on. `get_team` now orders
+    newest-first, and this is the row that notices if that ever stops working.
+    """
+    if expected.require_all_agents is None or not team:
+        return Check(
+            "mandatory-agents",
+            True,
+            "not checked — the pack does not pin the flag"
+            if team else "not checked — no team to read it from",
+        )
+    observed = team.get("require_all_agents")
+    if observed is None:
+        return Check(
+            "mandatory-agents",
+            False,
+            "the deployed team declares no require_all_agents — it predates "
+            "the field and the backend will default it to on, putting every "
+            "store specialist into the opening question's plan",
+        )
+    if bool(observed) != bool(expected.require_all_agents):
+        return Check(
+            "mandatory-agents",
+            False,
+            f"the deployed team reports require_all_agents={observed!r}, but "
+            f"this repository authored {expected.require_all_agents!r} — the "
+            "deployment is reading a team document older than the pack",
+        )
+    return Check(
+        "mandatory-agents",
+        True,
+        f"the deployed team reports require_all_agents="
+        f"{expected.require_all_agents!r}, as authored — one agent may answer "
+        "the opening question alone",
     )
 
 
@@ -366,6 +419,7 @@ def authored_expectation(surface=SURFACE_MODULE, pack=STORE_PACK,
         documents=tuple(sorted(
             name for name in os.listdir(corpus) if name.endswith(".docx")
         )) if os.path.isdir(corpus) else (),
+        require_all_agents=team.get("require_all_agents"),
     )
 
 
