@@ -55,13 +55,21 @@ and the `setInterval` that rotates them are deleted.
 
 **And it stops.** Reaching the Done phase removes the in-flight indicator from the screen — a rule
 worth stating separately because every other sentence here governs what the surface *says*, and
-none of them governs it ever *finishing*. That gap is already a shipped defect (#69): nothing
-clears `waitingForPlan` on the **Fast lane**, because the only signal that clears it is
+none of them governs it ever *finishing*. That gap was a shipped defect (#69): nothing
+cleared `waitingForPlan` on the **Fast lane**, because the only signal that cleared it was
 `plan_approval_request` and [ADR-013](./013-per-request-plan-review-over-orchestrator-bypass.md)
-means that lane has no plan to approve. So the surface renders *"Creating your plan..."* under the
+means that lane has no plan to approve. So the surface rendered *"Creating your plan..."* under the
 answer, indefinitely, three inches from a rail reading *"No plan to review on this request."* A
 narration that claims only what a signal reports and then never stops is still making a false
 claim — that the request is in flight — and it makes it for the rest of the conversation.
+
+#69 is fixed ahead of this machine, and its guard is written to **survive** being rebased into it:
+it drives raw wire text through `WebSocketService` into the real `PlanChat`, and asserts that no
+`progressbar` remains. Asserted by role rather than by copy, because this ADR rewrites every one of
+those strings — a guard pinned to the words is deleted along with the words, exactly when it is
+needed — and against the whole conversation rather than one indicator, because the surface has two
+and a stand-in rendering one can only agree with itself. Re-point it at the phase slice; do not
+drop it.
 
 Every phase is an observable event:
 

@@ -886,7 +886,15 @@ stages the system does not have, three inches from a **Token meter** whose whole
 had already drifted into telling the story backwards — *"Plan created — Fast lane"* on the home
 surface, then *"Loading plan data…"* on the plan surface. One module owns the strings, on the
 **Store surface**'s pattern, and one Redux slice holds the phase **across the navigation**, because
-across two components "only advances" is a coincidence and not a property. See
+across two components "only advances" is a coincidence and not a property.
+
+**And it stops.** Reaching Done removes the in-flight indicator from the screen, on the **Fast
+lane** — which has no `plan_approval_request` at all — as well as the Deliberate one and the error
+path. Stated separately because every other rule here governs what the surface *says* and none of
+them governs it ever *finishing*: #69 was a narration that claimed only what a signal reported and
+then ran for the rest of the conversation. Its guard drives raw wire text through
+`WebSocketService` into the real `PlanChat` and asserts no `progressbar` remains — by role, not by
+copy, so that rewriting these strings does not delete it. See
 [ADR-023](docs/ADR/023-progress-narration-claims-only-what-a-signal-reports.md).
 _Avoid_: loading message, progress indicator, spinner copy
 
