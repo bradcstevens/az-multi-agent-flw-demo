@@ -78,6 +78,16 @@ export class TransparencyRail {
         return this.platform.getAttribute('data-platform');
     }
 
+    /** The query the orchestrator actually sent to the SOP tool. */
+    async toolQuery(): Promise<string | null> {
+        return this.groundingPanel.getAttribute('data-tool-query');
+    }
+
+    /** The query the SOP agent used to retrieve from the corpus. */
+    async retrievalQuery(): Promise<string | null> {
+        return this.groundingPanel.getAttribute('data-retrieval-query');
+    }
+
     /** The document names the answer cited, in the order they came back. */
     async citedDocuments(): Promise<string[]> {
         if ((await this.citations.count()) === 0) {

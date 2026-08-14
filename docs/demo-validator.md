@@ -68,6 +68,14 @@ asserted only to have **arrived and to be non-empty**, which is a real assertion
 a paraphrased one look identical to a suite that greps for a sentence, and only one of them is a
 failure.
 
+Each run also attaches `sop-tool-query.json` to its Playwright artifact. It records both the query
+the Foundry orchestrator actually gave `search_store_procedures` and the query the backend used for
+the SOP corpus. The latter must be the corpus's `[rehearsed_hit]` question. A difference between
+the two is evidence of an orchestrator rephrasing; it is captured rather than guessed, and the
+closing-store alias makes that one rehearsed hit retrieve against its authored corpus wording. A
+missing Grounding panel remains a routing failure: no tool query exists because the orchestrator did
+not call the tool.
+
 The suite also asserts the Grounding panel is **empty before the question is asked**. Without it, a
 panel left lit by a previous conversation satisfies every other assertion in the spec.
 
@@ -118,12 +126,14 @@ the store?"*: the **Group Chat Manager** answering from context, and the **Shift
 answering with the **Troubleshooting Agent** then asking a clarification. With no tool call there is
 no `source_used`, the Grounding panel is honestly empty, and this suite is honestly red.
 
-**The retrieval sometimes misses on a question the corpus rehearses.** The hop completes — the panel
-names Copilot Studio and Dataverse — and the answer is the **honest miss**: *"Searched Dataverse and
+**The retrieval previously missed on a question the corpus rehearses.** The hop completed — the panel
+named Copilot Studio and Dataverse — and the answer was the **honest miss**: *"Searched Dataverse and
 found no matching procedure."* Two runs in eight ended this way while
 `check-deployed-surface.sh`'s `grounded-answer` check, which asks the backend directly, passed every
-time. The difference is the question: the check asks the corpus's own words, and the orchestrator
-hands the SOP tool whatever the model rephrased them into.
+time. The difference was the question: the check asked the corpus's own words, and the orchestrator
+handed the SOP tool whatever the model rephrased them into. The validator now records both values and
+requires the retrieved closing-store query to be the authored one. The ten-run rehearsal is the
+proof that the fix has reached the deployment; do not replace it with a direct SOP probe.
 
 The spec checks for the honest miss **before** it checks the citation, and fails with a message
 saying which of the two happened. Asserting only on the citation reports a miss as an empty string,

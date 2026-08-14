@@ -14,6 +14,8 @@ ANSWERED = {
     "text": "1. Count the drawer.",
     "failed": False,
     "conversation_id": "conv-7",
+    "tool_query": "What are the steps for closing the store tonight?",
+    "retrieval_query": "How do I close the store?",
     "platform": "Copilot Studio",
     "source": "Dataverse",
     "agent": "Store SOP Assistant",
@@ -42,6 +44,12 @@ class TestSourceUsed:
 
     def test_the_conversation_is_carried_so_the_hop_is_traceable(self):
         assert source_used(ANSWERED).conversation_id == "conv-7"
+
+    def test_the_tool_and_retrieval_queries_are_carried_for_miss_attribution(self):
+        signal = source_used(ANSWERED)
+
+        assert signal.tool_query == "What are the steps for closing the store tonight?"
+        assert signal.retrieval_query == "How do I close the store?"
 
     def test_a_failed_reply_lights_nothing(self):
         """#18's fixed failure message is written by the backend, not by

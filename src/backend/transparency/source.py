@@ -40,6 +40,8 @@ def source_used(reply: Mapping[str, Any]) -> Optional[SourceUsed]:
         platform=platform,
         source=reply.get("source") or "",
         agent_name=reply.get("agent") or "",
+        tool_query=reply.get("tool_query") or "",
+        retrieval_query=reply.get("retrieval_query") or "",
         citations=list(reply.get("citations") or []),
         conversation_id=reply.get("conversation_id"),
     )

@@ -273,7 +273,8 @@ def format_report(verdict, expected):
     ready = all(check.ok for check in checks)
     lines.append(
         "  ----  the walkthrough (#46, #47): "
-        + ("runnable against this deployment" if ready
+        + ("the direct SOP probe passed; run the Demo validator to prove "
+           "orchestrator routing" if ready
            else "blocked on the failures above")
     )
     return "\n".join(lines)

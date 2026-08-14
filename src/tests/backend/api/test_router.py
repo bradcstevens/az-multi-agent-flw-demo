@@ -1479,6 +1479,52 @@ class TestSopAsk:
         assert resp.status_code == 200
         assert resp.json()["text"] == "1. Count the drawer."
 
+    def test_a_rephrased_closing_question_uses_the_corpuss_rehearsed_query(
+        self, rt, monkeypatch
+    ):
+        """The tool's query and the retrieval query are both observable.
+
+        The orchestrator is free to phrase a procedure request differently
+        from the presenter. The SOP index is not: this one rehearsed hit is
+        resolved against the corpus's authored query, while the original tool
+        input stays available to attribute a miss correctly.
+        """
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        tool_query = "What are the steps for closing the store tonight?"
+
+        response = self._post(rt, tool_query)
+
+        assert response.status_code == 200
+        rt.sop.ask.assert_awaited_once_with("How do I close the store?")
+        assert response.json()["tool_query"] == tool_query
+        assert response.json()["retrieval_query"] == "How do I close the store?"
+
+    def test_an_out_of_corpus_question_is_not_normalized_to_the_rehearsed_hit(
+        self, rt, monkeypatch
+    ):
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        question = "How do I restart the car wash after a vehicle stalls in the bay?"
+
+        response = self._post(rt, question)
+
+        assert response.status_code == 200
+        rt.sop.ask.assert_awaited_once_with(question)
+        assert response.json()["tool_query"] == question
+        assert response.json()["retrieval_query"] == question
+
+    def test_a_qualified_closing_question_is_not_normalized_to_the_rehearsed_hit(
+        self, rt, monkeypatch
+    ):
+        """Only explicit closing-procedure aliases are safe to normalize."""
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        question = "How do I close the store after a gas leak?"
+
+        response = self._post(rt, question)
+
+        assert response.status_code == 200
+        rt.sop.ask.assert_awaited_once_with(question)
+        assert response.json()["retrieval_query"] == question
+
     def test_an_empty_question_is_rejected(self, rt, monkeypatch):
         monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
 
@@ -1562,6 +1608,18 @@ class TestSourceUsedSignal:
         (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
         (citation,) = push[0][0].citations
         assert citation["name"] == "SOP-102 Store Closing Procedure.docx"
+
+    def test_the_push_captures_the_tool_query_and_the_retrieval_query(
+        self, rt, monkeypatch
+    ):
+        monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
+        tool_query = "What are the steps for closing the store tonight?"
+
+        self._post(rt, tool_query)
+
+        (push,) = _pushes(rt, WebsocketMessageType.SOURCE_USED)
+        assert push[0][0].tool_query == tool_query
+        assert push[0][0].retrieval_query == "How do I close the store?"
 
     def test_a_failure_lights_nothing(self, rt, monkeypatch):
         """The fixed failure message is the backend's own words. A panel lit

@@ -40,6 +40,15 @@ Read the two boxes below before anything else. They are the only two things you 
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
 | **Between beats** | Beats 1 to 4 open a task view — click **New task** in the left panel to get back to the six cards. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
 
+**Ask an engineer to clear the deployment before a customer session.** Ten Demo validator runs
+against the deployed surface ([demo-validator.md](demo-validator.md)), all green, and every run's
+`sop-tool-query.json` artifact carrying the corpus's own closing-store wording as its
+`retrievalQuery`. Ten because the opening beat misses roughly one run in four (#54) and a single
+green run cannot tell you that. Keep the video and HTML report from one of those runs — that is the
+recording at the bottom of the fallback ladder, and it only counts if it is from a green run. A
+direct probe of the procedure library is **not** a substitute: it answers whether Copilot Studio is
+up, not whether the Foundry orchestrator reaches it, and the hop is the whole claim.
+
 **The demonstration opens with nobody signed in**, and that is deliberate — say so early. The
 header reads **Store 223** and **No user signed in**. This is a **shared store device**: one
 tablet behind the counter, used by whoever is on shift, with no individual identity in the
@@ -237,7 +246,7 @@ beat 2; it is not a failure.
 
 | Beat | What failure looks like | Continue? | What to say |
 | --- | --- | --- | --- |
-| 1 | The Grounding panel never lights at all, or it lights and says *found no matching procedure* for the closing question, or the answer says it could not reach the store procedure assistant | **Yes** — re-ask once by typing the same words; it is intermittent, roughly one run in four (#54) | If the panel is empty, another agent answered from what it already had and never called out to Copilot Studio — say *"let me ask that again, I want you to see where it goes"* and re-ask. If it says it found nothing, say *"that is the retrieval coming back empty rather than the hop failing — you are watching the honest behaviour of a grounded system"*. If it misses twice, go to beat 2, which makes the same point about grounding, and come back to beat 1 afterwards |
+| 1 | The Grounding panel never lights at all, or it lights and says *found no matching procedure* for the closing question, or the answer says it could not reach the store procedure assistant | **Yes** — re-ask once by typing the same words; it is intermittent, roughly one run in four (#54) | If the panel is empty, another agent answered from what it already had and never called out to Copilot Studio — say *"let me ask that again, I want you to see where it goes"* and re-ask. If it says it found nothing, say *"that is the retrieval coming back empty rather than the hop failing — you are watching the honest behaviour of a grounded system"*. If it misses twice, go to beat 2, which makes the same point about grounding, and come back to beat 1 afterwards. Whatever you say, **do not describe a citation that did not arrive** and do not fill in the closing steps from memory — a narrated `SOP-102` is the one failure the customer cannot see and cannot forgive |
 | 2 | It answers the car-wash question with plausible steps | **Yes** | Say plainly that the library has no such procedure and that an answer here would be the failure. Do not pretend it went well |
 | 3 | No chips appear, or the assistant asks for something else | **Yes** — type a short answer naming one thing you tried | *"It is asking what I have already tried."* The beat survives typing; only the ticket in beat 4 gets thinner |
 | 4 | No plan appears, or the ticket has no attempted steps | **Yes** | If the steps are missing, say so — *"those should be carried across, and that is the claim I would want you to test in a pilot"* — and do not read the empty rows out as if they were full |

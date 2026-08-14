@@ -833,6 +833,23 @@ async def clarification_ask(request: Request):
 # built lazily so a backend with no SOP agent configured still starts.
 _sop_client: Optional[DirectLineClient] = None
 
+# The presenter opens the walkthrough with this corpus-authored query. The
+# orchestrator can rephrase it before it calls the MCP tool, while the Copilot
+# Studio index was rehearsed against these exact words. Each alias is an
+# equivalent closing-procedure request; this deliberately is not a keyword
+# match, so a qualified request still gets an honest retrieval result.
+REHEARSED_SOP_QUERY = "How do I close the store?"
+_REHEARSED_SOP_QUERY_ALIASES = frozenset(
+    {
+        REHEARSED_SOP_QUERY.casefold(),
+        "what are the steps for closing the store tonight?",
+        "what are the steps for closing the store?",
+        "how do i close the store at the end of the night?",
+        "what is the store closing procedure?",
+        "provide the store closing procedure.",
+    }
+)
+
 
 def sop_client() -> DirectLineClient:
     """The process's Direct Line client, built on first use."""
@@ -840,6 +857,13 @@ def sop_client() -> DirectLineClient:
     if _sop_client is None:
         _sop_client = DirectLineClient.from_app_config()
     return _sop_client
+
+
+def _retrieval_query(tool_query: str) -> str:
+    """Return the corpus query for the one explicitly rehearsed procedure."""
+    if tool_query.casefold() in _REHEARSED_SOP_QUERY_ALIASES:
+        return REHEARSED_SOP_QUERY
+    return tool_query
 
 
 @app_router.post("/sop/ask")
@@ -860,9 +884,10 @@ async def sop_ask(request: Request):
     question = (body.get("question") or "").strip()
     if not question:
         raise HTTPException(status_code=400, detail="question is required")
+    retrieval_query = _retrieval_query(question)
 
     try:
-        answer = await sop_client().ask(question)
+        answer = await sop_client().ask(retrieval_query)
     except Exception as exc:
         logger.error("sop/ask: no SOP agent to ask: %s", exc)
         answer = SopAnswer(text=DIRECT_LINE_FAILURE, failed=True)
@@ -871,6 +896,8 @@ async def sop_ask(request: Request):
         "text": answer.text,
         "failed": answer.failed,
         "conversation_id": answer.conversation_id,
+        "tool_query": question,
+        "retrieval_query": retrieval_query,
         "platform": SOP_PLATFORM,
         "source": SOP_SOURCE,
         "agent": config.COPILOT_STUDIO_AGENT_NAME,

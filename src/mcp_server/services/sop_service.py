@@ -83,7 +83,8 @@ class SopService(MCPToolBase):
             do NOT reconstruct the steps from memory.
 
             Args:
-                question: The associate's question, in their own words.
+                question: The associate's complete question. Preserve its
+                    procedure wording; do not summarize or rephrase it.
 
             Returns:
                 The procedure, followed by the documents it came from.
