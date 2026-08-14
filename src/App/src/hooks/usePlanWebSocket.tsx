@@ -13,6 +13,7 @@ import {
     setShowProcessingPlanSpinner,
     setShowApprovalButtons,
     setReloadLeftList,
+    setWaitingForPlan,
     selectPlanData,
     selectContinueWithWebsocketFlow,
     selectPlanApproved,
@@ -242,7 +243,8 @@ export function usePlanWebSocket({
                 const completionTimeLine = completionElapsedSeconds !== null
                     ? `\n\n**Total completion time: ${formatElapsedTime(completionElapsedSeconds)}**`
                     : '';
-                const messageStatus = finalMessage?.data?.status;
+                const messageStatus = finalMessage?.status ?? finalMessage?.data?.status;
+                const finalContent = finalMessage?.content ?? finalMessage?.data?.content ?? '';
 
                 if (messageStatus === PlanStatus.COMPLETED) {
                     const agentMessageData: AgentMessageData = {
@@ -251,7 +253,7 @@ export function usePlanWebSocket({
                         timestamp: Date.now(),
                         steps: [],
                         next_steps: [],
-                        content: (finalMessage.data?.content || '') + completionTimeLine,
+                        content: finalContent + completionTimeLine,
                         raw_data: finalMessage,
                     };
                     dispatch(setShowBufferingText(true));
@@ -265,7 +267,7 @@ export function usePlanWebSocket({
                     persistAgentMessage(agentMessageData, planData, dispatch, true, streamingMessageBuffer);
                 } else if (messageStatus === 'error') {
                     // Safety net: handle error status sent as FINAL_RESULT_MESSAGE
-                    const errorContent = finalMessage.data?.content || 'An unexpected error occurred. Please try again later.';
+                    const errorContent = finalContent || 'An unexpected error occurred. Please try again later.';
                     const errorAgent: AgentMessageData = {
                         agent: 'system',
                         agent_type: AgentMessageType.SYSTEM_AGENT,
@@ -285,7 +287,7 @@ export function usePlanWebSocket({
                 } else {
                     // Any other terminal status (e.g. "terminated"): clear the spinner
                     // so the UI doesn't hang after the answer has already arrived.
-                    const content = finalMessage.data?.content;
+                    const content = finalContent;
                     if (content) {
                         const terminalMessage: AgentMessageData = {
                             agent: AgentType.GROUP_CHAT_MANAGER,
@@ -299,6 +301,7 @@ export function usePlanWebSocket({
                         dispatch(addAgentMessage(terminalMessage));
                     }
                     dispatch(setShowBufferingText(false));
+                    dispatch(setWaitingForPlan(false));
                     dispatch(setShowProcessingPlanSpinner(false));
                     processingStartedAtRef.current = null;
                     scrollToBottom();

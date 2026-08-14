@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StrictMode } from 'react';
-import { render, waitFor, act } from '@testing-library/react';
+import { render, waitFor, act, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 
@@ -8,13 +8,18 @@ import usePlanWebSocket from './usePlanWebSocket';
 import webSocketService from '@/store/WebSocketService';
 import { FakeSocket, frame } from '@/testing/fakeSocket';
 import { WebsocketMessageType } from '@/models';
-import planReducer, { setContinueWithWebsocketFlow } from '@/store/slices/planSlice';
+import planReducer, {
+    selectWaitingForPlan,
+    setContinueWithWebsocketFlow,
+} from '@/store/slices/planSlice';
 import chatReducer from '@/store/slices/chatSlice';
 import appReducer from '@/store/slices/appSlice';
 import teamReducer from '@/store/slices/teamSlice';
 import streamingReducer from '@/store/slices/streamingSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
+import { useAppSelector } from '@/store/hooks';
+import { renderThinkingState } from '@/components/content/streaming/StreamingPlanState';
 
 /**
  * The plan page's half of the connection lifecycle (issue #63, ADR-021).
@@ -24,15 +29,23 @@ import ticketReducer from '@/store/slices/ticketSlice';
  * that knows when the surface has finished with one, and it is the only connect
  * a reload of `/plan/:id` has, that path having no response to hang off.
  */
-const Host = ({ planId }: { planId?: string }) => {
+const Host = ({
+    planId,
+    scrollToBottom = () => {},
+    scrollToFinalResult = () => {},
+}: {
+    planId?: string;
+    scrollToBottom?: () => void;
+    scrollToFinalResult?: () => void;
+}) => {
     usePlanWebSocket({
         planId,
-        scrollToBottom: () => {},
-        scrollToFinalResult: () => {},
+        scrollToBottom,
+        scrollToFinalResult,
         formatErrorMessage: (content: string) => content,
         showToast: () => 0,
     });
-    return null;
+    return renderThinkingState(useAppSelector(selectWaitingForPlan));
 };
 
 const makeStore = () =>
@@ -49,11 +62,14 @@ const makeStore = () =>
         middleware: (getDefault) => getDefault({ serializableCheck: false }),
     });
 
-const renderHost = (planId?: string) => {
+const renderHost = (
+    planId?: string,
+    callbacks: Pick<React.ComponentProps<typeof Host>, 'scrollToBottom' | 'scrollToFinalResult'> = {},
+) => {
     const store = makeStore();
     const rendered = render(
         <Provider store={store}>
-            <Host planId={planId} />
+            <Host planId={planId} {...callbacks} />
         </Provider>,
     );
     return { store, ...rendered };
@@ -62,8 +78,10 @@ const renderHost = (planId?: string) => {
 /** The socket as `HomeInput` leaves it: opened on the response, before any navigation. */
 const openedOnTheResponse = async (planId: string) => {
     const connecting = webSocketService.connect(planId);
-    FakeSocket.latest()!.open();
+    const socket = FakeSocket.latest()!;
+    socket.open();
     await connecting;
+    return socket;
 };
 
 beforeEach(() => {
@@ -146,5 +164,57 @@ describe('the plan page mounted twice, as StrictMode mounts it', () => {
         unsub();
 
         expect(named).toEqual(['Troubleshooting Agent']);
+    });
+});
+
+describe('a final result arriving on the socket', () => {
+    const expectThinkingToStopAfter = async (status: string) => {
+        renderHost('plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        expect(screen.getByText('Creating your plan...')).toBeInTheDocument();
+
+        act(() => {
+            socket.deliver(
+                frame('final_result_message', {
+                    content: 'The answer is ready.',
+                    status,
+                }),
+            );
+        });
+
+        await waitFor(() =>
+            expect(screen.queryByText('Creating your plan...')).not.toBeInTheDocument(),
+        );
+    };
+
+    it('removes the in-flight indicator after a completed final result', async () => {
+        const scrollToFinalResult = vi.fn();
+        renderHost('plan-1', { scrollToFinalResult });
+        const socket = await openedOnTheResponse('plan-1');
+
+        expect(screen.getByText('Creating your plan...')).toBeInTheDocument();
+
+        act(() => {
+            socket.deliver(
+                frame('final_result_message', {
+                    content: 'The answer is ready.',
+                    status: 'completed',
+                }),
+            );
+        });
+
+        await waitFor(() =>
+            expect(screen.queryByText('Creating your plan...')).not.toBeInTheDocument(),
+        );
+        expect(scrollToFinalResult).toHaveBeenCalledOnce();
+    });
+
+    it('removes the in-flight indicator after an error final result', async () => {
+        await expectThinkingToStopAfter('error');
+    });
+
+    it('removes the in-flight indicator after another terminal final result', async () => {
+        await expectThinkingToStopAfter('failed');
     });
 });

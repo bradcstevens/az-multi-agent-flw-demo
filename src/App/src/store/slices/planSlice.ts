@@ -167,6 +167,7 @@ const planSlice = createSlice({
         },
         /** Single dispatch when FINAL_RESULT_MESSAGE arrives and plan is complete */
         planCompletedFinal(state) {
+            state.waitingForPlan = false;
             state.showProcessingPlanSpinner = false;
             if (state.planData?.plan) {
                 (state.planData as any).plan.overall_status = PlanStatus.COMPLETED;
@@ -175,6 +176,7 @@ const planSlice = createSlice({
 
         /** Single dispatch when an error occurs during plan execution */
         planFailedFinal(state) {
+            state.waitingForPlan = false;
             state.showProcessingPlanSpinner = false;
             if (state.planData?.plan) {
                 (state.planData as any).plan.overall_status = PlanStatus.FAILED;
