@@ -75,9 +75,29 @@ test.beforeEach(() => {
  * attribution — which layer a red run implicates — and neither is answerable
  * from a green run's silence.
  */
-test.afterEach(async () => {
+test.afterEach(async ({ page }) => {
     const info = test.info();
     const metadata = (info.config.metadata ?? {}) as Record<string, string>;
+
+    // The cost table is read **here**, at the end of the turn, and not in the
+    // block that fires when the Grounding panel lights. That block is right for
+    // everything `source_used` carries — the whole frame lands at once — and
+    // wrong for this: the meter fills from `token_usage`, one frame per
+    // executor, as each agent finishes, all of it after the SOP tool answered.
+    // Read early it reported `["Store SOP Assistant"]` for a turn whose table
+    // carried three rows including the Troubleshooting Agent at 6,906 tokens,
+    // which is the precise wrong answer — this field exists to separate "the
+    // troubleshooter must not run" from "the troubleshooter must not have the
+    // last word" (#54).
+    //
+    // Guarded, because the ledger observes the run and must not decide it: a
+    // page closed by a timeout is not a reason to turn a beat red.
+    try {
+        observed.agentsBilled = await new PlanSurface(page).rail.agentsBilled();
+    } catch (error) {
+        console.warn(`the cost table was not read: ${error}`);
+    }
+
     recordRehearsal({
         target: metadata.target ?? 'unknown',
         baseURL: metadata.baseURL ?? 'unknown',
@@ -162,7 +182,6 @@ test.describe('the cross-platform hop', () => {
             observed.retrievalQuery = await plan.rail.retrievalQuery();
             observed.honestMiss = await plan.rail.honestMiss.isVisible();
             observed.citations = await plan.rail.citedDocuments();
-            observed.agentsBilled = await plan.rail.agentsBilled();
         } finally {
             await test.info().attach('sop-tool-query', {
                 body: JSON.stringify(observed, null, 2),

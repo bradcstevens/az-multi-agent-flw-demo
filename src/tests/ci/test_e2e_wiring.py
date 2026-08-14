@@ -579,6 +579,62 @@ def test_the_proof_refuses_a_streak_it_cannot_attribute_to_a_build():
     )
 
 
+def test_the_cost_table_is_read_after_the_turn_not_when_the_panel_lights():
+    """The ledger's `agentsBilled` was reading a table still filling up (#54).
+
+    Measured 2026-08-14 against `rg-macae-flw-v1`, on the first rehearsal run
+    that could name its build. The ledger recorded:
+
+        agentsBilled: ["Store SOP Assistant"]
+
+    while the cost table in that same run's DOM snapshot carried three rows —
+    `Store SOP Assistant`, `Shift Tasks Agent` at 4,032 tokens, and
+    `Troubleshooting Agent` at 6,906. The beat had failed `clarified`, and the
+    ledger said the troubleshooter never ran.
+
+    That is the precise wrong answer. `agentsBilled` was added to separate two
+    fixes — *the troubleshooter must not run* from *the troubleshooter must not
+    have the last word* — because guessing between them cost three deploys. A
+    reader that under-reports it sends the next diagnosis to the first when the
+    evidence says the second.
+
+    The cause is that it was read in the block that fires when the **Grounding
+    panel** arrives. That block is right for everything `source_used` carries:
+    the whole frame lands at once, so reading it in one place is what stops a
+    run that failed the first assertion from recording nothing about the rest.
+    The cost table is not in that frame. It fills from `token_usage`, one frame
+    per executor, as each agent finishes — all of it *after* the SOP tool
+    answered and the panel lit. So it has to be read last.
+    """
+    spec = _code(CROSS_PLATFORM_SPEC)
+
+    grounding_block = spec.split("waitForGrounding", 1)[1].split("finally", 1)[0]
+    assert "agentsBilled" not in grounding_block, (
+        "the cost table is read when the Grounding panel lights, which is "
+        "before the specialists have run — the ledger under-reports who was "
+        "billed and names the wrong fix"
+    )
+
+    after_each = spec.split("test.afterEach", 1)[1].split("});", 1)[0]
+    assert "agentsBilled" in after_each, (
+        "nothing reads the cost table at the end of the turn, so the ledger "
+        "cannot say which agents the turn billed"
+    )
+
+
+def test_reading_the_cost_table_can_never_fail_the_beat():
+    # The ledger observes the run; it must not be able to decide it. A page
+    # closed by a timeout, a rail that never rendered — neither is a reason to
+    # turn a green beat red, and `recordRehearsal` already follows this rule.
+    spec = _code(CROSS_PLATFORM_SPEC)
+    after_each = spec.split("test.afterEach", 1)[1].split("recordRehearsal", 1)[0]
+
+    assert "catch" in after_each, (
+        "the end-of-turn read is unguarded: a page that has gone away would "
+        "fail the beat from inside the measurement"
+    )
+
+
 # ---------------------------------------------------------------------------
 # The fourth specialist's beat (#52, ADR-017).
 # ---------------------------------------------------------------------------

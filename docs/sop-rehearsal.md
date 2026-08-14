@@ -277,6 +277,34 @@ never complete without it:
 
 [ADR-018]: ADR/018-deployed-build-provenance-check.md
 
+## The meter was read a frame too early
+
+The first run that could name its build came back `clarified` — the hop worked, `SOP-102` was cited,
+and then the surface asked the presenter three troubleshooting questions back. Its ledger row said
+`agentsBilled: ["Store SOP Assistant"]`. Its own DOM snapshot, from the same run, showed a cost table
+with three rows: `Store SOP Assistant`, `Shift Tasks Agent` at 4,032 tokens, `Troubleshooting Agent`
+at 6,906.
+
+That is the precise wrong answer. `agentsBilled` exists in the ledger to separate the residual above
+— *the troubleshooter must not have the last word* — from the far cheaper *the troubleshooter must
+not run at all*. Guessing between those two has already cost this repository three deploys. Read as
+recorded, the next diagnosis would have gone to the orchestrator's routing to ask why an agent that
+never ran had spoken.
+
+The read was in the block that fires when the Grounding panel lights. That block is correct for
+everything `source_used` carries, because the whole frame lands at once and renders in one pass. It
+is wrong for the meter: the cost table fills from `token_usage`, **one frame per executor**, as each
+agent finishes — all of it after the SOP tool has already answered. So the ledger systematically
+recorded the agents billed *so far*, which on the runs that matter is the first one.
+
+Reading it in `afterEach` reads it after the turn. It is guarded, because the ledger observes a run
+and may not decide it: a page closed by a timeout is not a reason to turn a beat red, and
+`recordRehearsal` has never been allowed to throw for the same reason. On the next live run the row
+came back with two agents on a beat that had recorded one.
+
+This is the fifth way the proof could have come back green, or red, about the wrong thing — and the
+only one of the five that would have been read as evidence rather than as a passing streak.
+
 ## Running the proof
 
 ```bash
