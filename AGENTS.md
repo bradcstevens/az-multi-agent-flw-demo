@@ -52,6 +52,25 @@ because `pac` cannot authenticate unattended. Change the agent by editing
 not by editing it in the portal: the check fails on any component this repository did not author,
 and a portal edit is a behaviour nobody here can review.
 
+## Merging to `main` deploys
+
+A push to `main` that touches an image's build context (`src/backend`, `src/mcp_server`,
+`src/App`), what provisioning reads (`infra/**`, `azure.yaml`) or what `post_deploy.sh` seeds
+(`content/sop/**`, `content_packs/**`, `tools/store_pack/**`) runs
+`.github/workflows/deploy-main.yml`, which rebuilds the three images, provisions `macae-flw-v1`,
+re-seeds the store assistant, and then **gates on the running surface** — a real procedure question
+answered from Dataverse — before it goes green. It costs about twenty minutes and real money, and a
+bad commit reaches the demonstration environment before anyone reads it.
+
+[ADR-020](docs/ADR/020-deploy-main-on-every-commit.md) is the decision and
+[docs/deploy-from-main.md](docs/deploy-from-main.md) is the operator's half — the identity, its
+roles, and what each failing step means. Do not change the deploy order, the image tag, or the
+`MACAE_USE_CASE=none` pin without reading them: `src/tests/ci/test_deploy_workflow.py` asserts all
+three, and each is a failure this repository has already paid for once.
+
+The environment's provisioning inputs live in `infra/environments/macae-flw-v1.env`, not in
+`.azure/`. Three of them default to the Placeholder image if dropped.
+
 ## Feedback loops
 
 Run the loops your change touches before committing. Each command is self-contained: it
