@@ -1484,15 +1484,16 @@ class TestSopAsk:
     ):
         """The tool's query and the retrieval query are both observable.
 
-        This is the exact rephrasing the deployed orchestrator produced. The
+        This is one exact rephrasing the deployed orchestrator produced. The
         SOP index is not: this one rehearsed hit is resolved against the
         corpus's authored query, while the original tool input stays available
         to attribute a miss correctly.
         """
         monkeypatch.setattr(router_mod, "sop_client", lambda: rt.sop)
         tool_query = (
-            "Please look up the Store 223 closing procedure in the Store SOP "
-            "Assistant and return the quoted SOP guidance for how to close the store."
+            "Please look up the store closing procedure for Store 223 in the Store "
+            "SOP Assistant on Copilot Studio. Return the step-by-step closing "
+            "process and quote the SOP document it comes from."
         )
 
         response = self._post(rt, tool_query)
