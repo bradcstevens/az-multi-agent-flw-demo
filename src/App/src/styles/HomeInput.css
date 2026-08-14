@@ -103,11 +103,10 @@
 
 
 /*
- * Phone. One column, at the same 640px the shell stacks at (issue #25) — a
- * second breakpoint somewhere else is a surface that reflows twice, and the
- * associate this is for is holding a phone in a store. Deliberately no
- * `flex-wrap` or `flex` rules: the accelerator's had both, on an element
- * declared `display: grid`, where neither property does anything at all.
+ * Phone. One column at 640px, where the associate needs readable cards.
+ * Deliberately no `flex-wrap` or `flex` rules: the accelerator's had both, on
+ * an element declared `display: grid`, where neither property does anything at
+ * all.
  */
 @media (max-width: 640px) {
   .home-input-quick-tasks {

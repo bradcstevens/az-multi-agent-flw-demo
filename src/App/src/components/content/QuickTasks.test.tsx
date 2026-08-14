@@ -153,10 +153,8 @@ describe('six Quick Tasks on a phone-sized screen', () => {
         expect(css).toContain('.home-input-quick-tasks .fui-Button:focus-visible');
     });
 
-    it('collapses the task grid at the same breakpoint the shell stacks at', () => {
-        // 640px, as #25 fixed it. A second breakpoint somewhere else is a
-        // surface that reflows twice, and the associate this is for is holding
-        // a phone: six four-across cards at 390px are six unreadable slivers.
+    it('collapses the task grid on a phone-sized screen', () => {
+        // At 640px six four-across cards on a phone are six unreadable slivers.
         const css = readFileSync(STYLESHEET, 'utf8');
 
         expect(css).toContain('@media (max-width: 640px)');

@@ -38,12 +38,12 @@
 }
 
 /*
- * Phone. The columns stack, the surface scrolls as one, and the task-history
- * panel is dropped rather than squeezed — 280px of it beside a 390px viewport
- * leaves the conversation unusable, which is the one thing that must still work
- * here.
+ * Stack the layout at the same width the rail changes orientation. The surface
+ * scrolls as one, and the task-history panel is dropped rather than squeezed —
+ * 280px of it beside a 390px viewport leaves the conversation unusable, which
+ * is the one thing that must still work here.
  */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
     .coral-shell-row {
         flex-direction: column;
         overflow-y: auto;
@@ -53,7 +53,7 @@
         display: none;
     }
 
-    .transparency-rail {
+    .coral-shell-row .transparency-rail {
         width: 100%;
         min-width: 0;
         border-left: none;

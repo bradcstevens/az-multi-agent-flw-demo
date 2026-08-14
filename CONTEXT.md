@@ -466,10 +466,11 @@ than produced by a connected system (#25, R11's surviving fragment): **Store 223
 matters as much — a badge on a real Foundry answer, a real Copilot Studio hop or a measured token
 count gives away the demo's strongest evidence. Label the invented things, and only those.
 
-**Phone breakpoint** — 640px, below which the shell's columns stack and the task-history panel is
-dropped rather than squeezed (#25). The associate is holding a phone in a store. `CoralShellRow`'s
-layout had to move out of an inline style to get there: an inline `flex-direction: row` beats a
-media query, so the breakpoint would have been present, correct and completely inert.
+**Stacking breakpoint** — 900px, below which the shell's columns stack, the transparency rail sits
+beneath the conversation, and the task-history panel is dropped rather than squeezed (#25, #58).
+The associate is holding a phone in a store. `CoralShellRow`'s layout had to move out of an inline
+style to get there: an inline `flex-direction: row` beats a media query, so the breakpoint would
+have been present, correct and completely inert.
 
 **Grounding panel** — the R6 surface showing where an answer came from. Driven by **two signals
 combined**: a "source used" event emitted server-side over the existing WebSocket, which proves

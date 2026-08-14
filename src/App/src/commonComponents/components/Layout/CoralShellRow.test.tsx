@@ -7,11 +7,12 @@ import CoralShellRow from './CoralShellRow';
 
 const SRC = join(__dirname, '..', '..', '..');
 const STYLESHEET = join(SRC, 'styles', 'storeSurface.css');
+const RAIL_STYLESHEET = join(SRC, 'styles', 'transparency.css');
 
-/** The class selectors inside the phone breakpoint, read out of the stylesheet. */
-const phoneSelectors = (): string[] => {
+/** The class selectors inside the shared stacking breakpoint, read from the stylesheet. */
+const stackingSelectors = (): string[] => {
     const css = readFileSync(STYLESHEET, 'utf8');
-    const block = css.slice(css.indexOf('@media (max-width: 640px)'));
+    const block = css.slice(css.indexOf('@media (max-width: 900px)'));
     let depth = 0;
     let end = 0;
     for (let i = block.indexOf('{'); i < block.length; i += 1) {
@@ -53,8 +54,8 @@ describe('the store surface on a phone-sized screen', () => {
         expect(shell.style.flexDirection).toBe('');
     });
 
-    it('declares a phone breakpoint at all', () => {
-        expect(phoneSelectors().length).toBeGreaterThan(0);
+    it('declares a shared stacking breakpoint at all', () => {
+        expect(stackingSelectors().length).toBeGreaterThan(0);
     });
 
     it('targets only classes that something actually renders', () => {
@@ -64,7 +65,7 @@ describe('the store surface on a phone-sized screen', () => {
         // stops applying — and it would be discovered on a phone, on stage.
         const sources = sourceFiles(SRC).map((path) => readFileSync(path, 'utf8'));
 
-        for (const selector of phoneSelectors()) {
+        for (const selector of stackingSelectors()) {
             const rendered = sources.some((source) => source.includes(selector));
             expect(rendered, `no component renders .${selector}`).toBe(true);
         }
@@ -72,8 +73,22 @@ describe('the store surface on a phone-sized screen', () => {
 
     it('drops the task-history panel rather than squeezing it', () => {
         const css = readFileSync(STYLESHEET, 'utf8');
-        const block = css.slice(css.indexOf('@media (max-width: 640px)'));
+        const block = css.slice(css.indexOf('@media (max-width: 900px)'));
 
         expect(block).toMatch(/\.panel-left-container\s*\{\s*display:\s*none/);
+    });
+
+    it('declares the rail and shell stacking breakpoint once', () => {
+        // The rail is beside the conversation until the shell stacks. Giving
+        // it a second breakpoint creates a narrow side column styled as a
+        // stacked band between the two widths.
+        const shellCss = readFileSync(STYLESHEET, 'utf8');
+        const railCss = readFileSync(RAIL_STYLESHEET, 'utf8');
+
+        expect(shellCss).toMatch(
+            /@media\s*\(max-width:\s*900px\)\s*\{[\s\S]*\.coral-shell-row[\s\S]*\.transparency-rail/,
+        );
+        expect(shellCss).toContain('.coral-shell-row .transparency-rail');
+        expect(railCss).not.toContain('@media');
     });
 });
