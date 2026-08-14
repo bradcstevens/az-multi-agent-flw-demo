@@ -6,6 +6,7 @@
 # Exits non-zero if any check fails, so it can be wired into a feedback loop.
 #
 #   scripts/copilot_studio/check-sop-agent.sh                       # ask it
+#   scripts/copilot_studio/check-sop-agent.sh --samples 20          # ask it 20 times
 #   scripts/copilot_studio/check-sop-agent.sh --provision --publish --probe
 #   scripts/copilot_studio/check-sop-agent.sh --export .artifacts
 #
@@ -13,6 +14,13 @@
 # rehearsed questions. Unlike the Dataverse search preflight, probing here
 # leaves nothing behind — a conversation is not a record — so the run that
 # gathers no evidence is the one that needs a reason, not the other way round.
+#
+# --samples <n> asks the *procedure* question n times, each in its own fresh
+# conversation, and grades all n. One sample says the beat can work; it took
+# 69 conversations to see the fault issue #54 turned out to be, which was
+# intermittent at about 6% and came up clean nineteen single samples in twenty.
+# Each sample is a live conversation and costs a Copilot Studio message, so it
+# is opt-in rather than the default.
 #
 # --provision creates or converges the agent: the bot row, its instructions,
 # the greeting, the honest-miss Fallback topic and the ten SOP documents from

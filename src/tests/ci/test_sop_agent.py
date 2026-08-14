@@ -28,6 +28,7 @@ from copilot_studio.sop_agent import (
     INSTRUCTIONS,
     NOT_PROBED,
     Probe,
+    settled,
     upload_reason,
 )
 
@@ -305,12 +306,13 @@ MISS = reply(
 
 
 def probed(procedure=None, miss=MISS, greeting=GREETING_REPLY,
-           branding=None):
+           branding=None, repeats=()):
     return Probe(
         greeting=[greeting] if greeting else [],
         procedure=[procedure if procedure is not None else reply(ANSWER)],
         miss=[miss] if miss else [],
         branding=[branding if branding is not None else reply(BRANDED_ANSWER)],
+        repeats=repeats,
     )
 
 
@@ -484,13 +486,199 @@ def test_the_instruction_block_survives_a_blank_line():
     assert "  second paragraph" in data
 
 
-def test_the_fallback_topic_says_exactly_what_the_verdict_looks_for():
+def test_an_answer_that_gives_steps_and_then_says_it_has_none_fails():
+    """One conversation in sixty-nine came back as the cited closing procedure
+    followed by the honest-miss sentence. Every provenance assertion passes on
+    that turn — the steps are there, numbered, cited — and the presenter is left
+    reading a contradiction off the screen.
+    """
+    contradicted = Probe(
+        greeting=[GREETING_REPLY],
+        procedure=[reply(ANSWER), reply(HONEST_MISS, citations=())],
+        miss=[MISS],
+        branding=[reply(BRANDED_ANSWER)],
+    )
+
+    check = evaluate(bot_row(), uploaded(), probe=contradicted,
+                     corpus=CORPUS, banner=BANNER).check(
+                         "numbered-steps-with-source")
+
+    assert not check.ok
+    assert HONEST_MISS_PHRASE in check.detail
+
+
+def test_a_beat_is_not_over_at_its_first_activity():
+    """The fault the probe was blind to: the cited closing procedure arrives,
+    and the honest-miss sentence lands 30 ms behind it. Stopping at the first
+    reply reads that turn as a clean pass.
+    """
+    assert not settled(["first"], quiet_polls=0)
+    assert not settled(["first"], quiet_polls=1)
+    assert settled(["first"], quiet_polls=2)
+
+
+def test_silence_alone_never_ends_a_beat():
+    """An agent takes five to twenty seconds to answer, so the quiet before it
+    speaks is longer than the quiet after.
+    """
+    assert not settled([], quiet_polls=99)
+
+
+def test_one_sample_of_the_procedure_beat_cannot_see_an_intermittent_fault():
+    """A 6% fault is invisible to a single conversation, and a single
+    conversation is what this check asked for until #54. `--samples N` asks the
+    procedure question in N *fresh* conversations, and the repeats get their own
+    check so a mixed result reads as *four of five* rather than as a
+    contradiction inside one answer.
+    """
+    verdict = evaluate(bot_row(), uploaded(), corpus=CORPUS, banner=BANNER,
+                       probe=probed(repeats=[[reply(ANSWER)],
+                                             [reply(HONEST_MISS, citations=())]]))
+
+    check = verdict.check("procedure-answers-every-time")
+    assert not check.ok
+    assert "2 of 3" in check.detail
+
+
+def test_every_repeat_answering_from_the_corpus_passes():
+    verdict = evaluate(bot_row(), uploaded(), corpus=CORPUS, banner=BANNER,
+                       probe=probed(repeats=[[reply(ANSWER)], [reply(ANSWER)]]))
+
+    assert verdict.check("procedure-answers-every-time").ok
+    assert "3 of 3" in verdict.check("procedure-answers-every-time").detail
+
+
+def test_a_repeat_is_graded_by_the_same_rule_as_the_first_asking():
+    """The repeat check exists to catch a fault the first asking got lucky on,
+    so it cannot grade on a looser bar than the first asking did. Cited prose
+    with no numbered steps fails `numbered-steps-with-source` when it arrives
+    first; it fails here too.
+    """
+    prose = reply("Lock the doors, count the drawer and set the alarm.")
+
+    check = evaluate(bot_row(), uploaded(), corpus=CORPUS, banner=BANNER,
+                     probe=probed(repeats=[[prose]])).check(
+                         "procedure-answers-every-time")
+
+    assert not check.ok
+    assert "not numbered steps" in check.detail
+
+
+def test_a_repeat_citing_a_document_the_corpus_does_not_hold_fails():
+    """The other half of the same rule: a repeat can invent a source as easily
+    as a first asking can, and only the first asking was ever checked for it.
+    """
+    invented = reply(ANSWER, citations=("SOP-999 Car Wash Recovery.docx",))
+
+    check = evaluate(bot_row(), uploaded(), corpus=CORPUS, banner=BANNER,
+                     probe=probed(repeats=[[invented]])).check(
+                         "procedure-answers-every-time")
+
+    assert not check.ok
+    assert "SOP-999 Car Wash Recovery.docx" in check.detail
+
+
+def test_the_honest_miss_alone_is_not_reported_as_a_contradiction():
+    """Two different faults, and the words have to tell them apart: the miss
+    *beside* the steps means two things spoke, and the miss *alone* is the
+    failure #54 is named after. Reporting the second as the first sends the
+    reader looking for an answer that was never there.
+    """
+    missed = Probe(greeting=[GREETING_REPLY], miss=[MISS],
+                   procedure=[reply(HONEST_MISS, citations=())],
+                   branding=[reply(BRANDED_ANSWER)])
+
+    check = evaluate(bot_row(), uploaded(), probe=missed, corpus=CORPUS,
+                     banner=BANNER).check("numbered-steps-with-source")
+
+    assert not check.ok
+    assert "beside" not in check.detail
+    assert "came back as the honest miss" in check.detail
+
+
+def test_nothing_answering_reads_as_broken_rather_than_intermittent():
+    """Intermittent is a rate to measure and broken is a state to fix. An
+    operator who reads *0 of 3 — intermittent* goes looking for the good runs.
+    """
+    check = evaluate(
+        bot_row(), uploaded(), corpus=CORPUS, banner=BANNER,
+        probe=probed(procedure=reply(HONEST_MISS, citations=()),
+                     repeats=[[reply(HONEST_MISS, citations=())],
+                              [reply(HONEST_MISS, citations=())]]),
+    ).check("procedure-answers-every-time")
+
+    assert not check.ok
+    assert "broken rather than intermittent" in check.detail
+    assert "intermittent, which is exactly" not in check.detail
+
+
+def test_a_run_that_asked_once_says_so_rather_than_claiming_a_streak():
+    """One sample is not a streak and must not print like one — that conflation
+    is the one `direct-sop-answer` was renamed for.
+    """
+    check = evaluate(bot_row(), uploaded(), corpus=CORPUS, banner=BANNER,
+                     probe=probed()).check("procedure-answers-every-time")
+
+    assert check.ok
+    assert "1 of 1" in check.detail
+    assert "--samples" in check.detail
+
+
+def test_the_fallback_topic_searches_the_corpus_before_it_misses():
+    """The topic fires on the turns the generative planner did not answer, and
+    what it did on those turns was speak the honest miss with nothing having
+    searched. Measured 2026-08-14 over 69 fresh conversations asking the
+    rehearsed question: three came back as the miss, one as the cited answer
+    with the miss 30 ms behind it (#54).
+
+    Deleting the topic is worse, and was measured too: the platform's own
+    "Sorry, I am not able to find a related topic" answers instead, on 16 of 40
+    of the same question. So the search moves *inside* the fallback, and the
+    miss becomes what it claims to be — the corpus was searched and holds
+    nothing.
+    """
+    data = fallback_topic().data
+
+    assert "OnUnknownIntent" in data
+    assert data.index("SearchAndSummarizeContent") < data.index(HONEST_MISS)
+    assert "elseActions" in data
+
+
+def test_the_fallback_never_re_sends_the_answer_it_found():
+    """`SearchAndSummarizeContent` sends its own answer, and that activity is
+    what carries the citation entities the Grounding panel is a claim about.
+    Reading the answer out of `Topic.Answer` and sending it again would deliver
+    the same prose with no citations — the honest miss's exact appearance, from
+    a search that succeeded.
+    """
+    data = fallback_topic().data
+
+    assert "autoSend" not in data
+    assert "Topic.Answer" in data
+    assert "{Topic.Answer" not in data
+
+
+def test_the_instructions_say_exactly_what_the_verdict_looks_for():
     """The honest miss is authored in one place and checked in another. If they
     drift, the check passes on wording the agent no longer says, or fails on
     wording it does.
+
+    The instructions carry it as well as the Fallback topic, so the sentence is
+    the same one whichever of the two speaks it. Which of them the measured
+    fix is owed to is not separable from 80 clean runs, and this file does not
+    pretend otherwise: both were in the build that produced them.
     """
-    assert HONEST_MISS in fallback_topic().data
+    assert HONEST_MISS in INSTRUCTIONS
     assert HONEST_MISS_PHRASE in HONEST_MISS
+
+
+def test_the_instructions_forbid_the_honest_miss_beside_an_answer():
+    """The fault this addresses was not only the miss winning outright. One
+    conversation in sixty-nine returned the cited closing procedure *and* the
+    honest-miss sentence 30 ms later — a contradiction on stage that no panel
+    renders as a failure.
+    """
+    assert "if you are giving steps, you found it" in INSTRUCTIONS.lower()
 
 
 def test_the_conversation_start_topic_greets_an_explicit_event():
@@ -560,3 +748,99 @@ def test_the_remedy_for_a_run_that_did_not_ask_is_to_ask():
     verdict = evaluate(bot_row(), uploaded(), probe=None, corpus=CORPUS)
 
     assert "--probe" in format_report(verdict)
+
+
+class FakeDirectLine:
+    """Direct Line for the drain, in as few moving parts as the drain reads.
+
+    One conversation, a scripted list of polls, and a watermark the caller has
+    to honour to make progress — because the fault the drain was blind to is
+    exactly a second activity arriving in a *later* poll than the first.
+    """
+
+    def __init__(self, polls):
+        self.polls = list(polls)
+        self.sent = []
+        self.tokens = []
+
+    def __call__(self, url, method="GET", body=None, token=None, **kwargs):
+        self.tokens.append(token)
+        if url.endswith("/conversations") and method == "POST":
+            return {"conversationId": "c1"}
+        if method == "POST":
+            self.sent.append(body)
+            return {}
+        activities = self.polls.pop(0) if self.polls else []
+        return {"watermark": str(len(self.polls)), "activities": activities}
+
+
+def bot_says(text):
+    return {"id": text, "type": "message", "text": text,
+            "from": {"id": "bot", "role": "bot"}}
+
+
+def test_converse_keeps_polling_after_the_first_activity_arrives(monkeypatch):
+    """The seam the settle rule has to hold at. `settled` alone can be right
+    while `drain` still breaks on its first reply, and that break is what hid
+    the contradiction in one conversation of sixty-nine.
+    """
+    import time
+
+    from copilot_studio import sop_agent
+
+    fake = FakeDirectLine([[], [bot_says("greeting")], [], [],
+                           [bot_says(ANSWER)], [bot_says(HONEST_MISS)], [], []])
+    monkeypatch.setattr(sop_agent, "_request", fake)
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+
+    _, _, answers = sop_agent.converse("token", ["How do I close the store?"])
+
+    assert [activity["text"] for activity in answers[0]] == [ANSWER, HONEST_MISS]
+
+
+def test_each_repeat_gets_a_conversation_of_its_own_and_a_token_of_its_own():
+    """A Copilot Studio Direct Line token carries a `conv` claim, so re-spending
+    one rejoins the conversation it was minted for and replays its transcript —
+    a repeat that would then agree with the asking it was meant to check.
+    """
+    from copilot_studio import sop_agent
+
+    minted = []
+    conversed = []
+
+    def token(environment, bot):
+        minted.append(len(minted))
+        return "endpoint", f"token-{len(minted)}"
+
+    def converse(tok, questions, **kwargs):
+        conversed.append(tok)
+        return f"conversation-{len(conversed)}", [GREETING_REPLY], [
+            [reply(ANSWER)] for _ in questions]
+
+    original = sop_agent.direct_line_token, sop_agent.converse
+    sop_agent.direct_line_token, sop_agent.converse = token, converse
+    try:
+        probe = sop_agent.probe_live(None, None, samples=3)
+    finally:
+        sop_agent.direct_line_token, sop_agent.converse = original
+
+    assert len(probe.procedure_turns) == 3
+    assert len(set(conversed)) == 3
+    assert conversed == ["token-1", "token-2", "token-3"]
+
+
+def test_a_repeat_that_failed_differently_is_not_hidden_behind_the_first_fault():
+    """`numbered-steps-with-source` already reports the first asking's fault.
+    Repeating it here, and stopping there, is how the reason a *repeat* failed
+    goes unread — and the repeats exist to catch what the first asking missed.
+    """
+    check = evaluate(
+        bot_row(), uploaded(), corpus=CORPUS, banner=BANNER,
+        probe=probed(procedure=reply(HONEST_MISS, citations=()),
+                     repeats=[[reply(ANSWER)],
+                              [reply(ANSWER, citations=("SOP-999.docx",))]]),
+    ).check("procedure-answers-every-time")
+
+    assert not check.ok
+    assert "came back as the honest miss" in check.detail
+    assert "SOP-999.docx" in check.detail

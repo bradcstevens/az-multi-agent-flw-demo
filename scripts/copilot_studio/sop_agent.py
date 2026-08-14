@@ -220,6 +220,7 @@ def evaluate(bot, components, probe, corpus, banner=None):
         _published_check(bot),
         _greeting_check(probe),
         _procedure_check(probe, corpus),
+        _repeats_check(probe, corpus),
         _honest_miss_check(probe),
         _branding_check(probe, banner),
     ])
@@ -344,9 +345,21 @@ def _published_check(bot):
 # operator to fix an agent that was never questioned.
 NOT_PROBED = "not probed"
 
-# The wording the Fallback topic answers an out-of-corpus question with. The
-# agent is authored with this text and the verdict looks for it, so the beat
-# cannot drift from the check that proves it.
+# The wording an out-of-corpus question is refused with. It is spoken by the
+# Fallback topic and repeated in the agent's instructions, and the verdict looks
+# for it, so the beat cannot drift from the check that proves it.
+#
+# What issue #54 spent six deploys chasing through the orchestrator turned out
+# to end here. Measured 2026-08-14 over 69 fresh Direct Line conversations
+# asking the **rehearsed** question, with no orchestrator in front of them:
+# three came back as this sentence alone, uncited, and one came back as the
+# cited closing procedure with this sentence 30 ms behind it. The Fallback topic
+# spoke it on turns the generative planner had not answered — without anything
+# having searched the corpus, because the topic's only action was to say it.
+#
+# So the sentence is not the problem and it has not changed. Where it is spoken
+# from has: `fallback_topic` now searches the corpus first and reaches this only
+# if the search found nothing, which is what the sentence has always claimed.
 HONEST_MISS = (
     "That procedure is not in the store's SOP library, so I can't give you the "
     "steps. Ask your shift lead, and let them know the procedure is missing so "
@@ -374,13 +387,43 @@ class Probe:
     explicit conversation-start event, answers a procedure question in numbered
     steps from a named source, refuses an out-of-corpus question plainly, and
     reads back a line of the document's own branding.
+
+    `repeats` is the procedure question asked again, each in its own fresh
+    conversation. One sample answers *can it*; the fault this check exists to
+    catch since #54 answers *does it every time*, and at 6% that is invisible
+    below about thirty.
     """
 
-    def __init__(self, greeting=(), procedure=(), miss=(), branding=()):
+    def __init__(self, greeting=(), procedure=(), miss=(), branding=(),
+                 repeats=()):
         self.greeting = list(greeting)
         self.procedure = list(procedure)
         self.miss = list(miss)
         self.branding = list(branding)
+        self.repeats = [list(turn) for turn in repeats]
+
+    @property
+    def procedure_turns(self):
+        """Every conversation the procedure question was asked in."""
+        return [self.procedure] + self.repeats
+
+
+# How many consecutive polls must add nothing before a beat counts as over.
+# The same rule the Direct Line client in the backend drains by, for the same
+# reason: an agent answers in however many activities it chose to send, and a
+# poll landing between two of them is quiet without the turn being finished.
+PROBE_SETTLE_POLLS = 2
+
+
+def settled(replies, quiet_polls, settle_polls=PROBE_SETTLE_POLLS):
+    """Whether a beat has finished arriving. Pure.
+
+    Stopping at the *first* activity is what this replaced, and it made the
+    probe blind to the fault it exists to catch: the turn that answers the
+    rehearsed question correctly and then says the procedure is not in the
+    library. One reply is the beginning of a turn, not the end of it.
+    """
+    return bool(replies) and quiet_polls >= settle_polls
 
 
 def _spoken(activities):
@@ -406,6 +449,42 @@ def _greeting_check(probe):
                  f"the agent greets a new conversation: {text.strip()!r}")
 
 
+def procedure_fault(turn, corpus):
+    """Why one asking of the procedure question is not an answer from the corpus.
+
+    `None` when it is one. This is the single grading rule, and both checks that
+    read a procedure answer are held to it — `numbered-steps-with-source`, which
+    grades the first asking, and `procedure-answers-every-time`, which grades all
+    of them. Sharing it is the point: a repeat graded on a laxer bar than the
+    first asking is a green row that means less than the row above it.
+
+    The order of the two honest-miss branches carries the distinction #54 was
+    about. The miss *beside* steps is a contradiction on screen — two things
+    spoke. The miss *alone* is the failure the issue is named after.
+    """
+    text = _spoken(turn)
+    steps = numbered_steps(text)
+    documents = [name for activity in turn for name in cited_documents(activity)]
+    if HONEST_MISS_PHRASE in text and steps:
+        return (f"the answer says {HONEST_MISS_PHRASE!r} beside its steps — the "
+                "honest miss arrived with the answer, and the presenter is left "
+                "reading a contradiction")
+    if HONEST_MISS_PHRASE in text:
+        return ("a procedure the corpus holds came back as the honest miss: "
+                f"{HONEST_MISS_PHRASE!r}")
+    if len(steps) < MINIMUM_STEPS or steps[:1] != [1]:
+        return (f"the answer is not numbered steps (found {steps or 'none'}) — "
+                "an associate reads this one-handed, mid-shift")
+    if not documents:
+        return ("the answer cites no source document, so it is "
+                "indistinguishable from an invention")
+    unknown = [name for name in documents if name not in corpus]
+    if unknown:
+        return ("the answer cites a document that is not in the SOP corpus: "
+                + ", ".join(unknown))
+    return None
+
+
 def _procedure_check(probe, corpus):
     """Whether a procedure question came back as numbered steps from a source.
 
@@ -416,28 +495,12 @@ def _procedure_check(probe, corpus):
     if probe is None:
         return Check("numbered-steps-with-source", False,
                      f"{NOT_PROBED}: no procedure question was asked")
+    fault = procedure_fault(probe.procedure, corpus)
+    if fault:
+        return Check("numbered-steps-with-source", False, fault)
     steps = numbered_steps(_spoken(probe.procedure))
     documents = [name for activity in probe.procedure
                  for name in cited_documents(activity)]
-    if len(steps) < MINIMUM_STEPS or steps[:1] != [1]:
-        return Check(
-            "numbered-steps-with-source", False,
-            f"the answer is not numbered steps (found {steps or 'none'}) — an "
-            "associate reads this one-handed, mid-shift",
-        )
-    if not documents:
-        return Check(
-            "numbered-steps-with-source", False,
-            "the answer cites no source document, so it is indistinguishable "
-            "from an invention",
-        )
-    unknown = [name for name in documents if name not in corpus]
-    if unknown:
-        return Check(
-            "numbered-steps-with-source", False,
-            "the answer cites a document that is not in the SOP corpus: "
-            + ", ".join(unknown),
-        )
     return Check(
         "numbered-steps-with-source", True,
         f"{len(steps)} numbered steps, cited to " + ", ".join(documents),
@@ -468,6 +531,61 @@ def _honest_miss_check(probe):
         )
     return Check("honest-miss", True,
                  "the out-of-corpus question is refused plainly")
+
+
+def _repeats_check(probe, corpus):
+    """Whether *every* asking of the procedure question answered from the corpus.
+
+    `numbered-steps-with-source` grades one conversation, which answers "can
+    it" and was the whole of this check's evidence until #54. The fault that
+    issue turned out to be was intermittent at about 6%: ten samples come up
+    clean about half the time, and one sample nineteen times in twenty, so a
+    green row said nothing about the beat the presenter was about to stand in
+    front of. This is the same grading — `procedure_fault`, the rule above —
+    over as many fresh conversations as `--samples` asked for.
+
+    A run in which *nothing* answered is reported as broken rather than
+    intermittent. They want different next moves: intermittent is a rate to
+    measure, broken is a state to fix, and the words are how the operator knows
+    which one they are looking at.
+    """
+    if probe is None:
+        return Check("procedure-answers-every-time", False,
+                     f"{NOT_PROBED}: no procedure question was asked")
+    turns = probe.procedure_turns
+    faults = [procedure_fault(turn, corpus) for turn in turns]
+    clean = [fault for fault in faults if fault is None]
+    # Every *distinct* fault, not the first one. The first is usually the one
+    # `numbered-steps-with-source` already reported, and printing it again here
+    # is how a repeat that failed differently goes unread.
+    spoken = "; ".join(dict.fromkeys(fault for fault in faults if fault))
+    if turns and not clean:
+        return Check(
+            "procedure-answers-every-time", False,
+            f"no asking of the procedure question answered from the corpus "
+            f"({len(turns)} asked) — the rehearsed hit is broken rather than "
+            f"intermittent: {spoken}",
+        )
+    if len(clean) < len(turns):
+        return Check(
+            "procedure-answers-every-time", False,
+            f"only {len(clean)} of {len(turns)} askings of the procedure "
+            "question answered from the corpus — the rehearsed hit is "
+            f"intermittent, which is exactly what the walkthrough cannot be: "
+            f"{spoken}",
+        )
+    if len(turns) == 1:
+        return Check(
+            "procedure-answers-every-time", True,
+            "1 of 1 asking answered from the corpus — one sample, so this says "
+            "the beat can work and not that it always does; --samples N asks "
+            "N times in N fresh conversations",
+        )
+    return Check(
+        "procedure-answers-every-time", True,
+        f"{len(turns)} of {len(turns)} askings answered from the corpus, each "
+        "in a fresh conversation",
+    )
 
 
 def _branding_check(probe, banner):
@@ -514,7 +632,7 @@ def _branding_check(probe, banner):
     )
 
 
-INSTRUCTIONS = """You are the Store SOP Assistant for Circle K \
+INSTRUCTIONS = f"""You are the Store SOP Assistant for Circle K \
 Store 223. You answer questions about store standard operating procedures using \
 only the SOP documents in your knowledge.
 
@@ -525,9 +643,14 @@ procedure question as prose or as a paragraph.
 Always name the source document the steps came from, using its document title, \
 for example "SOP-102 Store Closing Procedure".
 
-If the procedure is not in the SOP library, say so plainly: say that it is not \
-in the store's SOP library and that the associate should ask their shift lead. \
-Never invent steps, never guess, and never answer from general knowledge.
+If, and only if, the procedure is not in the SOP library, reply with exactly \
+this sentence and nothing else:
+
+{HONEST_MISS}
+
+Never invent steps, never guess, and never answer from general knowledge. Never \
+say that sentence about a procedure you did find: if you are giving steps, you \
+found it, so do not also say it is missing.
 
 Keep answers short enough to read on a phone in the middle of a shift."""
 
@@ -594,21 +717,53 @@ def gpt_component():
 
 
 def fallback_topic():
-    """Return the Fallback topic, which is where the honest miss is spoken.
+    """Return the Fallback topic: search the corpus, then miss honestly.
 
-    Deliberately a topic and not a generative answer: the beat has to land the
-    same way on stage as it did in rehearsal, and a system topic says the same
-    sentence every time.
+    A bare `SendActivity` here is what issue #54 spent six deploys chasing. This
+    trigger fires on the turns the generative planner did not answer, and on
+    those turns the old topic spoke the honest miss **without anything having
+    searched** — measured 2026-08-14: three of sixty-nine fresh conversations
+    asking the rehearsed question got the honest miss, and one got it beside the
+    cited answer. Deleting the topic outright is worse: the platform's own
+    "Sorry, I am not able to find a related topic" answers instead, on 40% of
+    the same question, and that is not a beat, it is a stack trace.
+
+    So the search happens **inside** the fallback. `SearchAndSummarizeContent`
+    with no source list searches every knowledge source the agent has, and
+    sends its own answer — which is what carries the citation entities the
+    Grounding panel is a claim about, so the answer is never re-sent from a
+    variable here. `Topic.Answer` is read only to decide whether anything was
+    found. The honest miss is now what it says it is: the corpus was searched
+    and holds nothing.
+
+    The shape is Microsoft's own exported Conversational boosting topic
+    (CopilotStudioSamples, `account-contact-lookup`); the `elseActions` branch
+    is this repository's.
     """
     data = (
         "kind: AdaptiveDialog\n"
         "beginDialog:\n"
         "  kind: OnUnknownIntent\n"
         "  id: main\n"
+        "  priority: -1\n"
         "  actions:\n"
-        "    - kind: SendActivity\n"
-        "      id: sendMessage_honestMiss\n"
-        f"      activity: {HONEST_MISS}\n"
+        "    - kind: SearchAndSummarizeContent\n"
+        "      id: search-content\n"
+        "      userInput: =System.Activity.Text\n"
+        "      variable: Topic.Answer\n"
+        "    - kind: ConditionGroup\n"
+        "      id: has-answer-conditions\n"
+        "      conditions:\n"
+        "        - id: has-answer\n"
+        "          condition: =!IsBlank(Topic.Answer)\n"
+        "          actions:\n"
+        "            - kind: EndDialog\n"
+        "              id: end-topic\n"
+        "              clearTopicQueue: true\n"
+        "      elseActions:\n"
+        "        - kind: SendActivity\n"
+        "          id: sendMessage_honestMiss\n"
+        f"          activity: {HONEST_MISS}\n"
     )
     return Component(
         schemaname=f"{AGENT_SCHEMA_NAME}.topic.Fallback",
@@ -757,9 +912,9 @@ def _remedy(verdict):
         )
     return (
         "\nRemedy: the agent answered, but not the way the demo needs. Re-read "
-        "the instructions and the Fallback topic above, re-author and publish, "
-        "then start a *fresh* conversation — a published change never reaches "
-        "one already open:\n"
+        "the instructions above — they carry the honest miss verbatim — "
+        "re-author and publish, then start a *fresh* conversation: a published "
+        "change never reaches one already open:\n"
         "  scripts/copilot_studio/check-sop-agent.sh --provision --publish "
         "--probe"
     )
@@ -1093,6 +1248,7 @@ def converse(token, questions, answer_seconds=ANSWER_SECONDS):
     def drain(seconds):
         nonlocal watermark
         replies = []
+        quiet = 0
         deadline = time.time() + seconds
         while time.time() < deadline:
             url = f"{DIRECT_LINE}/conversations/{identifier}/activities"
@@ -1100,6 +1256,7 @@ def converse(token, questions, answer_seconds=ANSWER_SECONDS):
                 url += f"?watermark={watermark}"
             payload = _request(url, token=token)
             watermark = payload.get("watermark") or watermark
+            arrived = 0
             for activity in payload.get("activities", []):
                 # Direct Line replaces the sender identifier with a
                 # server-generated value, so the role is the only reliable way
@@ -1110,7 +1267,9 @@ def converse(token, questions, answer_seconds=ANSWER_SECONDS):
                     continue
                 seen.add(activity["id"])
                 replies.append(activity)
-            if replies:
+                arrived += 1
+            quiet = 0 if arrived else quiet + 1
+            if settled(replies, quiet):
                 break
             time.sleep(2)
         return replies
@@ -1130,15 +1289,31 @@ def converse(token, questions, answer_seconds=ANSWER_SECONDS):
     return identifier, greeting, answers
 
 
-def probe_live(environment, bot):
-    """Ask the agent the three rehearsed questions and return a `Probe`."""
+def probe_live(environment, bot, samples=1):
+    """Ask the agent the three rehearsed questions and return a `Probe`.
+
+    `samples` is how many times the *procedure* question is asked, each in its
+    own fresh conversation. More than one because the fault #54 turned out to
+    be was intermittent at about 6%, and one sample cannot see that.
+    """
     endpoint, token = direct_line_token(environment, bot)
     print(f"  Direct Line endpoint: {endpoint.split('?')[0]}")
     identifier, greeting, answers = converse(
         token, [PROCEDURE_QUESTION, OUT_OF_CORPUS_QUESTION, BRANDING_QUESTION])
     print(f"  conversation: {identifier}")
+    repeats = []
+    for _ in range(max(0, samples - 1)):
+        # A fresh token as well as a fresh conversation: a Copilot Studio
+        # Direct Line token carries a `conv` claim, so re-spending one rejoins
+        # the conversation it was minted for and replays its transcript.
+        _, again = direct_line_token(environment, bot)
+        _, _, more = converse(again, [PROCEDURE_QUESTION])
+        repeats.append(more[0])
+    if repeats:
+        print(f"  asked the procedure question {samples} times in "
+              f"{samples} conversations")
     return Probe(greeting=greeting, procedure=answers[0], miss=answers[1],
-                 branding=answers[2])
+                 branding=answers[2], repeats=repeats)
 
 
 def export_solution(environment, directory, solution=DEFAULT_SOLUTION):
@@ -1189,6 +1364,7 @@ def main(argv=None):
 
     environment_id = option("--environment")
     export_directory = option("--export")
+    samples = int(option("--samples") or 1)
     should_provision = "--provision" in argv
     should_publish = "--publish" in argv
     should_probe = "--probe" in argv or not (should_provision or should_publish
@@ -1208,7 +1384,8 @@ def main(argv=None):
     if export_directory:
         print(f"  exported {export_solution(environment, export_directory)}")
 
-    probe = probe_live(environment, bot) if (should_probe and bot) else None
+    probe = (probe_live(environment, bot, samples)
+             if (should_probe and bot) else None)
     verdict = evaluate(bot, read_components(environment, bot), probe,
                        corpus_filenames(repo_root), corpus_banner(repo_root))
     print(format_report(verdict))

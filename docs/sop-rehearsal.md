@@ -373,6 +373,103 @@ first 400 characters of what the agent actually said. The request half was added
 acceptance criterion and did its job; this is that criterion applied to the other end of the hop, and
 the next red run is readable from `az containerapp logs` alone.
 
+## The answer: the agent's own Fallback topic, and neither of the two
+
+It was the third possibility, and the reason no amount of asking the deployment had found it is that
+every path through the deployment goes through the orchestrator, and the orchestrator was never the
+variable.
+
+The loop that found it asks the **agent** rather than the deployment: N fresh Direct Line
+conversations, opened concurrently, each asking the rehearsed question and draining the whole window
+rather than settling early, each classified as `cited`, `miss` (the honest-miss sentence, uncited),
+`both`, or `uncited`. Sixty-nine of them, on 2026-08-14, against the agent exactly as it had been
+authored since #18:
+
+| Verdict | Count |
+| --- | --- |
+| `cited` — `SOP-102 Store Closing Procedure.docx` | 65 |
+| `miss` — the honest-miss sentence alone | 3 |
+| `both` — the cited procedure, and the honest-miss sentence 30 ms behind it | 1 |
+
+That is the centrepiece beat failing about **6% of the time inside Copilot Studio**, with no
+orchestrator, no rephrasing and no drain race anywhere near it. The 10-out-of-10 direct probe that
+had made this look like a path difference was not measuring a different path; it was ten samples of a
+6% fault, which come up clean about **half** the time (`0.94¹⁰ ≈ 0.54`). Ten green direct probes were
+never evidence of a different path — they were a coin landing heads.
+
+The `both` row is the one that names the cause. Nothing that *searched and found* `SOP-102` also
+concludes the corpus does not hold it. Two different things spoke in that turn — and the second was
+the **Fallback topic**, whose only action was `SendActivity(HONEST_MISS)`. Its trigger is
+`OnUnknownIntent`, so it fires on the turns the generative planner did not answer, and on those turns
+the agent said *the corpus does not hold this* **with nothing having searched the corpus**. The
+sentence was never true; it was just usually not said.
+
+### Deleting it is worse, and that is the useful half
+
+The obvious fix — take the topic out, let the instructions carry the wording — was tried and
+measured, which is the only reason it is not in this repository now. With no Fallback topic, the
+platform's own unknown-intent handler answers instead:
+
+```
+Sorry, I am not able to find a related topic. Can you rephrase and try again?
+```
+
+**16 of 40** asks of the rehearsed question. Not a beat: a stack trace, in front of a customer. And
+the out-of-corpus question got the same sentence, which loses the honest miss outright — the
+[AC4](https://github.com/bradcstevens/az-multi-agent-flw-demo/issues/54) failure, caught by
+`check-sop-agent.sh --probe` on the run that published it.
+
+That number is also the measurement that reframes the whole issue: the planner leaves the turn
+unanswered far more often than 6%. The old Fallback topic was *hiding* that behind a sentence that
+read as a deliberate demonstration of honesty.
+
+### So the search moves inside the fallback
+
+`fallback_topic()` now runs `SearchAndSummarizeContent` over the agent's knowledge and reaches the
+honest miss only through `elseActions`, when that search returned nothing. The shape is Microsoft's
+own exported Conversational boosting topic; the `elseActions` branch is this repository's. The
+answer is never re-sent from `Topic.Answer` — that activity is what carries the citation `entities`,
+and re-sending the prose without them produces the honest miss's exact appearance from a search that
+succeeded.
+
+Measured against the published fix, same loop:
+
+| Question | Runs | Result |
+| --- | --- | --- |
+| `How do I close the store?` | **80** | 80 cited to `SOP-102`, no miss, no contradiction |
+| `How do I restart the car wash…?` | **15** | 15 honest misses, the authored sentence verbatim, no invented steps |
+
+The honest miss is now what it always claimed to be: the corpus was searched, and it holds nothing.
+
+Two things are deliberately not claimed. The instructions were changed in the same build — they
+carry the honest-miss sentence verbatim and forbid saying it beside steps — so those 80 runs do not
+separate the topic's contribution from the instructions'. And 80 clean runs bound the residual at
+roughly 4%, not at zero; what closes that is the ten-run rehearsal through the browser.
+
+## The rehearsal against the fix: nine, and then a different fault
+
+Ten runs against build `38d2a6ca`, the agent published 2026-08-14T18:44Z:
+
+| Runs | Outcome |
+| --- | --- |
+| 1–9 | **grounded** — `SOP-102` retrieved and cited on screen |
+| 10 | **clarified** — retrieved and cited, and the surface asked the presenter a question back instead of showing it |
+
+**Zero honest misses in ten browser runs**, where the same beat produced two in eight on the
+afternoon the validator first ran and three in six a fortnight later. That is the fault this issue is
+named after, and it is the fault the Fallback topic was causing. It did not happen.
+
+The red run is the **first residual**, still open: the `Troubleshooting Agent` was billed on runs 3
+and 10, and on run 10 it took the last word — a procedure lookup routed into a troubleshooting
+clarification on a question with nothing broken in it. Seven prompt clauses have been forked on
+`minimal_plan` chasing it and it still fires about one run in five. It is a *routing* failure, in the
+backend, in a different layer from everything above; the answer was retrieved, cited and correct, and
+the surface declined to show it.
+
+So AC3 is unmet, and it is unmet for a reason the record can now name precisely rather than for the
+reason it was opened about. Ten distinct rephrasings reached the SOP tool over the ten runs and every
+one of them retrieved — the rephrasing question (AC1) stays answered.
+
 ## Running the proof
 
 ```bash
@@ -417,8 +514,10 @@ The report names one of four layers:
   `[rehearsed_hit].question`; the marker is armed on an exact match, deliberately.
 - **the agent's Dataverse index** — the corpus's own wording was retrieved against and missed. The
   expensive one, and the only one that means the demonstration's *content* is wrong. Before believing
-  it, put the same wording to `/api/v4/sop/ask` ten times: on 2026-08-14 that came back cited ten out
-  of ten while the browser missed three of six, which rules the index out and leaves the SOP agent's
-  own answering. The backend log now carries what it replied, which is how the two are told apart.
+  it, ask the **agent** rather than the deployment: many fresh Direct Line conversations, concurrently,
+  each draining the whole window. On 2026-08-14 that turned up a fault the deployment could not
+  express — the agent's own Fallback topic answering, 4 conversations in 69 — and the index was
+  never wrong. The backend log now carries what the agent replied, which is how a searched-and-missed
+  turn is told from a turn where nothing searched.
 - **unknown** — the evidence does not reach a layer, and the harness says so rather than guessing.
   Read `e2e/artifacts/report` and the run's `error-context.md`.
