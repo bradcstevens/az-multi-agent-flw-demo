@@ -34,6 +34,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [021](./021-connect-the-socket-before-navigation.md) | Connect the WebSocket on the `createPlan` response, not on the plan page | Accepted |
 | [022](./022-completed-tasks-are-hidden-never-deleted.md) | Completed tasks are hidden, never deleted | Accepted |
 | [023](./023-progress-narration-claims-only-what-a-signal-reports.md) | The loading screen claims only what a signal reports | Accepted |
+| [024](./024-the-escalation-continues-the-troubleshooting-conversation.md) | The escalation continues the troubleshooting conversation | Accepted |
 
 ## Writing a new one
 
