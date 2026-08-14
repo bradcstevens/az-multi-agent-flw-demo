@@ -31,6 +31,9 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [018](./018-deployed-build-provenance-check.md) | Check that the deployed build is the build we think it is | Accepted |
 | [019](./019-rebrand-the-sop-corpus-to-circle-k.md) | Rebrand the SOP corpus to Circle K, reversing the Brightpath position | Accepted |
 | [020](./020-deploy-main-on-every-commit.md) | Deploy `main` on every commit, and make the deploy prove its own result | Accepted |
+| [021](./021-connect-the-socket-before-navigation.md) | Connect the WebSocket on the `createPlan` response, not on the plan page | Accepted |
+| [022](./022-completed-tasks-are-hidden-never-deleted.md) | Completed tasks are hidden, never deleted | Accepted |
+| [023](./023-progress-narration-claims-only-what-a-signal-reports.md) | The loading screen claims only what a signal reports | Accepted |
 
 ## Writing a new one
 

@@ -680,6 +680,58 @@ own copy passes a rebrand it never saw, and the presenter finds out in front of 
 Recorded in [docs/presenter-runbook.md](docs/presenter-runbook.md), guarded by
 `src/tests/ci/test_presenter_runbook.py`.
 
+**Progress narration** — what the surface says between a question being submitted and its answer
+arriving. It enters a phase only when a **real signal reports it**, and where nothing has arrived
+it holds the last true statement rather than inventing the next one. Five phases, each an
+observable event: the `createPlan` POST in flight; the response's `lane`, read from the same field
+`LaneBadge` reads; `connection_status`, which is plumbing and says nothing; `agent_message_streaming`,
+which carries the **executor name** and so names *which* specialist is responding; and
+`plan_approval_request` or `final_result_message`. There is deliberately **no "agents selected"
+phase**: no such event exists, because `init_orchestration` and `AgentFactory.get_agents` build the
+workflow in-process and emit nothing.
+
+It replaces four authored strings — *"Initializing AI agents…"*, *"Generating plan scaffolds…"*,
+*"Optimizing task steps…"*, *"Applying finishing touches…"* — that `PlanPage` rotated on a 3000ms
+timer keyed to a GET-in-flight boolean. Nothing scaffolded and nothing optimised; they named four
+stages the system does not have, three inches from a **Token meter** whose whole discipline is
+**Not reported vs measured**. It also replaces six components each carrying their own copy, which
+had already drifted into telling the story backwards — *"Plan created — Fast lane"* on the home
+surface, then *"Loading plan data…"* on the plan surface. One module owns the strings, on the
+**Store surface**'s pattern, and one Redux slice holds the phase **across the navigation**, because
+across two components "only advances" is a coincidence and not a property. See
+[ADR-023](docs/ADR/023-progress-narration-claims-only-what-a-signal-reports.md).
+_Avoid_: loading message, progress indicator, spinner copy
+
+**Available vs participating** — the roster says who *could* answer; the stream says who *did*.
+The loading window's version of **Not reported vs measured**, and the same failure if the two are
+conflated. Three specialists are available before a question is even typed — `selectedTeam` is in
+Redux from `HomePage`'s mount, and `selectTeamAgentCount` has been sitting there unused — so
+availability is a true thing the surface can state immediately and without the wire. Selection is
+not: the **Identity boundary gate** refuses the boundary probe above the **Lane router**, where the
+number that participate is **zero**, which is exactly why the meter renders a real `0` on that row.
+"Three agents identified" over that beat contradicts the panel beneath it. Participation is claimed
+one agent at a time, as each speaks, by the **Progress narration**.
+
+The contradiction it removes was on screen: `PlanPanelRight` renders outside the loading branch, so
+`AgentTeamPanel` — sourced from `planData?.team`, still `null` — read *"No agent roster loaded for
+this conversation."* beside a spinner reading *"Initializing AI agents…"*.
+_Avoid_: agents assigned, agents identified, agents selected
+
+**Hidden completed tasks** — the presenter's clean panel between rehearsal runs. It **hides; it
+never deletes**, and the control is named for that, because a label saying *delete* over a record
+that survives is the identity form of the rule the transparency panels run on. `sessionStorage`,
+following the **Signed-in device** precedent — within a run the clear survives a reload, and a
+fresh tab is a fresh demonstration with the whole history back. A set of plan ids rather than a
+flag, so a task completing *after* a clear still appears.
+
+`delete_plan_by_plan_id` is implemented in `cosmosdb.py` and reachable from exactly one caller, the
+human-feedback rejection path; there is **no REST route** and this does not add one. That unrouted
+method is the trap — it reads as wiring nobody finished — which is why an otherwise reversible
+decision is written down as [ADR-022](docs/ADR/022-completed-tasks-are-hidden-never-deleted.md).
+The panel is only ever seen on a laptop: the **Stacking breakpoint** drops the task history rather
+than squeezing it, because the associate is holding a phone.
+_Avoid_: delete task, clear history, archive
+
 ## Licensing and capacity
 
 **Pay-as-you-go billing plan** — a Power Platform *billing policy* (`PowerPlatformPayGo`, id
