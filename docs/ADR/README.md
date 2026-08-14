@@ -32,9 +32,12 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [019](./019-rebrand-the-sop-corpus-to-circle-k.md) | Rebrand the SOP corpus to Circle K, reversing the Brightpath position | Accepted |
 | [020](./020-deploy-main-on-every-commit.md) | Deploy `main` on every commit, and make the deploy prove its own result | Accepted |
 | [021](./021-connect-the-socket-before-navigation.md) | Connect the WebSocket on the `createPlan` response, not on the plan page | Accepted |
-| [022](./022-completed-tasks-are-hidden-never-deleted.md) | Completed tasks are hidden, never deleted | Accepted |
+| [022](./022-completed-tasks-are-hidden-never-deleted.md) | Completed tasks are hidden, never deleted | **Superseded by 026** |
 | [023](./023-progress-narration-claims-only-what-a-signal-reports.md) | The loading screen claims only what a signal reports | Accepted |
-| [024](./024-the-escalation-continues-the-troubleshooting-conversation.md) | The escalation continues the troubleshooting conversation | Accepted |
+| [024](./024-the-escalation-continues-the-troubleshooting-conversation.md) | The escalation continues the troubleshooting conversation | **Superseded by 027** |
+| [025](./025-chat-is-the-unit-of-the-surface.md) | Chat is the unit of the surface | Accepted |
+| [026](./026-chats-are-deleted-not-hidden.md) | Chats are deleted, not hidden | Accepted — supersedes 022 |
+| [027](./027-resume-continues-the-session.md) | Resume continues the session | Accepted — supersedes 024 |
 
 ## Writing a new one
 

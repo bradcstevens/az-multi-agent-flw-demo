@@ -148,6 +148,12 @@ instantiates no agent — and a container that cannot be reached leaves the iden
 infrastructure failure refuses rather than admits.
 _Avoid_: session storage, browser state, conversation state
 
+**Chat** — the surface name for one **Session** and its persisted records. A Chat can contain more
+than one **Plan**; the surface groups those plans as one conversation while the domain keeps
+`Plan` and `session_id` as their precise names. A route served by a plans endpoint and grouped by
+session is therefore still a chat surface, not a reason to rename the model.
+_Avoid_: plan history, task history
+
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
 **retrieval miss** — an honest "that procedure is not in the library" — because conflating the two
 makes a governed refusal look like a bug. On the wire it is HTTP **403** with
@@ -868,15 +874,15 @@ own copy passes a rebrand it never saw, and the presenter finds out in front of 
 Recorded in [docs/presenter-runbook.md](docs/presenter-runbook.md), guarded by
 `src/tests/ci/test_presenter_runbook.py`.
 
-**Progress narration** — what the surface says between a question being submitted and its answer
+**Progress narration** — what the surface says between a chat being submitted and its answer
 arriving. It enters a phase only when a **real signal reports it**, and where nothing has arrived
-it holds the last true statement rather than inventing the next one. Five phases, each an
-observable event: the `createPlan` POST in flight; the response's `lane`, read from the same field
-`LaneBadge` reads; `connection_status`, which is plumbing and says nothing; `agent_message_streaming`,
-which carries the **executor name** and so names *which* specialist is responding; and
-`plan_approval_request` or `final_result_message`. There is deliberately **no "agents selected"
-phase**: no such event exists, because `init_orchestration` and `AgentFactory.get_agents` build the
-workflow in-process and emit nothing.
+it holds the last true statement rather than inventing the next one. The Sent phase says
+*"Starting chat…"*, from the `createPlan` POST in flight. The remaining observable events are the
+response's `lane`, read from the same field `LaneBadge` reads; `connection_status`, which is
+plumbing and says nothing; `agent_message_streaming`, which carries the **executor name** and so
+names *which* specialist is responding; and `plan_approval_request` or `final_result_message`.
+There is deliberately **no "agents selected" phase**: no such event exists, because
+`init_orchestration` and `AgentFactory.get_agents` build the workflow in-process and emit nothing.
 
 It replaces four authored strings — *"Initializing AI agents…"*, *"Generating plan scaffolds…"*,
 *"Optimizing task steps…"*, *"Applying finishing touches…"* — that `PlanPage` rotated on a 3000ms
@@ -919,28 +925,13 @@ The contradiction it removes was on screen: `PlanPanelRight` renders outside the
 this conversation."* beside a spinner reading *"Initializing AI agents…"*.
 _Avoid_: agents assigned, agents identified, agents selected
 
-**Hidden completed tasks** — the presenter's clean panel between rehearsal runs. It **hides; it
-never deletes**, and the control is named for that, because a label saying *delete* over a record
-that survives is the identity form of the rule the transparency panels run on. `sessionStorage`,
-following the **Signed-in device** precedent — within a run the clear survives a reload, and a
-fresh tab is a fresh demonstration with the whole history back. A set of plan ids rather than a
-flag, so a task completing *after* a clear still appears. The tab's memory of it is
-`src/App/src/models/hiddenCompletedTasks.ts`, which also carries the two strings, because ADR-022
-makes the label load-bearing rather than a copy detail.
-
-`delete_plan_by_plan_id` is implemented in `cosmosdb.py` and reachable from exactly one caller, the
-human-feedback rejection path; there is **no REST route** and this does not add one. That unrouted
-method is the trap — it reads as wiring nobody finished — which is why an otherwise reversible
-decision is written down as [ADR-022](docs/ADR/022-completed-tasks-are-hidden-never-deleted.md).
-The panel is only ever seen on a laptop: the **Stacking breakpoint** drops the task history rather
-than squeezing it, because the associate is holding a phone.
-
-The row's dead `MenuTrigger` went with it, and was dead twice over: measured while removing it, a
-`Menu` with no `MenuPopover` renders **nothing** on `@fluentui/react-components` 9.64 — the trigger
-never reached the DOM, so no test and no screen reader could see it and no browser could click it.
-A DOM assertion for that pattern is therefore inert, which is the failure #25 already found once,
-so `TaskList.test` guards it by reading the component's source.
-_Avoid_: delete task, clear history, archive
+**Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that
+session partition — its plans, transcript, `m_plan`, **Troubleshooting record**, **Simulated
+ticket**, and **Session state** — scoped to its `user_id`, so one associate cannot delete another's
+chat. `delete_plan_by_plan_id` remains the human-feedback rejection path's single-purpose
+primitive; it neither owns nor authorizes Chat deletion. The accepted cost is that a rehearsal can
+destroy the diagnosis trail that #47, #54, #61, and #62 used.
+_Avoid_: hidden completed tasks, delete plan, clear history, archive
 
 ## Licensing and capacity
 
@@ -1203,6 +1194,14 @@ another commit. See [docs/preflight/deployed-build.md](docs/preflight/deployed-b
 _Avoid_: stale deployment, drift
 
 ## Confirmed findings
+
+### One session renders as two rows (confirmed 2026-08-14, issue #71)
+
+The left panel builds one row per **Plan** while keying and selecting rows by `session_id`. When the
+troubleshooting turn and its escalation share a session, React receives duplicate keys, either row
+opens the first plan, and the troubleshooting row stays highlighted while the escalation is open.
+The panel is therefore inconsistent with **Chat**: one session must be one row, named by its first
+plan and opening its latest plan.
 
 ### The escalation drafts nothing and interviews the associate instead (confirmed 2026-08-14, issue #62)
 
