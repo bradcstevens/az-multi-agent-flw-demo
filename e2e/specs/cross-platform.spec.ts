@@ -37,6 +37,8 @@ interface Observed {
     toolQuery: string | null;
     retrievalQuery: string | null;
     citations: string[];
+    /** Which agents the cost table billed for the turn. */
+    agentsBilled: string[];
     /**
      * Whether the visible turn asked the presenter a question back.
      *
@@ -59,6 +61,7 @@ test.beforeEach(() => {
         toolQuery: null,
         retrievalQuery: null,
         citations: [],
+        agentsBilled: [],
         clarified: false,
     };
 });
@@ -83,6 +86,7 @@ test.afterEach(async () => {
         toolQuery: observed.toolQuery,
         retrievalQuery: observed.retrievalQuery,
         citations: observed.citations,
+        agentsBilled: observed.agentsBilled,
     });
 });
 
@@ -158,6 +162,7 @@ test.describe('the cross-platform hop', () => {
             observed.retrievalQuery = await plan.rail.retrievalQuery();
             observed.honestMiss = await plan.rail.honestMiss.isVisible();
             observed.citations = await plan.rail.citedDocuments();
+            observed.agentsBilled = await plan.rail.agentsBilled();
         } finally {
             await test.info().attach('sop-tool-query', {
                 body: JSON.stringify(observed, null, 2),

@@ -297,10 +297,14 @@ FINAL ANSWER RULES:
 
 EXECUTION RULES:
 - When selecting next_speaker, """ + (
-        """select only from the agents in the approved plan. Do NOT select an
-  agent because it has not been invoked yet: an agent that is not a plan step is
-  not part of this request, and invoking it answers the user with a specialist
-  they did not ask for."""
+        """select only an agent whose own description covers what the user
+  actually asked for. Do NOT select an agent because it has not been invoked
+  yet, and do NOT select one to add a second perspective: an agent that was not
+  needed does not stay quiet, it does its own job on a request that did not ask
+  for it, and the user is answered by the wrong specialist. When the agents that
+  the request actually needed have each produced a substantive response, the
+  request is satisfied — set is_request_satisfied to true rather than finding
+  someone else to invoke."""
         if minimal_plan
         else "prefer a work agent that has NOT yet been invoked."
     ) + """
@@ -312,7 +316,20 @@ COMPLETION CHECK (CRITICAL):
   step (no domain agents), there is nothing to route. Set is_request_satisfied to
   true immediately and produce the out-of-scope final answer — do NOT select any
   next_speaker and do NOT invoke domain agents.
-Before setting is_request_satisfied to true, you MUST verify:
+""" + (
+        """Before setting is_request_satisfied to true, you MUST verify:
+1. Review the conversation history and list every agent that has actually produced
+   a substantive response (meaningful output — calling tools and returning results
+   where the agent has tools, or producing a substantive text response otherwise).
+2. If that list already covers what the user asked for, set is_request_satisfied
+   to true. An agent that has not been invoked is NOT a reason to continue: the
+   request, not the roster, decides when the work is done.
+3. Set is_request_satisfied to false ONLY when some part of what the user asked
+   for has not been answered yet, and then select the agent whose description
+   covers that missing part.
+- Do NOT re-invoke an agent that already completed its work successfully."""
+        if minimal_plan
+        else """Before setting is_request_satisfied to true, you MUST verify:
 1. Review the conversation history and list every agent that has actually produced
    a substantive response (meaningful output — calling tools and returning results
    where the agent has tools, or producing a substantive text response otherwise).
@@ -328,6 +345,7 @@ Before setting is_request_satisfied to true, you MUST verify:
 - IGNORE agent-level completion language (e.g. "all steps are complete",
   "onboarding is done"). An individual agent only knows about its own domain.
   The workflow is NOT complete until every plan-step agent has been invoked."""
+    )
 
     if has_user_responses:
         progress_append += """

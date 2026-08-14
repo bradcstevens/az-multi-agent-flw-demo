@@ -64,6 +64,14 @@ export interface Rehearsal {
     retrievalQuery: string | null;
     /** The documents the answer came back with. */
     citations: string[];
+    /**
+     * Which agents the cost table billed. Not a pass/fail signal — the reason
+     * it is here is that it separates two very different fixes (#54): whether
+     * a green run is one where the troubleshooting specialist stayed out of
+     * the turn, or one where it ran and lost the last word. Guessing between
+     * those cost three deploys.
+     */
+    agentsBilled: string[];
 }
 
 function shortCommit(): string | null {

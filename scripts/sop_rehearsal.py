@@ -259,6 +259,9 @@ def format_report(summary: Summary) -> str:
             f"  {verdict}  run {index} of {summary.wanted}: "
             f"{row.get('outcome')}, asked {query!r}"
         )
+        billed = row.get("agentsBilled") or []
+        if billed:
+            lines.append(f"        billed: {', '.join(billed)}")
         blame = attribution(row)
         if blame:
             lines.append(f"        layer: {blame.layer} — {blame.detail}")

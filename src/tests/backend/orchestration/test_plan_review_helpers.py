@@ -265,7 +265,12 @@ class TestGetMagenticPromptKwargs:
 
         progress = result["progress_ledger_prompt"]
         assert "prefer a work agent that has NOT yet been invoked" not in progress
-        assert "only from the agents in the approved plan" in progress
+        assert "whose own description covers what the user" in progress
+        # And the completion check must not pull one back in behind it: it used
+        # to say "select the next uninvoked agent as next_speaker", which is the
+        # same instruction wearing a different hat.
+        assert "select the next uninvoked agent" not in progress
+        assert "not the roster, decides when the work is done" in progress
 
     def test_given_no_minimal_plan_when_called_then_uninvoked_agents_are_preferred(self):
         # A pipeline team's whole point: an agent that has not run yet is the
@@ -275,6 +280,7 @@ class TestGetMagenticPromptKwargs:
 
         progress = result["progress_ledger_prompt"]
         assert "prefer a work agent that has NOT yet been invoked" in progress
+        assert "select the next uninvoked agent" in progress
 
     def test_given_no_user_responses_when_called_then_final_has_answer_rules(self):
         # Act

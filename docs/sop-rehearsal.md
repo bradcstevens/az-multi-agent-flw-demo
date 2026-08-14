@@ -179,13 +179,32 @@ fixes each *reduced* the failure rate without removing it: they changed how the 
 this clause operates after the plan is built.
 
 On a pipeline team the rule is exactly right — an agent that has not run yet is the one the plan is
-waiting on. Under `minimal_plan` it is replaced by its opposite: select only from the agents in the
-approved plan, and do not select an agent because it has not been invoked yet, because an agent that
-is not a plan step is not part of this request.
+waiting on. Under `minimal_plan` it is replaced by its opposite: select only an agent whose own
+description covers what was asked, and do not select one because it has not been invoked yet.
 
-Three clauses, one inherited assumption — *every agent on the team runs on every request* — expressed
-in three places that fail independently. The order they were found in is the order the ledger found
-them, which is the argument for the ledger.
+The first attempt at that replacement said *"select only from the agents in the **approved** plan"*,
+and it did not work either — because the rehearsed beat runs in the **Fast lane**, where
+`enable_plan_review=False` and nothing is approved at all. A rule conditioned on an approved plan is
+a rule the manager can read as not applying. The wording now names what the *user asked for*, which
+exists in both lanes.
+
+Underneath it, the COMPLETION CHECK was saying the same thing again in a different voice:
+
+> If ANY plan-step agent has NOT been invoked and produced a substantive response, set
+> is_request_satisfied to false and **select the next uninvoked agent as next_speaker**.
+
+Two clauses, thirty lines apart, one telling the manager not to reach for an unused agent and the
+other telling it to. Under `minimal_plan` the completion check now ends on what the user asked for
+rather than on the roster.
+
+Four clauses, one inherited assumption — *every agent on the team runs on every request* — expressed
+in four places that fail independently. Each was found the same way: a red run, a cost table showing
+the troubleshooter billed, and a search for what put it there. The order they were found in is the
+order the ledger found them, which is the argument for the ledger.
+
+The ledger now records **which agents were billed** for each run, because guessing between "the
+troubleshooter must not run" and "the troubleshooter must not have the last word" is what cost three
+of those deploys.
 
 ## The flag reaches Cosmos, and is still not read
 

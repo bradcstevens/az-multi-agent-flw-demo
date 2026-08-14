@@ -88,6 +88,23 @@ export class TransparencyRail {
         return this.groundingPanel.getAttribute('data-retrieval-query');
     }
 
+    /**
+     * Which agents the cost table billed for this turn.
+     *
+     * The measurement that told the three routing fixes apart (#54). The
+     * outcome alone says the beat came back as a clarification; this says
+     * *which specialist produced it*, and — on a green run — whether the one
+     * that used to hijack the answer ran at all. Read off the panel the
+     * presenter is looking at, so it is the same claim they can see.
+     */
+    async agentsBilled(): Promise<string[]> {
+        const names = this.tokenMeter.getByTestId('meter-agent');
+        if ((await names.count()) === 0) {
+            return [];
+        }
+        return (await names.allInnerTexts()).map((name) => name.trim());
+    }
+
     /** The document names the answer cited, in the order they came back. */
     async citedDocuments(): Promise<string[]> {
         if ((await this.citations.count()) === 0) {
