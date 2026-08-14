@@ -449,9 +449,12 @@ rendered is one prop away from returning.
 nothing else: **Send question** on the **Store surface**, **Send message** on the plan surface
 (#56). It was two declarations that had already drifted — one repainted by a stylesheet Fluent
 overrides, one by inline styles that override Fluent — so the surface's primary action rendered
-transparent with a grey glyph and looked like its own disabled state. Nothing outside the component
-declares its colour: Fluent's styles are injected after an imported stylesheet, so a rule of ours is
-a rule that reads like the thing the surface renders and does nothing.
+transparent with a grey glyph and looked like its own disabled state. Nothing anywhere declares its
+colour, and the two ways to break that fail differently: a rule in `styles/` loses, because Fluent's
+styles are injected after an imported stylesheet — it reads like the thing the surface renders and
+does nothing — while an inline style wins, and hardcodes past the theme. The surface has two
+(`teamsLightTheme`, `teamsDarkTheme`), so a contrast ratio met by a hardcoded colour is met in at
+most one of them. Colour is the theme's to state.
 
 Unavailability is **`disabledFocusable`, not `disabled`** — a natively-disabled control leaves the
 tab order, so the one affordance that asks a question disappears for a keyboard user instead of
