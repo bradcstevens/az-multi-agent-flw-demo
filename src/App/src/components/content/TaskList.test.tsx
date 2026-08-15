@@ -15,6 +15,7 @@ import {
 
 const completed = (id: string, name: string): Task => ({
     id,
+    planId: `${id}-latest`,
     name,
     status: 'completed',
     date: '14 August 2026',

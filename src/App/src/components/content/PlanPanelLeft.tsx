@@ -109,11 +109,16 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   const handleTaskSelect = useCallback(
     (taskId: string) => {
       const performNavigation = () => {
-        const selectedPlan = plans?.find(
-          (plan: Plan) => plan.session_id === taskId
-        );
-        if (selectedPlan) {
-          navigate(`/plan/${selectedPlan.id}`);
+        /*
+          The row carries the plan it opens (#71). Searching the plans for one
+          matching the row's session took the *first* match, so on the
+          walkthrough's centrepiece pair — a troubleshooting turn and the
+          escalation that continues its session (ADR-024) — the escalation was
+          unreachable from this panel.
+        */
+        const selectedChat = completedTasks.find((chat) => chat.id === taskId);
+        if (selectedChat) {
+          navigate(`/plan/${selectedChat.planId}`);
         }
       };
 
@@ -123,7 +128,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         performNavigation();
       }
     },
-    [plans, navigate, onNavigationWithAlert]
+    [completedTasks, navigate, onNavigationWithAlert]
   );
 
   const handleLogoClick = useCallback(() => {

@@ -14,9 +14,14 @@ import {
  */
 export class TaskService {
   /**
-   * Transform PlanWithSteps data into Task arrays for TaskList component
+   * Transform Plan data into the rows the TaskList renders — one per Chat.
+   *
+   * A Chat is a Session (ADR-025) and can hold more than one Plan, so this
+   * groups by `session_id`: the row is named by the conversation's **first**
+   * plan and carries its **latest** as the plan the row opens.
+   *
    * @param plansData Array of PlanWithSteps to transform
-   * @returns Object containing inProgress and completed task arrays
+   * @returns Object containing inProgress and completed chat arrays
    */
   static transformPlansToTasks(plansData: Plan[]): {
     inProgress: Task[];
@@ -29,20 +34,36 @@ export class TaskService {
     const inProgress: Task[] = [];
     const completed: Task[] = [];
 
+    // A Chat is a Session (ADR-025), and ADR-024 has the escalation continue
+    // the troubleshooting turn's session — so a row is a `session_id`, never a
+    // plan. Keying rows by session while building one per plan is what put two
+    // rows carrying one key on screen at the walkthrough's centrepiece (#71).
+    const bySession = new Map<string, Plan[]>();
     plansData.forEach((plan) => {
+      const group = bySession.get(plan.session_id);
+      if (group) {
+        group.push(plan);
+      } else {
+        bySession.set(plan.session_id, [plan]);
+      }
+    });
+
+    bySession.forEach((group) => {
+      const ordered = this.orderPlansByTime(group);
+      const first = ordered[0];
+      const latest = ordered[ordered.length - 1];
+
       const task: Task = {
-        id: plan.session_id,
-        name: plan.initial_goal,
-        status: plan.overall_status === PlanStatus.COMPLETED ? "completed" : "inprogress",
-        date: new Intl.DateTimeFormat(undefined, {
-          dateStyle: "long",
-          // timeStyle: "short",
-        }).format(new Date(plan.timestamp)),
+        id: first.session_id,
+        planId: latest.id,
+        name: first.initial_goal,
+        status: latest.overall_status === PlanStatus.COMPLETED ? "completed" : "inprogress",
+        date: this.formatPlanDate(latest.timestamp),
       };
 
       // Categorize based on plan status and completion
       if (
-        plan.overall_status === PlanStatus.COMPLETED
+        latest.overall_status === PlanStatus.COMPLETED
       ) {
         completed.push(task);
       } else {
@@ -51,6 +72,47 @@ export class TaskService {
     });
 
     return { inProgress, completed };
+  }
+
+  /**
+   * When this chat was last active, as the panel says it.
+   *
+   * Total. `Intl.DateTimeFormat.format` throws `RangeError` on an unreadable
+   * timestamp, and it is called while building the whole history — so one
+   * malformed record took out every row rather than its own date. `Task.date`
+   * is optional and the row already renders without one.
+   */
+  private static formatPlanDate(timestamp: string): string | undefined {
+    const at = Date.parse(timestamp);
+    if (Number.isNaN(at)) return undefined;
+
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "long",
+      // timeStyle: "short",
+    }).format(at);
+  }
+
+  /**
+   * Order one chat's plans oldest-first.
+   *
+   * By `timestamp`, because the list's order is the API's and says nothing
+   * about which turn came first within a conversation.
+   *
+   * An unreadable timestamp is not comparable with a readable one, and mixing
+   * the two orderings gives a comparator that disagrees with itself — for
+   * `[10:00, 09:00, unreadable]` it holds `a > b`, `b < c` and `a < c` at
+   * once, so which plan names the row is left to the engine's sort. One
+   * unreadable timestamp therefore hands the whole group back in the order the
+   * history gave it, which is a real order even if it is not this one.
+   */
+  private static orderPlansByTime(plans: Plan[]): Plan[] {
+    const times = plans.map((plan) => Date.parse(plan.timestamp));
+    if (times.some(Number.isNaN)) return plans;
+
+    return plans
+      .map((plan, index) => ({ plan, index, at: times[index] }))
+      .sort((a, b) => (a.at === b.at ? a.index - b.index : a.at - b.at))
+      .map((entry) => entry.plan);
   }
 
   /**

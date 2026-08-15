@@ -25,8 +25,9 @@
  *   so the words live here beside the behaviour rather than loose in a
  *   component.
  *
- * The id is the one the task list keys a task by — the plan's `session_id`,
- * which is also what selecting a row navigates to.
+ * The id is the one the task list keys a task by — the chat's `session_id`. One chat is one row
+ * (#71), so hiding a row hides exactly one conversation; the plan that row *opens* is a separate
+ * thing the row carries, and is not what is hidden.
  */
 
 /** Where the tab remembers what the presenter hid. Namespaced, as the key is shared. */

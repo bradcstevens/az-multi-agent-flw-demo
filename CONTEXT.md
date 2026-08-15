@@ -1261,13 +1261,21 @@ _Avoid_: stale deployment, drift
 
 ## Confirmed findings
 
-### One session renders as two rows (confirmed 2026-08-14, issue #71)
+### One session renders as two rows (confirmed 2026-08-14, fixed 2026-08-14, issue #71)
 
-The left panel builds one row per **Plan** while keying and selecting rows by `session_id`. When the
-troubleshooting turn and its escalation share a session, React receives duplicate keys, either row
-opens the first plan, and the troubleshooting row stays highlighted while the escalation is open.
-The panel is therefore inconsistent with **Chat**: one session must be one row, named by its first
+The left panel built one row per **Plan** while keying and selecting rows by `session_id`. When the
+troubleshooting turn and its escalation share a session, React received duplicate keys, either row
+opened the first plan, and the troubleshooting row stayed highlighted while the escalation was open.
+The panel was therefore inconsistent with **Chat**: one session must be one row, named by its first
 plan and opening its latest plan.
+
+Fixed by grouping in `TaskService.transformPlansToTasks`, which now emits one row per `session_id`
+— named by the **first** plan's `initial_goal`, carrying the **latest** plan's id as the row's own
+`planId`, and taking its status and date from that latest plan. First and latest are read from
+`timestamp`, because the order a history endpoint returns plans in says nothing about which turn
+opened a conversation. `PlanPanelLeft` navigates to the row's `planId` rather than searching the
+plans for one matching the row's session: that search took the first match, and taking the first
+match is what made the escalation unreachable.
 
 ### The escalation drafts nothing and interviews the associate instead (confirmed 2026-08-14, issue #62)
 

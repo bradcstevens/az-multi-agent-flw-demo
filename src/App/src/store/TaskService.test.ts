@@ -5,6 +5,8 @@ vi.mock('../api/apiService', () => ({
 }));
 
 import { TaskService } from './TaskService';
+import { PlanStatus } from '../models/enums';
+import type { Plan } from '../models';
 import { apiService } from '../api/apiService';
 import {
     forgetSignedInDevice,
@@ -142,5 +144,127 @@ describe('creating a plan on a signed-in device', () => {
             lane: 'deliberate',
             starting_task_id: 'task-223-escalation',
         });
+    });
+});
+
+describe('a chat is a session, so the list has one row per session', () => {
+    // ADR-024 made the escalation continue the troubleshooting turn's session,
+    // so beats 3 and 4 of the walkthrough are two Plans sharing one
+    // `session_id`. ADR-025 says the surface groups them as one Chat.
+    const troubleshooting = {
+        id: 'plan-troubleshooting',
+        session_id: 'session-shared',
+        timestamp: '2026-08-14T09:00:00Z',
+        initial_goal: 'The coffee machine is showing an error',
+        overall_status: PlanStatus.COMPLETED,
+    } as unknown as Plan;
+
+    const escalation = {
+        id: 'plan-escalation',
+        session_id: 'session-shared',
+        timestamp: '2026-08-14T09:20:00Z',
+        initial_goal: "I can't fix it",
+        overall_status: PlanStatus.COMPLETED,
+    } as unknown as Plan;
+
+    it('renders the troubleshooting turn and its escalation as one chat', () => {
+        const { completed } = TaskService.transformPlansToTasks([
+            troubleshooting,
+            escalation,
+        ]);
+
+        expect(completed).toHaveLength(1);
+        expect(completed[0].id).toBe('session-shared');
+    });
+
+    it('names the chat for what the conversation was about, not where it got to', () => {
+        // Newest-first, which is the order a history endpoint hands them back:
+        // the name must come from the turn that opened the conversation, so it
+        // cannot be read off the array.
+        const { completed } = TaskService.transformPlansToTasks([
+            escalation,
+            troubleshooting,
+        ]);
+
+        expect(completed[0].name).toBe('The coffee machine is showing an error');
+    });
+
+    it('opens the latest plan, so the escalation is what the row reaches', () => {
+        const { completed } = TaskService.transformPlansToTasks([
+            escalation,
+            troubleshooting,
+        ]);
+
+        expect(completed[0].planId).toBe('plan-escalation');
+    });
+
+    it('keeps the order the history gave when a plan carries a timestamp it cannot read', () => {
+        // An unreadable timestamp is not comparable with a readable one, so a
+        // comparator that falls back to array order for those pairs and to
+        // time for the rest disagrees with itself: for a group ordered
+        // [10:00, 09:00, unreadable] it holds a > b, b < c and a < c at once,
+        // and which plan names the row then depends on the engine's sort. One
+        // unreadable timestamp therefore hands the whole chat back in the
+        // order the history gave it.
+        const unreadable = {
+            ...escalation,
+            id: 'plan-unreadable',
+            timestamp: 'not a date',
+        } as unknown as Plan;
+
+        const { completed } = TaskService.transformPlansToTasks([
+            escalation,
+            troubleshooting,
+            unreadable,
+        ]);
+
+        expect(completed[0].name).toBe("I can't fix it");
+        expect(completed[0].planId).toBe('plan-unreadable');
+    });
+
+    it('lets the rest of the history render when one record carries no readable date', () => {
+        // `Intl.DateTimeFormat.format` throws on an unreadable timestamp, and
+        // it is called while building every row — so one malformed record took
+        // the whole panel with it rather than its own date.
+        const undated = {
+            ...troubleshooting,
+            id: 'plan-undated',
+            session_id: 'session-undated',
+            timestamp: '',
+            initial_goal: 'How do I close the store?',
+        } as unknown as Plan;
+
+        const { completed } = TaskService.transformPlansToTasks([
+            undated,
+            troubleshooting,
+            escalation,
+        ]);
+
+        expect(completed.map((chat) => chat.name)).toEqual([
+            'How do I close the store?',
+            'The coffee machine is showing an error',
+        ]);
+        expect(completed[0].date).toBeUndefined();
+        expect(completed[1].date).toBeTruthy();
+    });
+
+    it('keeps separate conversations as separate rows', () => {
+        const otherSession = {
+            ...troubleshooting,
+            id: 'plan-other',
+            session_id: 'session-other',
+            initial_goal: 'How do I close the store?',
+        } as unknown as Plan;
+
+        const { completed } = TaskService.transformPlansToTasks([
+            troubleshooting,
+            escalation,
+            otherSession,
+        ]);
+
+        expect(completed.map((chat) => chat.id)).toEqual([
+            'session-shared',
+            'session-other',
+        ]);
     });
 });
