@@ -214,7 +214,16 @@ export function usePlanWebSocket({
         const unsub = webSocketService.on(
             WebsocketMessageType.USER_CLARIFICATION_REQUEST,
             (msg: any) => {
-                if (!msg) return;
+                /*
+                  The parser is total and returns `null` for a frame it cannot
+                  read, and `emit` re-wraps whatever it is handed — so a frame
+                  carrying no `request_id` arrived here as `{ data: null }`,
+                  walked past a guard that only checked the envelope, and threw
+                  inside the listener where the socket service logged it and
+                  moved on (#68). A question this surface could not answer is
+                  not a question; it opens nothing and says nothing.
+                */
+                if (!msg?.data?.request_id) return;
                 const agentMessageData: AgentMessageData = {
                     agent: AgentType.GROUP_CHAT_MANAGER,
                     agent_type: AgentMessageType.AI_AGENT,

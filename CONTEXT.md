@@ -810,6 +810,29 @@ its caller, for the reason the approval seam owns submission in #22.
 
 _Avoid_: suggested reply, quick reply
 
+**The message box answers a Clarification, and says so when there is none.** The plan surface's box
+is the clarification seam's other half: it posts an answer against a pending question's
+`request_id`, and it can post nothing else. It offered itself regardless — *"Type your message
+here…"* over a submit that defaulted a missing identifier to `''` and posted anyway, a clarification
+answering nothing and the associate's message gone with nothing on screen to say why (#68).
+Availability and the payload are one claim now, `selectPendingClarificationRequestId`: no pending
+question, no box — and the box says *"This conversation is not waiting on a reply. The box opens
+when an agent asks you a question."* rather than only dimming, because being unavailable without a
+reason is the quieter half of the same fault. A question carrying **no identifier is not one this
+surface can answer**, so it is not pending either — refused where the frame arrives, since the
+parser is total and the socket's re-wrapping had that refusal throwing inside a listener and being
+logged there. **Answering one settles it**, since a clarification left in the store outlives its
+answer and the surface goes on offering to answer it — which is what the **Rehearsed reply** chips
+going hidden after a tap has always meant, and what `troubleshooting.spec.ts` already asserted. The
+answer settles **the question it answered**, by name: the backend releases the orchestration before
+it finishes persisting, so the next question can reach the browser while the last answer is still in
+flight, and an answer that settled whatever happened to be stored would close the box over a
+question the backend is waiting on. The gate lives in `PlanChatBody` for the reason the chips own
+theirs. Nothing here was defended before except by coincidence: the in-flight lock happens
+to be closed whenever nothing is pending, and that is exactly the coincidence **Resume** removes
+when a turn typed here becomes a new turn in this **Chat**'s session
+([ADR-027](docs/ADR/027-resume-continues-the-session.md), #77).
+
 **Rehearsed hit** — the walkthrough's opening tap, and the mirror image of the honest miss:
 `corpus.toml`'s `[rehearsed_hit]` names the question *and the `SOP-NNN` that answers it*. The miss
 has always been guarded, because the corpus keeps its `absent_terms` out; nothing guarded the other

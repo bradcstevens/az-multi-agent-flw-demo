@@ -40,10 +40,11 @@ import {
 import {
     selectInput,
     selectSubmittingChatDisable,
-    selectClarificationMessage,
+    selectPendingClarificationRequestId,
     selectAgentMessages,
     setInput,
     setSubmittingChatDisableInput,
+    clarificationAnswered,
     addAgentMessage,
 } from '../store/slices/chatSlice';
 import {
@@ -130,7 +131,7 @@ const PlanPage: React.FC = () => {
     const narration = useAppSelector(selectProgressNarration);
     const input = useAppSelector(selectInput);
     const submittingChatDisableInput = useAppSelector(selectSubmittingChatDisable);
-    const clarificationMessage = useAppSelector(selectClarificationMessage);
+    const clarificationRequestId = useAppSelector(selectPendingClarificationRequestId);
     const agentMessages = useAppSelector(selectAgentMessages);
     const streamingMessages = useAppSelector(selectStreamingMessages);
     const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
@@ -375,8 +376,29 @@ const PlanPage: React.FC = () => {
     ]);
 
     /* ── Chat submission ────────────────────────────────────── */
+    /*
+      The question on screen *now*, read after the answer's POST returns. The
+      callback closes over the question it was answering, which is the right
+      identifier to answer against and the wrong one to decide what the surface
+      should do once the answer lands.
+    */
+    const pendingClarificationIdRef = React.useRef<string | null>(clarificationRequestId);
+    useEffect(() => {
+        pendingClarificationIdRef.current = clarificationRequestId;
+    }, [clarificationRequestId]);
+
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
+            /*
+              This box answers a **Clarification** and nothing else, so with no
+              question pending there is nothing for it to carry (#68). The
+              request is refused here rather than sent against an empty
+              `request_id` — a clarification answering nothing, and the
+              associate's message gone with no explanation on screen. The
+              refusal comes first, so the empty-input toast below can never
+              name a clarification nobody asked for.
+            */
+            if (!clarificationRequestId) return;
             if (!chatInput.trim()) {
                 showToast('Please enter a clarification', 'error');
                 return;
@@ -392,12 +414,17 @@ const PlanPage: React.FC = () => {
             const id = showToast('Submitting clarification', 'progress');
             try {
                 await PlanDataService.submitClarification({
-                    request_id: clarificationMessage?.request_id || '',
+                    request_id: clarificationRequestId,
                     answer: chatInput,
                     plan_id: planData.plan.id,
                     m_plan_id: planApprovalRequest?.id || '',
                 });
                 dispatch(setInput(''));
+                // The question is settled, so nothing is pending against it. A
+                // clarification left in the store outlives its answer, and the
+                // surface goes on offering to answer it — named, so a slower
+                // answer cannot retire a question asked after it.
+                dispatch(clarificationAnswered(clarificationRequestId));
                 dismissToast(id);
                 showToast('Clarification submitted successfully', 'success');
                 const agentMessageData: AgentMessageData = {
@@ -410,11 +437,19 @@ const PlanPage: React.FC = () => {
                     raw_data: chatInput,
                 };
                 dispatch(addAgentMessage(agentMessageData));
-                dispatch(setSubmittingChatDisableInput(true));
-                dispatch(setShowProcessingPlanSpinner(true));
-                // The associate answered, so the turn is in flight again — the
-                // pause for a **Clarification** settled it (#64, ADR-023).
-                dispatch(requestSent(planData.plan.id));
+                /*
+                  The turn is in flight again — unless the next question has
+                  already arrived, in which case it is waiting on the associate
+                  and this answer is the slow one. Re-locking the box then
+                  closes it over a question the backend is waiting on (#68).
+                */
+                if (pendingClarificationIdRef.current === clarificationRequestId) {
+                    dispatch(setSubmittingChatDisableInput(true));
+                    dispatch(setShowProcessingPlanSpinner(true));
+                    // The associate answered, so the turn is in flight again — the
+                    // pause for a **Clarification** settled it (#64, ADR-023).
+                    dispatch(requestSent(planData.plan.id));
+                }
                 scrollToBottom();
             } catch {
                 dispatch(requestSettled());
@@ -424,7 +459,7 @@ const PlanPage: React.FC = () => {
                 showToast('Failed to submit clarification', 'error');
             }
         },
-        [planData, clarificationMessage, planApprovalRequest, showToast, dismissToast, dispatch, scrollToBottom],
+        [planData, clarificationRequestId, planApprovalRequest, showToast, dismissToast, dispatch, scrollToBottom],
     );
 
     /* ── Left-panel handlers ────────────────────────────────── */
