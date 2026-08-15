@@ -23,7 +23,7 @@ both are the sort a reviewer has to be able to check by reading:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Iterable, Tuple
 
 from common.models.messages import PlanStatus
 
@@ -82,6 +82,73 @@ class ChatDeletion:
             DeletionOutcome.incomplete if failed else DeletionOutcome.deleted,
             deleted=deleted,
             failed=failed,
+        )
+
+
+@dataclass(frozen=True)
+class ChatsDeletion:
+    """The result of asking for **every** Chat to be deleted (#76).
+
+    One chat's delete says what happened in an HTTP status. A sweep of the
+    whole list cannot: its chats do not all end the same way, and a status code
+    that reported the worst of them would throw away the fact that the rest are
+    gone — leaving the panel unable to say which rows to drop. So the
+    accounting *is* the result, and the surface reads it rather than the status.
+
+    Three buckets, and every chat lands in exactly one:
+
+    * ``deleted`` — the sessions that went, **named** rather than counted. The
+      panel prunes those rows and navigates away from the open conversation
+      only if it is among them; a number cannot say which.
+    * ``kept_running`` — chats refused by the same fail-closed rule the single
+      delete uses. ADR-026's noted cost at list scale: refusing the whole
+      operation because one chat is running would make the control useless at
+      the moment it is wanted, and dropping the chat quietly would be the
+      surface saying something that is not so.
+    * ``failed`` — anything else, including a chat only partly swept. A
+      half-deleted chat is still in Cosmos and is not a deletion.
+    """
+
+    deleted: Tuple[str, ...] = ()
+    kept_running: int = 0
+    failed: int = 0
+    documents_deleted: int = 0
+
+    @property
+    def status(self) -> str:
+        """``deleted`` only when nothing was left behind."""
+        return "incomplete" if self.failed else "deleted"
+
+    @classmethod
+    def tally(
+        cls, results: Iterable[Tuple[str, ChatDeletion]]
+    ) -> "ChatsDeletion":
+        """Add up one sweep per Chat, by what each actually managed.
+
+        **Total**, and that is the point: an outcome added to
+        ``DeletionOutcome`` later falls into ``failed`` rather than off the
+        end, so the surface can never report a shorter list than was swept.
+        """
+        deleted = []
+        kept_running = 0
+        failed = 0
+        documents_deleted = 0
+
+        for session_id, result in results:
+            documents_deleted += result.deleted
+
+            if result.outcome is DeletionOutcome.deleted:
+                deleted.append(session_id)
+            elif result.outcome is DeletionOutcome.still_running:
+                kept_running += 1
+            else:
+                failed += 1
+
+        return cls(
+            deleted=tuple(deleted),
+            kept_running=kept_running,
+            failed=failed,
+            documents_deleted=documents_deleted,
         )
 
 

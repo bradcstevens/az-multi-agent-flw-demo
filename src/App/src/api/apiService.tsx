@@ -14,7 +14,7 @@ import {
     AgentMessageResponse
 } from '../models';
 import { SessionState } from '../models/sessionState';
-import { ChatDeletionResponse } from '../models/chatDeletion';
+import { ChatDeletionResponse, ChatsDeletionResponse } from '../models/chatDeletion';
 
 // Constants for endpoints
 const API_ENDPOINTS = {
@@ -203,6 +203,27 @@ export class APIService {
     async deleteChat(sessionId: string): Promise<ChatDeletionResponse> {
         const deleted = await apiClient.delete<ChatDeletionResponse>(
             `${API_ENDPOINTS.CHATS}/${encodeURIComponent(sessionId)}`
+        );
+        this._cache.invalidate(new RegExp(`^plans_`));
+        return deleted;
+    }
+
+    /**
+     * **Delete every Chat** of the associate's own (#76, ADR-026).
+     *
+     * Each chat is swept on the single delete's own terms — a running one is
+     * kept rather than taken, and the whole operation is not refused because
+     * of it. The route always answers 200 and puts what actually happened in
+     * the body, so this method returns that shape rather than throwing on a
+     * partial result: the panel is what decides whether "kept" or "failed"
+     * changes what it shows.
+     *
+     * The plans cache is invalidated for the same reason the single delete
+     * invalidates it: a cached list is the one way a deleted row comes back.
+     */
+    async deleteAllChats(): Promise<ChatsDeletionResponse> {
+        const deleted = await apiClient.delete<ChatsDeletionResponse>(
+            API_ENDPOINTS.CHATS
         );
         this._cache.invalidate(new RegExp(`^plans_`));
         return deleted;

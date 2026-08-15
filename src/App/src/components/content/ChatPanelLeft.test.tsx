@@ -8,6 +8,13 @@ vi.mock('@/api', () => ({
     apiService: {
         getPlans: vi.fn().mockResolvedValue([]),
         deleteChat: vi.fn().mockResolvedValue({ status: 'deleted' }),
+        deleteAllChats: vi.fn().mockResolvedValue({
+            status: 'deleted',
+            deleted_sessions: [],
+            documents_deleted: 0,
+            chats_kept_running: 0,
+            chats_failed: 0,
+        }),
     },
 }));
 
@@ -17,7 +24,9 @@ import { ASSISTANT_NAME } from '../../models/storeSurface';
 import { apiService } from '@/api';
 import { PlanStatus } from '../../models/enums';
 import {
+    CONFIRM_DELETE_ALL_LABEL,
     CONFIRM_DELETE_LABEL,
+    DELETE_ALL_CHATS_LABEL,
     DELETE_CHAT_LABEL,
     chatMenuLabel,
 } from '../../models/chatDeletion';
@@ -359,5 +368,133 @@ describe('deleting a chat from the panel', () => {
             screen.getByRole('button', { name: /^The coffee machine/ }),
         ).toBeInTheDocument();
         expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation');
+    });
+});
+
+describe('deleting every chat from the panel (#76)', () => {
+    /*
+      The list-level control, ADR-026 applied to the whole history rather
+      than one row. A running chat is kept by the same fail-closed rule the
+      single delete uses, and the panel has to say so rather than let the row
+      just vanish from the count.
+    */
+    const RUNNING = {
+        id: 'plan-running',
+        session_id: 'session-running',
+        timestamp: '2026-08-14T06:00:00Z',
+        initial_goal: 'Ordering more coffee filters',
+        overall_status: PlanStatus.IN_PROGRESS,
+    } as unknown as Plan;
+
+    const openDeleteAllDialog = async () => {
+        fireEvent.click(
+            await screen.findByRole('button', { name: DELETE_ALL_CHATS_LABEL }),
+        );
+    };
+
+    const confirmDeleteAll = async () => {
+        fireEvent.click(
+            await screen.findByRole('button', { name: CONFIRM_DELETE_ALL_LABEL }),
+        );
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(apiService.getPlans).mockResolvedValue([
+            TROUBLESHOOTING,
+            ESCALATION,
+            RUNNING,
+        ] as never);
+        vi.mocked(apiService.deleteAllChats).mockResolvedValue({
+            status: 'deleted',
+            deleted_sessions: ['session-shared'],
+            documents_deleted: 7,
+            chats_kept_running: 1,
+            chats_failed: 0,
+        } as never);
+    });
+
+    it('is disabled when nothing on screen can be deleted', async () => {
+        vi.mocked(apiService.getPlans).mockResolvedValue([RUNNING] as never);
+        renderPanelAt('/chat/plan-running');
+
+        expect(
+            await screen.findByRole('button', { name: DELETE_ALL_CHATS_LABEL }),
+        ).toBeDisabled();
+    });
+
+    it("states how many chats the sweep will take, in the confirmation", async () => {
+        renderPanelAt('/chat/plan-troubleshooting');
+        await screen.findByRole('button', { name: /^The coffee machine/ });
+
+        await openDeleteAllDialog();
+
+        // Two settled chats share one session (`session-shared`); the running
+        // one is not offered up as part of the count.
+        expect(await screen.findByText(/deletes 1 chat\b/)).toBeInTheDocument();
+    });
+
+    it('reads the history again and clears the deleted rows after a sweep', async () => {
+        renderPanelAt('/chat/plan-somewhere-else');
+        await screen.findByRole('button', { name: /^The coffee machine/ });
+        vi.mocked(apiService.getPlans).mockResolvedValue([RUNNING] as never);
+
+        await openDeleteAllDialog();
+        await confirmDeleteAll();
+
+        await waitFor(() => expect(apiService.deleteAllChats).toHaveBeenCalledWith());
+        await waitFor(() =>
+            expect(
+                screen.queryByRole('button', { name: /^The coffee machine/ }),
+            ).not.toBeInTheDocument(),
+        );
+        expect(
+            await screen.findByRole('button', { name: /^Ordering more coffee filters/ }),
+        ).toBeInTheDocument();
+    });
+
+    it('leaves the open conversation once its chat has gone', async () => {
+        renderPanelAt('/chat/plan-troubleshooting');
+        await screen.findByRole('button', { name: /^The coffee machine/ });
+
+        await openDeleteAllDialog();
+        await confirmDeleteAll();
+
+        await waitFor(() => expect(screen.getByTestId('here')).toHaveTextContent('/'));
+    });
+
+    it('names the one chat a sweep kept running, rather than only counting it', async () => {
+        renderPanelAt('/chat/plan-somewhere-else');
+        await screen.findByRole('button', { name: /^The coffee machine/ });
+        vi.mocked(apiService.deleteAllChats).mockResolvedValue({
+            status: 'deleted',
+            deleted_sessions: ['session-shared'],
+            documents_deleted: 7,
+            chats_kept_running: 1,
+            chats_failed: 0,
+        } as never);
+
+        await openDeleteAllDialog();
+        await confirmDeleteAll();
+
+        expect(
+            await screen.findByText(/Ordering more coffee filters.*kept/i),
+        ).toBeInTheDocument();
+    });
+
+    it('keeps the confirmation open and says why when the sweep is refused', async () => {
+        vi.mocked(apiService.deleteAllChats).mockRejectedValue(new Error('offline'));
+        renderPanelAt('/chat/plan-troubleshooting');
+        await screen.findByRole('button', { name: /^The coffee machine/ });
+
+        await openDeleteAllDialog();
+        await confirmDeleteAll();
+
+        await waitFor(() => expect(apiService.deleteAllChats).toHaveBeenCalled());
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText('offline')).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /^The coffee machine/ }),
+        ).toBeInTheDocument();
     });
 });

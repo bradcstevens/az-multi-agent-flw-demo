@@ -106,3 +106,57 @@ export interface ChatDeletionResponse {
     session_id: string;
     documents_deleted: number;
 }
+
+/**
+ * **Delete every chat** — the list-level control (#76, ADR-026).
+ *
+ * The single delete answers with a status code; a sweep of the whole list
+ * cannot, because its chats do not all end the same way. `DELETE /v4/chats`
+ * therefore always answers 200 and puts the accounting in the body — which
+ * sessions went, named rather than counted, and how many were kept running
+ * or left behind. The panel reads this shape rather than the status code.
+ */
+export interface ChatsDeletionResponse {
+    status: string;
+    deleted_sessions: string[];
+    documents_deleted: number;
+    chats_kept_running: number;
+    chats_failed: number;
+}
+
+/** What the list-level control is called. */
+export const DELETE_ALL_CHATS_LABEL = 'Delete all chats';
+
+/** The confirmation's heading for the list-level control. */
+export const DELETE_ALL_CHATS_TITLE = 'Delete all chats?';
+
+/**
+ * What the confirmation says before the sweep runs — **stating the count**.
+ *
+ * A count-free warning cannot tell the presenter what they are about to
+ * spend when the list holds more than a couple of rows, and the whole point
+ * of a list-level control is that it is reached for once the list is long.
+ */
+export const deleteAllChatsWarning = (count: number): string =>
+    `This deletes ${count} ${count === 1 ? 'chat' : 'chats'}, along with each one's ` +
+    'troubleshooting record and ticket, for good. This cannot be undone.';
+
+/** The button that actually sweeps the list — named for the act. */
+export const CONFIRM_DELETE_ALL_LABEL = 'Delete all';
+
+/**
+ * What the panel says once a sweep kept one or more chats running.
+ *
+ * **Named**, not merely counted, when there is exactly one: the associate
+ * reading this is looking at a list they just asked to be cleared, and "a
+ * chat was kept" without saying which forces them to hunt the row down
+ * themselves. Silence here would be the surface omitting a kept chat rather
+ * than reporting it — the same dishonesty ADR-026 refuses at the row level.
+ */
+export const keptRunningMessage = (count: number, name?: string): string => {
+    if (count === 1 && name) {
+        return `"${name}" is still running, so it was kept.`;
+    }
+    return `${count} ${count === 1 ? 'chat is' : 'chats are'} still running, so ` +
+        `${count === 1 ? 'it was' : 'they were'} kept.`;
+};

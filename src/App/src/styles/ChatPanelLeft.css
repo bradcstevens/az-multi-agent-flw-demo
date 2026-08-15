@@ -39,6 +39,23 @@ background: radial-gradient(circle, rgba(238, 174, 221, 1) 0%, rgba(117, 121, 23
 color: #2F2F4A; */
 }
 
+.tab.tab-delete-all-chats {
+  margin: 0px 8px;
+  padding: 0;
+  cursor: default;
+}
+
+.tab.tab-delete-all-chats:hover,
+.tab.tab-delete-all-chats:active {
+  background-color: transparent;
+}
+
+.chat-panel-kept-running-notice {
+  display: block;
+  margin: 4px 12px 0;
+  color: var(--colorPaletteYellowForeground2, var(--colorNeutralForeground2));
+}
+
 /* Panel Layout Styles */
 .panel-left-container {
   flex-shrink: 0;

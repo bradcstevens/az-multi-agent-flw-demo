@@ -19,7 +19,7 @@ from backend.models.plan_models import MPlan
 
 # Import the REAL modules using backend.* paths for proper coverage tracking
 from backend.common.database.database_base import DatabaseBase
-from chat.deletion import ChatDeletion, DeletionOutcome
+from chat.deletion import ChatDeletion, ChatsDeletion, DeletionOutcome
 from backend.common.models.messages import (AgentMessageData, BaseDataModel,
                                             CurrentTeamAgent, Plan, Step,
                                             TeamConfiguration, UserCurrentTeam)
@@ -157,6 +157,9 @@ class TestDatabaseBaseImplementationRequirements:
             # primitive above.
             async def delete_chat(self, session_id: str) -> ChatDeletion:
                 return ChatDeletion(DeletionOutcome.no_such_chat)
+
+            async def delete_all_chats(self) -> ChatsDeletion:
+                return ChatsDeletion()
             
             async def add_mplan(self, mplan: MPlan) -> None:
                 pass
@@ -256,6 +259,7 @@ class TestDatabaseBaseContextManager:
             async def update_current_team(self, current_team): pass
             async def delete_plan_by_plan_id(self, plan_id): return False
             async def delete_chat(self, session_id): return ChatDeletion(DeletionOutcome.no_such_chat)
+            async def delete_all_chats(self): return ChatsDeletion()
             async def add_mplan(self, mplan): pass
             async def update_mplan(self, mplan): pass
             async def get_mplan(self, plan_id): return None
@@ -322,6 +326,7 @@ class TestDatabaseBaseContextManager:
             async def update_current_team(self, current_team): pass
             async def delete_plan_by_plan_id(self, plan_id): return False
             async def delete_chat(self, session_id): return ChatDeletion(DeletionOutcome.no_such_chat)
+            async def delete_all_chats(self): return ChatsDeletion()
             async def add_mplan(self, mplan): pass
             async def update_mplan(self, mplan): pass
             async def get_mplan(self, plan_id): return None
@@ -495,6 +500,7 @@ class TestConcreteImplementation:
             async def update_current_team(self, current_team): pass
             async def delete_plan_by_plan_id(self, plan_id): return True
             async def delete_chat(self, session_id): return ChatDeletion(DeletionOutcome.deleted)
+            async def delete_all_chats(self): return ChatsDeletion()
             async def add_mplan(self, mplan): pass
             async def update_mplan(self, mplan): pass
             async def get_mplan(self, plan_id): return None
@@ -565,6 +571,7 @@ class TestDatabaseBaseAbstractMethodCoverage:
             async def update_current_team(self, current_team): await super().update_current_team(current_team)
             async def delete_plan_by_plan_id(self, plan_id): return await super().delete_plan_by_plan_id(plan_id)
             async def delete_chat(self, session_id): return await super().delete_chat(session_id)
+            async def delete_all_chats(self): return await super().delete_all_chats()
             async def add_mplan(self, mplan): await super().add_mplan(mplan)
             async def update_mplan(self, mplan): await super().update_mplan(mplan)
             async def get_mplan(self, plan_id): return await super().get_mplan(plan_id)

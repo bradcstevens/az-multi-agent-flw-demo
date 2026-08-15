@@ -2124,6 +2124,56 @@ async def get_plans(request: Request):
     return all_plans
 
 
+@app_router.delete("/chats")
+async def delete_all_chats(request: Request):
+    """
+    Delete every Chat belonging to the current user (#76, ADR-026).
+
+    ---
+    tags:
+      - Chats
+
+    One chat's delete answers in an HTTP status. A sweep of the whole list
+    cannot: its chats do not all end the same way, and a status code carrying
+    the worst of them would throw away which rows the panel may now drop. So
+    the accounting is the body of the response, not its status code — the
+    route always answers 200 and lets the caller read what actually happened.
+
+    Nothing about which chats to take comes from the request: the sessions
+    swept come from this user's own plans, read inside the store, not from
+    whatever the browser's list happened to show.
+    """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        track_event_if_configured(
+            "Error_User_Not_Found", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    result = await memory_store.delete_all_chats()
+
+    track_event_if_configured(
+        "Chats_Deleted",
+        {
+            "status": result.status,
+            "deleted_count": len(result.deleted),
+            "chats_kept_running": result.kept_running,
+            "chats_failed": result.failed,
+            "user_id": user_id,
+        },
+    )
+
+    return {
+        "status": result.status,
+        "deleted_sessions": list(result.deleted),
+        "documents_deleted": result.documents_deleted,
+        "chats_kept_running": result.kept_running,
+        "chats_failed": result.failed,
+    }
+
+
 @app_router.delete("/chats/{session_id}")
 async def delete_chat(session_id: str, request: Request):
     """

@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Type
 
 from models.plan_models import MPlan
 
-from chat.deletion import ChatDeletion
+from chat.deletion import ChatDeletion, ChatsDeletion
 
 from ..models.messages import (
     AgentMessageData,
@@ -215,6 +215,17 @@ class DatabaseBase(ABC):
         Scoped to the client's own ``user_id``, refused while the Chat is
         running, and reporting what it actually took. Distinct from
         ``delete_plan_by_plan_id`` above, which is none of those three.
+        """
+        pass
+
+    @abstractmethod
+    async def delete_all_chats(self) -> ChatsDeletion:
+        """Delete every Chat of this user's, on the single delete's terms (#76).
+
+        Each chat goes through ``delete_chat`` above, so a running one is kept
+        rather than taken and the whole operation is not refused because of it.
+        The result names the sessions that went and counts the ones that did
+        not, because the outcome has to be able to say a chat was kept.
         """
         pass
 

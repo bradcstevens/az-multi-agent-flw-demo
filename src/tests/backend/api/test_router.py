@@ -98,6 +98,7 @@ from associate.records import DEMO_ASSOCIATE  # noqa: E402
 from chat.deletion import (  # noqa: E402
     STILL_RUNNING_DETAIL,
     ChatDeletion,
+    ChatsDeletion,
     DeletionOutcome,
 )
 from guardrail.corpus import (  # noqa: E402
@@ -1643,6 +1644,104 @@ class TestDeleteChat:
         rt.store.delete_plan_by_plan_id = AsyncMock()
 
         self._reports(rt, ChatDeletion.swept(deleted=1, failed=0))
+
+        rt.store.delete_plan_by_plan_id.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# DELETE /chats
+# ---------------------------------------------------------------------------
+class TestDeleteAllChats:
+    """The list-level control, at the route (#76, ADR-026).
+
+    One chat's delete answers in an HTTP status. This one cannot: its chats do
+    not all end the same way, and a status carrying the worst of them would
+    throw away which rows the panel may now drop. So the accounting is the
+    body, and these tests are about it being complete and honest.
+    """
+
+    def _reports(self, rt, deletion):
+        rt.store.delete_all_chats = AsyncMock(return_value=deletion)
+        return rt.client.delete("/api/v4/chats")
+
+    def test_no_user(self, rt):
+        _no_user(rt)
+        rt.store.delete_all_chats = AsyncMock()
+
+        resp = rt.client.delete("/api/v4/chats")
+
+        assert resp.status_code == 400
+        rt.store.delete_all_chats.assert_not_awaited()
+
+    def test_says_which_chats_went_rather_than_how_many(self, rt):
+        # The panel prunes the rows the store says went and navigates away from
+        # the open conversation only if it is among them. A count cannot say
+        # which, and guessing from the browser's own snapshot is how a row for
+        # a chat still in Cosmos disappears.
+        resp = self._reports(
+            rt,
+            ChatsDeletion(
+                deleted=("session-1", "session-2"), documents_deleted=9
+            ),
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "deleted"
+        assert body["deleted_sessions"] == ["session-1", "session-2"]
+        assert body["documents_deleted"] == 9
+        assert body["chats_kept_running"] == 0
+        assert body["chats_failed"] == 0
+
+    def test_a_running_chat_is_kept_and_the_outcome_says_so(self, rt):
+        # The one rule that makes this control honest. Silently omitting the
+        # kept chat is the surface saying something that is not so; refusing
+        # the whole operation makes the control useless when it is wanted.
+        resp = self._reports(
+            rt, ChatsDeletion(deleted=("session-1",), kept_running=2)
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["chats_kept_running"] == 2
+
+    def test_a_chat_that_would_not_go_is_reported_and_not_dropped(self, rt):
+        # Not a 500: a status code carrying this would take the two chats that
+        # did go with it, and the panel would keep listing rows that are gone.
+        resp = self._reports(
+            rt,
+            ChatsDeletion(
+                deleted=("session-1", "session-2"), failed=1, documents_deleted=6
+            ),
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "incomplete"
+        assert body["chats_failed"] == 1
+        assert body["deleted_sessions"] == ["session-1", "session-2"]
+
+    def test_an_empty_history_is_an_answer_rather_than_a_404(self, rt):
+        # A presenter who clears the list twice is not making a mistake the
+        # second time.
+        resp = self._reports(rt, ChatsDeletion())
+
+        assert resp.status_code == 200
+        assert resp.json()["deleted_sessions"] == []
+
+    def test_the_store_is_reached_as_this_user(self, rt):
+        # The `user_id` predicate lives in the store and is the whole of the
+        # authorization. Nothing about which chats to take comes from the
+        # request: the browser's list is read by team, and a control that swept
+        # what the browser named would clear another associate's history.
+        self._reports(rt, ChatsDeletion())
+
+        rt.database_factory.get_database.assert_awaited_with(user_id="user-1")
+        rt.store.delete_all_chats.assert_awaited_once_with()
+
+    def test_clearing_the_list_never_reaches_the_single_plan_primitive(self, rt):
+        rt.store.delete_plan_by_plan_id = AsyncMock()
+
+        self._reports(rt, ChatsDeletion(deleted=("session-1",)))
 
         rt.store.delete_plan_by_plan_id.assert_not_awaited()
 

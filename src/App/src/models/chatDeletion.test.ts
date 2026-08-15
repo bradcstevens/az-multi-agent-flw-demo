@@ -9,6 +9,11 @@ import {
     STILL_RUNNING_REASON,
     canDeleteChat,
     chatMenuLabel,
+    CONFIRM_DELETE_ALL_LABEL,
+    DELETE_ALL_CHATS_LABEL,
+    DELETE_ALL_CHATS_TITLE,
+    deleteAllChatsWarning,
+    keptRunningMessage,
 } from './chatDeletion';
 
 describe('which chats may be deleted', () => {
@@ -68,5 +73,37 @@ describe('the words the control says', () => {
 
     it('says why a running chat is kept', () => {
         expect(STILL_RUNNING_REASON.toLowerCase()).toContain('running');
+    });
+});
+
+describe('the list-level control (#76)', () => {
+    it('says delete, and says all, because that is what it does', () => {
+        expect(DELETE_ALL_CHATS_LABEL.toLowerCase()).toContain('delete');
+        expect(DELETE_ALL_CHATS_LABEL.toLowerCase()).toContain('all');
+    });
+
+    it('warns before the sweep runs, and cannot be undone', () => {
+        expect(DELETE_ALL_CHATS_TITLE.toLowerCase()).toContain('delete');
+        expect(deleteAllChatsWarning(3).toLowerCase()).toContain('undone');
+    });
+
+    it('states the count, singular and plural', () => {
+        expect(deleteAllChatsWarning(1)).toContain('1 chat,');
+        expect(deleteAllChatsWarning(4)).toContain('4 chats,');
+    });
+
+    it('names the confirming button for the act, not "yes"', () => {
+        expect(CONFIRM_DELETE_ALL_LABEL.toLowerCase()).toContain('delete');
+    });
+
+    it('names the one chat a sweep kept, rather than only counting it', () => {
+        expect(keptRunningMessage(1, 'How do I close the store?')).toBe(
+            '"How do I close the store?" is still running, so it was kept.',
+        );
+    });
+
+    it('falls back to a count when more than one chat was kept, or none is named', () => {
+        expect(keptRunningMessage(2)).toContain('2 chats are');
+        expect(keptRunningMessage(1)).toContain('1 chat is');
     });
 });

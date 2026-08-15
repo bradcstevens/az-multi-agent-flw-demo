@@ -11,6 +11,7 @@ import pytest
 from chat import deletion
 from chat.deletion import (
     ChatDeletion,
+    ChatsDeletion,
     DeletionOutcome,
     SETTLED_STATUSES,
     STILL_RUNNING_DETAIL,
@@ -99,3 +100,105 @@ class TestWhatTheDeletionReports:
 
     def test_the_refusal_says_why_rather_than_only_that(self):
         assert "running" in STILL_RUNNING_DETAIL.lower()
+
+
+class TestWhatDeletingEveryChatReports:
+    """The list-level control's accounting (#76).
+
+    One chat's delete answers with an HTTP status; a sweep of the whole list
+    cannot, because its chats do not all end the same way. The accounting is
+    therefore the result rather than a decoration on it, and this is the rule
+    that produces it — pure, so a reviewer can check the arithmetic without a
+    store.
+    """
+
+    def test_nothing_to_delete_is_a_result_and_not_an_error(self):
+        # A presenter who clears the list twice is not making a mistake the
+        # second time.
+        tallied = ChatsDeletion.tally([])
+
+        assert tallied.deleted == ()
+        assert tallied.kept_running == 0
+        assert tallied.failed == 0
+        assert tallied.documents_deleted == 0
+        assert tallied.status == "deleted"
+
+    def test_every_chat_that_went_is_named_rather_than_counted(self):
+        # The panel prunes the rows the store says went, and navigates away
+        # from the open chat only if it is one of them. A number cannot say
+        # which, so the sessions come back and the count is derived from them.
+        tallied = ChatsDeletion.tally(
+            [
+                ("session-1", ChatDeletion.swept(deleted=4, failed=0)),
+                ("session-2", ChatDeletion.swept(deleted=3, failed=0)),
+            ]
+        )
+
+        assert tallied.deleted == ("session-1", "session-2")
+        assert tallied.documents_deleted == 7
+        assert tallied.status == "deleted"
+
+    def test_a_running_chat_is_kept_and_counted_as_kept(self):
+        # ADR-026's noted cost, at list scale: refusing the whole operation
+        # because one chat is running makes the control useless at exactly the
+        # moment it is wanted, and omitting the chat silently is the surface
+        # saying something that is not so.
+        tallied = ChatsDeletion.tally(
+            [
+                ("session-1", ChatDeletion.swept(deleted=4, failed=0)),
+                ("session-2", ChatDeletion(DeletionOutcome.still_running)),
+            ]
+        )
+
+        assert tallied.deleted == ("session-1",)
+        assert tallied.kept_running == 1
+        assert tallied.failed == 0
+        assert tallied.status == "deleted"
+
+    def test_a_chat_that_only_partly_went_is_a_failure_and_not_a_deletion(self):
+        # It is still in Cosmos, so the panel may not drop its row and the
+        # outcome may not count it. The documents that did go are still
+        # counted: they are gone whatever the row says.
+        tallied = ChatsDeletion.tally(
+            [
+                ("session-1", ChatDeletion.swept(deleted=4, failed=0)),
+                ("session-2", ChatDeletion.swept(deleted=2, failed=3)),
+            ]
+        )
+
+        assert tallied.deleted == ("session-1",)
+        assert tallied.failed == 1
+        assert tallied.documents_deleted == 6
+        assert tallied.status == "incomplete"
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [DeletionOutcome.no_such_chat, DeletionOutcome.not_yours],
+    )
+    def test_a_chat_this_sweep_may_not_take_is_a_failure(self, outcome):
+        # These are enumerated from the user's own plans, so neither should
+        # happen — a session holding somebody else's record is the one way it
+        # can. It is not deleted and it is not running, and the third bucket is
+        # where a result nobody predicted has to land rather than vanish.
+        tallied = ChatsDeletion.tally([("session-1", ChatDeletion(outcome))])
+
+        assert tallied.deleted == ()
+        assert tallied.kept_running == 0
+        assert tallied.failed == 1
+        assert tallied.status == "incomplete"
+
+    def test_every_chat_lands_in_exactly_one_bucket(self):
+        # Total, deliberately. An outcome added to `DeletionOutcome` later
+        # would otherwise be dropped on the floor and the surface would report
+        # a shorter list than it swept.
+        results = [
+            (f"session-{i}", ChatDeletion(outcome))
+            for i, outcome in enumerate(DeletionOutcome)
+        ]
+
+        tallied = ChatsDeletion.tally(results)
+
+        assert (
+            len(tallied.deleted) + tallied.kept_running + tallied.failed
+            == len(results)
+        )

@@ -4,7 +4,7 @@ import datetime
 import logging
 import sys
 import os
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 import pytest
 
 # Add the backend directory to the Python path
@@ -39,7 +39,7 @@ from backend.common.models.messages import (
     TeamConfiguration,
     UserCurrentTeam,
 )
-from chat.deletion import DeletionOutcome
+from chat.deletion import ChatDeletion, DeletionOutcome
 from models.plan_models import MPlan
 
 
@@ -1157,6 +1157,180 @@ class TestCosmosDBChatDeletion:
         assert result.outcome is DeletionOutcome.incomplete
         assert result.deleted == 1
         assert result.failed == 1
+
+
+class TestDeleteAllChats:
+    """The list-level control, at the store (#76, ADR-026).
+
+    "The same primitive applied to a set" is literal here: this enumerates the
+    associate's Chats and hands each one to ``delete_chat``, so every chat that
+    goes goes on exactly the terms the single delete established — the whole
+    session partition, scoped to this ``user_id``, and a running chat kept by
+    the same fail-closed rule. The enumeration is the only new decision, and it
+    is what these tests are mostly about.
+    """
+
+    @pytest.fixture
+    def client(self):
+        client = CosmosDBClient(
+            endpoint="https://test.documents.azure.com:443/",
+            credential="test_credential",
+            database_name="test_db",
+            container_name="test_container",
+            session_id="test_session",
+            user_id="test_user",
+        )
+        client._initialized = True
+        client.container = AsyncMock()
+        return client
+
+    @staticmethod
+    def _sessions(client, rows, raises=None):
+        """Stand in for the read that finds this associate's Chats."""
+
+        def query_items(**kwargs):
+            async def cursor():
+                if raises is not None:
+                    raise raises
+                for row in rows:
+                    yield row
+
+            return cursor()
+
+        client.container.query_items = Mock(side_effect=query_items)
+
+    @pytest.mark.asyncio
+    async def test_every_chat_of_this_users_is_swept_by_the_single_delete(
+        self, client
+    ):
+        # Not a second sweep written beside the first. `delete_chat` is where
+        # ownership is proved twice, where a running chat is kept and where the
+        # partition is enumerated in full before anything goes; a bulk path
+        # that re-implemented any of that would be a second place for all three
+        # to be forgotten.
+        self._sessions(
+            client, [{"session_id": "session-1"}, {"session_id": "session-2"}]
+        )
+        client.delete_chat = AsyncMock(
+            side_effect=[
+                ChatDeletion.swept(deleted=4, failed=0),
+                ChatDeletion.swept(deleted=3, failed=0),
+            ]
+        )
+
+        result = await client.delete_all_chats()
+
+        assert client.delete_chat.await_args_list == [
+            call("session-1"),
+            call("session-2"),
+        ]
+        assert result.deleted == ("session-1", "session-2")
+        assert result.documents_deleted == 7
+
+    @pytest.mark.asyncio
+    async def test_only_this_users_chats_are_found(self, client):
+        # The whole of the authorization, and the reason the enumeration is not
+        # the panel's list handed back: the panel reads plans by *team*, and a
+        # control that swept whatever the browser listed would let one
+        # associate clear another's history.
+        self._sessions(client, [])
+
+        await client.delete_all_chats()
+
+        read = client.container.query_items.call_args.kwargs
+        assert "c.user_id=@user_id" in read["query"]
+        assert {"name": "@user_id", "value": "test_user"} in read["parameters"]
+
+    @pytest.mark.asyncio
+    async def test_a_chat_is_swept_once_however_many_plans_it_holds(self, client):
+        # A Chat is a Session and holds more than one Plan (#71) — the
+        # walkthrough's centrepiece pair is one chat with two. Deduped here
+        # rather than left to the store's `DISTINCT`, because the second sweep
+        # of an already-deleted partition reports `no_such_chat` and the
+        # outcome would count a phantom failure.
+        self._sessions(
+            client,
+            [
+                {"session_id": "session-1"},
+                {"session_id": "session-2"},
+                {"session_id": "session-1"},
+            ],
+        )
+        client.delete_chat = AsyncMock(return_value=ChatDeletion.swept(1, 0))
+
+        result = await client.delete_all_chats()
+
+        assert client.delete_chat.await_args_list == [
+            call("session-1"),
+            call("session-2"),
+        ]
+        assert result.failed == 0
+
+    @pytest.mark.asyncio
+    async def test_a_running_chat_is_kept_and_the_rest_still_go(self, client):
+        # The one rule that makes this control honest. Refusing the whole
+        # operation because something is running makes it useless at exactly
+        # the moment a presenter wants it.
+        self._sessions(
+            client, [{"session_id": "session-1"}, {"session_id": "session-2"}]
+        )
+        client.delete_chat = AsyncMock(
+            side_effect=[
+                ChatDeletion(DeletionOutcome.still_running),
+                ChatDeletion.swept(deleted=3, failed=0),
+            ]
+        )
+
+        result = await client.delete_all_chats()
+
+        assert result.deleted == ("session-2",)
+        assert result.kept_running == 1
+
+    @pytest.mark.asyncio
+    async def test_one_chat_that_will_not_go_does_not_stop_the_others(self, client):
+        # Stopping at the first failure would leave the list half-cleared with
+        # no account of where it stopped, which is worse than the failure.
+        self._sessions(
+            client,
+            [
+                {"session_id": "session-1"},
+                {"session_id": "session-2"},
+                {"session_id": "session-3"},
+            ],
+        )
+        client.delete_chat = AsyncMock(
+            side_effect=[
+                ChatDeletion.swept(deleted=2, failed=1),
+                Exception("Cosmos is having a moment"),
+                ChatDeletion.swept(deleted=5, failed=0),
+            ]
+        )
+
+        result = await client.delete_all_chats()
+
+        assert result.deleted == ("session-3",)
+        assert result.failed == 2
+        assert result.status == "incomplete"
+
+    @pytest.mark.asyncio
+    async def test_a_store_failure_is_not_reported_as_an_empty_list(self, client):
+        # An outage while enumerating would otherwise come back as "there was
+        # nothing to delete", and the panel would tell the presenter their
+        # history is gone while every chat sits in Cosmos. The same reading
+        # `delete_chat` refuses, for the same reason.
+        self._sessions(client, [], raises=Exception("Cosmos unavailable"))
+
+        with pytest.raises(Exception, match="Cosmos unavailable"):
+            await client.delete_all_chats()
+
+    @pytest.mark.asyncio
+    async def test_an_empty_history_is_a_result_rather_than_an_error(self, client):
+        self._sessions(client, [])
+
+        result = await client.delete_all_chats()
+
+        assert result.deleted == ()
+        assert result.status == "deleted"
 
 
 class TestCosmosDBDataManagement:

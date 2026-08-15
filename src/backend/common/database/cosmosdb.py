@@ -8,7 +8,7 @@ from models.plan_models import MPlan
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos.aio._database import DatabaseProxy
 
-from chat.deletion import ChatDeletion, DeletionOutcome, is_running
+from chat.deletion import ChatDeletion, ChatsDeletion, DeletionOutcome, is_running
 
 from ..models.messages import (
     AgentMessage,
@@ -602,6 +602,68 @@ class CosmosDBClient(DatabaseBase):
                 )
 
         return ChatDeletion.swept(deleted=deleted, failed=failed)
+
+    async def delete_all_chats(self) -> ChatsDeletion:
+        """**Chat deletion** applied to the whole list (#76, ADR-026).
+
+        A presenter clearing the stage between rehearsal runs, in one action.
+        Every chat that goes is handed to :meth:`delete_chat` and goes on
+        exactly its terms — the whole session partition, scoped to this
+        ``user_id``, and a running chat kept by the same fail-closed rule. That
+        method is not re-implemented here on purpose: it is where ownership is
+        proved twice and where the partition is read in full before anything is
+        deleted, and a second copy would be a second place to forget all of it.
+
+        The enumeration is this method's own decision, and it is **not** the
+        panel's list handed back. The chat list is read by *team*
+        (``get_all_plans_by_team_id``), so sweeping whatever the browser listed
+        would let one associate clear another's history; the sessions here come
+        from this user's own plans. Deduped in Python rather than by
+        ``DISTINCT``: a Chat holds more than one Plan (#71) — the walkthrough's
+        centrepiece pair is one chat with two — and sweeping the same partition
+        twice reports the second pass as ``no_such_chat``, which would put a
+        phantom failure in front of the presenter.
+
+        A store failure while enumerating is raised rather than read as an
+        empty history: "there was nothing to delete" and "the list could not be
+        read" are the same sentence to a panel, and the first one lets the
+        surface report a history that is sitting untouched in Cosmos as gone.
+
+        One chat that will not go does not stop the others. Stopping at the
+        first failure leaves the list half-cleared with no account of where it
+        stopped, which is worse than the failure; the result says which chats
+        went instead.
+        """
+        await self._ensure_initialized()
+
+        sessions = self.container.query_items(
+            query=(
+                "SELECT c.session_id FROM c "
+                "WHERE c.user_id=@user_id AND c.data_type=@data_type"
+            ),
+            parameters=[
+                {"name": "@user_id", "value": self.user_id},
+                {"name": "@data_type", "value": DataType.plan},
+            ],
+        )
+
+        # Order-preserving, so the sweep runs in the order the store answered
+        # and a re-read of the log follows it.
+        doomed: List[str] = []
+        async for row in sessions:
+            session_id = row.get("session_id")
+            if session_id and session_id not in doomed:
+                doomed.append(session_id)
+
+        results = []
+        for session_id in doomed:
+            try:
+                results.append((session_id, await self.delete_chat(session_id)))
+            except Exception as e:
+                self.logger.warning("Failed deleting chat %s: %s", session_id, e)
+                results.append((session_id, ChatDeletion(DeletionOutcome.incomplete)))
+
+        return ChatsDeletion.tally(results)
 
     async def add_mplan(self, mplan: MPlan) -> None:
         """Add a team configuration to the database."""
