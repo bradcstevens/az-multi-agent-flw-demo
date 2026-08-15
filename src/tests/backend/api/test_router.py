@@ -74,7 +74,15 @@ def _import_router():
     finally:
         router_mod_obj = sys.modules.get("backend.api.router")
         for key in list(sys.modules):
-            if key not in snapshot and not key.startswith("backend"):
+            # `chat.*` survives with the router's own package: the route
+            # compares `DeletionOutcome` members by identity, and a second
+            # import of that module would give this file a different enum whose
+            # members are equal to nothing the router holds (#75).
+            if (
+                key not in snapshot
+                and not key.startswith("backend")
+                and not key.split(".")[0] == "chat"
+            ):
                 del sys.modules[key]
         for key, value in snapshot.items():
             sys.modules[key] = value
@@ -87,6 +95,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from associate.answer import PERSONAL_ANSWER_KIND  # noqa: E402
 from associate.records import DEMO_ASSOCIATE  # noqa: E402
+from chat.deletion import (  # noqa: E402
+    STILL_RUNNING_DETAIL,
+    ChatDeletion,
+    DeletionOutcome,
+)
 from guardrail.corpus import (  # noqa: E402
     PERSONAL_INTENT_ANCHORS,
     STORE_SCOPE_ANCHORS,
@@ -1551,6 +1564,87 @@ class TestGetPlans:
         ]
         rt.store.get_all_plans_by_team_id.assert_awaited_once_with(team_id="t1")
         rt.store.get_all_plans_by_team_id_status.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# DELETE /chats/{session_id}
+# ---------------------------------------------------------------------------
+class TestDeleteChat:
+    """The surface's delete control, at the route (#75, ADR-026)."""
+
+    def _reports(self, rt, deletion):
+        rt.store.delete_chat = AsyncMock(return_value=deletion)
+        return rt.client.delete("/api/v4/chats/session-1")
+
+    def test_no_user(self, rt):
+        _no_user(rt)
+        rt.store.delete_chat = AsyncMock()
+
+        resp = rt.client.delete("/api/v4/chats/session-1")
+
+        assert resp.status_code == 400
+        rt.store.delete_chat.assert_not_awaited()
+
+    def test_deletes_the_chat_and_says_how_much_went(self, rt):
+        resp = self._reports(rt, ChatDeletion.swept(deleted=7, failed=0))
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "deleted"
+        assert body["session_id"] == "session-1"
+        assert body["documents_deleted"] == 7
+        rt.store.delete_chat.assert_awaited_once_with(session_id="session-1")
+
+    def test_a_chat_nobody_owns_here_is_not_found(self, rt):
+        resp = self._reports(rt, ChatDeletion(DeletionOutcome.no_such_chat))
+
+        assert resp.status_code == 404
+
+    def test_a_chat_belonging_to_someone_else_is_told_apart_from_neither(self, rt):
+        # The store can tell "no such chat" from "a session holding another
+        # user's record" and logs which it was. The wire may not: an answer
+        # that distinguishes them confirms the existence of somebody else's
+        # conversation to anyone who can guess a session id.
+        mine = self._reports(rt, ChatDeletion(DeletionOutcome.no_such_chat))
+        theirs = self._reports(rt, ChatDeletion(DeletionOutcome.not_yours))
+
+        assert theirs.status_code == 404
+        assert theirs.json() == mine.json()
+
+    def test_a_running_chat_is_refused_with_a_reason(self, rt):
+        # ADR-026's own noted cost: a running Chat cannot be deleted, so the
+        # surface has to be able to say why rather than read as a dead control.
+        resp = self._reports(rt, ChatDeletion(DeletionOutcome.still_running))
+
+        assert resp.status_code == 409
+        assert resp.json()["detail"] == STILL_RUNNING_DETAIL
+
+    def test_a_half_deleted_chat_is_not_reported_as_deleted(self, rt):
+        # The failure this route exists not to repeat:
+        # `delete_plan_by_plan_id` returns `True` even when it deleted nothing.
+        resp = self._reports(rt, ChatDeletion.swept(deleted=4, failed=3))
+
+        assert resp.status_code == 500
+        assert "4" in resp.json()["detail"]
+
+    def test_the_store_is_reached_as_this_user(self, rt):
+        # The `user_id` predicate lives in the store and is taken from the
+        # client it was built for, so the route may not hand it a session id
+        # under anybody else's identity.
+        self._reports(rt, ChatDeletion.swept(deleted=1, failed=0))
+
+        rt.database_factory.get_database.assert_awaited_with(user_id="user-1")
+
+    def test_deleting_a_chat_never_reaches_the_single_plan_primitive(self, rt):
+        # ADR-026 leaves `delete_plan_by_plan_id` alone with its one caller: it
+        # takes one document, carries no `user_id` predicate and returns `True`
+        # regardless. Routed here it would delete a plan and leave the
+        # conversation behind.
+        rt.store.delete_plan_by_plan_id = AsyncMock()
+
+        self._reports(rt, ChatDeletion.swept(deleted=1, failed=0))
+
+        rt.store.delete_plan_by_plan_id.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------

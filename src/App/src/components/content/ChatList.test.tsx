@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FluentProvider, teamsLightTheme } from '@fluentui/react-components';
 
 import ChatList from './ChatList';
@@ -9,10 +7,14 @@ import { Chat } from '@/models';
 import { PlanStatus } from '../../models/enums';
 import { NO_CHATS_MESSAGE, chatStateLabel } from '../../models/chatState';
 import {
-    HIDDEN_COMPLETED_TASKS_KEY,
-    HIDE_COMPLETED_LABEL,
-    forgetHiddenCompletedTasks,
-} from '../../models/hiddenCompletedTasks';
+    CANCEL_DELETE_LABEL,
+    CONFIRM_DELETE_LABEL,
+    DELETE_CHAT_LABEL,
+    DELETE_CHAT_WARNING,
+    DELETE_FAILED_TITLE,
+    STILL_RUNNING_REASON,
+    chatMenuLabel,
+} from '../../models/chatDeletion';
 
 const chat = (id: string, name: string, status: PlanStatus): Chat => ({
     id,
@@ -36,17 +38,18 @@ const renderList = (chats: Chat[], props: Record<string, unknown> = {}) =>
             <ChatList
                 chats={chats}
                 onChatSelect={vi.fn()}
+                onChatDelete={vi.fn()}
                 {...props}
             />
         </FluentProvider>,
     );
 
-const hideControl = () => screen.getByRole('button', { name: HIDE_COMPLETED_LABEL });
+/** Open a row's overflow menu the way a mouse does. */
+const openMenuFor = (name: string) => {
+    fireEvent.click(screen.getByRole('button', { name: chatMenuLabel(name) }));
+};
 
-beforeEach(() => {
-    window.sessionStorage.clear();
-    forgetHiddenCompletedTasks();
-});
+const deleteItem = () => screen.getByRole('menuitem', { name: DELETE_CHAT_LABEL });
 
 describe('the chat list', () => {
     it('shows the morning of rehearsals it has been given', () => {
@@ -62,131 +65,267 @@ describe('the chat list', () => {
         expect(screen.getByText(NO_CHATS_MESSAGE)).toBeInTheDocument();
     });
 
-    it('carries no button on the row, because on stage someone will click it', () => {
-        // The live half of the guard: any button a row grows from here has to
-        // earn its name, and this fails when one appears unnamed.
+    it('offers no control that hides a chat instead of deleting it', () => {
+        /*
+          ADR-026 supersedes ADR-022: the hide is gone rather than standing
+          beside the delete. Two controls, one of which quietly leaves the
+          record behind, is the ambiguity the delete label exists to remove.
+
+          The menu is opened before looking. A hide reintroduced where it would
+          now naturally go — beside the delete, as a `MenuItem` — is invisible
+          to a check that only reads the closed row. Found by review.
+        */
         renderList(MORNING);
+        openMenuFor('How do I close the store?');
 
-        const rowButtons = screen
-            .getAllByRole('button')
-            .filter(
-                (button) =>
-                    !button.classList.contains('task-tab') &&
-                    button.closest('.task-tab'),
-            );
-
-        expect(rowButtons).toHaveLength(0);
-    });
-
-    it('carries no `MenuTrigger` the DOM cannot see', () => {
-        // Measured while removing it: on `@fluentui/react-components` 9.64 a
-        // `Menu` with a `MenuTrigger` and no `MenuPopover` renders *nothing* —
-        // the trigger never reaches the DOM. So the dead button this ticket
-        // removes was invisible to the assertion above, and to a screen reader,
-        // and to a click. A DOM guard for it would be inert, which is the
-        // failure #25 already found once; the file itself is the only place the
-        // pattern is visible.
-        const source = readFileSync(
-            join(__dirname, 'ChatList.tsx'),
-            'utf-8',
-        ).replace(/\/\*[\s\S]*?\*\//g, '');
-
-        expect(source).not.toMatch(/<MenuTrigger/);
+        expect(screen.getByRole('menu')).toBeInTheDocument();
+        expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+        expect(
+            screen.queryByRole('menuitem', { name: /hide|archive/i }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /hide|archive/i }),
+        ).not.toBeInTheDocument();
     });
 });
 
-describe('hiding the completed tasks', () => {
-    it('offers a control named for what it does', () => {
-        // ADR-022: it hides, it does not delete, and the label is the whole
-        // reason that is honest rather than a lie the audience cannot check.
+describe('the row‘s overflow menu', () => {
+    /*
+      The inverted guard (#75). ADR-022 removed a `Menu` carrying a
+      `MenuTrigger` and no `MenuPopover`, having measured that on
+      `@fluentui/react-components` 9.64 such a menu renders *nothing* — the
+      trigger never reaches the DOM, so no test, no screen reader and no click
+      could see it. That is why the old check was a source read. The pattern is
+      live now, so every assertion here is against the DOM instead: build the
+      menu wrong and the panel ships an invisible delete with the suite green.
+    */
+
+    it('puts a trigger on the row that the DOM can actually see', () => {
         renderList(MORNING);
-
-        expect(hideControl()).toBeInTheDocument();
-        expect(
-            screen.queryByRole('button', { name: /delete|remove|clear|archive/i }),
-        ).not.toBeInTheDocument();
-    });
-
-    it('hides every currently-completed task from view', () => {
-        renderList(MORNING);
-
-        fireEvent.click(hideControl());
-
-        expect(screen.queryByText('How do I close the store?')).not.toBeInTheDocument();
-        expect(screen.queryByText('The register is frozen')).not.toBeInTheDocument();
-    });
-
-    it('leaves the empty state behind, which is true whether empty or hidden', () => {
-        renderList(MORNING);
-
-        fireEvent.click(hideControl());
-
-        expect(screen.getByText(NO_CHATS_MESSAGE)).toBeInTheDocument();
-    });
-
-    it('holds across a reload in the same tab', () => {
-        const { unmount } = renderList(MORNING);
-        fireEvent.click(hideControl());
-        unmount();
-
-        // What the panel would read on the other side of a refresh.
-        expect(
-            JSON.parse(window.sessionStorage.getItem(HIDDEN_COMPLETED_TASKS_KEY) ?? 'null'),
-        ).toEqual(['chat-1', 'chat-2']);
-
-        renderList(MORNING);
-        expect(screen.queryByText('How do I close the store?')).not.toBeInTheDocument();
-    });
-
-    it('is gone in a fresh tab, which is a fresh demonstration', () => {
-        renderList(MORNING);
-
-        fireEvent.click(hideControl());
-
-        expect(window.localStorage.getItem(HIDDEN_COMPLETED_TASKS_KEY)).toBeNull();
-        expect(window.localStorage.length).toBe(0);
-    });
-
-    it('still shows a task that completes after the clear', () => {
-        // A set of plan ids, not a global flag. "Stay hidden until I unhide" is
-        // a different feature and is deliberately not this one.
-        const { unmount } = renderList(MORNING);
-        fireEvent.click(hideControl());
-        unmount();
-
-        renderList([...MORNING, completed('plan-3', 'How do I swap a shift?')]);
-
-        expect(screen.getByText('How do I swap a shift?')).toBeInTheDocument();
-        expect(screen.queryByText('How do I close the store?')).not.toBeInTheDocument();
-    });
-
-    it('keeps its place in the tab order when there is nothing left to hide', () => {
-        // A natively-disabled control leaves the tab order, so the only
-        // affordance on this panel would vanish for a keyboard user instead of
-        // saying why it cannot be used (#56's finding, same shape).
-        renderList([]);
-
-        expect(hideControl()).toHaveAttribute('aria-disabled', 'true');
-        expect(hideControl()).not.toHaveAttribute('disabled');
-    });
-
-    it('does nothing when there is nothing left to hide', () => {
-        renderList([]);
-
-        fireEvent.click(hideControl());
-
-        expect(window.sessionStorage.getItem(HIDDEN_COMPLETED_TASKS_KEY)).toBeNull();
-    });
-
-    it('is not offered while the list is still loading', () => {
-        // Hiding what has not arrived hides nothing and reads as a broken
-        // control.
-        renderList([], { loading: true });
 
         expect(
-            screen.queryByRole('button', { name: HIDE_COMPLETED_LABEL }),
-        ).not.toBeInTheDocument();
-        expect(screen.queryByText(NO_CHATS_MESSAGE)).not.toBeInTheDocument();
+            screen.getByRole('button', { name: chatMenuLabel('How do I close the store?') }),
+        ).toBeInTheDocument();
+    });
+
+    it('names each row‘s menu after its own chat', () => {
+        // One of these per row. A screen reader offered several identically
+        // named buttons cannot say which conversation it is about to destroy.
+        renderList(MORNING);
+
+        expect(
+            screen.getByRole('button', { name: chatMenuLabel('The register is frozen') }),
+        ).toBeInTheDocument();
+    });
+
+    it('opens from the keyboard, not only from a mouse', () => {
+        // ArrowDown is the menu's own keyboard opener. Enter and Space reach it
+        // through the click a browser synthesises on a focused `button`, which
+        // jsdom does not — so this asserts the path Fluent implements itself
+        // rather than one this environment cannot produce.
+        renderList(MORNING);
+
+        const trigger = screen.getByRole('button', {
+            name: chatMenuLabel('How do I close the store?'),
+        });
+        trigger.focus();
+        fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+
+        expect(deleteItem()).toBeInTheDocument();
+    });
+
+    it('reaches a delete item through a popover that renders', () => {
+        renderList(MORNING);
+
+        openMenuFor('How do I close the store?');
+
+        expect(deleteItem()).toBeInTheDocument();
+    });
+
+    it('does not open the chat when the menu is used', () => {
+        // The trigger sits inside the row, and the row is itself a button.
+        const onChatSelect = vi.fn();
+        renderList(MORNING, { onChatSelect });
+
+        openMenuFor('How do I close the store?');
+
+        expect(onChatSelect).not.toHaveBeenCalled();
+    });
+});
+
+describe('deleting one chat', () => {
+    it('asks before it destroys anything', async () => {
+        const onChatDelete = vi.fn();
+        renderList(MORNING, { onChatDelete });
+
+        openMenuFor('How do I close the store?');
+        fireEvent.click(deleteItem());
+
+        expect(await screen.findByText(DELETE_CHAT_WARNING)).toBeInTheDocument();
+        expect(onChatDelete).not.toHaveBeenCalled();
+    });
+
+    it('names the chat it is about to delete', async () => {
+        // Two rows, one dialog. A confirmation that does not name the
+        // conversation is a confirmation nobody can actually check.
+        renderList(MORNING);
+
+        openMenuFor('The register is frozen');
+        fireEvent.click(deleteItem());
+
+        const dialog = await screen.findByRole('dialog');
+        expect(dialog).toHaveTextContent('The register is frozen');
+    });
+
+    it('deletes the chat the menu was opened on, once confirmed', async () => {
+        const onChatDelete = vi.fn().mockResolvedValue(undefined);
+        renderList(MORNING, { onChatDelete });
+
+        openMenuFor('The register is frozen');
+        fireEvent.click(deleteItem());
+        fireEvent.click(
+            await screen.findByRole('button', { name: CONFIRM_DELETE_LABEL }),
+        );
+
+        await waitFor(() =>
+            expect(onChatDelete).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 'chat-2' }),
+            ),
+        );
+    });
+
+    it('destroys nothing when the confirmation is declined', async () => {
+        const onChatDelete = vi.fn();
+        renderList(MORNING, { onChatDelete });
+
+        openMenuFor('How do I close the store?');
+        fireEvent.click(deleteItem());
+        fireEvent.click(
+            await screen.findByRole('button', { name: CANCEL_DELETE_LABEL }),
+        );
+
+        await waitFor(() =>
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+        );
+        expect(onChatDelete).not.toHaveBeenCalled();
+    });
+
+    it('leaves the confirmation open when the delete fails', async () => {
+        // A dialog that closes on a rejected delete tells the associate the
+        // chat is gone. It is still in Cosmos, and the row is about to come
+        // back on the next load.
+        const onChatDelete = vi.fn().mockRejectedValue(new Error('conflict'));
+        renderList(MORNING, { onChatDelete });
+
+        openMenuFor('How do I close the store?');
+        fireEvent.click(deleteItem());
+        fireEvent.click(
+            await screen.findByRole('button', { name: CONFIRM_DELETE_LABEL }),
+        );
+
+        await waitFor(() => expect(onChatDelete).toHaveBeenCalled());
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('says why the delete failed, where the associate is looking', async () => {
+        /*
+          Found by review. The panel holds a Fluent `useToastController`
+          bound to a `Toaster` this application has never mounted, so a
+          failure thrown to a toast is a failure nobody is told about — a
+          confirmation that stays open with the button apparently doing
+          nothing. The reason belongs in the dialog that is already on screen.
+        */
+        const onChatDelete = vi
+            .fn()
+            .mockRejectedValue(new Error(STILL_RUNNING_REASON));
+        renderList(MORNING, { onChatDelete });
+
+        openMenuFor('How do I close the store?');
+        fireEvent.click(deleteItem());
+        fireEvent.click(
+            await screen.findByRole('button', { name: CONFIRM_DELETE_LABEL }),
+        );
+
+        const said = await screen.findByRole('alert');
+        expect(said).toHaveTextContent(DELETE_FAILED_TITLE);
+        expect(said).toHaveTextContent(STILL_RUNNING_REASON);
+    });
+
+    it('forgets the failure when the confirmation is dismissed', async () => {
+        // Otherwise the next chat's confirmation opens already carrying the
+        // last one's error, which is the dialog reporting a delete that has
+        // not been attempted.
+        const onChatDelete = vi.fn().mockRejectedValue(new Error('conflict'));
+        renderList(MORNING, { onChatDelete });
+
+        openMenuFor('How do I close the store?');
+        fireEvent.click(deleteItem());
+        fireEvent.click(
+            await screen.findByRole('button', { name: CONFIRM_DELETE_LABEL }),
+        );
+        await screen.findByRole('alert');
+        fireEvent.click(screen.getByRole('button', { name: CANCEL_DELETE_LABEL }));
+
+        openMenuFor('The register is frozen');
+        fireEvent.click(deleteItem());
+
+        expect(await screen.findByRole('dialog')).toBeInTheDocument();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+});
+
+describe('a running chat is kept', () => {
+    const RUNNING = chat('chat-running', 'The register is frozen', PlanStatus.IN_PROGRESS);
+
+    it('offers the delete but will not take it', () => {
+        renderList([RUNNING]);
+
+        openMenuFor('The register is frozen');
+
+        expect(deleteItem()).toHaveAttribute('aria-disabled', 'true');
+    });
+
+    it('says why, rather than reading as a control that did not work', () => {
+        // ADR-026's own noted cost: a running Chat cannot be deleted, so the
+        // surface has to explain when it keeps one.
+        renderList([RUNNING]);
+
+        openMenuFor('The register is frozen');
+
+        expect(screen.getByText(STILL_RUNNING_REASON)).toBeInTheDocument();
+    });
+
+    it('keeps its place in the tab order while it refuses', () => {
+        // A natively-disabled control leaves the tab order, so a keyboard user
+        // would find the reason missing rather than read it (#56's finding).
+        renderList([RUNNING]);
+
+        openMenuFor('The register is frozen');
+
+        expect(deleteItem()).not.toHaveAttribute('disabled');
+    });
+
+    it('asks nothing and deletes nothing when the item is activated anyway', async () => {
+        const onChatDelete = vi.fn();
+        renderList([RUNNING], { onChatDelete });
+
+        openMenuFor('The register is frozen');
+        fireEvent.click(deleteItem());
+
+        await waitFor(() =>
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+        );
+        expect(onChatDelete).not.toHaveBeenCalled();
+    });
+
+    it('is not offered a delete no state can be read from', () => {
+        // Fail-closed: a status this build does not know is a chat something
+        // may still be happening to.
+        renderList([{ ...RUNNING, status: 'archived' as PlanStatus }]);
+
+        openMenuFor('The register is frozen');
+
+        expect(deleteItem()).toHaveAttribute('aria-disabled', 'true');
     });
 });
 
@@ -196,6 +335,10 @@ describe('the list holds chats in every state', () => {
     const RUNNING = chat('chat-running', 'The register is frozen', PlanStatus.IN_PROGRESS);
     const FAILED = chat('chat-failed', 'How do I swap a shift?', PlanStatus.FAILED);
     const DONE = completed('chat-done', 'How do I close the store?');
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
     it('shows a chat that is still running', () => {
         renderList([RUNNING]);
@@ -212,49 +355,27 @@ describe('the list holds chats in every state', () => {
     it('states each row‘s state, so a broken chat need not be opened to find out', () => {
         renderList([RUNNING, FAILED, DONE]);
 
-        const stateOf = (name: string | RegExp) =>
+        // Anchored: the row's accessible name begins with the chat's name,
+        // while its menu trigger's is *"More options for …"*.
+        const stateOf = (name: RegExp) =>
             screen.getByRole('button', { name }).textContent ?? '';
 
-        expect(stateOf(/register is frozen/)).toContain(
+        expect(stateOf(/^The register is frozen/)).toContain(
             chatStateLabel(PlanStatus.IN_PROGRESS),
         );
-        expect(stateOf(/swap a shift/)).toContain(chatStateLabel(PlanStatus.FAILED));
-        expect(stateOf(/close the store/)).toContain(
+        expect(stateOf(/^How do I swap a shift\?/)).toContain(
+            chatStateLabel(PlanStatus.FAILED),
+        );
+        expect(stateOf(/^How do I close the store\?/)).toContain(
             chatStateLabel(PlanStatus.COMPLETED),
         );
     });
 
-    it('hides only the completed chats, because that is what the control says', () => {
-        // ADR-022's label is *"Hide completed tasks"*. With every state listed,
-        // hiding whatever the list happens to hold would take a running chat
-        // with it — the control claiming an action it was not given.
-        renderList([RUNNING, DONE]);
+    it('lets the rehearsal debris go, which is why deletion followed #74', () => {
+        renderList([FAILED]);
 
-        fireEvent.click(hideControl());
+        openMenuFor('How do I swap a shift?');
 
-        expect(screen.getByText('The register is frozen')).toBeInTheDocument();
-        expect(screen.queryByText('How do I close the store?')).not.toBeInTheDocument();
-    });
-
-    it('shows a hidden chat again the moment it is running', () => {
-        // The hide is scoped to completed chats, and a chat's id is its
-        // `session_id` while its state is its latest plan's (#71). A chat
-        // hidden while finished and then resumed is a *running* chat, and a
-        // control named for completed ones may not still be suppressing it —
-        // the same rule as ADR-022's "a task that completes after the clear
-        // still appears", read from the other side.
-        const { unmount } = renderList([DONE]);
-        fireEvent.click(hideControl());
-        unmount();
-
-        renderList([{ ...DONE, status: PlanStatus.IN_PROGRESS }]);
-
-        expect(screen.getByText('How do I close the store?')).toBeInTheDocument();
-    });
-
-    it('says there is nothing to hide when nothing has finished', () => {
-        renderList([RUNNING]);
-
-        expect(hideControl()).toHaveAttribute('aria-disabled', 'true');
+        expect(deleteItem()).not.toHaveAttribute('aria-disabled', 'true');
     });
 });

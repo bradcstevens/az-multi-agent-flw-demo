@@ -36,6 +36,15 @@ export interface ChatListProps {
     /** Every chat, in every state (#74) — the panel filters nothing out. */
     chats: Chat[];
     onChatSelect: (chatId: string) => void;
+    /**
+     * Delete this chat — the whole Chat, not the plan its row opens (ADR-026).
+     *
+     * Takes the row rather than an id: the confirmation names the chat, and
+     * the panel that performs the request has to know whether the chat it just
+     * destroyed is the one on screen. Rejecting means the chat is still there,
+     * and the list leaves its confirmation standing when it does.
+     */
+    onChatDelete: (chat: Chat) => Promise<void> | void;
     loading?: boolean;
     selectedChatId?: string;
     isLoadingTeam?: boolean;

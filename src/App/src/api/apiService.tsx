@@ -14,12 +14,16 @@ import {
     AgentMessageResponse
 } from '../models';
 import { SessionState } from '../models/sessionState';
+import { ChatDeletionResponse } from '../models/chatDeletion';
 
 // Constants for endpoints
 const API_ENDPOINTS = {
     PROCESS_REQUEST: '/v4/process_request',
     PLANS: '/v4/plans',
     PLAN: '/v4/plan',
+    // Chat deletion is session-scoped (ADR-026): the path carries a
+    // `session_id`, never the plan id a row opens with.
+    CHATS: '/v4/chats',
     PLAN_APPROVAL: '/v4/plan_approval',
     HUMAN_CLARIFICATION: '/v4/user_clarification',
     USER_BROWSER_LANGUAGE: '/user_browser_language',
@@ -179,6 +183,29 @@ export class APIService {
         }
 
         return fetcher();
+    }
+
+    /**
+     * **Chat deletion** — the whole Chat, by its session (#75, ADR-026).
+     *
+     * Deletes every document in that Chat's session partition: its plans,
+     * their steps, the transcript, `m_plan`, the **Troubleshooting record**,
+     * the **Simulated ticket** and the **Session state**. The route scopes it
+     * to the associate's own `user_id` and refuses while the Chat is running,
+     * so a rejection here means the conversation is still in Cosmos and the
+     * surface must go on saying so.
+     *
+     * The plans cache is invalidated rather than trimmed: the panel re-reads
+     * the history, and a cached list is the one way a deleted row comes back.
+     *
+     * @param sessionId The Chat's `session_id` — never the plan id a row opens.
+     */
+    async deleteChat(sessionId: string): Promise<ChatDeletionResponse> {
+        const deleted = await apiClient.delete<ChatDeletionResponse>(
+            `${API_ENDPOINTS.CHATS}/${encodeURIComponent(sessionId)}`
+        );
+        this._cache.invalidate(new RegExp(`^plans_`));
+        return deleted;
     }
 
     /**

@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional, Type
 
 from models.plan_models import MPlan
 
+from chat.deletion import ChatDeletion
+
 from ..models.messages import (
     AgentMessageData,
     BaseDataModel,
@@ -204,6 +206,16 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def delete_plan_by_plan_id(self, plan_id: str) -> bool:
         """Delete a plan by plan_id and return True if deleted."""
+        pass
+
+    @abstractmethod
+    async def delete_chat(self, session_id: str) -> ChatDeletion:
+        """Delete one Chat: every document in its session partition (ADR-026).
+
+        Scoped to the client's own ``user_id``, refused while the Chat is
+        running, and reporting what it actually took. Distinct from
+        ``delete_plan_by_plan_id`` above, which is none of those three.
+        """
         pass
 
     @abstractmethod

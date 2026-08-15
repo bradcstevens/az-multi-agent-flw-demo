@@ -1,67 +1,91 @@
 import {
   Button,
   Caption1,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   Skeleton,
   SkeletonItem,
 } from "@fluentui/react-components";
-import { EyeOff20Regular } from "@fluentui/react-icons";
+import { Delete20Regular, MoreHorizontal20Regular } from "@fluentui/react-icons";
 import React from "react";
 import "../../styles/ChatList.css";
 import { Chat, ChatListProps } from "@/models";
-import { PlanStatus } from "../../models/enums";
 import { NO_CHATS_MESSAGE, chatStateLabel } from "../../models/chatState";
+import {
+  CANCEL_DELETE_LABEL,
+  CONFIRM_DELETE_LABEL,
+  DELETE_CHAT_LABEL,
+  DELETE_CHAT_TITLE,
+  DELETE_CHAT_WARNING,
+  DELETE_FAILED_TITLE,
+  STILL_RUNNING_REASON,
+  canDeleteChat,
+  chatMenuLabel,
+} from "../../models/chatDeletion";
 import {
   Accordion,
   AccordionHeader,
   AccordionItem,
   AccordionPanel,
 } from "@fluentui/react-components";
-import {
-  HIDE_COMPLETED_LABEL,
-  hideCompletedTasks,
-} from "../../models/hiddenCompletedTasks";
-import useHiddenCompletedTasks from "../../hooks/useHiddenCompletedTasks";
 
 const ChatList: React.FC<ChatListProps> = ({
   chats,
   onChatSelect,
+  onChatDelete,
   loading,
   selectedChatId,
   isLoadingTeam
 }) => {
-  const hidden = useHiddenCompletedTasks();
   const isLoading = Boolean(loading || isLoadingTeam);
-  const visibleChats = React.useMemo(
-    /*
-      Only a completed chat can be hidden. The hide is a set of `session_id`s
-      (ADR-022) while a chat's state is its latest plan's (#71), so a chat
-      hidden while finished and then resumed is a *running* chat that a control
-      named for completed ones would still be suppressing. ADR-022's own rule,
-      read from the other side: a task that completes after the clear still
-      appears.
-    */
-    () =>
-      chats.filter(
-        (chat) =>
-          chat.status !== PlanStatus.COMPLETED || !hidden.has(chat.id)
-      ),
-    [chats, hidden]
-  );
   /*
-    What the hide control is allowed to take (#74). Its label is *"Hide
-    completed tasks"* (ADR-022), and the list now holds chats in every state —
-    handing it whatever the list happens to contain would take a running chat
-    with it, which is the control claiming an action nobody gave it.
+    Which chat the confirmation is about, or none. One dialog for the whole
+    list rather than one per row: the confirmation names the chat it holds, so
+    a second one would be a second place for that name to come from.
   */
-  const hideable = React.useMemo(
-    () =>
-      visibleChats.filter((chat) => chat.status === PlanStatus.COMPLETED),
-    [visibleChats]
-  );
+  const [confirming, setConfirming] = React.useState<Chat | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
+  const [failure, setFailure] = React.useState<string | null>(null);
+
+  const confirmDelete = React.useCallback(async () => {
+    if (!confirming) return;
+
+    setDeleting(true);
+    setFailure(null);
+    try {
+      await onChatDelete(confirming);
+      setConfirming(null);
+    } catch (error) {
+      /*
+        The chat is still there. Closing on a rejected delete would tell the
+        associate it is gone and leave the row to reappear on the next load, so
+        the dialog stays open and says so.
+
+        Said *here*, in the dialog the associate is already looking at, rather
+        than thrown to a toast: the panel holds a Fluent `useToastController`
+        whose `Toaster` this application has never mounted, so a message sent
+        that way is a message nobody receives. Found by review.
+      */
+      setFailure(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDeleting(false);
+    }
+  }, [confirming, onChatDelete]);
 
   const renderChatRow = (chat: Chat) => {
     const isActive = chat.id === selectedChatId;
     const state = chatStateLabel(chat.status);
+    const deletable = canDeleteChat(chat.status);
+    const reasonId = `chat-delete-reason-${chat.id}`;
 
     return (
       <div
@@ -98,17 +122,64 @@ const ChatList: React.FC<ChatListProps> = ({
           </div>
         </div>
         {/*
-          No row menu. This row used to carry a Fluent `Menu` with a
-          `MenuTrigger` and no `MenuPopover` at all, whose `onClick` called
-          `stopPropagation` and nothing else (#66). Measured while removing it:
-          on `@fluentui/react-components` 9.64 a `Menu` with one child renders
-          *nothing* — the trigger never reaches the DOM — so the row has been
-          carrying an icon button that no test and no screen reader could see,
-          and no browser could click. Dead twice over, which is why
-          `ChatList.test` guards it by reading this file rather than the DOM.
-          Clearing is list-level because the need is list-level, so nothing
-          belongs here.
+          The row's menu, popover included (#75). ADR-022 removed a `Menu`
+          carrying a `MenuTrigger` and no `MenuPopover` after measuring that on
+          `@fluentui/react-components` 9.64 such a menu renders *nothing* — the
+          trigger never reaches the DOM, so no test, no screen reader and no
+          click could see it. Rebuilding the control means building the popover
+          too, and `ChatList.test` asserts it through the DOM rather than by
+          reading this file.
+
+          The click is stopped here: this row is itself a button, and reaching
+          for the menu must not open the chat underneath it.
         */}
+        <div
+          className="task-menu"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Menu>
+            <MenuTrigger disableButtonEnhancement>
+              <Button
+                appearance="subtle"
+                size="small"
+                icon={<MoreHorizontal20Regular />}
+                className="task-menu-button"
+                aria-label={chatMenuLabel(chat.name)}
+              />
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem
+                  icon={<Delete20Regular />}
+                  /*
+                    `disabledFocusable` beside `disabled`, not instead of it:
+                    `disabled` is what puts `aria-disabled` on the item, and
+                    `disabledFocusable` is what keeps it in the tab order — a
+                    natively-disabled item leaves it, so a keyboard user would
+                    find the reason below missing rather than read it.
+                  */
+                  disabled={!deletable}
+                  disabledFocusable={!deletable}
+                  aria-describedby={deletable ? undefined : reasonId}
+                  onClick={() => deletable && setConfirming(chat)}
+                >
+                  {DELETE_CHAT_LABEL}
+                </MenuItem>
+                {!deletable && (
+                  /*
+                    ADR-026's own noted cost: a running Chat cannot be deleted,
+                    so the surface has to explain when it keeps one rather than
+                    leave a control that reads as broken.
+                  */
+                  <Caption1 id={reasonId} className="task-menu-reason">
+                    {STILL_RUNNING_REASON}
+                  </Caption1>
+                )}
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+        </div>
       </div>
     );
   };
@@ -128,64 +199,26 @@ const ChatList: React.FC<ChatListProps> = ({
       <Accordion defaultOpenItems="1" collapsible>
         <AccordionItem value="1">
           {/*
-            The hide control is a sibling of the accordion's own toggle rather
-            than a child of it: `AccordionHeader` renders its children *inside*
-            a button, and a button inside a button is not markup a screen
-            reader can offer as two things to do.
+            Not "Completed" any more: the list holds chats in every state
+            (#74), and a heading naming one of them would be false above the
+            other five.
           */}
-          <div className="task-list-completed-header">
-            {/*
-              Not "Completed" any more: the list holds chats in every state
-              (#74), and a heading naming one of them would be false above the
-              other five.
-            */}
-            <AccordionHeader expandIconPosition="end">
-              Chats
-            </AccordionHeader>
-            {!isLoading && (
-              <Button
-                appearance="subtle"
-                size="small"
-                icon={<EyeOff20Regular />}
-                className="task-list-hide-completed"
-                /*
-                  It hides; it never deletes (ADR-022). Every plan stays in
-                  Cosmos — which is what the intermittency work behind #47 and
-                  #54 read — so a label saying *delete* would be the surface
-                  saying something that is not so.
-                */
-                aria-label={HIDE_COMPLETED_LABEL}
-                title={
-                  hideable.length
-                    ? HIDE_COMPLETED_LABEL
-                    : "Nothing left to hide"
-                }
-                /*
-                  `disabledFocusable`, not `disabled`: a natively-disabled
-                  control leaves the tab order, so the panel's only affordance
-                  would disappear for a keyboard user rather than say why it
-                  cannot be used.
-                */
-                disabledFocusable={!hideable.length}
-                onClick={() =>
-                  hideCompletedTasks(hideable.map((chat) => chat.id))
-                }
-              />
-            )}
-          </div>
+          <AccordionHeader expandIconPosition="end">
+            Chats
+          </AccordionHeader>
           <AccordionPanel>
             {isLoading
               ? Array.from({ length: 5 }, (_, i) =>
-                renderSkeleton(`completed-${i}`)
+                renderSkeleton(`chat-${i}`)
               )
-              : visibleChats.length
-                ? visibleChats.map(renderChatRow)
+              : chats.length
+                ? chats.map(renderChatRow)
                 : (
                   /*
-                    True whether the list is empty or merely hidden. A bare
-                    "No chats" stops being true the moment a clear hides some,
-                    and would have the panel claiming the records are gone when
-                    they are not.
+                    Plainly (#75). ADR-022's hedged "to show" guarded a list
+                    that could merely be hidden; ADR-026 deletes chats instead,
+                    so there is no state left in which the hedge is what makes
+                    the sentence true.
                   */
                   <Caption1 className="task-list-empty">
                     {NO_CHATS_MESSAGE}
@@ -195,6 +228,60 @@ const ChatList: React.FC<ChatListProps> = ({
         </AccordionItem>
 
       </Accordion>
+
+      <Dialog
+        open={confirming !== null}
+        onOpenChange={(_, data) => {
+          if (data.open || deleting) return;
+          setConfirming(null);
+          setFailure(null);
+        }}
+      >
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{DELETE_CHAT_TITLE}</DialogTitle>
+            <DialogContent>
+              {/*
+                The chat is named here. Every row shares one dialog, and a
+                confirmation that does not say which conversation it is about
+                is a confirmation nobody can check.
+              */}
+              <div className="task-delete-name">{confirming?.name}</div>
+              <div>{DELETE_CHAT_WARNING}</div>
+              {failure !== null && (
+                /*
+                  What went wrong, where the associate asked. `role="alert"`
+                  because the dialog does not move and nothing else changes:
+                  without it a refusal is a button that appeared to do nothing.
+                */
+                <div className="task-delete-failure" role="alert">
+                  <strong>{DELETE_FAILED_TITLE}</strong>
+                  <div>{failure}</div>
+                </div>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button
+                appearance="secondary"
+                disabled={deleting}
+                onClick={() => {
+                  setConfirming(null);
+                  setFailure(null);
+                }}
+              >
+                {CANCEL_DELETE_LABEL}
+              </Button>
+              <Button
+                appearance="primary"
+                disabled={deleting}
+                onClick={confirmDelete}
+              >
+                {CONFIRM_DELETE_LABEL}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   );
 };

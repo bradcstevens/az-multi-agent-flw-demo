@@ -140,6 +140,47 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
     [chats, navigate, onNavigationWithAlert]
   );
 
+  const handleChatDelete = useCallback(
+    async (chat: Chat) => {
+      /*
+        **Chat deletion** (#75, ADR-026). What goes is the chat's `session_id`
+        — the whole conversation and everything in its partition — never the
+        plan id the row carries to open with, which would take one turn and
+        leave the rest of the chat in Cosmos.
+
+        Rethrows on failure, and deliberately says nothing itself: a refused
+        delete (a running chat, or a sweep that could not finish) means the
+        conversation is still there, and `ChatList` keeps its confirmation
+        standing and reports the reason in the dialog the associate is already
+        looking at.
+      */
+      await apiService.deleteChat(chat.id);
+
+      /*
+        The row goes here rather than only on the next read. `loadPlansData`
+        swallows its own failure into `plansError`, so a refresh that did not
+        arrive would leave a deleted chat sitting in the panel with its
+        confirmation already closed — the surface saying a conversation is
+        gone and listing it anyway. Found by review.
+      */
+      setPlans((current) =>
+        current ? current.filter((plan) => plan.session_id !== chat.id) : current
+      );
+
+      /*
+        The page is rendering a plan that no longer exists. Leaving the
+        presenter looking at the transcript of a conversation the surface has
+        just said is gone is the panel contradicting itself.
+      */
+      if (chat.id === selectedChatId) {
+        navigate("/");
+      }
+
+      await loadPlansData(true);
+    },
+    [loadPlansData, navigate, selectedChatId]
+  );
+
   const handleLogoClick = useCallback(() => {
     const performNavigation = () => {
       navigate("/");
@@ -194,6 +235,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
         <ChatList
           chats={chats}
           onChatSelect={handleChatSelect}
+          onChatDelete={handleChatDelete}
           loading={plansLoading}
           selectedChatId={selectedChatId ?? undefined}
           isLoadingTeam={isLoadingTeam}

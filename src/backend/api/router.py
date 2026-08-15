@@ -20,6 +20,7 @@ from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
                      Request, UploadFile, WebSocket, WebSocketDisconnect)
 from associate.answer import personal_answer_detail
 from associate.records import DEMO_ASSOCIATE, lookup_associate
+from chat.deletion import STILL_RUNNING_DETAIL, DeletionOutcome
 from guardrail.gate import identity_boundary_gate
 from guardrail.identity import ANONYMOUS
 from guardrail.refusal import policy_block_detail
@@ -2121,6 +2122,77 @@ async def get_plans(request: Request):
     )
 
     return all_plans
+
+
+@app_router.delete("/chats/{session_id}")
+async def delete_chat(session_id: str, request: Request):
+    """
+    Delete one Chat — every document in its session partition.
+
+    ---
+    tags:
+      - Chats
+
+    #75 / ADR-026. **Chat deletion**, not plan deletion: a Chat is a Session
+    and everything the conversation produced lives in that session's partition
+    — its plans, their steps, the transcript, ``m_plan``, the **Troubleshooting
+    record**, the **Simulated ticket** and the **Session state**.
+    ``delete_plan_by_plan_id`` is deliberately not reached from here; it takes
+    one document, is not scoped by ``user_id``, and reports success whatever
+    happened.
+
+    The route reports what the store actually managed. A running Chat is
+    refused with the reason the surface shows, a chat that is not this user's
+    is simply not found, and a sweep that left documents behind is a failure
+    rather than a success with a smaller number in it.
+    """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        track_event_if_configured(
+            "Error_User_Not_Found", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    # The store is built for this user, and its `user_id` predicate is the whole
+    # of the authorization — a session id is not a secret.
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    result = await memory_store.delete_chat(session_id=session_id)
+
+    if result.outcome in (DeletionOutcome.no_such_chat, DeletionOutcome.not_yours):
+        # One answer for "no such chat" and "not yours" alike: distinguishing
+        # them tells a caller something about somebody else's chat. The store
+        # logs which of the two it was.
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    if result.outcome is DeletionOutcome.still_running:
+        raise HTTPException(status_code=409, detail=STILL_RUNNING_DETAIL)
+
+    if result.outcome is DeletionOutcome.incomplete:
+        logger.error(
+            "Chat %s was only partly deleted: %s documents went, %s did not",
+            session_id,
+            result.deleted,
+            result.failed,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Deleted {result.deleted} of {result.deleted + result.failed} "
+                "documents; this chat is still partly in the record."
+            ),
+        )
+
+    track_event_if_configured(
+        "Chat_Deleted",
+        {"status": "success", "session_id": session_id, "user_id": user_id},
+    )
+
+    return {
+        "status": "deleted",
+        "session_id": session_id,
+        "documents_deleted": result.deleted,
+    }
 
 
 # Get plans is called in the initial side rendering of the frontend

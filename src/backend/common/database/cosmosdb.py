@@ -8,6 +8,8 @@ from models.plan_models import MPlan
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos.aio._database import DatabaseProxy
 
+from chat.deletion import ChatDeletion, DeletionOutcome, is_running
+
 from ..models.messages import (
     AgentMessage,
     AgentMessageData,
@@ -467,7 +469,16 @@ class CosmosDBClient(DatabaseBase):
         await self.update_item(current_team)
 
     async def delete_plan_by_plan_id(self, plan_id: str) -> bool:
-        """Delete a plan by its ID."""
+        """Delete a plan by its ID.
+
+        **Not Chat deletion** (ADR-026). It takes one plan document, carries no
+        ``user_id`` predicate and returns ``True`` whatever happened, so
+        routing it as the surface's delete control would leave the transcript
+        and the session-scoped records behind and let a caller who knows an id
+        reach another user's chat. It keeps its single caller — the
+        human-feedback rejection path — and ``delete_chat`` is the operation
+        the panel is wired to.
+        """
         query = "SELECT c.id, c.session_id FROM c WHERE c.id=@plan_id "
 
         params = [
@@ -487,6 +498,110 @@ class CosmosDBClient(DatabaseBase):
                     )
 
         return True
+
+    async def delete_chat(self, session_id: str) -> ChatDeletion:
+        """**Chat deletion** — every document in one Chat's session partition.
+
+        #75 / ADR-026. A Chat is a Session (ADR-025) and everything the
+        conversation produced is written into that session's partition: its
+        plans, their steps, the transcript, ``m_plan``, the **Troubleshooting
+        record**, the **Simulated ticket** and the **Session state**. Deleting
+        the plan alone would leave the conversation behind under a control that
+        promised to remove it, so the sweep is the partition's and is
+        deliberately not narrowed by ``data_type``.
+
+        Two things stand between a session id and that sweep, and both are
+        here rather than at the route, so no second caller can forget them:
+
+        * **Ownership.** The Chat is read back by its session *and* this
+          client's ``user_id``, and then the partition itself is checked for a
+          record belonging to somebody else before anything is deleted.
+          Nothing else authorizes the delete — a session id is not a secret,
+          and ``process_request`` takes one from the caller.
+        * **A running Chat is kept.** The state is the chat's **latest** plan's
+          (#71), which the newest-first read puts first, and ``is_running`` is
+          fail-closed about statuses it does not know.
+
+        Both reads go to the container directly rather than through
+        ``query_items``, which is a decision and not a shortcut: that helper
+        drops documents it cannot validate into a model and turns a Cosmos
+        failure into an empty list. Here either would defeat the rule above —
+        an unreadable newest plan would promote an older settled one, and an
+        outage would report a live chat as no chat at all.
+
+        Reports what actually happened. A sweep that could not take every
+        document comes back ``incomplete``, because a half-deleted chat is
+        still in Cosmos.
+        """
+        await self._ensure_initialized()
+
+        # Newest first: a Chat's state is its latest plan's, and this read is
+        # also the first half of the ownership check — a session that yields no
+        # plan of this user's is, to this caller, no chat at all.
+        latest = self.container.query_items(
+            query=(
+                "SELECT TOP 1 c.overall_status FROM c "
+                "WHERE c.session_id=@session_id AND c.data_type=@data_type "
+                "AND c.user_id=@user_id ORDER BY c._ts DESC"
+            ),
+            parameters=[
+                {"name": "@session_id", "value": session_id},
+                {"name": "@data_type", "value": DataType.plan},
+                {"name": "@user_id", "value": self.user_id},
+            ],
+        )
+
+        status: Any = None
+        found = False
+        async for row in latest:
+            status = row.get("overall_status")
+            found = True
+            break
+
+        if not found:
+            return ChatDeletion(DeletionOutcome.no_such_chat)
+
+        if is_running(status):
+            return ChatDeletion(DeletionOutcome.still_running)
+
+        # The partition is enumerated in full before a single delete. Owning
+        # one plan in a session does not make the session's every document
+        # yours, and discovering that halfway through the sweep would leave a
+        # chat neither deleted nor intact.
+        documents = self.container.query_items(
+            query="SELECT c.id, c.user_id FROM c WHERE c.session_id=@session_id",
+            parameters=[{"name": "@session_id", "value": session_id}],
+        )
+
+        doomed = []
+        async for doc in documents:
+            owner = doc.get("user_id")
+            # `None` is not somebody else. The Session state, the
+            # Troubleshooting record and the Simulated ticket are written
+            # against the session rather than against a user.
+            if owner is not None and owner != self.user_id:
+                self.logger.warning(
+                    "Refusing to delete session %s: it holds another user's record",
+                    session_id,
+                )
+                return ChatDeletion(DeletionOutcome.not_yours)
+            doomed.append(doc["id"])
+
+        deleted = 0
+        failed = 0
+        for document_id in doomed:
+            try:
+                await self.container.delete_item(
+                    document_id, partition_key=session_id
+                )
+                deleted += 1
+            except Exception as e:
+                failed += 1
+                self.logger.warning(
+                    "Failed deleting chat document %s: %s", document_id, e
+                )
+
+        return ChatDeletion.swept(deleted=deleted, failed=failed)
 
     async def add_mplan(self, mplan: MPlan) -> None:
         """Add a team configuration to the database."""

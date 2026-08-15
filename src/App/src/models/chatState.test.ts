@@ -43,9 +43,12 @@ describe('what the list says when it is empty', () => {
         expect(NO_CHATS_MESSAGE.toLowerCase()).not.toContain('completed');
     });
 
-    it('says "to show", because a hidden chat is not a deleted one', () => {
-        // ADR-022's reason, kept: every plan stays in Cosmos, so a bare "No
-        // chats" would have the panel claiming the records are gone.
-        expect(NO_CHATS_MESSAGE).toMatch(/to show$/);
+    it('says plainly that there are none, because nothing is merely hidden now', () => {
+        // ADR-022's *"to show"* was load-bearing while the list could be
+        // hidden: a bare "No chats" would have claimed the records were gone
+        // when every plan was still in Cosmos. ADR-026 deletes them instead, so
+        // the hedge is no longer true of anything and the panel says the plain
+        // thing (#75).
+        expect(NO_CHATS_MESSAGE).toBe('No chats yet');
     });
 });

@@ -168,10 +168,9 @@ filter hid: a chat mid-escalation is `in_progress`, because a Chat's state is it
 Each row therefore states its own state, in `chatStateLabel`'s words
 (`src/App/src/models/chatState.ts`), which is total — a status the backend adds later reaches the
 panel as itself rather than as a blank row. `failed` and `canceled` chats are listed too, which
-makes rehearsal debris visible and is why **Chat deletion** follows. The hide control (ADR-022) is
-scoped to the completed rows alone: a control saying *"Hide completed tasks"* may not take a
-running chat with it.
-_Avoid_: plan history, task history
+makes rehearsal debris visible and is why **Chat deletion** follows. Each row carries an overflow
+menu whose one item is that deletion (#75, ADR-026); the hide control it replaced is gone.
+_Avoid_: plan history, task history, hide completed tasks
 
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
 **retrieval miss** — an honest "that procedure is not in the library" — because conflating the two
@@ -1016,6 +1015,22 @@ ticket**, and **Session state** — scoped to its `user_id`, so one associate ca
 chat. `delete_plan_by_plan_id` remains the human-feedback rejection path's single-purpose
 primitive; it neither owns nor authorizes Chat deletion. The accepted cost is that a rehearsal can
 destroy the diagnosis trail that #47, #54, #61, and #62 used.
+
+Built in #75. The rule of *which* chats may go is pure and lives in `src/backend/chat/deletion.py`
+— a chat is deletable once its latest plan is `completed`, `failed` or `canceled`, and **any other
+answer, including none, means running**, because offering a delete the route will refuse is the
+surface claiming an action it does not have. `CosmosDBClient.delete_chat` reads that status **raw**
+rather than through `Plan` — the shared `query_items` helper drops documents it cannot validate and
+turns a Cosmos failure into an empty list, either of which would defeat the rule above — proves
+ownership twice (a plan of this user's, and no other user's record anywhere in the partition), and
+counts what actually went: `DELETE /api/v4/chats/{session_id}` answers **404** for no such chat or
+somebody else's, **409** for a running one, **500** when the sweep could not take everything, and
+**200** with the number of documents removed — never success unconditionally. The row's half is
+`src/App/src/models/chatDeletion.ts`, and the two copies of the settled-status rule are held
+together by `src/tests/ci/test_chat_deletion_contract.py`. The refusal is said in one sentence,
+shared: the menu's reason and the 409's detail are the same string, and a refused delete is
+reported in the confirmation dialog itself rather than through a Fluent `Toaster` this application
+has never mounted.
 _Avoid_: hidden completed tasks, delete plan, clear history, archive
 
 ## Licensing and capacity

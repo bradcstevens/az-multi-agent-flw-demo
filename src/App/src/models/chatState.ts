@@ -54,10 +54,11 @@ export const chatStateLabel = (status?: string): string => {
 /**
  * What the list says when there is nothing in it.
  *
- * Chats, not completed tasks: the list is no longer a completed-only list.
- * *"to show"* is kept from ADR-022 and load-bearing for the same reason — a
- * bare "No chats" becomes false the moment a hide takes some out of view, and
- * the panel would be claiming the records are gone when every plan is still in
- * Cosmos.
+ * Plainly (#75). ADR-022's hedged *"to show"* was load-bearing while the panel
+ * could merely hide chats — a bare "No chats" would have claimed the records
+ * were gone when every plan was still in Cosmos. ADR-026 deletes them instead,
+ * so there is no longer a state in which the hedge is what makes the sentence
+ * true, and a hedge that guards nothing is just a sentence saying less than it
+ * knows.
  */
-export const NO_CHATS_MESSAGE = 'No chats to show';
+export const NO_CHATS_MESSAGE = 'No chats yet';

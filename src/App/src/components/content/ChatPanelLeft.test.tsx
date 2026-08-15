@@ -5,7 +5,10 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 
 vi.mock('@/api', () => ({
-    apiService: { getPlans: vi.fn().mockResolvedValue([]) },
+    apiService: {
+        getPlans: vi.fn().mockResolvedValue([]),
+        deleteChat: vi.fn().mockResolvedValue({ status: 'deleted' }),
+    },
 }));
 
 import ChatPanelLeft from './ChatPanelLeft';
@@ -13,7 +16,11 @@ import appReducer from '../../store/slices/appSlice';
 import { ASSISTANT_NAME } from '../../models/storeSurface';
 import { apiService } from '@/api';
 import { PlanStatus } from '../../models/enums';
-import { forgetHiddenCompletedTasks } from '../../models/hiddenCompletedTasks';
+import {
+    CONFIRM_DELETE_LABEL,
+    DELETE_CHAT_LABEL,
+    chatMenuLabel,
+} from '../../models/chatDeletion';
 import type { Plan } from '../../models';
 
 const renderPanel = (props: Record<string, unknown> = {}) =>
@@ -109,8 +116,6 @@ const renderPanelAt = (path: string) =>
 describe('one chat is one row', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        window.sessionStorage.clear();
-        forgetHiddenCompletedTasks();
         vi.mocked(apiService.getPlans).mockResolvedValue([
             TROUBLESHOOTING,
             ESCALATION,
@@ -126,7 +131,7 @@ describe('one chat is one row', () => {
         renderPanelAt('/chat/plan-troubleshooting');
 
         expect(
-            await screen.findByRole('button', { name: /coffee machine/i }),
+            await screen.findByRole('button', { name: /^The coffee machine/ }),
         ).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /can't fix it/i })).not.toBeInTheDocument();
         expect(
@@ -139,7 +144,7 @@ describe('one chat is one row', () => {
     it('opens the chat where the conversation got to, so the escalation is reachable', async () => {
         renderPanelAt('/chat/plan-troubleshooting');
 
-        fireEvent.click(await screen.findByRole('button', { name: /coffee machine/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^The coffee machine/ }));
 
         await waitFor(() =>
             expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation'),
@@ -149,14 +154,14 @@ describe('one chat is one row', () => {
     it('highlights the chat that is open, escalation included', async () => {
         renderPanelAt('/chat/plan-escalation');
 
-        const row = await screen.findByRole('button', { name: /coffee machine/i });
+        const row = await screen.findByRole('button', { name: /^The coffee machine/ });
         expect(row).toHaveClass('active');
     });
 
     it('highlights nothing when the open plan belongs to another chat', async () => {
         renderPanelAt('/chat/plan-somewhere-else');
 
-        const row = await screen.findByRole('button', { name: /coffee machine/i });
+        const row = await screen.findByRole('button', { name: /^The coffee machine/ });
         expect(row).not.toHaveClass('active');
     });
 });
@@ -183,8 +188,6 @@ describe('the panel shows chats in every state', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        window.sessionStorage.clear();
-        forgetHiddenCompletedTasks();
         vi.mocked(apiService.getPlans).mockResolvedValue([
             TROUBLESHOOTING,
             RUNNING_ESCALATION,
@@ -196,7 +199,7 @@ describe('the panel shows chats in every state', () => {
         renderPanelAt('/chat/plan-troubleshooting');
 
         expect(
-            await screen.findByRole('button', { name: /coffee machine/i }),
+            await screen.findByRole('button', { name: /^The coffee machine/ }),
         ).toBeInTheDocument();
     });
 
@@ -204,17 +207,157 @@ describe('the panel shows chats in every state', () => {
         renderPanelAt('/chat/plan-troubleshooting');
 
         expect(
-            await screen.findByRole('button', { name: /swap a shift/i }),
+            await screen.findByRole('button', { name: /^How do I swap a shift/ }),
         ).toBeInTheDocument();
     });
 
     it('opens a chat that has not finished at the turn it got to', async () => {
         renderPanelAt('/chat/plan-troubleshooting');
 
-        fireEvent.click(await screen.findByRole('button', { name: /coffee machine/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^The coffee machine/ }));
 
         await waitFor(() =>
             expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation'),
         );
+    });
+});
+
+describe('deleting a chat from the panel', () => {
+    /*
+      #75 / ADR-026. The panel owns the request, the reload and the navigation:
+      the list can only say a row was confirmed. Chat deletion is
+      session-scoped, so what goes is `session_id` — never the plan id the row
+      carries to open with.
+    */
+    const FINISHED_ELSEWHERE = {
+        id: 'plan-other',
+        session_id: 'session-other',
+        timestamp: '2026-08-14T07:00:00Z',
+        initial_goal: 'How do I swap a shift?',
+        overall_status: PlanStatus.COMPLETED,
+    } as unknown as Plan;
+
+    const deleteChat = async (name: string) => {
+        fireEvent.click(
+            await screen.findByRole('button', { name: chatMenuLabel(name) }),
+        );
+        fireEvent.click(screen.getByRole('menuitem', { name: DELETE_CHAT_LABEL }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: CONFIRM_DELETE_LABEL }),
+        );
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(apiService.getPlans).mockResolvedValue([
+            TROUBLESHOOTING,
+            ESCALATION,
+            FINISHED_ELSEWHERE,
+        ] as never);
+        vi.mocked(apiService.deleteChat).mockResolvedValue({
+            status: 'deleted',
+            session_id: 'session-shared',
+            documents_deleted: 7,
+        } as never);
+    });
+
+    it('deletes the chat‘s session, not the plan the row opens', async () => {
+        // The row carries its latest plan's id (#71) and that is what a delete
+        // reading the wrong field would send — taking one turn of the
+        // conversation and leaving the rest of it in Cosmos.
+        renderPanelAt('/chat/plan-troubleshooting');
+
+        await deleteChat('The coffee machine is showing an error');
+
+        await waitFor(() =>
+            expect(apiService.deleteChat).toHaveBeenCalledWith('session-shared'),
+        );
+    });
+
+    it('reads the history again after a delete', async () => {
+        renderPanelAt('/chat/plan-escalation');
+        await screen.findByRole('button', { name: /^How do I swap a shift/ });
+
+        await deleteChat('How do I swap a shift?');
+
+        // Forced, not cached. `getPlans`'s second argument is `useCache`, and
+        // the panel's own cached list is the one way a deleted row comes back.
+        await waitFor(() =>
+            expect(apiService.getPlans).toHaveBeenCalledWith(undefined, false),
+        );
+    });
+
+    it('takes the row even when the history does not come back', async () => {
+        /*
+          Found by review. `loadPlansData` swallows its own failure into
+          `plansError`, so a panel that waited for the re-read to remove the row
+          would keep listing a conversation it has just reported gone — with the
+          confirmation already closed, and nothing on screen to say why.
+
+          Deletes a chat other than the open one deliberately: deleting the open
+          one navigates away and unmounts the panel, which would make any
+          assertion about its rows pass for the wrong reason.
+        */
+        renderPanelAt('/chat/plan-escalation');
+        await screen.findByRole('button', { name: /^How do I swap a shift/ });
+        vi.mocked(apiService.getPlans).mockRejectedValue(new Error('offline'));
+
+        await deleteChat('How do I swap a shift?');
+
+        /*
+          Waited on the re-read rather than on the row: a modal confirmation
+          hides the rest of the tree from `getByRole` while it is open, so a
+          bare `waitFor` for the row's absence passes on the dialog and never
+          observes the panel at all.
+        */
+        await waitFor(() => expect(apiService.getPlans).toHaveBeenCalledTimes(2));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /^How do I swap a shift/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /^The coffee machine/ }),
+        ).toBeInTheDocument();
+    });
+
+    it('leaves a conversation it has just destroyed', async () => {
+        // The page is rendering a plan that no longer exists. Staying put
+        // would leave the presenter looking at a transcript of something the
+        // surface has just said is gone.
+        renderPanelAt('/chat/plan-escalation');
+        vi.mocked(apiService.getPlans).mockResolvedValue([
+            FINISHED_ELSEWHERE,
+        ] as never);
+
+        await deleteChat('The coffee machine is showing an error');
+
+        await waitFor(() => expect(screen.getByTestId('here')).toHaveTextContent('/'));
+        expect(screen.getByTestId('here')).not.toHaveTextContent('plan-escalation');
+    });
+
+    it('stays where it is when the chat deleted is a different one', async () => {
+        renderPanelAt('/chat/plan-escalation');
+        await screen.findByRole('button', { name: /^How do I swap a shift/ });
+
+        await deleteChat('How do I swap a shift?');
+
+        await waitFor(() => expect(apiService.deleteChat).toHaveBeenCalled());
+        expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation');
+    });
+
+    it('keeps the chat on screen when the delete was refused', async () => {
+        // A 409 for a running chat, or a partial sweep. Either way the
+        // conversation is still in Cosmos, and a row that vanished optimistically
+        // would be the panel saying something that is not so.
+        vi.mocked(apiService.deleteChat).mockRejectedValue(new Error('conflict'));
+        renderPanelAt('/chat/plan-escalation');
+
+        await deleteChat('The coffee machine is showing an error');
+
+        await waitFor(() => expect(apiService.deleteChat).toHaveBeenCalled());
+        expect(
+            screen.getByRole('button', { name: /^The coffee machine/ }),
+        ).toBeInTheDocument();
+        expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation');
     });
 });

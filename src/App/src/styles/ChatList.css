@@ -118,31 +118,48 @@
 }
 
 /*
-  The hide control sits beside the accordion's own toggle rather than inside
-  it: `AccordionHeader` renders its children *inside* a button, and a button
-  inside a button is not markup a screen reader can offer as two things to do.
+  The row's trailing edge: its overflow menu (#75).
+
+  `.task-menu-button` returns here after ADR-022 removed the rules of that name
+  — those styled the hover state of a `MenuTrigger` with no `MenuPopover`, a
+  control that on this version of Fluent never reached the DOM at all. This one
+  has its popover, so the styling is worth having.
 */
-.task-list-completed-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.task-menu {
+  flex-shrink: 0;
 }
 
-.task-list-completed-header .fui-AccordionHeader {
-  flex: 1;
-  min-width: 0;
-}
-
-.task-list-hide-completed {
+.task-menu-button {
   flex-shrink: 0;
 }
 
 /*
-  Nothing about the row's trailing edge belongs here any more. The
-  `.task-menu-button` rules this replaces styled the hover state of a Fluent
-  `MenuTrigger` with no `MenuPopover` — a control that, on this version of
-  Fluent, never reached the DOM at all (#66).
+  Why a running chat is kept, said inside the menu that refuses it (ADR-026).
+  Wrapped, not truncated: a reason the associate cannot finish reading is not a
+  reason.
 */
+.task-menu-reason {
+  display: block;
+  max-width: 220px;
+  padding: 4px 10px 8px;
+  color: var(--colorNeutralForeground3);
+}
+
+/* The chat the confirmation is about, named above the warning. */
+.task-delete-name {
+  font-weight: 600;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+/* Why a delete did not happen, said in the dialog that is still open. */
+.task-delete-failure {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background-color: var(--colorStatusDangerBackground1);
+  color: var(--colorStatusDangerForeground1);
+}
 
 .task-list-empty {
   display: block;
