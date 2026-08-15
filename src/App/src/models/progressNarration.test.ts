@@ -180,8 +180,8 @@ describe('nowhere else says any of it', () => {
 
     it('rotates nothing on a timer', () => {
         // The rotation was a progress bar with no progress behind it. A
-        // `setInterval` on the plan page is how it came back last time.
-        const page = readFileSync(join(__dirname, '..', 'pages', 'PlanPage.tsx'), 'utf8');
+        // `setInterval` on the chat page is how it came back last time.
+        const page = readFileSync(join(__dirname, '..', 'pages', 'ChatPage.tsx'), 'utf8');
         expect(page).not.toContain('loadingMessages');
         expect(page.match(/setInterval/g) ?? []).toHaveLength(1);
     });

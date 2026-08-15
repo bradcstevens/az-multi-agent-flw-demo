@@ -1,13 +1,13 @@
 import React, { useEffect, useCallback } from 'react';
 import { Spinner } from '@fluentui/react-components';
-import '../styles/PlanPage.css';
+import '../styles/ChatPage.css';
 import CoralShellColumn from '../commonComponents/components/Layout/CoralShellColumn';
 import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import HomeInput from '@/components/content/HomeInput';
 import TransparencyRail from '@/components/transparency/TransparencyRail';
-import { NewTaskService } from '../store/NewTaskService';
-import PlanPanelLeft from '@/components/content/PlanPanelLeft';
+import { NewChatService } from '../store/NewChatService';
+import ChatPanelLeft from '@/components/content/ChatPanelLeft';
 import ContentToolbar from '@/commonComponents/components/Content/ContentToolbar';
 import { TeamService } from '../store/TeamService';
 import StoreIdentity from '../components/branding/StoreIdentity';
@@ -23,7 +23,7 @@ import {
 import { selectReloadLeftList } from '../store/slices/planSlice';
 
 /**
- * HomePage component - displays task lists and provides navigation
+ * HomePage component - displays the chat history and provides navigation
  * Accessible via the route "/"
  */
 const HomePage: React.FC = () => {
@@ -85,8 +85,8 @@ const HomePage: React.FC = () => {
         initTeam();
     }, [dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleNewTaskButton = useCallback(() => {
-        NewTaskService.handleNewTaskFromHome();
+    const handleNewChatButton = useCallback(() => {
+        NewChatService.handleNewChatFromHome();
     }, []);
 
     return (
@@ -94,9 +94,9 @@ const HomePage: React.FC = () => {
             <InlineToaster />
             <CoralShellColumn>
                 <CoralShellRow>
-                    <PlanPanelLeft
-                        reloadTasks={reloadLeftList}
-                        onNewTaskButton={handleNewTaskButton}
+                    <ChatPanelLeft
+                        reloadChats={reloadLeftList}
+                        onNewChatButton={handleNewChatButton}
                         isLoadingTeam={isLoadingTeam}
                     />
                     <Content>
@@ -120,7 +120,7 @@ const HomePage: React.FC = () => {
                     </Content>
                     {/*
                       The transparency rail (issue #24). It is on the home
-                      surface as well as the plan surface because the meter is
+                      surface as well as the chat surface because the meter is
                       a running total across the whole walkthrough: the
                       identity boundary gate refuses a question *here*, and the
                       row proving that refusal cost nothing has to be beside

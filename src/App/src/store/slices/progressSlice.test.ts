@@ -108,7 +108,7 @@ describe('the phase only ever advances', () => {
     it('starts over when the associate approves the plan, which puts a POST in flight', () => {
         // The Deliberate lane's second half. Read off `planApprovalAccepted`
         // itself rather than dispatched beside it: an approval that narrated
-        // only when the plan page remembered to say so is two places to
+        // only when the chat page remembered to say so is two places to
         // disagree about whether a request is in flight.
         //
         // It holds the lane — the last thing a signal reported — until an agent

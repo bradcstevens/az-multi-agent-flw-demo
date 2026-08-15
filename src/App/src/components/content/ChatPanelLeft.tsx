@@ -14,28 +14,33 @@ import {
   ChatAdd20Regular,
   ErrorCircle20Regular,
 } from "@fluentui/react-icons";
-import TaskList from "./TaskList";
+import ChatList from "./ChatList";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plan, PlanPanelLefProps, Task } from "@/models";
+import { Chat, ChatPanelLeftProps, Plan } from "@/models";
 import { apiService } from "@/api";
 import { TaskService } from "@/store";
-import "../../styles/PlanPanelLeft.css";
+import "../../styles/ChatPanelLeft.css";
 import { ASSISTANT_NAME } from "../../models/storeSurface";
 import StoreAssistantLogo from "../branding/StoreAssistantLogo";
 
-const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
-  reloadTasks,
-  onNewTaskButton,
+const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
+  reloadChats,
+  onNewChatButton,
   restReload,
   onNavigationWithAlert,
   isLoadingTeam
 }) => {
   const { dispatchToast } = useToastController("toast");
   const navigate = useNavigate();
-  const { planId } = useParams<{ planId: string }>();
+  /*
+    The route is `/chat/:id` and the id in it is a **Plan**'s (ADR-025): a
+    Chat is a Session and can hold more than one Plan, so the surface says
+    chat while the identity in the URL stays the precise one.
+  */
+  const { id: planId } = useParams<{ id: string }>();
 
-  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [completedChats, setCompletedChats] = useState<Chat[]>([]);
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [plansLoading, setPlansLoading] = useState<boolean>(false);
   const [plansError, setPlansError] = useState<Error | null>(null);
@@ -75,15 +80,15 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
 
 
   useEffect(() => {
-    if (reloadTasks) {
-      loadPlansData(true); // Force refresh when reloadTasks is true
+    if (reloadChats) {
+      loadPlansData(true); // Force refresh when reloadChats is true
     }
-  }, [loadPlansData, reloadTasks]);
+  }, [loadPlansData, reloadChats]);
   useEffect(() => {
     if (plans) {
       const { completed } =
-        TaskService.transformPlansToTasks(plans);
-      setCompletedTasks(completed);
+        TaskService.transformPlansToChats(plans);
+      setCompletedChats(completed);
     }
   }, [plans]);
 
@@ -93,7 +98,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         <Toast>
           <ToastTitle>
             <ErrorCircle20Regular />
-            Failed to load tasks
+            Failed to load chats
           </ToastTitle>
           <ToastBody>{plansError.message}</ToastBody>
         </Toast>,
@@ -103,11 +108,11 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   }, [plansError, dispatchToast]);
 
   // Get the session_id that matches the current URL's planId
-  const selectedTaskId =
+  const selectedChatId =
     plans?.find((plan) => plan.id === planId)?.session_id ?? null;
 
-  const handleTaskSelect = useCallback(
-    (taskId: string) => {
+  const handleChatSelect = useCallback(
+    (chatId: string) => {
       const performNavigation = () => {
         /*
           The row carries the plan it opens (#71). Searching the plans for one
@@ -116,9 +121,9 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
           escalation that continues its session (ADR-024) — the escalation was
           unreachable from this panel.
         */
-        const selectedChat = completedTasks.find((chat) => chat.id === taskId);
+        const selectedChat = completedChats.find((chat) => chat.id === chatId);
         if (selectedChat) {
-          navigate(`/plan/${selectedChat.planId}`);
+          navigate(`/chat/${selectedChat.planId}`);
         }
       };
 
@@ -128,7 +133,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         performNavigation();
       }
     },
-    [completedTasks, navigate, onNavigationWithAlert]
+    [completedChats, navigate, onNavigationWithAlert]
   );
 
   const handleLogoClick = useCallback(() => {
@@ -152,7 +157,7 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
           panelTitle={ASSISTANT_NAME}
           panelIcon={<StoreAssistantLogo />}
         >
-          <Tooltip content="New task" relationship={"label"} />
+          <Tooltip content="New chat" relationship={"label"} />
         </PanelLeftToolbar>
 
         {/*
@@ -165,28 +170,28 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
         */}
         <div
           className="tab tab-new-task"
-          onClick={onNewTaskButton}
+          onClick={onNewChatButton}
           tabIndex={0} // ✅ allows tab focus
           role="button" // ✅ announces as button
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              onNewTaskButton();
+              onNewChatButton();
             }
           }}
         >
           <div className="tab tab-new-task-icon">
             <ChatAdd20Regular />
           </div>
-          <Body1Strong>New task</Body1Strong>
+          <Body1Strong>New chat</Body1Strong>
         </div>
 
         <br />
-        <TaskList
-          completedTasks={completedTasks}
-          onTaskSelect={handleTaskSelect}
+        <ChatList
+          completedChats={completedChats}
+          onChatSelect={handleChatSelect}
           loading={plansLoading}
-          selectedTaskId={selectedTaskId ?? undefined}
+          selectedChatId={selectedChatId ?? undefined}
           isLoadingTeam={isLoadingTeam}
         />
 
@@ -205,6 +210,6 @@ const PlanPanelLeft: React.FC<PlanPanelLefProps> = ({
   );
 };
 
-const MemoizedPlanPanelLeft = React.memo(PlanPanelLeft);
-MemoizedPlanPanelLeft.displayName = 'PlanPanelLeft';
-export default MemoizedPlanPanelLeft;
+const MemoizedChatPanelLeft = React.memo(ChatPanelLeft);
+MemoizedChatPanelLeft.displayName = 'ChatPanelLeft';
+export default MemoizedChatPanelLeft;

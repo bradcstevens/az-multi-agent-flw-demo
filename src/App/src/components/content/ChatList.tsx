@@ -6,8 +6,8 @@ import {
 } from "@fluentui/react-components";
 import { EyeOff20Regular } from "@fluentui/react-icons";
 import React from "react";
-import "../../styles/TaskList.css";
-import { Task, TaskListProps } from "@/models";
+import "../../styles/ChatList.css";
+import { Chat, ChatListProps } from "@/models";
 import {
   Accordion,
   AccordionHeader,
@@ -21,44 +21,44 @@ import {
 } from "../../models/hiddenCompletedTasks";
 import useHiddenCompletedTasks from "../../hooks/useHiddenCompletedTasks";
 
-const TaskList: React.FC<TaskListProps> = ({
-  completedTasks,
-  onTaskSelect,
+const ChatList: React.FC<ChatListProps> = ({
+  completedChats,
+  onChatSelect,
   loading,
-  selectedTaskId,
+  selectedChatId,
   isLoadingTeam
 }) => {
   const hidden = useHiddenCompletedTasks();
   const isLoading = Boolean(loading || isLoadingTeam);
-  const visibleTasks = React.useMemo(
-    () => completedTasks.filter((task) => !hidden.has(task.id)),
-    [completedTasks, hidden]
+  const visibleChats = React.useMemo(
+    () => completedChats.filter((chat) => !hidden.has(chat.id)),
+    [completedChats, hidden]
   );
 
-  const renderTaskItem = (task: Task) => {
-    const isActive = task.id === selectedTaskId;
+  const renderChatRow = (chat: Chat) => {
+    const isActive = chat.id === selectedChatId;
 
     return (
       <div
-        key={task.id}
+        key={chat.id}
         className={`task-tab${isActive ? " active" : ""}`}
         role="button"
         tabIndex={0}
-        onClick={() => onTaskSelect(task.id)}
+        onClick={() => onChatSelect(chat.id)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            onTaskSelect(task.id);
+            onChatSelect(chat.id);
           }
         }}
       >
         <div className="sideNavTick" />
         <div className="left">
-          <div className="task-name-truncated" title={task.name}>
-            {task.name}
+          <div className="task-name-truncated" title={chat.name}>
+            {chat.name}
           </div>
-          {task.date && task.status == "completed" && (
-            <Caption1 className="task-list-task-date">{task.date}</Caption1>
+          {chat.date && chat.status == "completed" && (
+            <Caption1 className="task-list-task-date">{chat.date}</Caption1>
           )}
         </div>
         {/*
@@ -69,7 +69,7 @@ const TaskList: React.FC<TaskListProps> = ({
           *nothing* — the trigger never reaches the DOM — so the row has been
           carrying an icon button that no test and no screen reader could see,
           and no browser could click. Dead twice over, which is why
-          `TaskList.test` guards it by reading this file rather than the DOM.
+          `ChatList.test` guards it by reading this file rather than the DOM.
           Clearing is list-level because the need is list-level, so nothing
           belongs here.
         */}
@@ -79,7 +79,7 @@ const TaskList: React.FC<TaskListProps> = ({
 
   const renderSkeleton = (key: string) => (
     <div key={key} className="task-skeleton-container">
-      <Skeleton aria-label="Loading task">
+      <Skeleton aria-label="Loading chat">
         <div className="task-skeleton-wrapper">
           <SkeletonItem shape="rectangle" animation="wave" size={24} />
         </div>
@@ -115,7 +115,7 @@ const TaskList: React.FC<TaskListProps> = ({
                 */
                 aria-label={HIDE_COMPLETED_LABEL}
                 title={
-                  visibleTasks.length
+                  visibleChats.length
                     ? HIDE_COMPLETED_LABEL
                     : "Nothing left to hide"
                 }
@@ -125,9 +125,9 @@ const TaskList: React.FC<TaskListProps> = ({
                   would disappear for a keyboard user rather than say why it
                   cannot be used.
                 */
-                disabledFocusable={!visibleTasks.length}
+                disabledFocusable={!visibleChats.length}
                 onClick={() =>
-                  hideCompletedTasks(completedTasks.map((task) => task.id))
+                  hideCompletedTasks(completedChats.map((chat) => chat.id))
                 }
               />
             )}
@@ -137,8 +137,8 @@ const TaskList: React.FC<TaskListProps> = ({
               ? Array.from({ length: 5 }, (_, i) =>
                 renderSkeleton(`completed-${i}`)
               )
-              : visibleTasks.length
-                ? visibleTasks.map(renderTaskItem)
+              : visibleChats.length
+                ? visibleChats.map(renderChatRow)
                 : (
                   /*
                     True whether the list is empty or merely hidden. A bare
@@ -158,6 +158,6 @@ const TaskList: React.FC<TaskListProps> = ({
   );
 };
 
-const MemoizedTaskList = React.memo(TaskList);
-MemoizedTaskList.displayName = 'TaskList';
-export default MemoizedTaskList;
+const MemoizedChatList = React.memo(ChatList);
+MemoizedChatList.displayName = 'ChatList';
+export default MemoizedChatList;

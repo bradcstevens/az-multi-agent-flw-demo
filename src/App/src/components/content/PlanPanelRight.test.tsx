@@ -50,7 +50,7 @@ const renderPanel = (store = makeStore(), approvalRequest: any = null) =>
         </Provider>,
     );
 
-describe('the plan surface with Plan review off', () => {
+describe('the chat surface with Plan review off', () => {
     it('shows the agent roster even though there is no plan to review', () => {
         // The Fast lane produces no plan object at all (ADR-013). The panel
         // used to bail out entirely on that, so the Agent Team was empty for
@@ -118,7 +118,7 @@ describe('the plan surface with Plan review off', () => {
     });
 });
 
-describe('the plan surface on the deliberate lane', () => {
+describe('the chat surface on the deliberate lane', () => {
     // Removing the early return was meant to stop the Fast lane rendering "No
     // plan available" — not to change the lane that *does* have a plan to
     // review. These pin the path the escalation beat depends on (#22).
@@ -154,7 +154,7 @@ describe('the plan surface on the deliberate lane', () => {
         // This panel is a shell column, and it contains the rail. An inline
         // `width` or `border-left` here beats a media query, so the shared
         // stacking breakpoint would be present, correct and inert for the whole
-        // plan surface — the failure #25 already found once on the shell
+        // chat surface — the failure #25 already found once on the shell
         // itself, and the reason the rail stacked while its container did not.
         renderPanel();
 
@@ -166,7 +166,7 @@ describe('the plan surface on the deliberate lane', () => {
     });
 });
 
-describe('the Simulated ticket on the plan surface (issue #22)', () => {
+describe('the Simulated ticket on the chat surface (issue #22)', () => {
     // The rail is the one surface that survives the stacking breakpoint — #25
     // drops the left panel and keeps this one — and the associate's screen is
     // a phone. A ticket rendered only where a phone cannot reach it is a

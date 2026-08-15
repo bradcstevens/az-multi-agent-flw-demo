@@ -13,7 +13,7 @@ import {
     sessionOfPlan,
 } from '../backend';
 import { recordRehearsal } from '../evidence';
-import { PlanSurface } from '../pages/PlanSurface';
+import { ChatSurface } from '../pages/ChatSurface';
 import { StoreSurface } from '../pages/StoreSurface';
 
 /**
@@ -39,15 +39,17 @@ test.afterEach(() => {
 });
 
 function planIdFrom(url: string): string {
-    const match = url.match(/\/plan\/([^/?#]+)/);
+    // The route is `/chat/:id` (ADR-025, #73) and the id in it is a Plan's,
+    // which is what the escalation beat has to read back out of Cosmos.
+    const match = url.match(/\/chat\/([^/?#]+)/);
     if (!match) {
-        throw new Error(`not a plan surface: ${url}`);
+        throw new Error(`not a chat surface: ${url}`);
     }
     return match[1];
 }
 
 async function followOnEscalation(page: Page): Promise<{
-    plan: PlanSurface;
+    plan: ChatSurface;
     reported: string;
     session: string;
 }> {
@@ -57,9 +59,9 @@ async function followOnEscalation(page: Page): Promise<{
     await store.open();
     await store.tapQuickTask(troubleshooting.name);
 
-    const troubleshootingPlan = new PlanSurface(page);
+    const troubleshootingPlan = new ChatSurface(page);
     await troubleshootingPlan.waitForArrival(120_000);
-    const originalPlanUrl = page.url();
+    const originalChatUrl = page.url();
 
     await expect(troubleshootingPlan.rehearsedReplies).toBeVisible({
         timeout: 240_000,
@@ -76,11 +78,11 @@ async function followOnEscalation(page: Page): Promise<{
     await expect(troubleshootingPlan.followOnTask).toBeVisible();
     await troubleshootingPlan.tapFollowOnTask(escalation.name);
     await page.waitForURL(
-        (url) => /\/plan\//.test(url.pathname) && url.href !== originalPlanUrl,
+        (url) => /\/chat\//.test(url.pathname) && url.href !== originalChatUrl,
         { timeout: 120_000 },
     );
 
-    const plan = new PlanSurface(page);
+    const plan = new ChatSurface(page);
     return {
         plan,
         reported,

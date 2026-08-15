@@ -48,7 +48,7 @@ export interface PlanState {
     continueWithWebsocketFlow: boolean;
     /** Has the user approved the plan (or is the plan already post-approval)? */
     planApproved: boolean;
-    /** Trigger to reload the left-panel task list */
+    /** Trigger to reload the left-panel chat list */
     reloadLeftList: boolean;
     /** Cancellation dialog state */
     showCancellationDialog: boolean;

@@ -23,7 +23,7 @@ const Content: React.FC<ContentProps> = ({ children }) => {
     // crushed first — shrank anyway.
     //
     // `main`, because it is: the rail beside it is already an `aside` and the
-    // task history is a `nav`, so the conversation was the one landmark on the
+    // chat history is a `nav`, so the conversation was the one landmark on the
     // surface that a screen reader could not jump to. It is also what the skip
     // link in `CoralShellColumn` targets.
     return (

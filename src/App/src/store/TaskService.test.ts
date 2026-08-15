@@ -168,7 +168,7 @@ describe('a chat is a session, so the list has one row per session', () => {
     } as unknown as Plan;
 
     it('renders the troubleshooting turn and its escalation as one chat', () => {
-        const { completed } = TaskService.transformPlansToTasks([
+        const { completed } = TaskService.transformPlansToChats([
             troubleshooting,
             escalation,
         ]);
@@ -181,7 +181,7 @@ describe('a chat is a session, so the list has one row per session', () => {
         // Newest-first, which is the order a history endpoint hands them back:
         // the name must come from the turn that opened the conversation, so it
         // cannot be read off the array.
-        const { completed } = TaskService.transformPlansToTasks([
+        const { completed } = TaskService.transformPlansToChats([
             escalation,
             troubleshooting,
         ]);
@@ -190,7 +190,7 @@ describe('a chat is a session, so the list has one row per session', () => {
     });
 
     it('opens the latest plan, so the escalation is what the row reaches', () => {
-        const { completed } = TaskService.transformPlansToTasks([
+        const { completed } = TaskService.transformPlansToChats([
             escalation,
             troubleshooting,
         ]);
@@ -212,7 +212,7 @@ describe('a chat is a session, so the list has one row per session', () => {
             timestamp: 'not a date',
         } as unknown as Plan;
 
-        const { completed } = TaskService.transformPlansToTasks([
+        const { completed } = TaskService.transformPlansToChats([
             escalation,
             troubleshooting,
             unreadable,
@@ -234,7 +234,7 @@ describe('a chat is a session, so the list has one row per session', () => {
             initial_goal: 'How do I close the store?',
         } as unknown as Plan;
 
-        const { completed } = TaskService.transformPlansToTasks([
+        const { completed } = TaskService.transformPlansToChats([
             undated,
             troubleshooting,
             escalation,
@@ -256,7 +256,7 @@ describe('a chat is a session, so the list has one row per session', () => {
             initial_goal: 'How do I close the store?',
         } as unknown as Plan;
 
-        const { completed } = TaskService.transformPlansToTasks([
+        const { completed } = TaskService.transformPlansToChats([
             troubleshooting,
             escalation,
             otherSession,

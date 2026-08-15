@@ -89,7 +89,7 @@ const progressSlice = createSlice({
             state.phase = 'done';
         },
         /**
-         * The plan page opened a conversation.
+         * The chat page opened a conversation.
          *
          * A no-op for the plan this narration is already about, which is how it
          * survives the navigation it caused. Any other plan is somebody else's
@@ -106,7 +106,7 @@ const progressSlice = createSlice({
          *
          * Read off the plan slice's own action rather than dispatched beside
          * it, for this slice's whole reason for existing: an approval that
-         * narrated only when the plan page remembered to say so is a second
+         * narrated only when the chat page remembered to say so is a second
          * place to disagree about whether a request is in flight. It re-arms
          * rather than advances — an approval is a new request, and the phase
          * bound is within a request.

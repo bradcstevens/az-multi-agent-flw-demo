@@ -126,8 +126,8 @@ describe('a transparency signal arriving on the socket', () => {
 /**
  * Two entry points, one socket (issue #63, ADR-021).
  *
- * The connect is initiated on the `createPlan` response, and the plan page
- * keeps its own for a reload of `/plan/:id`. So for a plan asked from the home
+ * The connect is initiated on the `createPlan` response, and the chat page
+ * keeps its own for a reload of `/chat/:id`. So for a plan asked from the home
  * surface both run, the second one landing while the first is still
  * handshaking — the exact case the service used to reject outright, telling its
  * caller the connection had failed while the same connection was succeeding.

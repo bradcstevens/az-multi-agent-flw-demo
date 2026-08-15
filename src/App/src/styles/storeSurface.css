@@ -4,9 +4,9 @@
  *
  * The phone breakpoint is a requirement, not a nicety: the associate this demo
  * is about is holding a phone in a store, on a shared device, mid-shift. The
- * accelerator's three-column desktop shell (task history | conversation |
+ * accelerator's three-column desktop shell (chat history | conversation |
  * transparency rail) is roughly 900px of furniture before the conversation
- * gets any width at all, so on a phone the columns stack and the task history —
+ * gets any width at all, so on a phone the columns stack and the chat history —
  * presenter furniture, not associate furniture — goes away entirely.
  *
  * Layout only. Nothing here decides what the surface *says*; a stylesheet must
@@ -108,7 +108,7 @@
  * Every column the shell puts beside the conversation is released here, and
  * only here. A fixed width and a left border are what a side column looks like;
  * below this breakpoint there is nothing to its left, so both are a lie. That
- * includes the *container* of the rail on the plan surface as well as the rail
+ * includes the *container* of the rail on the chat surface as well as the rail
  * itself — the rail is a child of `.plan-panel-right` there, and a 280px band
  * with a left border wrapping a rail with a top border is the same disagreement
  * this breakpoint exists to end.
@@ -144,13 +144,13 @@
     }
 
     /*
-     * The task history goes away, rather than being squeezed.
+     * The chat history goes away, rather than being squeezed.
      *
      * Scoped under the shell, like every other column released here, and that
      * is load-bearing rather than tidiness (#66). Unscoped, this rule is a
      * single class — exactly the specificity of `.panel-left-container`'s own
-     * `display: flex` in `PlanPanelLeft.css` — and a media query adds none. The
-     * tie was broken by import order, `PlanPanelLeft.css` happened to load
+     * `display: flex` in `ChatPanelLeft.css` — and a media query adds none. The
+     * tie was broken by import order, `ChatPanelLeft.css` happened to load
      * second, and so the one rule the phone layout most depends on lost every
      * time: the associate got 240px of presenter furniture above the
      * conversation on a 390px screen, while this stylesheet, the test that

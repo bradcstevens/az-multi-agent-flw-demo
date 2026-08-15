@@ -48,7 +48,7 @@ export interface AgentAvailability {
  * The specialists available to this conversation, conversation roster first.
  *
  * Order matters. The plan fetch's `team` is this conversation's own roster and
- * wins whenever it is present — a historical plan opened from the task list
+ * wins whenever it is present — a historical plan opened from the chat list
  * may have run on a different team, and the team the tab happens to hold is
  * not a claim about it. `selectedTeam` fills the window before it arrives, and
  * that window is most of what the audience is looking at.

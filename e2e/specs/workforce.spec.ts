@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { agentHoldingToolbox, agentKey, quickTasks } from '../authored';
-import { PlanSurface } from '../pages/PlanSurface';
+import { ChatSurface } from '../pages/ChatSurface';
 import { StoreSurface } from '../pages/StoreSurface';
 
 /**
@@ -106,7 +106,7 @@ test.describe('the fourth specialist', () => {
                 'safe to show until it separates again.',
         ).toBeHidden();
 
-        const plan = new PlanSurface(page);
+        const plan = new ChatSurface(page);
         await plan.waitForArrival(120_000);
 
         const turn = plan.latestAgentTurn;

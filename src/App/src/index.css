@@ -188,7 +188,7 @@ pre {
     --zIndexSkipLink: 900;
 }
 
-/* Keyboard users reach the conversation without walking the task history. */
+/* Keyboard users reach the conversation without walking the chat history. */
 .skip-to-content {
     position: absolute;
     left: -9999px;

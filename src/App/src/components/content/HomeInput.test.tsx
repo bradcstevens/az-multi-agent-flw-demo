@@ -267,13 +267,13 @@ describe('the home surface', () => {
  * *before* it returns the HTTP response, so everything the orchestration emits
  * from that moment is pushed at whatever socket exists — and
  * `send_status_update_async` drops it when there is none. Hanging the connect
- * off the plan page put the navigation, a mount and a second GET inside that
+ * off the chat page put the navigation, a mount and a second GET inside that
  * window, and the frames most likely to fall in it are the first agent's
  * `agent_message_streaming` header — the only signal in the system that names
  * *which* specialist took the question — and, on a short Fast lane answer,
  * `source_used` and `token_usage` too.
  *
- * There is deliberately no plan page anywhere in this tree. That is the claim:
+ * There is deliberately no chat page anywhere in this tree. That is the claim:
  * the connect does not depend on one.
  */
 describe('the socket the answer arrives on', () => {
@@ -289,7 +289,7 @@ describe('the socket the answer arrives on', () => {
         return true;
     };
 
-    it('is open before any plan page has mounted', async () => {
+    it('is open before any chat page has mounted', async () => {
         renderInput();
 
         await ask('how do I close the store?');
@@ -447,7 +447,7 @@ const rulesNaming = (cls: string): [string, string][] => {
 /**
  * The **Progress narration** as the home surface arms it (issue #64, ADR-023).
  *
- * The two phases that happen before any plan page exists, which is exactly why
+ * The two phases that happen before any chat page exists, which is exactly why
  * the phase is held in a slice: the story used to run backwards across this
  * navigation — *"Plan created — Fast lane"* here, then *"Loading plan data..."*
  * over *"Initializing AI agents..."* on the page that follows.
@@ -482,7 +482,7 @@ describe('what the home surface says about a question it has just sent', () => {
 
     it('stops narrating a question the gate refused', async () => {
         // A refusal is an answer. Nothing is in flight behind it, and there is
-        // no plan page to arrive at that could ever stop the narration.
+        // no chat page to arrive at that could ever stop the narration.
         createPlan.mockRejectedValue(REFUSAL);
         const { narration } = renderInput();
 

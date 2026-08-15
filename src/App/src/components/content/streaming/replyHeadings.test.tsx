@@ -13,7 +13,7 @@ import { sourceFiles } from '@/testing/stylesheets';
  *
  * The words come from a language model, and `react-markdown` renders `#` as a
  * real `<h1>`. Left alone, one reply puts a second top-level heading on the
- * plan surface — above the panels that explain where that reply came from and
+ * chat surface — above the panels that explain where that reply came from and
  * what it cost.
  */
 

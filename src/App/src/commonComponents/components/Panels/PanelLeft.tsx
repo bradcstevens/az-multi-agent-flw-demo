@@ -68,16 +68,16 @@ const PanelLeft: React.FC<PanelLeftProps> = ({
 
   return (
     /*
-     * `nav`, because it is: this panel is the task history, and every row in it
-     * navigates to a plan. It was the second of the surface's three columns to
+     * `nav`, because it is: this panel is the chat history, and every row in it
+     * opens a conversation. It was the second of the surface's three columns to
      * be an anonymous `div` — the rail was already an `aside` — which left a
-     * screen-reader user no landmark to move between and no way past the task
+     * screen-reader user no landmark to move between and no way past the chat
      * list except through it. The conversation is now a `main`, and the skip
      * link in `CoralShellColumn` jumps to it.
      */
     <nav
       className="panelLeft"
-      aria-label="Task history"
+      aria-label="Chat history"
       style={{
         width: `${width}px`,
         display: "flex",

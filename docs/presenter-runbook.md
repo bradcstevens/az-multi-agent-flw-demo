@@ -11,7 +11,7 @@ Read the two boxes below before anything else. They are the only two things you 
 > There is no button and no hint. Pressing it makes the assistant post a shift-task alert on its
 > own, which is beat 7. Press it once — holding it does nothing extra, by design.
 >
-> **It only works while a task view is open** — that is, on the screen you are on *after* asking
+> **It only works while a chat is open** — that is, on the screen you are on *after* asking
 > something, not on the home screen with the six cards. On the home screen the key does nothing at
 > all. That is why beat 7 taps the card first and fires the chord second.
 >
@@ -38,7 +38,7 @@ Read the two boxes below before anything else. They are the only two things you 
 | **Screen** | Full screen, and wide enough for the panels on the right to be visible — they are the evidence. Below 900px wide they stack underneath, which is fine to *show* and awkward to *drive*. |
 | **Rehearse** | Run the eight taps once end to end before the meeting. It takes about ten minutes and it is the only way to know today's deployment is healthy. |
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
-| **Between beats** | Use **New task** between beats 1, 2 and 3. Beat 4 continues beat 3 from its follow-on card. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
+| **Between beats** | Use **New chat** between beats 1, 2 and 3. Beat 4 continues beat 3 from its follow-on card. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
 
 **Ask an engineer to clear the deployment before a customer session.** One command does it:
 `bash scripts/sop-rehearsal.sh` ([sop-rehearsal.md](sop-rehearsal.md)) — ten Demo validator runs
@@ -62,7 +62,7 @@ be a contrast with.
 
 ## The eight taps
 
-Tap the card, then send. Use **New task** between conversations, except where beat 4 continues beat 3.
+Tap the card, then send. Use **New chat** between conversations, except where beat 4 continues beat 3.
 
 ### 1. Close the store — the cross-platform hop
 
@@ -179,7 +179,7 @@ put that door is the decision they have been avoiding.
 ### 7. What is due this shift? — it reaches out first
 
 **Tap:** `What is due this shift?` — *"What tasks are due on this shift?"* and let it answer. You
-need to be on a task view for the next part to work.
+need to be in a chat for the next part to work.
 
 **Then press the chord: Ctrl + Alt + Shift + A.** Say nothing about the keyboard, and keep talking
 while you do it.
@@ -282,7 +282,7 @@ beat 2; it is not a failure.
 | 4 | No plan appears, or the ticket has no attempted steps | **Yes** | If the steps are missing, say so — *"those should be carried across, and that is the claim I would want you to test in a pilot"* — and do not read the empty rows out as if they were full |
 | 5 | The personal question is answered instead of refused | **Stop and re-run it once** | This is the one beat with nothing to fall back on. If it answers again, move to beat 6 and be straight: the boundary is the piece to prove in a pilot |
 | 6 | The header does not change, or the same refusal appears again | **Yes** | Tap it once more. If it still refuses, describe the delta rather than showing it, and keep the argument — the argument is what they came for |
-| 7 | The chord does nothing | **Yes** | Check you are on a task view and not the home screen — the key is dead there — and press it again. If nothing arrives, describe the alert instead of showing it |
+| 7 | The chord does nothing | **Yes** | Check you are in a chat and not the home screen — the key is dead there — and press it again. If nothing arrives, describe the alert instead of showing it |
 | 8 | The question is **refused** as a personal one, or another specialist answers it | **Yes** | A refusal is the identity boundary being over-cautious, not the assistant being broken — say *"it is treating a shift question as a personal one; that is the boundary erring on the safe side, and it is the direction you want it to err in"* and move on. If the answer arrives from another specialist, the answer is still right; make the routing point from the **Agent Team** panel, which shows four, rather than from the cost table |
 
 ---

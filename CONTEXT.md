@@ -152,6 +152,13 @@ _Avoid_: session storage, browser state, conversation state
 than one **Plan**; the surface groups those plans as one conversation while the domain keeps
 `Plan` and `session_id` as their precise names. A route served by a plans endpoint and grouped by
 session is therefore still a chat surface, not a reason to rename the model.
+
+The surface says it in its own names (#73, ADR-025): `ChatPanelLeft` (*"Chat history"*, **New
+chat**), `ChatList`, `ChatPage`, `NewChatService`, `Chat` as the row, and the route **`/chat/:id`**
+— whose `:id` is a **Plan**'s, because a row opens the chat's latest plan. `/plan/:id` still
+redirects there, for the presenter who has the old path in a tab. `Plan`, `PlanStatus`,
+`planSlice`, `PlanPanelRight` and the plan endpoints keep their names, and so does `TaskService`,
+which creates Plans and signs a device in rather than owning the panel.
 _Avoid_: plan history, task history
 
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
@@ -493,7 +500,7 @@ rendered is one prop away from returning.
 
 **Send control** — the button that submits what has been typed, one component
 (`components/content/SendControl.tsx`) on both surfaces, named out loud because it is an icon and
-nothing else: **Send question** on the **Store surface**, **Send message** on the plan surface
+nothing else: **Send question** on the **Store surface**, **Send message** on the chat surface
 (#56). It was two declarations that had already drifted — one repainted by a stylesheet Fluent
 overrides, one by inline styles that override Fluent — so the surface's primary action rendered
 transparent with a grey glyph and looked like its own disabled state. Nothing anywhere declares its
@@ -542,7 +549,7 @@ style to get there: an inline `flex-direction: row` beats a media query, so the 
 have been present, correct and completely inert.
 
 Declared **once**, in `storeSurface.css`, for every column the shell puts beside the conversation —
-including the rail's *container* on the plan surface. A fixed pixel width and a `border-left` are
+including the rail's *container* on the chat surface. A fixed pixel width and a `border-left` are
 what a side column looks like, and below the breakpoint there is nothing to its left, so both are a
 lie. `.plan-panel-right` kept them after the rail itself had given them up, which stacked the rail
 as a 280px band with a left border wrapping a rail with a top border: the same disagreement one
@@ -726,7 +733,7 @@ screen: it is Microsoft's published rate, not a measured bill.
 
 **Transparency rail** — the host for the three panels, reading the Redux slice directly rather than
 taking props so it can sit on **both** surfaces. It has to: the refusal happens on the home surface
-and the answers happen on the plan surface, while the meter's total spans both.
+and the answers happen on the chat surface, while the meter's total spans both.
 
 **Presenter alert** — the R8 proactive shift-task message, triggered by a hidden backend route plus
 a keyboard chord and pushed over the existing WebSocket. No wall-clock timer. The route is
@@ -746,8 +753,8 @@ An **auto-repeat** is not a press — holding the chord a beat too long would ot
 every repeat interval, and a stack of identical cards reads as a bug rather than a beat. A
 **global** listener — the one place this codebase departs from its inline `onKeyDown` convention,
 because the chord must work while focus is anywhere. It POSTs an **empty body**; the words and the
-recipient are both the server's. **Global within the plan surface, though, not within the demo**:
-`usePresenterChord` is mounted by `PlanPage` alone, and the recipient is resolved from the sole
+recipient are both the server's. **Global within the chat surface, though, not within the demo**:
+`usePresenterChord` is mounted by `ChatPage` alone, and the recipient is resolved from the sole
 connected WebSocket, which only a plan has. So on the home surface — where the six **Quick Task**
 cards are, and where the refusal and the **Mocked unlock**'s answer render — no listener is bound
 and the key does nothing at all. That is a fact about the walkthrough's order, not a detail: the
@@ -771,11 +778,11 @@ socket existing. `process_request` starts `run_orchestration_task` as a detached
 returns the HTTP response, and `send_status_update_async` **drops** anything pushed at a socket that
 is not there. Since #63 the connect is initiated on the **`createPlan` response**, before `navigate`
 (ADR-021) — so the window is the round trip and no longer the round trip *plus* a navigation, a
-mount and a second GET. The plan page keeps a connect of its own for the path with no response to
-hang off: a reload of `/plan/:id`. Two entry points, one socket — `connect()` returns the in-flight
+mount and a second GET. The chat page keeps a connect of its own for the path with no response to
+hang off: a reload of `/chat/:id`. Two entry points, one socket — `connect()` returns the in-flight
 handshake for a plan it is already opening rather than reporting a failure to the second caller, and
 `isServing()` counts a handshake as serving because the response's connect and the navigation happen
-in the same tick. The plan page **adopts** the socket it finds rather than opening a second one, and
+in the same tick. The chat page **adopts** the socket it finds rather than opening a second one, and
 owns the **disconnect** for as long as it is on screen, rather than leaving it to
 `continueWithWebsocketFlow` — which only turns true once the plan GET has landed, so a presenter who
 left before it did used to leave an adopted socket open with nothing to close it. Adoption is what
@@ -813,7 +820,7 @@ the same corpus' `NEGATIVE_CONTROLS` — the one it is measured *not* to refuse.
 and rendered *inside* the conversation it follows rather than on the home grid (#61, ADR-024). One
 user today: the troubleshooting fault names the escalation. It exists because beats 3 and 4 are one
 conversation — an associate trying things and then asking for help with the same fault — and the
-only route back to the home screen is **New task**, which starts a new one by construction, so the
+only route back to the home screen is **New chat**, which starts a new one by construction, so the
 **Simulated ticket** read an empty **Troubleshooting record** and said `not reported`. Tapping it
 submits the authored prompt and the authored **Lane** with *the current plan's* `session_id`, which
 needs no backend change: a Lane is a property of the request, so the escalation keeps its
@@ -849,7 +856,7 @@ its caller, for the reason the approval seam owns submission in #22.
 
 _Avoid_: suggested reply, quick reply
 
-**The message box answers a Clarification, and says so when there is none.** The plan surface's box
+**The message box answers a Clarification, and says so when there is none.** The chat surface's box
 is the clarification seam's other half: it posts an answer against a pending question's
 `request_id`, and it can post nothing else. It offered itself regardless — *"Type your message
 here…"* over a submit that defaulted a missing identifier to `''` and posted anyway, a clarification
@@ -947,12 +954,12 @@ There is deliberately **no "agents selected" phase**: no such event exists, beca
 `init_orchestration` and `AgentFactory.get_agents` build the workflow in-process and emit nothing.
 
 It replaces four authored strings — *"Initializing AI agents…"*, *"Generating plan scaffolds…"*,
-*"Optimizing task steps…"*, *"Applying finishing touches…"* — that `PlanPage` rotated on a 3000ms
+*"Optimizing task steps…"*, *"Applying finishing touches…"* — that `ChatPage` rotated on a 3000ms
 timer keyed to a GET-in-flight boolean. Nothing scaffolded and nothing optimised; they named four
 stages the system does not have, three inches from a **Token meter** whose whole discipline is
 **Not reported vs measured**. It also replaces six components each carrying their own copy, which
 had already drifted into telling the story backwards — *"Plan created — Fast lane"* on the home
-surface, then *"Loading plan data…"* on the plan surface. `models/progressNarration.ts` owns the
+surface, then *"Loading plan data…"* on the chat surface. `models/progressNarration.ts` owns the
 strings, on the **Store surface**'s pattern — and a test reads the source tree, because six
 components each holding a copy is a fault about the repository that no render can see —
 while `store/slices/progressSlice.ts` holds the phase **across the navigation**, because across two
@@ -1269,11 +1276,11 @@ opened the first plan, and the troubleshooting row stayed highlighted while the 
 The panel was therefore inconsistent with **Chat**: one session must be one row, named by its first
 plan and opening its latest plan.
 
-Fixed by grouping in `TaskService.transformPlansToTasks`, which now emits one row per `session_id`
+Fixed by grouping in `TaskService.transformPlansToChats`, which now emits one row per `session_id`
 — named by the **first** plan's `initial_goal`, carrying the **latest** plan's id as the row's own
 `planId`, and taking its status and date from that latest plan. First and latest are read from
 `timestamp`, because the order a history endpoint returns plans in says nothing about which turn
-opened a conversation. `PlanPanelLeft` navigates to the row's `planId` rather than searching the
+opened a conversation. `ChatPanelLeft` navigates to the row's `planId` rather than searching the
 plans for one matching the row's session: that search took the first match, and taking the first
 match is what made the escalation unreachable.
 

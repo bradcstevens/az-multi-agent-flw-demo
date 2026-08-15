@@ -159,7 +159,7 @@ describe('the transparency slice', () => {
     it('keeps the meter when only the conversation moved on', () => {
         // The meter is the walkthrough's running total — a refusal on the home
         // surface has to still be on it when the next question is answered on
-        // the plan surface, or the guardrail's zero is never seen beside a cost.
+        // the chat surface, or the guardrail's zero is never seen beside a cost.
         let state = reducer(
             initial(),
             refusalRecorded({ kind: 'policy_block', code: 'identity_boundary', message: 'no' }),

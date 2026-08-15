@@ -18,7 +18,7 @@ describe('the send control and the two themes', () => {
     ])('declares no colour of its own in the %s theme', (_name, theme) => {
         // The half the stylesheet guard cannot see. A rule in `styles/` about
         // this control is a rule Fluent overrides; an *inline* one is the
-        // opposite failure and the one the plan surface actually had — a brand
+        // opposite failure and the one the chat surface actually had — a brand
         // foreground on a transparent background, hardcoded past the theme, so
         // the contrast it happened to meet in one theme was nobody's guarantee
         // in the other (#56). Colour is the theme's to state, in both.

@@ -25,7 +25,7 @@ vi.mock('../store/PlanDataService', () => ({
 }));
 
 import HomePage from './HomePage';
-import PlanPage from './PlanPage';
+import ChatPage from './ChatPage';
 import TransparencyRail from '@/components/transparency/TransparencyRail';
 import { TeamService } from '../store/TeamService';
 import { PlanDataService } from '../store/PlanDataService';
@@ -65,7 +65,7 @@ const TEAM = {
 } as any;
 
 /**
- * A reply with the model's own Markdown headings in it. The plan surface has
+ * A reply with the model's own Markdown headings in it. The chat surface has
  * to hold its outline while an agent is talking, and `#` in a reply is where
  * the second top-level heading came from.
  */
@@ -139,12 +139,12 @@ const renderHomeSurface = () =>
         </Provider>,
     );
 
-const renderPlanSurface = () =>
+const renderChatSurface = () =>
     render(
         <Provider store={makeStore()}>
-            <MemoryRouter initialEntries={['/plan/plan-1']}>
+            <MemoryRouter initialEntries={['/chat/plan-1']}>
                 <Routes>
-                    <Route path="/plan/:planId" element={<PlanPage />} />
+                    <Route path="/chat/:id" element={<ChatPage />} />
                 </Routes>
             </MemoryRouter>
         </Provider>,
@@ -208,9 +208,9 @@ describe('the home surface has a heading outline', () => {
     });
 });
 
-describe('the plan surface has a heading outline', () => {
+describe('the chat surface has a heading outline', () => {
     it('exposes exactly one top-level heading, and it names the assistant', async () => {
-        renderPlanSurface();
+        renderChatSurface();
 
         await waitFor(() => expect(screen.getByTestId('transparency-rail')).toBeInTheDocument());
         await waitFor(() => expect(screen.getByText('Plan Overview')).toBeInTheDocument());
@@ -220,7 +220,7 @@ describe('the plan surface has a heading outline', () => {
     });
 
     it('makes the plan and every transparency panel reachable by heading navigation', async () => {
-        renderPlanSurface();
+        renderChatSurface();
 
         await waitFor(() => expect(screen.getByText('Plan Overview')).toBeInTheDocument());
 
@@ -234,7 +234,7 @@ describe('the plan surface has a heading outline', () => {
     });
 
     it('descends without skipping a level', async () => {
-        renderPlanSurface();
+        renderChatSurface();
 
         await waitFor(() => expect(screen.getByText('Plan Overview')).toBeInTheDocument());
 
@@ -246,7 +246,7 @@ describe('the plan surface has a heading outline', () => {
 describe('the rail heads its panels without heading the surface', () => {
     it('exposes no top-level heading of its own', () => {
         // The rail is on both surfaces. A top-level heading inside it would be
-        // a second one on each — and on the plan surface it is rendered inside
+        // a second one on each — and on the chat surface it is rendered inside
         // the panel *beside* the conversation, which is not what the page is
         // about.
         render(

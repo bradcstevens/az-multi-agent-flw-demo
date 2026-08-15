@@ -30,11 +30,11 @@ vi.mock('../store/PlanDataService', () => ({
 vi.mock('../store/TaskService', () => ({
     TaskService: {
         createPlan: vi.fn(),
-        transformPlansToTasks: vi.fn(() => ({ inProgress: [], completed: [] })),
+        transformPlansToChats: vi.fn(() => ({ inProgress: [], completed: [] })),
     },
 }));
 
-vi.mock('../components/content/PlanPanelLeft', () => ({
+vi.mock('../components/content/ChatPanelLeft', () => ({
     default: () => null,
 }));
 
@@ -42,7 +42,7 @@ vi.mock('../components/content/PlanPanelRight', () => ({
     default: () => null,
 }));
 
-import PlanPage from './PlanPage';
+import ChatPage from './ChatPage';
 import { PlanDataService } from '../store/PlanDataService';
 import { TaskService } from '../store/TaskService';
 import planReducer from '../store/slices/planSlice';
@@ -142,9 +142,9 @@ const makeStore = () => {
 const renderPlan = () =>
     render(
         <Provider store={makeStore()}>
-            <MemoryRouter initialEntries={['/plan/plan-troubleshooting']}>
+            <MemoryRouter initialEntries={['/chat/plan-troubleshooting']}>
                 <Routes>
-                    <Route path="/plan/:planId" element={<PlanPage />} />
+                    <Route path="/chat/:id" element={<ChatPage />} />
                 </Routes>
             </MemoryRouter>
         </Provider>,

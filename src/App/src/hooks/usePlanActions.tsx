@@ -51,7 +51,7 @@ export function usePlanActions() {
         // (#24). The Token meter deliberately does not: it is the
         // walkthrough's running total, and clearing it here would mean the
         // guardrail's zero — recorded on the home surface — was never seen
-        // beside a row that cost something on the plan surface.
+        // beside a row that cost something on the chat surface.
         dispatch(conversationStarted());
     }, [dispatch]);
 

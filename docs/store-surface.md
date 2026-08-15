@@ -105,7 +105,7 @@ can break these tests is the one change that would not have run them.
 ## The phone
 
 The associate is holding a phone, in a store, on a shared device. The accelerator's shell is three
-columns — task history, conversation, transparency rail — which is roughly 900px of furniture
+columns — chat history, conversation, transparency rail — which is roughly 900px of furniture
 before the conversation gets any width at all.
 
 At **900px** the columns stack, the transparency rail moves beneath the conversation, and the
@@ -128,7 +128,7 @@ stops applying, and it would be discovered on a phone, on stage.
 The rail is a direct child of the shell on the home surface and a **grandchild** on the plan
 surface, where `PlanPanelRight` wraps it. Moving the breakpoint fixed the rail and left its
 container behind: `.plan-panel-right` kept `width: 280px`, `height: 100vh` and a `border-left`
-below the breakpoint, so on the plan surface the stacked rail was a 280px band, a viewport tall,
+below the breakpoint, so on the chat surface the stacked rail was a 280px band, a viewport tall,
 with a left border on the outside and a top border on the inside. A side column wearing the styling
 of a stacked one — the ticket's own complaint, one level up.
 
@@ -158,7 +158,7 @@ failure was invisible in a different way.
 
 The rail was a **content box**: 320px declared plus 16px of padding on each side is 353px rendered,
 so every width in the stylesheet was 33px short of the truth. Its container declared 280px — a
-second number for the same column — and `overflow: hidden`, so on the plan surface a 353px rail
+second number for the same column — and `overflow: hidden`, so on the chat surface a 353px rail
 rendered into a 321px box and **53px of it was amputated at every desktop width**, with no scrollbar
 to say so. Because `.token-meter` cells could not wrap, the end that fell outside was the estimated
 Copilot Credits column: the panel that exists to prove what an answer cost, losing the number.
@@ -247,7 +247,7 @@ surfaces).
 ### A reply may not head the surface
 
 The words in a reply come from a language model, and `react-markdown` renders a `#` as a real
-`<h1>`. So a reply that opened with one put a **second top-level heading** on the plan surface,
+`<h1>`. So a reply that opened with one put a **second top-level heading** on the chat surface,
 above the very panels that explain where that reply came from and what it cost. A screen-reader
 user skimming by heading would meet the model's prose before **Grounding** and **What this cost**,
 with nothing to tell the surface's structure apart from the answer's. The backend makes it likelier

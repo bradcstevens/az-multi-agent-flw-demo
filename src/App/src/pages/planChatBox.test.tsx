@@ -42,7 +42,7 @@ vi.mock('../store/TaskService', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../store/TaskService')>();
     class StubbedTaskService extends actual.TaskService {
         static createPlan = vi.fn();
-        static transformPlansToTasks = vi.fn(() => ({ inProgress: [], completed: [] }));
+        static transformPlansToChats = vi.fn(() => ({ inProgress: [], completed: [] }));
     }
     // The barrel re-exports the default binding, which the conversation's
     // agent messages reach for; a factory that returns only the named one
@@ -50,10 +50,10 @@ vi.mock('../store/TaskService', async (importOriginal) => {
     return { TaskService: StubbedTaskService, default: StubbedTaskService };
 });
 
-vi.mock('../components/content/PlanPanelLeft', () => ({ default: () => null }));
+vi.mock('../components/content/ChatPanelLeft', () => ({ default: () => null }));
 vi.mock('../components/content/PlanPanelRight', () => ({ default: () => null }));
 
-import PlanPage from './PlanPage';
+import ChatPage from './ChatPage';
 import { PlanDataService } from '../store/PlanDataService';
 import planReducer from '../store/slices/planSlice';
 import chatReducer from '../store/slices/chatSlice';
@@ -68,7 +68,7 @@ import { NOTHING_TO_ANSWER } from '../components/content/PlanChatBody';
 import { PlanStatus, ProcessedPlanData } from '../models';
 
 /**
- * What the plan surface's message box does with what is typed into it (#68).
+ * What the chat surface's message box does with what is typed into it (#68).
  *
  * The box answers a **Clarification** and nothing else, so the question this
  * suite asks is the one the surface got wrong in both directions: it posted a
@@ -119,9 +119,9 @@ const renderPlan = () =>
                     getDefaultMiddleware({ serializableCheck: false }),
             })}
         >
-            <MemoryRouter initialEntries={['/plan/plan-troubleshooting']}>
+            <MemoryRouter initialEntries={['/chat/plan-troubleshooting']}>
                 <Routes>
-                    <Route path="/plan/:planId" element={<PlanPage />} />
+                    <Route path="/chat/:id" element={<ChatPage />} />
                 </Routes>
             </MemoryRouter>
         </Provider>,
@@ -145,7 +145,7 @@ const answer = (text: string) => {
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
 };
 
-describe('the plan surface message box', () => {
+describe('the chat surface message box', () => {
     beforeEach(() => {
         FakeSocket.instances = [];
         vi.stubGlobal('WebSocket', FakeSocket);

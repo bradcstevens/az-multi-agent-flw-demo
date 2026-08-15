@@ -1,4 +1,11 @@
-export interface Task {
+/**
+ * The left panel's rows.
+ *
+ * A row is a **Chat** — one Session and the plans it holds (ADR-025) — which
+ * is why the row's own id is a `session_id` and the Plan it opens is a
+ * separate field.
+ */
+export interface Chat {
     id: string;
     name: string;
     /**
@@ -15,10 +22,10 @@ export interface Task {
     date?: string;
 }
 
-export interface TaskListProps {
-    completedTasks: Task[];
-    onTaskSelect: (taskId: string) => void;
+export interface ChatListProps {
+    completedChats: Chat[];
+    onChatSelect: (chatId: string) => void;
     loading?: boolean;
-    selectedTaskId?: string;
+    selectedChatId?: string;
     isLoadingTeam?: boolean;
 }

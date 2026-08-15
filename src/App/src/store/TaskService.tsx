@@ -1,5 +1,5 @@
 import { Plan, PlanStatus } from "../models";
-import { Task } from "../models/taskList";
+import { Chat } from "../models/chatList";
 import { apiService } from "../api/apiService";
 import { parsePolicyBlock, PolicyBlockError } from "../api/policyBlock";
 import { InputTask, InputTaskResponse } from "../models/inputTask";
@@ -10,11 +10,15 @@ import {
 } from "../models/signedInDevice";
 
 /**
- * TaskService - Service for handling task-related operations and transformations
+ * TaskService - Service for handling plan and session operations.
+ *
+ * Named for the domain it talks to, not for the surface: it creates Plans,
+ * signs a device in, and hands the left panel its rows. Only the row-shaped
+ * half speaks the chat vocabulary (ADR-025).
  */
 export class TaskService {
   /**
-   * Transform Plan data into the rows the TaskList renders — one per Chat.
+   * Transform Plan data into the rows the ChatList renders — one per Chat.
    *
    * A Chat is a Session (ADR-025) and can hold more than one Plan, so this
    * groups by `session_id`: the row is named by the conversation's **first**
@@ -23,16 +27,16 @@ export class TaskService {
    * @param plansData Array of PlanWithSteps to transform
    * @returns Object containing inProgress and completed chat arrays
    */
-  static transformPlansToTasks(plansData: Plan[]): {
-    inProgress: Task[];
-    completed: Task[];
+  static transformPlansToChats(plansData: Plan[]): {
+    inProgress: Chat[];
+    completed: Chat[];
   } {
     if (!plansData || plansData.length === 0) {
       return { inProgress: [], completed: [] };
     }
 
-    const inProgress: Task[] = [];
-    const completed: Task[] = [];
+    const inProgress: Chat[] = [];
+    const completed: Chat[] = [];
 
     // A Chat is a Session (ADR-025), and ADR-024 has the escalation continue
     // the troubleshooting turn's session — so a row is a `session_id`, never a
@@ -53,7 +57,7 @@ export class TaskService {
       const first = ordered[0];
       const latest = ordered[ordered.length - 1];
 
-      const task: Task = {
+      const chat: Chat = {
         id: first.session_id,
         planId: latest.id,
         name: first.initial_goal,
@@ -65,9 +69,9 @@ export class TaskService {
       if (
         latest.overall_status === PlanStatus.COMPLETED
       ) {
-        completed.push(task);
+        completed.push(chat);
       } else {
-        inProgress.push(task);
+        inProgress.push(chat);
       }
     });
 
@@ -79,7 +83,7 @@ export class TaskService {
    *
    * Total. `Intl.DateTimeFormat.format` throws `RangeError` on an unreadable
    * timestamp, and it is called while building the whole history — so one
-   * malformed record took out every row rather than its own date. `Task.date`
+   * malformed record took out every row rather than its own date. `Chat.date`
    * is optional and the row already renders without one.
    */
   private static formatPlanDate(timestamp: string): string | undefined {
@@ -116,47 +120,47 @@ export class TaskService {
   }
 
   /**
-   * Get task statistics from task arrays
-   * @param inProgressTasks Array of in-progress tasks
-   * @param completedTasks Array of completed tasks
-   * @returns Object containing task count statistics
+   * Get chat statistics from chat arrays
+   * @param inProgressChats Array of in-progress chats
+   * @param completedChats Array of completed chats
+   * @returns Object containing chat count statistics
    */
-  static getTaskStatistics(inProgressTasks: Task[], completedTasks: Task[]) {
+  static getChatStatistics(inProgressChats: Chat[], completedChats: Chat[]) {
     return {
-      inProgressCount: inProgressTasks.length,
-      completedCount: completedTasks.length,
-      totalCount: inProgressTasks.length + completedTasks.length,
+      inProgressCount: inProgressChats.length,
+      completedCount: completedChats.length,
+      totalCount: inProgressChats.length + completedChats.length,
     };
   }
 
   /**
-   * Find a task by ID in either task array
-   * @param taskId The task ID to search for
-   * @param inProgressTasks Array of in-progress tasks
-   * @param completedTasks Array of completed tasks
-   * @returns The found task or undefined
+   * Find a chat by ID in either chat array
+   * @param chatId The chat ID to search for
+   * @param inProgressChats Array of in-progress chats
+   * @param completedChats Array of completed chats
+   * @returns The found chat or undefined
    */
-  static findTaskById(
-    taskId: string,
-    inProgressTasks: Task[],
-    completedTasks: Task[]
-  ): Task | undefined {
-    return [...inProgressTasks, ...completedTasks].find(
-      (task) => task.id === taskId
+  static findChatById(
+    chatId: string,
+    inProgressChats: Chat[],
+    completedChats: Chat[]
+  ): Chat | undefined {
+    return [...inProgressChats, ...completedChats].find(
+      (chat) => chat.id === chatId
     );
   }
 
   /**
-   * Filter tasks by status
-   * @param tasks Array of tasks to filter
+   * Filter chats by status
+   * @param chats Array of chats to filter
    * @param status Status to filter by
-   * @returns Filtered array of tasks
+   * @returns Filtered array of chats
    */
-  static filterTasksByStatus(
-    tasks: Task[],
+  static filterChatsByStatus(
+    chats: Chat[],
     status: "inprogress" | "completed"
-  ): Task[] {
-    return tasks.filter((task) => task.status === status);
+  ): Chat[] {
+    return chats.filter((chat) => chat.status === status);
   }
 
   /**
@@ -250,7 +254,7 @@ export class TaskService {
    *   Omitted for free-typed input, which the backend's lane router then
    *   routes by its keyword fallback (issue #16, ADR-013).
    * @param sessionId An existing conversation to continue. Omitted when a
-   *   task starts a new conversation.
+   *   chat starts a new conversation.
    * @param startingTaskId The authored Quick Task initiating this request.
    * @returns Promise with the response containing plan ID, status and the
    *   lane actually taken

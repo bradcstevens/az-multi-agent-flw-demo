@@ -7,7 +7,7 @@ import type { Components } from 'react-markdown';
  *
  * The words in a reply come from a language model, and `react-markdown` renders
  * a `#` as a real `<h1>`. So a reply that happened to open with one put a
- * second top-level heading on the plan surface — above the very panels that
+ * second top-level heading on the chat surface — above the very panels that
  * explain where that reply came from and what it cost. A screen-reader user
  * skimming by heading would meet the model's prose before **Grounding** and
  * **What this cost**, with nothing to tell the surface's structure apart from

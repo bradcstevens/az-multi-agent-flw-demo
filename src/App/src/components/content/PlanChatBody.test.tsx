@@ -36,7 +36,7 @@ const renderBody = (
     );
 };
 
-describe('the plan surface send control', () => {
+describe('the chat surface send control', () => {
     it('is named for what it does', () => {
         // The same unnamed icon as the home surface (#56), on the surface where
         // the conversation actually continues.
@@ -72,7 +72,7 @@ describe('the plan surface send control', () => {
     });
 });
 
-describe('the plan surface message box outside a clarification', () => {
+describe('the chat surface message box outside a clarification', () => {
     /*
       The governing rule, applied to the one control on this surface (#68): a
       surface may say nothing, but it may not say something that is not so. The

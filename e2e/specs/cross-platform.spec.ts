@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { quickTaskNamed, rehearsedHit } from '../authored';
 import { outcomeOf, recordRehearsal } from '../evidence';
-import { PlanSurface } from '../pages/PlanSurface';
+import { ChatSurface } from '../pages/ChatSurface';
 import { StoreSurface } from '../pages/StoreSurface';
 
 /**
@@ -93,7 +93,7 @@ test.afterEach(async ({ page }) => {
     // Guarded, because the ledger observes the run and must not decide it: a
     // page closed by a timeout is not a reason to turn a beat red.
     try {
-        observed.agentsBilled = await new PlanSurface(page).rail.agentsBilled();
+        observed.agentsBilled = await new ChatSurface(page).rail.agentsBilled();
     } catch (error) {
         console.warn(`the cost table was not read: ${error}`);
     }
@@ -161,7 +161,7 @@ test.describe('the cross-platform hop', () => {
 
         await store.tapQuickTask(task.name);
 
-        const plan = new PlanSurface(page);
+        const plan = new ChatSurface(page);
         await plan.waitForArrival(120_000);
 
         // The hop itself. The badge appears only when the backend emitted

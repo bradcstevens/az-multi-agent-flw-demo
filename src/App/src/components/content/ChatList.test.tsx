@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { FluentProvider, teamsLightTheme } from '@fluentui/react-components';
 
-import TaskList from './TaskList';
-import { Task } from '@/models';
+import ChatList from './ChatList';
+import { Chat } from '@/models';
 import {
     HIDDEN_COMPLETED_TASKS_KEY,
     HIDE_COMPLETED_LABEL,
@@ -13,7 +13,7 @@ import {
     forgetHiddenCompletedTasks,
 } from '../../models/hiddenCompletedTasks';
 
-const completed = (id: string, name: string): Task => ({
+const completed = (id: string, name: string): Chat => ({
     id,
     planId: `${id}-latest`,
     name,
@@ -22,16 +22,16 @@ const completed = (id: string, name: string): Task => ({
 });
 
 const MORNING = [
-    completed('plan-1', 'How do I close the store?'),
-    completed('plan-2', 'The register is frozen'),
+    completed('chat-1', 'How do I close the store?'),
+    completed('chat-2', 'The register is frozen'),
 ];
 
-const renderList = (completedTasks: Task[], props: Record<string, unknown> = {}) =>
+const renderList = (completedChats: Chat[], props: Record<string, unknown> = {}) =>
     render(
         <FluentProvider theme={teamsLightTheme}>
-            <TaskList
-                completedTasks={completedTasks}
-                onTaskSelect={vi.fn()}
+            <ChatList
+                completedChats={completedChats}
+                onChatSelect={vi.fn()}
                 {...props}
             />
         </FluentProvider>,
@@ -44,7 +44,7 @@ beforeEach(() => {
     forgetHiddenCompletedTasks();
 });
 
-describe('the completed task list', () => {
+describe('the completed chat list', () => {
     it('shows the morning of rehearsals it has been given', () => {
         renderList(MORNING);
 
@@ -83,7 +83,7 @@ describe('the completed task list', () => {
         // failure #25 already found once; the file itself is the only place the
         // pattern is visible.
         const source = readFileSync(
-            join(__dirname, 'TaskList.tsx'),
+            join(__dirname, 'ChatList.tsx'),
             'utf-8',
         ).replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -128,7 +128,7 @@ describe('hiding the completed tasks', () => {
         // What the panel would read on the other side of a refresh.
         expect(
             JSON.parse(window.sessionStorage.getItem(HIDDEN_COMPLETED_TASKS_KEY) ?? 'null'),
-        ).toEqual(['plan-1', 'plan-2']);
+        ).toEqual(['chat-1', 'chat-2']);
 
         renderList(MORNING);
         expect(screen.queryByText('How do I close the store?')).not.toBeInTheDocument();

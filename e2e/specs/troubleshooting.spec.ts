@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { troubleshootingTask } from '../authored';
 import { attemptedSteps } from '../backend';
 import { recordRehearsal } from '../evidence';
-import { PlanSurface } from '../pages/PlanSurface';
+import { ChatSurface } from '../pages/ChatSurface';
 import { StoreSurface } from '../pages/StoreSurface';
 
 /**
@@ -38,7 +38,7 @@ test.describe('the troubleshooting beat', () => {
         await store.open();
         await store.tapQuickTask(task.name);
 
-        const plan = new PlanSurface(page);
+        const plan = new ChatSurface(page);
         await plan.waitForArrival(120_000);
 
         await expect(plan.rehearsedReplies).toBeVisible({ timeout: 240_000 });

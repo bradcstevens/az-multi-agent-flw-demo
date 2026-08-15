@@ -54,7 +54,7 @@ describe('the transparency rail fits its own box', () => {
     it('renders the width it declares, padding included', () => {
         // A content-box column is its declared width *plus* its padding, so
         // every width in the stylesheet is a number the surface never uses. On
-        // the plan surface that difference is clipped away silently by the
+        // the chat surface that difference is clipped away silently by the
         // container; on a phone it is cut off the right-hand edge.
         const misdeclared = allRulesIncludingMediaQueries()
             .filter((rule) => DECLARED_LENGTH.test(rule.body) && DECLARES_PADDING.test(rule.body))

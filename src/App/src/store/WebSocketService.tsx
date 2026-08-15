@@ -43,10 +43,10 @@ class WebSocketService {
           One socket per plan, whichever caller asks first (ADR-021).
 
           The connect is initiated on the `createPlan` response and the plan
-          page keeps its own for a reload of /plan/:id, so both run for a plan
+          page keeps its own for a reload of /chat/:id, so both run for a plan
           asked from the home surface — the second landing while the first is
           still handshaking. Rejecting it told that caller the connection had
-          failed while the same connection was succeeding, and the plan page
+          failed while the same connection was succeeding, and the chat page
           logs a reject as "continuing without real-time updates", which was
           then untrue.
         */
@@ -400,7 +400,7 @@ class WebSocketService {
      *
      * The handshake counts. `HomeInput` starts the connect on the `createPlan`
      * response and navigates in the same tick (ADR-021), so by the time the
-     * plan page's effects run the socket it must adopt is almost always still
+     * chat page's effects run the socket it must adopt is almost always still
      * `CONNECTING`. A check that only saw `OPEN` would call it somebody else's
      * and close it.
      */

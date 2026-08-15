@@ -24,7 +24,7 @@ import { StreamMessage, WebsocketMessageType } from '@/models';
  * transparency signal and lives in a slice of its own. It is subscribed here
  * because a second `useEffect` in a second hook is a second thing to mount on
  * every surface the first is mounted on — and the surface this arrives on,
- * the plan page, is the one where a missing subscription looks exactly like a
+ * the chat page, is the one where a missing subscription looks exactly like a
  * ticket that was never raised.
  */
 export function useTransparencySignals(): void {

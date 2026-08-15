@@ -166,7 +166,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
         declared in `storeSurface.css` in the one place that declares it for
         the rail this panel contains. Nothing here may pin a width, a height or
         a side border inline — an inline declaration beats a media query, and
-        the breakpoint would be inert for the whole plan surface.
+        the breakpoint would be inert for the whole chat surface.
       */}
       {raisedTicket && <SimulatedTicketCard ticket={raisedTicket} />}
 

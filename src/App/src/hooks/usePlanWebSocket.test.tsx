@@ -24,12 +24,12 @@ import { useAppSelector } from '@/store/hooks';
 import PlanChat from '@/components/content/PlanChat';
 
 /**
- * The plan page's half of the connection lifecycle (issue #63, ADR-021).
+ * The chat page's half of the connection lifecycle (issue #63, ADR-021).
  *
- * The connect is initiated on the `createPlan` response, so the plan page is no
+ * The connect is initiated on the `createPlan` response, so the chat page is no
  * longer the only way a socket gets opened — but it is still the only thing
  * that knows when the surface has finished with one, and it is the only connect
- * a reload of `/plan/:id` has, that path having no response to hang off.
+ * a reload of `/chat/:id` has, that path having no response to hang off.
  *
  * The host renders the **real** conversation, `PlanChat`, fed from the store the
  * way `PlanPage` feeds it. A stand-in that renders one of the two in-flight
@@ -124,7 +124,7 @@ beforeEach(() => {
     window.appConfig = { API_URL: 'https://backend.example/api' } as never;
 });
 
-describe('the plan page and a socket opened before it', () => {
+describe('the chat page and a socket opened before it', () => {
     it('opens no second socket for a plan already connected', async () => {
         await openedOnTheResponse('plan-1');
         const { store } = renderHost('plan-1');
@@ -149,7 +149,7 @@ describe('the plan page and a socket opened before it', () => {
         expect(webSocketService.isConnected()).toBe(false);
     });
 
-    it('connects on a reload of /plan/:id, which has no response to hang off', async () => {
+    it('connects on a reload of /chat/:id, which has no response to hang off', async () => {
         const { store } = renderHost('plan-1');
 
         act(() => {
@@ -160,11 +160,11 @@ describe('the plan page and a socket opened before it', () => {
     });
 });
 
-describe('the plan page mounted twice, as StrictMode mounts it', () => {
+describe('the chat page mounted twice, as StrictMode mounts it', () => {
     it('still has a socket for the plan after the double invoke', async () => {
         // React 18 StrictMode runs every effect setup, then its cleanup, then
         // the setup again. A cleanup that disconnects a socket no setup opens
-        // is therefore a socket closed on arrival — and the plan page's own
+        // is therefore a socket closed on arrival — and the chat page's own
         // connect cannot reopen it, because `continueWithWebsocketFlow` is
         // still false until the plan GET lands. That is #63 again, reachable
         // from the dev server, which is the surface the local Demo validator
@@ -215,7 +215,7 @@ const inFlightIndicators = () => screen.queryAllByRole('progressbar');
  * The narration as the home surface arms it, before the navigation (ADR-023).
  *
  * `HomeInput` dispatches both: the POST going out, and the lane the response
- * reported. The plan page inherits the phase because one slice holds it — which
+ * reported. The chat page inherits the phase because one slice holds it — which
  * is the whole reason there is a slice.
  */
 const askAQuestion = (store: ReturnType<typeof makeStore>, planId: string) => {

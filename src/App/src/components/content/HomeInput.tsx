@@ -26,7 +26,7 @@ import {
   requestSettled,
 } from "../../store/slices/progressSlice";
 import LaneBadge from "../lane/LaneBadge";
-import { NewTaskService } from "../../store/NewTaskService";
+import { NewChatService } from "../../store/NewChatService";
 import webSocketService from "@/store/WebSocketService";
 import { useAppDispatch } from "@/store/hooks";
 import { refusalRecorded, requestStarted } from "@/store/slices/transparencySlice";
@@ -119,7 +119,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
   };
 
   useEffect(() => {
-    const cleanup = NewTaskService.addResetListener(resetTextarea);
+    const cleanup = NewChatService.addResetListener(resetTextarea);
     return cleanup;
   }, []);
 
@@ -155,7 +155,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
     dispatch(requestStarted());
     // The **Progress narration**'s first phase, and its only authored words
     // (#64, ADR-023): the POST is in flight, and that is all anything knows.
-    // The toast reads them out of the same module the plan page will, so the
+    // The toast reads them out of the same module the chat page will, so the
     // two surfaces cannot disagree across the navigation between them.
     dispatch(requestSent());
     let id = showToast(SENDING, "progress");
@@ -187,7 +187,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       // a null plan here is not a failure to create one.
       const answer = parsePersonalAnswer(response);
       if (answer) {
-        // Answered here, with no plan and no plan page. Nothing downstream
+        // Answered here, with no plan and no chat page. Nothing downstream
         // could ever stop a narration left running.
         dispatch(requestSettled());
         dismissToast(id);
@@ -200,7 +200,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
       // assistant, not an implementation detail (ADR-013). It is not always
       // the lane declared: free-typed input declares nothing, and an
       // unreadable declaration falls open to the Deliberate lane. It is
-      // carried to the plan page, where the answer (or the approval step)
+      // carried to the chat page, where the answer (or the approval step)
       // arrives, so it outlives this toast.
       if (response.plan_id && response.plan_id !== null) {
         // The lane the router decided, read from the same `response.lane` the
@@ -215,7 +215,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
           }),
         );
 
-        // The socket opens here, on the response, and not on the plan page
+        // The socket opens here, on the response, and not on the chat page
         // (ADR-021). `process_request` schedules the orchestration *before* it
         // returns this response, so every frame emitted between now and the
         // browser's connect is pushed at a socket that does not exist and
@@ -224,11 +224,11 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
         // specialist took the question. Waiting for `navigate`, a mount and a
         // second GET put all three inside that window (#63).
         //
-        // This looks misplaced in a submit handler and is not: the plan page
-        // keeps its own connect for a reload of /plan/:id, which has no
+        // This looks misplaced in a submit handler and is not: the chat page
+        // keeps its own connect for a reload of /chat/:id, which has no
         // response to hang off. Read ADR-021 before moving it back.
         webSocketService.connect(response.plan_id).catch(() => {
-          // The plan page retries, and the surface degrades to polling. A
+          // The chat page retries, and the surface degrades to polling. A
           // failure here must not take the navigation with it.
         });
 
@@ -240,7 +240,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
         );
         dismissToast(id);
 
-        navigate(`/plan/${response.plan_id}`, {
+        navigate(`/chat/${response.plan_id}`, {
           state: { lane: response.lane },
         });
       } else {

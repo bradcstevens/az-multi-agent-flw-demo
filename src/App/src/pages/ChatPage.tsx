@@ -70,7 +70,7 @@ import { usePresenterChord } from '../hooks/usePresenterChord';
 /* ── Components ──────────────────────────────────────────────── */
 import PlanChat from '../components/content/PlanChat';
 import PlanPanelRight from '../components/content/PlanPanelRight';
-import PlanPanelLeft from '../components/content/PlanPanelLeft';
+import ChatPanelLeft from '../components/content/ChatPanelLeft';
 import CoralShellColumn from '../commonComponents/components/Layout/CoralShellColumn';
 import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
@@ -92,16 +92,21 @@ import Octo from '../commonComponents/imports/Octopus.png';
 import LoadingMessage from '../commonComponents/components/LoadingMessage';
 import PlanCancellationDialog from '../components/common/PlanCancellationDialog';
 import TimeoutDialog from '../components/common/TimeoutDialog';
-import '../styles/PlanPage.css';
+import '../styles/ChatPage.css';
 
 // Singleton API service
 const apiService = new APIService();
 
 /* ================================================================
- *  PlanPage — refactored to use Redux + extracted hooks
+ *  ChatPage — refactored to use Redux + extracted hooks
  * ================================================================ */
-const PlanPage: React.FC = () => {
-    const { planId } = useParams<{ planId: string }>();
+const ChatPage: React.FC = () => {
+    /*
+      The route is `/chat/:id` and the id in it is a **Plan**'s (ADR-025): a
+      Chat is a Session and can hold more than one Plan, so the surface says
+      chat while the identity in the URL stays the precise one.
+    */
+    const { id: planId } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
     /**
@@ -348,7 +353,7 @@ const PlanPage: React.FC = () => {
                 }),
             );
             webSocketService.connect(response.plan_id).catch(() => {
-                // The plan page retries, and the surface degrades to polling.
+                // The chat page retries, and the surface degrades to polling.
             });
             dismissToast(id);
             showToast(
@@ -357,7 +362,7 @@ const PlanPage: React.FC = () => {
                     : 'Plan created!',
                 'success',
             );
-            navigate(`/plan/${response.plan_id}`, { state: { lane: response.lane } });
+            navigate(`/chat/${response.plan_id}`, { state: { lane: response.lane } });
         } catch {
             dispatch(requestSettled());
             dismissToast(id);
@@ -463,7 +468,7 @@ const PlanPage: React.FC = () => {
     );
 
     /* ── Left-panel handlers ────────────────────────────────── */
-    const handleNewTaskButton = useCallback(() => {
+    const handleNewChatButton = useCallback(() => {
         handleNavigationWithAlert(() => navigate('/', { state: { focusInput: true } }));
     }, [navigate, handleNavigationWithAlert]);
 
@@ -517,9 +522,9 @@ const PlanPage: React.FC = () => {
         return (
             <CoralShellColumn>
                 <CoralShellRow>
-                    <PlanPanelLeft
-                        reloadTasks={reloadLeftList}
-                        onNewTaskButton={handleNewTaskButton}
+                    <ChatPanelLeft
+                        reloadChats={reloadLeftList}
+                        onNewChatButton={handleNewChatButton}
                         restReload={resetReload}
                         onNavigationWithAlert={handleNavigationWithAlert}
                     />
@@ -537,9 +542,9 @@ const PlanPage: React.FC = () => {
     return (
         <CoralShellColumn>
             <CoralShellRow>
-                <PlanPanelLeft
-                    reloadTasks={reloadLeftList}
-                    onNewTaskButton={handleNewTaskButton}
+                <ChatPanelLeft
+                    reloadChats={reloadLeftList}
+                    onNewChatButton={handleNewChatButton}
                     restReload={resetReload}
                     onNavigationWithAlert={handleNavigationWithAlert}
                 />
@@ -629,6 +634,6 @@ const PlanPage: React.FC = () => {
     );
 };
 
-const MemoizedPlanPage = React.memo(PlanPage);
-MemoizedPlanPage.displayName = 'PlanPage';
-export default MemoizedPlanPage;
+const MemoizedChatPage = React.memo(ChatPage);
+MemoizedChatPage.displayName = 'ChatPage';
+export default MemoizedChatPage;

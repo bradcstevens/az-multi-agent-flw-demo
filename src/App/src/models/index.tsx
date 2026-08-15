@@ -10,8 +10,8 @@ export * from './plan';
 export * from './messages';
 export * from './inputTask';
 export * from './agentMessage';
-export * from './taskList';
-export * from './planPanelLeft';
+export * from './chatList';
+export * from './chatPanelLeft';
 export * from './homeInput';
 export * from './auth';
 

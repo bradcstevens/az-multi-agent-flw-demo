@@ -39,7 +39,7 @@ surface ends up saying something that is not so:
 
 | State | Scope | Cleared by |
 | --- | --- | --- |
-| `source` | **One answer** | `requestStarted` — HomeInput submission, Quick Task activation, and `PlanPage.handleOnchatSubmit` |
+| `source` | **One answer** | `requestStarted` — HomeInput submission, Quick Task activation, and `ChatPage.handleOnchatSubmit` |
 | `alerts` | **One conversation** | `conversationStarted` — the `planId` effect, and `resetPlanVariables` |
 | `meter` | **The whole walkthrough** | nothing but `transparencyReset` |
 
@@ -50,13 +50,13 @@ crediting Copilot Studio on screen with an answer it did not give, which is the 
 for a failed reply, told from the other end.
 
 The meter is deliberately the exception. The refusal is recorded on the home surface and the costed
-answers arrive on the plan surface, so a meter cleared at the conversation boundary would never show
+answers arrive on the chat surface, so a meter cleared at the conversation boundary would never show
 the guardrail's zero beside a row that cost something — which is the entire comparison R7 exists to
 make.
 
 Both clearing points are dispatched from more than one place, because there is more than one way to
 start each. A question is started by `HomeInput.handleSubmit`, its Quick Task
-activation, **and** by `PlanPage.handleOnchatSubmit`, the clarification path — a
+activation, **and** by `ChatPage.handleOnchatSubmit`, the clarification path — a
 follow-up produces a new answer just as much as a first question does. A conversation is started by
 the `planId` effect and not only by `resetPlanVariables`, which runs on the no-planId error path
 alone: wiring the reset there and nowhere else would have left it firing almost never.
@@ -175,7 +175,7 @@ review on this request."
 ### It states availability, never participation
 
 The panel is on screen for the whole loading window — `PlanPanelRight` renders *outside*
-`PlanPage`'s `loading || !planData` branch — and `planData` is `null` for all of it. Sourced only
+`ChatPage`'s `loading || !planData` branch — and `planData` is `null` for all of it. Sourced only
 from the plan fetch, it therefore rendered its honest empty state, **"No agent roster loaded for
 this conversation."**, two inches from a spinner reading *"Initializing AI agents…"*. One of those
 was wrong and it was not the panel — and the spinner no longer says it, because #64 deleted the
@@ -186,7 +186,7 @@ Nothing was missing. The **store assistant roster** is in Redux from `HomePage`'
 `selectedTeam` is the panel's second source and `selectTeamAgentCount` — exported and unused since
 the slice was written — is the count. Resolution order is in `models/agentAvailability.ts`: this
 conversation's own roster, then the plan's flat list of names, then the roster this tab is holding,
-then nothing. A historical plan opened from the task list ran on its own team, and the team the tab
+then nothing. A historical plan opened from the chat list ran on its own team, and the team the tab
 happens to hold is not a claim about it — which is why `selectedTeam` is a fallback and never a
 replacement.
 
@@ -230,8 +230,8 @@ page during a demo is a worse answer than a beat that did not land.
 
 `TransparencyRail` reads the slice directly rather than taking props, so it can be dropped onto any
 surface the walkthrough visits — and it has to be. The refusal happens on the home surface and the
-answers happen on the plan surface, while the meter's running total spans both. A rail only on the
-plan page would mean the guardrail's zero was never seen beside a row that cost something.
+answers happen on the chat surface, while the meter's running total spans both. A rail only on the
+chat page would mean the guardrail's zero was never seen beside a row that cost something.
 
 ## The panels are headings
 

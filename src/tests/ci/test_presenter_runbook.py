@@ -355,7 +355,7 @@ def test_the_improvised_paraphrases_are_ones_the_corpus_measured():
 
 
 def test_the_runbook_says_where_the_chord_works():
-    """`usePresenterChord` is mounted on the plan surface and nowhere else.
+    """`usePresenterChord` is mounted on the chat page and nowhere else.
 
     So the chord is not merely hidden — on the home surface, where the six cards
     are and where the refusal and the personal answer render, there is no
@@ -373,15 +373,15 @@ def test_the_runbook_says_where_the_chord_works():
         for page in pages.glob("*.tsx")
         if "usePresenterChord()" in page.read_text(encoding="utf-8")
     )
-    assert mounting == ["PlanPage.tsx"], (
+    assert mounting == ["ChatPage.tsx"], (
         f"the chord is now mounted by {mounting}; the runbook's warning about "
         "where it works needs to change with it"
     )
 
     runbook = _rendered()
     label = _exported_string(CHORD_MODULE, "PRESENTER_CHORD_LABEL")
-    assert re.search(r"task view is open", runbook[runbook.index(label) :][:900]), (
-        "the runbook does not say that the chord only works while a task view "
+    assert re.search(r"while a chat is open", runbook[runbook.index(label) :][:900]), (
+        "the runbook does not say that the chord only works while a chat "
         "is open, which is the difference between the beat landing and the key "
         "doing nothing at all"
     )

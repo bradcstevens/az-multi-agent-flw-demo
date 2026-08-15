@@ -67,7 +67,7 @@ interface UsePlanWebSocketProps {
 }
 
 /**
- * Creates an AgentMessageResponse and persists it, then optionally reloads the task list.
+ * Creates an AgentMessageResponse and persists it, then optionally reloads the chat list.
  */
 function persistAgentMessage(
     agentMessageData: AgentMessageData,
@@ -424,12 +424,12 @@ export function usePlanWebSocket({
 
     // ── WebSocket connect ─────────────────────────────────────────
     /*
-      The plan page's connect, which is now the *second* one (ADR-021). The
+      The chat page's connect, which is now the *second* one (ADR-021). The
       first is initiated by `HomeInput` on the `createPlan` response, because
       the backend schedules the orchestration before that response returns and
       everything it emits in the meantime is pushed at a socket that does not
       exist (#63). This one serves the case that has no response to hang off —
-      a direct load or a reload of /plan/:id — and is a no-op when the socket
+      a direct load or a reload of /chat/:id — and is a no-op when the socket
       for this plan is already open or still handshaking.
     */
     useEffect(() => {
@@ -473,7 +473,7 @@ export function usePlanWebSocket({
 
     // ── WebSocket disconnect ──────────────────────────────────────
     /*
-      The socket belongs to the plan page for as long as the plan page is on
+      The socket belongs to the chat page for as long as the chat page is on
       screen, whether the page opened it or adopted one opened on the
       `createPlan` response (ADR-021). It cannot be owned by
       `continueWithWebsocketFlow`, which only turns true once the plan GET has

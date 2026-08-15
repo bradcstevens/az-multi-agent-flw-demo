@@ -3,14 +3,14 @@ import { Locator, Page, expect } from '@playwright/test';
 import { TransparencyRail } from './TransparencyRail';
 
 /**
- * The plan surface — where the answer, the approval gate and the ticket land,
+ * The chat surface — where the answer, the approval gate and the ticket land,
  * and where the **Transparency rail** sits beside them.
  *
  * The prose is the one thing on this object that a model wrote, and the only
  * thing asserted about it is that it **arrived**. Everything a beat actually
  * grades is read off the rail.
  */
-export class PlanSurface {
+export class ChatSurface {
     readonly rail: TransparencyRail;
 
     constructor(readonly page: Page) {
@@ -105,7 +105,9 @@ export class PlanSurface {
 
     /** Wait for the surface the question navigated to. */
     async waitForArrival(timeout: number): Promise<void> {
-        await this.page.waitForURL(/\/plan\//, { timeout });
+        // `/chat/<plan id>` since #73: a Chat is the unit of the surface
+        // (ADR-025) while the id in the route is still a Plan's.
+        await this.page.waitForURL(/\/chat\//, { timeout });
         await expect(this.rail.root).toBeVisible({ timeout });
     }
 

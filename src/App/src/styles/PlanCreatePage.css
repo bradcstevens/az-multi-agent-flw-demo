@@ -1,7 +1,7 @@
-/* PlanCreatePage.css - Extends PlanPage.css styles */
+/* PlanCreatePage.css - Extends ChatPage.css styles */
 
 /* Any additional styles specific to plan creation page can go here */
-/* Currently inheriting all styles from PlanPage.css */
+/* Currently inheriting all styles from ChatPage.css */
 
 /* Responsive design for mobile */
 @media (max-width: 768px) {

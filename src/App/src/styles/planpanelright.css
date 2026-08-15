@@ -1,5 +1,5 @@
 /*
- * PlanPanelRight — the plan surface's right-hand column, and the container the
+ * PlanPanelRight — the chat surface's right-hand column, and the container the
  * transparency rail sits inside there.
  *
  * It declares **no width of its own** (#60). It used to declare 280px while the

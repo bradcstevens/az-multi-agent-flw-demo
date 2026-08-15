@@ -62,7 +62,7 @@ export interface NarrationSubject {
 export const SENDING = 'Sending your question...';
 
 /**
- * What the plan page says while the plan record itself is being fetched.
+ * What the chat page says while the plan record itself is being fetched.
  *
  * A different claim from the phases above — it is about the *record*, not about
  * the request — and it lives here for the same reason they do: a component
@@ -71,8 +71,8 @@ export const SENDING = 'Sending your question...';
 export const LOADING_PLAN = 'Loading plan data...';
 
 /**
- * What the two plan surfaces say when a plan has been announced but its steps
- * have not arrived.
+ * What the two places a plan is shown say when one has been announced but its
+ * steps have not arrived.
  *
  * Both of them, from here, because they are two views of one moment: the plan
  * card in the conversation and the rail's Plan Overview. It is said only where

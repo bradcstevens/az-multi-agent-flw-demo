@@ -102,7 +102,7 @@ describe('the store surface on a phone-sized screen', () => {
         }
     });
 
-    it('drops the task-history panel rather than squeezing it', () => {
+    it('drops the chat-history panel rather than squeezing it', () => {
         const css = readFileSync(STYLESHEET, 'utf8');
         const block = css.slice(css.indexOf(STACKING_BREAKPOINT));
 
@@ -118,8 +118,8 @@ describe('the store surface on a phone-sized screen', () => {
         // outside it, and the tie goes to whichever stylesheet the bundler
         // imported second — which is decided by an import order in a component,
         // nowhere near either stylesheet. `.panel-left-container` was declared
-        // `display: none` here and `display: flex` in `PlanPanelLeft.css`, and
-        // the phone kept a 240px task-history panel it was supposed to drop.
+        // `display: none` here and `display: flex` in `ChatPanelLeft.css`, and
+        // the phone kept a 240px chat-history panel it was supposed to drop.
         //
         // Read out of the stylesheets rather than listed, for #58's reason: a
         // list agrees with itself forever.
@@ -162,7 +162,7 @@ describe('the store surface on a phone-sized screen', () => {
         // conversation looks like. Below the breakpoint there is nothing to its
         // left, so both are a lie: a 280px band with a left border, wearing the
         // dress of an orientation the shell is no longer in. The rail on the
-        // plan surface is nested inside one of these, which is how it kept its
+        // chat surface is nested inside one of these, which is how it kept its
         // side-column width after the rail itself stopped keeping its own.
         const columns = sideColumns();
         expect(columns.length, 'no side columns found — the detector has stopped detecting').toBeGreaterThan(0);

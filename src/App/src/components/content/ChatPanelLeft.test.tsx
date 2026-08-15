@@ -8,7 +8,7 @@ vi.mock('@/api', () => ({
     apiService: { getPlans: vi.fn().mockResolvedValue([]) },
 }));
 
-import PlanPanelLeft from './PlanPanelLeft';
+import ChatPanelLeft from './ChatPanelLeft';
 import appReducer from '../../store/slices/appSlice';
 import { ASSISTANT_NAME } from '../../models/storeSurface';
 import { apiService } from '@/api';
@@ -20,9 +20,9 @@ const renderPanel = (props: Record<string, unknown> = {}) =>
     render(
         <Provider store={configureStore({ reducer: { app: appReducer } })}>
             <MemoryRouter>
-                <PlanPanelLeft
-                    reloadTasks={false}
-                    onNewTaskButton={() => undefined}
+                <ChatPanelLeft
+                    reloadChats={false}
+                    onNewChatButton={() => undefined}
                     {...props}
                 />
             </MemoryRouter>
@@ -93,11 +93,11 @@ const renderPanelAt = (path: string) =>
                 <HereIs />
                 <Routes>
                     <Route
-                        path="/plan/:planId"
+                        path="/chat/:id"
                         element={
-                            <PlanPanelLeft
-                                reloadTasks={false}
-                                onNewTaskButton={() => undefined}
+                            <ChatPanelLeft
+                                reloadChats={false}
+                                onNewChatButton={() => undefined}
                             />
                         }
                     />
@@ -123,7 +123,7 @@ describe('one chat is one row', () => {
         // claim.
         const duplicateKeys = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-        renderPanelAt('/plan/plan-troubleshooting');
+        renderPanelAt('/chat/plan-troubleshooting');
 
         expect(
             await screen.findByRole('button', { name: /coffee machine/i }),
@@ -137,24 +137,24 @@ describe('one chat is one row', () => {
     });
 
     it('opens the chat where the conversation got to, so the escalation is reachable', async () => {
-        renderPanelAt('/plan/plan-troubleshooting');
+        renderPanelAt('/chat/plan-troubleshooting');
 
         fireEvent.click(await screen.findByRole('button', { name: /coffee machine/i }));
 
         await waitFor(() =>
-            expect(screen.getByTestId('here')).toHaveTextContent('/plan/plan-escalation'),
+            expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation'),
         );
     });
 
     it('highlights the chat that is open, escalation included', async () => {
-        renderPanelAt('/plan/plan-escalation');
+        renderPanelAt('/chat/plan-escalation');
 
         const row = await screen.findByRole('button', { name: /coffee machine/i });
         expect(row).toHaveClass('active');
     });
 
     it('highlights nothing when the open plan belongs to another chat', async () => {
-        renderPanelAt('/plan/plan-somewhere-else');
+        renderPanelAt('/chat/plan-somewhere-else');
 
         const row = await screen.findByRole('button', { name: /coffee machine/i });
         expect(row).not.toHaveClass('active');
