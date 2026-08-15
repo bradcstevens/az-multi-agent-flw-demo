@@ -8,6 +8,8 @@ import { EyeOff20Regular } from "@fluentui/react-icons";
 import React from "react";
 import "../../styles/ChatList.css";
 import { Chat, ChatListProps } from "@/models";
+import { PlanStatus } from "../../models/enums";
+import { NO_CHATS_MESSAGE, chatStateLabel } from "../../models/chatState";
 import {
   Accordion,
   AccordionHeader,
@@ -16,13 +18,12 @@ import {
 } from "@fluentui/react-components";
 import {
   HIDE_COMPLETED_LABEL,
-  NO_COMPLETED_TASKS_MESSAGE,
   hideCompletedTasks,
 } from "../../models/hiddenCompletedTasks";
 import useHiddenCompletedTasks from "../../hooks/useHiddenCompletedTasks";
 
 const ChatList: React.FC<ChatListProps> = ({
-  completedChats,
+  chats,
   onChatSelect,
   loading,
   selectedChatId,
@@ -31,12 +32,36 @@ const ChatList: React.FC<ChatListProps> = ({
   const hidden = useHiddenCompletedTasks();
   const isLoading = Boolean(loading || isLoadingTeam);
   const visibleChats = React.useMemo(
-    () => completedChats.filter((chat) => !hidden.has(chat.id)),
-    [completedChats, hidden]
+    /*
+      Only a completed chat can be hidden. The hide is a set of `session_id`s
+      (ADR-022) while a chat's state is its latest plan's (#71), so a chat
+      hidden while finished and then resumed is a *running* chat that a control
+      named for completed ones would still be suppressing. ADR-022's own rule,
+      read from the other side: a task that completes after the clear still
+      appears.
+    */
+    () =>
+      chats.filter(
+        (chat) =>
+          chat.status !== PlanStatus.COMPLETED || !hidden.has(chat.id)
+      ),
+    [chats, hidden]
+  );
+  /*
+    What the hide control is allowed to take (#74). Its label is *"Hide
+    completed tasks"* (ADR-022), and the list now holds chats in every state —
+    handing it whatever the list happens to contain would take a running chat
+    with it, which is the control claiming an action nobody gave it.
+  */
+  const hideable = React.useMemo(
+    () =>
+      visibleChats.filter((chat) => chat.status === PlanStatus.COMPLETED),
+    [visibleChats]
   );
 
   const renderChatRow = (chat: Chat) => {
     const isActive = chat.id === selectedChatId;
+    const state = chatStateLabel(chat.status);
 
     return (
       <div
@@ -57,9 +82,20 @@ const ChatList: React.FC<ChatListProps> = ({
           <div className="task-name-truncated" title={chat.name}>
             {chat.name}
           </div>
-          {chat.date && chat.status == "completed" && (
-            <Caption1 className="task-list-task-date">{chat.date}</Caption1>
-          )}
+          <div className="task-list-task-meta">
+            {/*
+              Each row states its own state (#74). With failed and canceled
+              chats listed beside good ones, a row that says nothing about its
+              state cannot be told from one that finished — the associate would
+              have to open a broken chat to find out it is broken.
+            */}
+            {state && (
+              <Caption1 className="task-list-task-state">{state}</Caption1>
+            )}
+            {chat.date && (
+              <Caption1 className="task-list-task-date">{chat.date}</Caption1>
+            )}
+          </div>
         </div>
         {/*
           No row menu. This row used to carry a Fluent `Menu` with a
@@ -98,8 +134,13 @@ const ChatList: React.FC<ChatListProps> = ({
             reader can offer as two things to do.
           */}
           <div className="task-list-completed-header">
+            {/*
+              Not "Completed" any more: the list holds chats in every state
+              (#74), and a heading naming one of them would be false above the
+              other five.
+            */}
             <AccordionHeader expandIconPosition="end">
-              Completed
+              Chats
             </AccordionHeader>
             {!isLoading && (
               <Button
@@ -115,7 +156,7 @@ const ChatList: React.FC<ChatListProps> = ({
                 */
                 aria-label={HIDE_COMPLETED_LABEL}
                 title={
-                  visibleChats.length
+                  hideable.length
                     ? HIDE_COMPLETED_LABEL
                     : "Nothing left to hide"
                 }
@@ -125,9 +166,9 @@ const ChatList: React.FC<ChatListProps> = ({
                   would disappear for a keyboard user rather than say why it
                   cannot be used.
                 */
-                disabledFocusable={!visibleChats.length}
+                disabledFocusable={!hideable.length}
                 onClick={() =>
-                  hideCompletedTasks(completedChats.map((chat) => chat.id))
+                  hideCompletedTasks(hideable.map((chat) => chat.id))
                 }
               />
             )}
@@ -142,12 +183,12 @@ const ChatList: React.FC<ChatListProps> = ({
                 : (
                   /*
                     True whether the list is empty or merely hidden. A bare
-                    "No completed tasks" stops being true the moment a clear
-                    hides some, and would have the panel claiming the records
-                    are gone when they are not.
+                    "No chats" stops being true the moment a clear hides some,
+                    and would have the panel claiming the records are gone when
+                    they are not.
                   */
                   <Caption1 className="task-list-empty">
-                    {NO_COMPLETED_TASKS_MESSAGE}
+                    {NO_CHATS_MESSAGE}
                   </Caption1>
                 )}
           </AccordionPanel>

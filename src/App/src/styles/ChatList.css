@@ -4,6 +4,31 @@
     color: var(--colorNeutralForeground3); /* tokens.colorNeutralForeground2 */
 }
 
+/*
+  The row's state beside its date (#74). One line, and it may not push the
+  chat's name out of the 280px panel — the name is what the associate reads to
+  find the conversation, so the state is what gives way when the pair will not
+  fit.
+*/
+.task-list-task-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.task-list-task-state {
+    color: var(--colorNeutralForeground3);
+    flex: 0 0 auto;
+}
+
+.task-list-task-meta .task-list-task-date {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .tab {
   display: flex;
   align-items: center;

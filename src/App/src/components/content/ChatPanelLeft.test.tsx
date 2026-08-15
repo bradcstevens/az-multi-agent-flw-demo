@@ -160,3 +160,61 @@ describe('one chat is one row', () => {
         expect(row).not.toHaveClass('active');
     });
 });
+
+describe('the panel shows chats in every state', () => {
+    /*
+      #74. `GET /plans` filtered to `completed` and this panel rendered only the
+      completed bucket, so a chat mid-escalation — a Chat whose latest plan is
+      still running (#71) — was not on screen at all, and it is the chat most
+      worth resuming.
+    */
+    const RUNNING_ESCALATION = {
+        ...ESCALATION,
+        overall_status: PlanStatus.IN_PROGRESS,
+    } as unknown as Plan;
+
+    const FAILED = {
+        id: 'plan-failed',
+        session_id: 'session-failed',
+        timestamp: '2026-08-14T08:00:00Z',
+        initial_goal: 'How do I swap a shift?',
+        overall_status: PlanStatus.FAILED,
+    } as unknown as Plan;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.sessionStorage.clear();
+        forgetHiddenCompletedTasks();
+        vi.mocked(apiService.getPlans).mockResolvedValue([
+            TROUBLESHOOTING,
+            RUNNING_ESCALATION,
+            FAILED,
+        ] as never);
+    });
+
+    it('keeps a chat mid-escalation on screen', async () => {
+        renderPanelAt('/chat/plan-troubleshooting');
+
+        expect(
+            await screen.findByRole('button', { name: /coffee machine/i }),
+        ).toBeInTheDocument();
+    });
+
+    it('shows a failed chat, so rehearsal debris is visible rather than lost', async () => {
+        renderPanelAt('/chat/plan-troubleshooting');
+
+        expect(
+            await screen.findByRole('button', { name: /swap a shift/i }),
+        ).toBeInTheDocument();
+    });
+
+    it('opens a chat that has not finished at the turn it got to', async () => {
+        renderPanelAt('/chat/plan-troubleshooting');
+
+        fireEvent.click(await screen.findByRole('button', { name: /coffee machine/i }));
+
+        await waitFor(() =>
+            expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation'),
+        );
+    });
+});

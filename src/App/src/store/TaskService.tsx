@@ -1,4 +1,4 @@
-import { Plan, PlanStatus } from "../models";
+import { Plan } from "../models";
 import { Chat } from "../models/chatList";
 import { apiService } from "../api/apiService";
 import { parsePolicyBlock, PolicyBlockError } from "../api/policyBlock";
@@ -24,19 +24,22 @@ export class TaskService {
    * groups by `session_id`: the row is named by the conversation's **first**
    * plan and carries its **latest** as the plan the row opens.
    *
+   * **Every state** (#74). This used to hand back an `inProgress` bucket and a
+   * `completed` one, of which the panel rendered the second — and `GET /plans`
+   * filtered to `completed` anyway, so the first could never be populated.
+   * Dead code twice over, and it hid the chat most worth resuming. One list
+   * now, each row carrying its own status for the panel to state.
+   *
+   * The order is the history's own, which `GET /plans` gives newest-first: a
+   * `Map` keeps insertion order, so a chat sits where its newest plan came.
+   *
    * @param plansData Array of PlanWithSteps to transform
-   * @returns Object containing inProgress and completed chat arrays
+   * @returns One Chat per session, in every PlanStatus
    */
-  static transformPlansToChats(plansData: Plan[]): {
-    inProgress: Chat[];
-    completed: Chat[];
-  } {
+  static transformPlansToChats(plansData: Plan[]): Chat[] {
     if (!plansData || plansData.length === 0) {
-      return { inProgress: [], completed: [] };
+      return [];
     }
-
-    const inProgress: Chat[] = [];
-    const completed: Chat[] = [];
 
     // A Chat is a Session (ADR-025), and ADR-024 has the escalation continue
     // the troubleshooting turn's session — so a row is a `session_id`, never a
@@ -52,30 +55,26 @@ export class TaskService {
       }
     });
 
+    const chats: Chat[] = [];
+
     bySession.forEach((group) => {
       const ordered = this.orderPlansByTime(group);
       const first = ordered[0];
       const latest = ordered[ordered.length - 1];
 
-      const chat: Chat = {
+      chats.push({
         id: first.session_id,
         planId: latest.id,
         name: first.initial_goal,
-        status: latest.overall_status === PlanStatus.COMPLETED ? "completed" : "inprogress",
+        // The latest plan's own status, not a two-valued surface word: a chat
+        // mid-escalation is in progress, and a row that can only say "not
+        // completed" cannot tell a failed chat from a running one.
+        status: latest.overall_status,
         date: this.formatPlanDate(latest.timestamp),
-      };
-
-      // Categorize based on plan status and completion
-      if (
-        latest.overall_status === PlanStatus.COMPLETED
-      ) {
-        completed.push(chat);
-      } else {
-        inProgress.push(chat);
-      }
+      });
     });
 
-    return { inProgress, completed };
+    return chats;
   }
 
   /**
@@ -117,50 +116,6 @@ export class TaskService {
       .map((plan, index) => ({ plan, index, at: times[index] }))
       .sort((a, b) => (a.at === b.at ? a.index - b.index : a.at - b.at))
       .map((entry) => entry.plan);
-  }
-
-  /**
-   * Get chat statistics from chat arrays
-   * @param inProgressChats Array of in-progress chats
-   * @param completedChats Array of completed chats
-   * @returns Object containing chat count statistics
-   */
-  static getChatStatistics(inProgressChats: Chat[], completedChats: Chat[]) {
-    return {
-      inProgressCount: inProgressChats.length,
-      completedCount: completedChats.length,
-      totalCount: inProgressChats.length + completedChats.length,
-    };
-  }
-
-  /**
-   * Find a chat by ID in either chat array
-   * @param chatId The chat ID to search for
-   * @param inProgressChats Array of in-progress chats
-   * @param completedChats Array of completed chats
-   * @returns The found chat or undefined
-   */
-  static findChatById(
-    chatId: string,
-    inProgressChats: Chat[],
-    completedChats: Chat[]
-  ): Chat | undefined {
-    return [...inProgressChats, ...completedChats].find(
-      (chat) => chat.id === chatId
-    );
-  }
-
-  /**
-   * Filter chats by status
-   * @param chats Array of chats to filter
-   * @param status Status to filter by
-   * @returns Filtered array of chats
-   */
-  static filterChatsByStatus(
-    chats: Chat[],
-    status: "inprogress" | "completed"
-  ): Chat[] {
-    return chats.filter((chat) => chat.status === status);
   }
 
   /**

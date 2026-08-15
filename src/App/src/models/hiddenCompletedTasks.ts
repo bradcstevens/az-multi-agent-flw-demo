@@ -41,14 +41,10 @@ export const HIDDEN_COMPLETED_TASKS_KEY = 'store-assistant.hidden-completed-task
  */
 export const HIDE_COMPLETED_LABEL = 'Hide completed tasks';
 
-/**
- * What the list says when there is nothing in it.
- *
- * *"to show"* is load-bearing: a bare "No completed tasks" becomes false the
- * moment a clear hides some, and the panel would be claiming the records are
- * gone when they are not.
- */
-export const NO_COMPLETED_TASKS_MESSAGE = 'No completed tasks to show';
+// The list's empty state moved to `chatState.ts` with #74: the list holds
+// chats in every state now, so what it says when empty is a claim about chats
+// rather than about completed tasks, and it is read whether anything is hidden
+// or not.
 
 type Listener = () => void;
 

@@ -6,31 +6,35 @@ import { FluentProvider, teamsLightTheme } from '@fluentui/react-components';
 
 import ChatList from './ChatList';
 import { Chat } from '@/models';
+import { PlanStatus } from '../../models/enums';
+import { NO_CHATS_MESSAGE, chatStateLabel } from '../../models/chatState';
 import {
     HIDDEN_COMPLETED_TASKS_KEY,
     HIDE_COMPLETED_LABEL,
-    NO_COMPLETED_TASKS_MESSAGE,
     forgetHiddenCompletedTasks,
 } from '../../models/hiddenCompletedTasks';
 
-const completed = (id: string, name: string): Chat => ({
+const chat = (id: string, name: string, status: PlanStatus): Chat => ({
     id,
     planId: `${id}-latest`,
     name,
-    status: 'completed',
+    status,
     date: '14 August 2026',
 });
+
+const completed = (id: string, name: string): Chat =>
+    chat(id, name, PlanStatus.COMPLETED);
 
 const MORNING = [
     completed('chat-1', 'How do I close the store?'),
     completed('chat-2', 'The register is frozen'),
 ];
 
-const renderList = (completedChats: Chat[], props: Record<string, unknown> = {}) =>
+const renderList = (chats: Chat[], props: Record<string, unknown> = {}) =>
     render(
         <FluentProvider theme={teamsLightTheme}>
             <ChatList
-                completedChats={completedChats}
+                chats={chats}
                 onChatSelect={vi.fn()}
                 {...props}
             />
@@ -44,7 +48,7 @@ beforeEach(() => {
     forgetHiddenCompletedTasks();
 });
 
-describe('the completed chat list', () => {
+describe('the chat list', () => {
     it('shows the morning of rehearsals it has been given', () => {
         renderList(MORNING);
 
@@ -55,7 +59,7 @@ describe('the completed chat list', () => {
     it('says so rather than opening onto blank space when there is nothing to show', () => {
         renderList([]);
 
-        expect(screen.getByText(NO_COMPLETED_TASKS_MESSAGE)).toBeInTheDocument();
+        expect(screen.getByText(NO_CHATS_MESSAGE)).toBeInTheDocument();
     });
 
     it('carries no button on the row, because on stage someone will click it', () => {
@@ -117,7 +121,7 @@ describe('hiding the completed tasks', () => {
 
         fireEvent.click(hideControl());
 
-        expect(screen.getByText(NO_COMPLETED_TASKS_MESSAGE)).toBeInTheDocument();
+        expect(screen.getByText(NO_CHATS_MESSAGE)).toBeInTheDocument();
     });
 
     it('holds across a reload in the same tab', () => {
@@ -182,6 +186,75 @@ describe('hiding the completed tasks', () => {
         expect(
             screen.queryByRole('button', { name: HIDE_COMPLETED_LABEL }),
         ).not.toBeInTheDocument();
-        expect(screen.queryByText(NO_COMPLETED_TASKS_MESSAGE)).not.toBeInTheDocument();
+        expect(screen.queryByText(NO_CHATS_MESSAGE)).not.toBeInTheDocument();
+    });
+});
+
+describe('the list holds chats in every state', () => {
+    // #74. `GET /plans` filtered to `completed`, so the chat most worth
+    // resuming — the one that did not finish — never reached this panel.
+    const RUNNING = chat('chat-running', 'The register is frozen', PlanStatus.IN_PROGRESS);
+    const FAILED = chat('chat-failed', 'How do I swap a shift?', PlanStatus.FAILED);
+    const DONE = completed('chat-done', 'How do I close the store?');
+
+    it('shows a chat that is still running', () => {
+        renderList([RUNNING]);
+
+        expect(screen.getByText('The register is frozen')).toBeInTheDocument();
+    });
+
+    it('shows a failed chat', () => {
+        renderList([FAILED]);
+
+        expect(screen.getByText('How do I swap a shift?')).toBeInTheDocument();
+    });
+
+    it('states each row‘s state, so a broken chat need not be opened to find out', () => {
+        renderList([RUNNING, FAILED, DONE]);
+
+        const stateOf = (name: string | RegExp) =>
+            screen.getByRole('button', { name }).textContent ?? '';
+
+        expect(stateOf(/register is frozen/)).toContain(
+            chatStateLabel(PlanStatus.IN_PROGRESS),
+        );
+        expect(stateOf(/swap a shift/)).toContain(chatStateLabel(PlanStatus.FAILED));
+        expect(stateOf(/close the store/)).toContain(
+            chatStateLabel(PlanStatus.COMPLETED),
+        );
+    });
+
+    it('hides only the completed chats, because that is what the control says', () => {
+        // ADR-022's label is *"Hide completed tasks"*. With every state listed,
+        // hiding whatever the list happens to hold would take a running chat
+        // with it — the control claiming an action it was not given.
+        renderList([RUNNING, DONE]);
+
+        fireEvent.click(hideControl());
+
+        expect(screen.getByText('The register is frozen')).toBeInTheDocument();
+        expect(screen.queryByText('How do I close the store?')).not.toBeInTheDocument();
+    });
+
+    it('shows a hidden chat again the moment it is running', () => {
+        // The hide is scoped to completed chats, and a chat's id is its
+        // `session_id` while its state is its latest plan's (#71). A chat
+        // hidden while finished and then resumed is a *running* chat, and a
+        // control named for completed ones may not still be suppressing it —
+        // the same rule as ADR-022's "a task that completes after the clear
+        // still appears", read from the other side.
+        const { unmount } = renderList([DONE]);
+        fireEvent.click(hideControl());
+        unmount();
+
+        renderList([{ ...DONE, status: PlanStatus.IN_PROGRESS }]);
+
+        expect(screen.getByText('How do I close the store?')).toBeInTheDocument();
+    });
+
+    it('says there is nothing to hide when nothing has finished', () => {
+        renderList([RUNNING]);
+
+        expect(hideControl()).toHaveAttribute('aria-disabled', 'true');
     });
 });

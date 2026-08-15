@@ -40,7 +40,13 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
   */
   const { id: planId } = useParams<{ id: string }>();
 
-  const [completedChats, setCompletedChats] = useState<Chat[]>([]);
+  /*
+    Every chat, in every state (#74). This used to be the completed bucket
+    alone — which meant a chat mid-escalation, whose latest plan is still
+    running (#71), was not on screen at all, and that is the chat most worth
+    resuming.
+  */
+  const [chats, setChats] = useState<Chat[]>([]);
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [plansLoading, setPlansLoading] = useState<boolean>(false);
   const [plansError, setPlansError] = useState<Error | null>(null);
@@ -86,9 +92,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
   }, [loadPlansData, reloadChats]);
   useEffect(() => {
     if (plans) {
-      const { completed } =
-        TaskService.transformPlansToChats(plans);
-      setCompletedChats(completed);
+      setChats(TaskService.transformPlansToChats(plans));
     }
   }, [plans]);
 
@@ -121,7 +125,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
           escalation that continues its session (ADR-024) — the escalation was
           unreachable from this panel.
         */
-        const selectedChat = completedChats.find((chat) => chat.id === chatId);
+        const selectedChat = chats.find((chat) => chat.id === chatId);
         if (selectedChat) {
           navigate(`/chat/${selectedChat.planId}`);
         }
@@ -133,7 +137,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
         performNavigation();
       }
     },
-    [completedChats, navigate, onNavigationWithAlert]
+    [chats, navigate, onNavigationWithAlert]
   );
 
   const handleLogoClick = useCallback(() => {
@@ -188,7 +192,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
 
         <br />
         <ChatList
-          completedChats={completedChats}
+          chats={chats}
           onChatSelect={handleChatSelect}
           loading={plansLoading}
           selectedChatId={selectedChatId ?? undefined}

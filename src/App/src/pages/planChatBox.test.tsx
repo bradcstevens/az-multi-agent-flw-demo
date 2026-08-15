@@ -42,7 +42,7 @@ vi.mock('../store/TaskService', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../store/TaskService')>();
     class StubbedTaskService extends actual.TaskService {
         static createPlan = vi.fn();
-        static transformPlansToChats = vi.fn(() => ({ inProgress: [], completed: [] }));
+        static transformPlansToChats = vi.fn(() => []);
     }
     // The barrel re-exports the default binding, which the conversation's
     // agent messages reach for; a factory that returns only the named one

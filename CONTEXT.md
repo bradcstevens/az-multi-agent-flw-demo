@@ -159,6 +159,18 @@ chat**), `ChatList`, `ChatPage`, `NewChatService`, `Chat` as the row, and the ro
 redirects there, for the presenter who has the old path in a tab. `Plan`, `PlanStatus`,
 `planSlice`, `PlanPanelRight` and the plan endpoints keep their names, and so does `TaskService`,
 which creates Plans and signs a device in rather than owning the panel.
+
+The list holds chats in **every** `PlanStatus` (#74). `GET /plans` filters nothing — it reads
+`get_all_plans_by_team_id`, newest first — and `transformPlansToChats` returns one list rather than
+an `inProgress` bucket the filtered endpoint could never populate and the panel discarded anyway.
+The chat most worth resuming is the one that did not finish, and that was exactly the chat the
+filter hid: a chat mid-escalation is `in_progress`, because a Chat's state is its **latest** plan's.
+Each row therefore states its own state, in `chatStateLabel`'s words
+(`src/App/src/models/chatState.ts`), which is total — a status the backend adds later reaches the
+panel as itself rather than as a blank row. `failed` and `canceled` chats are listed too, which
+makes rehearsal debris visible and is why **Chat deletion** follows. The hide control (ADR-022) is
+scoped to the completed rows alone: a control saying *"Hide completed tasks"* may not take a
+running chat with it.
 _Avoid_: plan history, task history
 
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a

@@ -30,7 +30,7 @@ vi.mock('../store/PlanDataService', () => ({
 vi.mock('../store/TaskService', () => ({
     TaskService: {
         createPlan: vi.fn(),
-        transformPlansToChats: vi.fn(() => ({ inProgress: [], completed: [] })),
+        transformPlansToChats: vi.fn(() => []),
     },
 }));
 

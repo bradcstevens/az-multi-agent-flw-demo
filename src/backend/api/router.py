@@ -2111,8 +2111,13 @@ async def get_plans(request: Request):
     if not current_team:
         return []
 
-    all_plans = await memory_store.get_all_plans_by_team_id_status(
-        user_id=user_id, team_id=current_team.team_id, status=PlanStatus.completed
+    # Every status, deliberately (#74). Filtering to `PlanStatus.completed`
+    # meant five of the six statuses never reached the chat list, and the chat
+    # most worth resuming is the one that did not finish. Listing `failed` and
+    # `canceled` too makes rehearsal debris visible, which is what Chat
+    # deletion (ADR-026) answers.
+    all_plans = await memory_store.get_all_plans_by_team_id(
+        team_id=current_team.team_id
     )
 
     return all_plans

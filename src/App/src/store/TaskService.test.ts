@@ -168,34 +168,34 @@ describe('a chat is a session, so the list has one row per session', () => {
     } as unknown as Plan;
 
     it('renders the troubleshooting turn and its escalation as one chat', () => {
-        const { completed } = TaskService.transformPlansToChats([
+        const chats = TaskService.transformPlansToChats([
             troubleshooting,
             escalation,
         ]);
 
-        expect(completed).toHaveLength(1);
-        expect(completed[0].id).toBe('session-shared');
+        expect(chats).toHaveLength(1);
+        expect(chats[0].id).toBe('session-shared');
     });
 
     it('names the chat for what the conversation was about, not where it got to', () => {
         // Newest-first, which is the order a history endpoint hands them back:
         // the name must come from the turn that opened the conversation, so it
         // cannot be read off the array.
-        const { completed } = TaskService.transformPlansToChats([
+        const chats = TaskService.transformPlansToChats([
             escalation,
             troubleshooting,
         ]);
 
-        expect(completed[0].name).toBe('The coffee machine is showing an error');
+        expect(chats[0].name).toBe('The coffee machine is showing an error');
     });
 
     it('opens the latest plan, so the escalation is what the row reaches', () => {
-        const { completed } = TaskService.transformPlansToChats([
+        const chats = TaskService.transformPlansToChats([
             escalation,
             troubleshooting,
         ]);
 
-        expect(completed[0].planId).toBe('plan-escalation');
+        expect(chats[0].planId).toBe('plan-escalation');
     });
 
     it('keeps the order the history gave when a plan carries a timestamp it cannot read', () => {
@@ -212,14 +212,14 @@ describe('a chat is a session, so the list has one row per session', () => {
             timestamp: 'not a date',
         } as unknown as Plan;
 
-        const { completed } = TaskService.transformPlansToChats([
+        const chats = TaskService.transformPlansToChats([
             escalation,
             troubleshooting,
             unreadable,
         ]);
 
-        expect(completed[0].name).toBe("I can't fix it");
-        expect(completed[0].planId).toBe('plan-unreadable');
+        expect(chats[0].name).toBe("I can't fix it");
+        expect(chats[0].planId).toBe('plan-unreadable');
     });
 
     it('lets the rest of the history render when one record carries no readable date', () => {
@@ -234,18 +234,18 @@ describe('a chat is a session, so the list has one row per session', () => {
             initial_goal: 'How do I close the store?',
         } as unknown as Plan;
 
-        const { completed } = TaskService.transformPlansToChats([
+        const chats = TaskService.transformPlansToChats([
             undated,
             troubleshooting,
             escalation,
         ]);
 
-        expect(completed.map((chat) => chat.name)).toEqual([
+        expect(chats.map((chat) => chat.name)).toEqual([
             'How do I close the store?',
             'The coffee machine is showing an error',
         ]);
-        expect(completed[0].date).toBeUndefined();
-        expect(completed[1].date).toBeTruthy();
+        expect(chats[0].date).toBeUndefined();
+        expect(chats[1].date).toBeTruthy();
     });
 
     it('keeps separate conversations as separate rows', () => {
@@ -256,15 +256,84 @@ describe('a chat is a session, so the list has one row per session', () => {
             initial_goal: 'How do I close the store?',
         } as unknown as Plan;
 
-        const { completed } = TaskService.transformPlansToChats([
+        const chats = TaskService.transformPlansToChats([
             troubleshooting,
             escalation,
             otherSession,
         ]);
 
-        expect(completed.map((chat) => chat.id)).toEqual([
+        expect(chats.map((chat) => chat.id)).toEqual([
             'session-shared',
             'session-other',
+        ]);
+    });
+});
+
+describe('the list holds chats in every state', () => {
+    // #74. `GET /plans` filtered to `completed`, so five of the six statuses
+    // never reached the panel — and the chat most worth resuming is the one
+    // that did not finish.
+    const plan = (
+        session: string,
+        id: string,
+        overall_status: PlanStatus,
+        timestamp = '2026-08-14T09:00:00Z',
+    ) =>
+        ({
+            id,
+            session_id: session,
+            timestamp,
+            initial_goal: `${session} opened with this`,
+            overall_status,
+        } as unknown as Plan);
+
+    it('lists a chat that is still running', () => {
+        const chats = TaskService.transformPlansToChats([
+            plan('session-running', 'plan-running', PlanStatus.IN_PROGRESS),
+        ]);
+
+        expect(chats.map((chat) => chat.id)).toEqual(['session-running']);
+    });
+
+    it('lists a failed chat and a canceled one, so rehearsal debris is visible', () => {
+        const chats = TaskService.transformPlansToChats([
+            plan('session-failed', 'plan-failed', PlanStatus.FAILED),
+            plan('session-canceled', 'plan-canceled', PlanStatus.CANCELED),
+        ]);
+
+        expect(chats.map((chat) => chat.id)).toEqual([
+            'session-failed',
+            'session-canceled',
+        ]);
+    });
+
+    it("carries the latest plan's own status, not a two-valued surface word", () => {
+        // A chat mid-escalation is in progress even though the troubleshooting
+        // turn that opened it finished (#71). The row must be able to say
+        // which of `failed`, `canceled` and `in_progress` it is, and
+        // "not completed" cannot.
+        const chats = TaskService.transformPlansToChats([
+            plan('session-shared', 'plan-troubleshooting', PlanStatus.COMPLETED, '2026-08-14T09:00:00Z'),
+            plan('session-shared', 'plan-escalation', PlanStatus.IN_PROGRESS, '2026-08-14T09:20:00Z'),
+        ]);
+
+        expect(chats).toHaveLength(1);
+        expect(chats[0].status).toBe(PlanStatus.IN_PROGRESS);
+        expect(chats[0].planId).toBe('plan-escalation');
+    });
+
+    it('keeps the order the history gave, which is newest chat first', () => {
+        // `GET /plans` orders by `_ts DESC`, and dropping the status filter
+        // must not leave the panel's row order to whichever plan Cosmos
+        // returns first.
+        const chats = TaskService.transformPlansToChats([
+            plan('session-newest', 'plan-newest', PlanStatus.IN_PROGRESS),
+            plan('session-oldest', 'plan-oldest', PlanStatus.COMPLETED),
+        ]);
+
+        expect(chats.map((chat) => chat.id)).toEqual([
+            'session-newest',
+            'session-oldest',
         ]);
     });
 });

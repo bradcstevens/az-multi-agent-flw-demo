@@ -533,7 +533,10 @@ class TestCosmosDBPlanOperations:
         result = await client.get_all_plans_by_team_id("test_team_id")
         
         assert result == mock_plans
-        expected_query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id"
+        # Newest chat first. This became the chat list's read when #74 dropped
+        # the status filter, and the filtered query it replaced carried this
+        # ordering — losing it would leave the panel's row order to Cosmos.
+        expected_query = "SELECT * FROM c WHERE c.team_id=@team_id AND c.data_type=@data_type and c.user_id=@user_id ORDER BY c._ts DESC"
         expected_params = [
             {"name": "@user_id", "value": "test_user"},
             {"name": "@team_id", "value": "test_team_id"},

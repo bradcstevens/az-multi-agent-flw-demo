@@ -134,6 +134,7 @@ def rt(monkeypatch):
     store.get_team_by_id = AsyncMock(return_value=MagicMock())
     store.get_plan = AsyncMock(return_value=None)
     store.get_agent_messages = AsyncMock(return_value=[])
+    store.get_all_plans_by_team_id = AsyncMock(return_value=[])
     store.get_all_plans_by_team_id_status = AsyncMock(return_value=[])
     store.delete_current_team = AsyncMock()
     store.add_plan = AsyncMock()
@@ -1520,9 +1521,36 @@ class TestGetPlans:
         current = MagicMock()
         current.team_id = "t1"
         rt.store.get_current_team.return_value = current
-        rt.store.get_all_plans_by_team_id_status.return_value = []
+        rt.store.get_all_plans_by_team_id.return_value = []
         resp = rt.client.get("/api/v4/plans")
         assert resp.status_code == 200
+
+    def test_returns_chats_in_every_state(self, rt):
+        """A chat that did not finish is the one most worth resuming (#74).
+
+        Filtering to ``completed`` is what hid it, so this asserts the
+        unfiltered read *and* that the filtered one is not reached — a route
+        that called both would answer this test and still hide nothing.
+        """
+        current = MagicMock()
+        current.team_id = "t1"
+        rt.store.get_current_team.return_value = current
+        rt.store.get_all_plans_by_team_id.return_value = [
+            {"id": "p-running", "overall_status": "in_progress"},
+            {"id": "p-failed", "overall_status": "failed"},
+            {"id": "p-done", "overall_status": "completed"},
+        ]
+
+        resp = rt.client.get("/api/v4/plans")
+
+        assert resp.status_code == 200
+        assert [plan["overall_status"] for plan in resp.json()] == [
+            "in_progress",
+            "failed",
+            "completed",
+        ]
+        rt.store.get_all_plans_by_team_id.assert_awaited_once_with(team_id="t1")
+        rt.store.get_all_plans_by_team_id_status.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------

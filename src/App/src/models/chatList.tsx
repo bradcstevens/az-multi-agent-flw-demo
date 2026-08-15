@@ -1,3 +1,5 @@
+import { PlanStatus } from './enums';
+
 /**
  * The left panel's rows.
  *
@@ -18,12 +20,21 @@ export interface Chat {
      * from the panel (#71).
      */
     planId: string;
-    status: string;
+    /**
+     * What state this chat is in — its **latest** plan's `overall_status`.
+     *
+     * The domain's own status, not a two-valued surface word (#74). The list
+     * holds chats in every state, so a row has to be able to say which of
+     * `failed`, `canceled` and `in_progress` it is; "not completed" cannot.
+     * `chatStateLabel` in `models/chatState.ts` is the words it says.
+     */
+    status: PlanStatus;
     date?: string;
 }
 
 export interface ChatListProps {
-    completedChats: Chat[];
+    /** Every chat, in every state (#74) — the panel filters nothing out. */
+    chats: Chat[];
     onChatSelect: (chatId: string) => void;
     loading?: boolean;
     selectedChatId?: string;

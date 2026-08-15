@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     HIDDEN_COMPLETED_TASKS_KEY,
     HIDE_COMPLETED_LABEL,
-    NO_COMPLETED_TASKS_MESSAGE,
     forgetHiddenCompletedTasks,
     hiddenCompletedTaskIds,
     hideCompletedTasks,
@@ -159,10 +158,5 @@ describe('the words the control uses', () => {
         expect(HIDE_COMPLETED_LABEL.toLowerCase()).not.toMatch(
             /delete|remove|clear|archive|erase/,
         );
-    });
-
-    it('has an empty state that stays true once something has been hidden', () => {
-        // "No completed tasks" would be false the moment a clear hides some.
-        expect(NO_COMPLETED_TASKS_MESSAGE).toMatch(/to show$/);
     });
 });
