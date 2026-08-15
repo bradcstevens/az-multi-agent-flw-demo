@@ -88,7 +88,8 @@ last-key-wins parse would silently assert the wrong beat.
 
 ## What it asserts, and what it refuses to
 
-The cross-platform beat is asserted on the **deterministic transparency signals** — the platform the
+The cross-platform beat — `cross-platform.spec.ts` — is asserted on the **deterministic transparency
+signals** — the platform the
 **Grounding panel** names (`Copilot Studio`), the route it reports (`Dataverse`), and the citation's
 document identifier (`SOP-102`) — and never on the wording of anything a model wrote. Model prose is
 asserted only to have **arrived and to be non-empty**, which is a real assertion: an empty answer and
@@ -142,6 +143,21 @@ reporter refuses to replace the **Recorded fallback** for a multi-project run. T
 independent rather than a cross-file conversation: the escalation spec starts with its own
 troubleshooting plan before it follows on, so the walkthrough remains valid without relying on
 filename order.
+
+### A beat this repository describes has a spec, or CI goes red
+
+The validator cannot run in CI, so nothing that runs unattended observes a beat. What *can* run is
+the arithmetic over which beats exist: `test_each_claimed_beat_has_a_spec_and_every_spec_is_reachable`
+reads every `*.spec.ts` filename named in `CONTEXT.md`, `AGENTS.md` or `docs/` and fails when one of
+them has no file under `e2e/specs/`. The spec set itself comes off the filesystem, so a spec added
+tomorrow is covered without editing a list.
+
+Both directions are read rather than restated, and that is the point (#67). The escalation and
+troubleshooting beats were authored, ran live, found #61 and #62, and never landed on `main` — while
+`CONTEXT.md` had been naming both files for a day. A roster of spec names inside the test would not
+have noticed: a roster can only name the files that were on disk when it was written, which is
+always after the fault. The reverse direction — every landed spec is named somewhere in the record —
+is what stops a documentation edit emptying the claim and leaving the guard passing over nothing.
 
 ## Selectors
 

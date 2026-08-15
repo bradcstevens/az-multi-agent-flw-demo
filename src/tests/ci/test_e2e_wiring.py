@@ -39,6 +39,48 @@ INHERITED = REPO_ROOT / "tests" / "e2e-test"
 STORE_SURFACE = E2E / "pages" / "StoreSurface.ts"
 CROSS_PLATFORM_SPEC = E2E / "specs" / "cross-platform.spec.ts"
 SPECS = tuple(sorted(E2E.joinpath("specs").rglob("*.spec.ts")))
+
+#: The durable record — everything in this repository that may claim a beat.
+#:
+#: `CONTEXT.md` is the glossary and its **Confirmed findings**; `docs/` holds
+#: the loop's own record and the ADRs; `AGENTS.md` declares the loops. A beat
+#: this repository describes in any of them is a beat it claims to assert.
+RECORD = (REPO_ROOT / "CONTEXT.md", AGENTS, *sorted(REPO_ROOT.joinpath("docs").rglob("*.md")))
+
+#: A Playwright spec filename, wherever the record happens to name it — bare or
+#: as `e2e/specs/…`. The trailing boundary matters in both directions: without
+#: it `foo.spec.tsx` reads as a claim on a `foo.spec.ts` nobody wrote, and with
+#: a plain `\b` a filename that ends a sentence would stop being a claim.
+SPEC_NAMED = re.compile(
+    r"[A-Za-z0-9][A-Za-z0-9._-]*\.spec\.ts(?![A-Za-z0-9_-])(?!\.[A-Za-z0-9])"
+)
+
+
+def _claimed_specs() -> dict[str, list[str]]:
+    """Return every spec filename the durable record names, and where.
+
+    The set is *read out of the repository* rather than restated here, which is
+    the whole point: a roster in this file is a second place to be wrong about
+    which beats exist, and it can only ever name the specs that were on disk the
+    day it was written. The fault this guards against — issue #67 — is a spec
+    that was authored, described in the record, and never landed on `main`, and
+    a roster written after the fact cannot see it.
+
+    What is matched is a **filename**, not a beat: prose about the escalation
+    beat claims nothing here, `escalation.spec.ts` does. And the record is
+    historical — a deleted spec stays claimed until the entry that names it is
+    corrected, which is what correcting an entry is for.
+    """
+    claimed: dict[str, list[str]] = {}
+    for path in RECORD:
+        if not path.exists():
+            continue
+        for name in SPEC_NAMED.findall(_text(path)):
+            sources = claimed.setdefault(name, [])
+            relative = str(path.relative_to(REPO_ROOT))
+            if relative not in sources:
+                sources.append(relative)
+    return claimed
 HOME_INPUT = (
     REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
 )
@@ -126,24 +168,37 @@ def test_the_same_specs_run_against_either_target():
 
 
 def test_each_claimed_beat_has_a_spec_and_every_spec_is_reachable():
-    """The validator runs every spec under its one authored directory.
+    """The validator runs every beat this repository says it runs.
 
-    A spec added after this test must be covered without editing a roster here:
-    the filesystem is the source of the set. The explicit names are the
-    walkthrough beats this repository claims to demonstrate; an absent one is
-    a claim with no browser assertion behind it.
+    Two directions, and both are read rather than restated. The **claim** comes
+    out of the durable record — `CONTEXT.md`, `AGENTS.md`, `docs/` — so a spec
+    filename named in the record with no file behind it is red here. The
+    **spec set** comes off the filesystem, so a spec added after this test is
+    covered without editing a roster.
+
+    This is the check issue #67 *was*. `escalation.spec.ts` and
+    `troubleshooting.spec.ts` were authored, ran live against the deployment,
+    found two real defects, and never landed on `main` — while `CONTEXT.md` had
+    already been naming both files for a day. Every Feedback loop was green,
+    because the check that would have caught it is not the one that was running.
+    A roster of today's four spec names would not have caught it either: it
+    could only have been written after the files were on disk.
     """
     names = {spec.name for spec in SPECS}
-    claimed = {
-        "cross-platform.spec.ts",
-        "escalation.spec.ts",
-        "troubleshooting.spec.ts",
-        "workforce.spec.ts",
-    }
+    claimed = _claimed_specs()
 
-    assert claimed <= names, (
+    assert len(names) == len(SPECS), (
+        "two specs share a filename under different directories; the record "
+        "names files, so one would silently answer the other's claim"
+    )
+    assert claimed, (
+        "this repository's record names no spec at all; the claim cannot be "
+        "read out of it"
+    )
+    missing = sorted(name for name in claimed if name not in names)
+    assert not missing, (
         "the Demo validator claims beats with no browser spec: "
-        f"{sorted(claimed - names)}"
+        + ", ".join(f"{name} (named in {', '.join(claimed[name])})" for name in missing)
     )
 
     config = _code(CONFIG)
@@ -168,10 +223,31 @@ def test_each_claimed_beat_has_a_spec_and_every_spec_is_reachable():
         )
 
 
+def test_every_landed_spec_is_named_in_the_durable_record():
+    """The claim above cannot go silent.
+
+    `_claimed_specs` reads the record, so a record that stopped naming a beat
+    would leave the guard passing over nothing — the guard's own version of the
+    fault it guards against. Requiring the other direction is what keeps the two
+    moving together: a spec lands with a description of the beat it asserts, or
+    it does not land.
+    """
+    claimed = _claimed_specs()
+
+    undocumented = sorted(spec.name for spec in SPECS if spec.name not in claimed)
+    assert not undocumented, (
+        "the Demo validator runs beats this repository's record never names: "
+        f"{undocumented}. A record that says nothing about a spec cannot notice "
+        "the next one that is authored and never lands"
+    )
+
+
 def test_every_rebased_spec_leaves_rehearsal_evidence():
     # The run is an observation of a deployed build, so every beat writes a
     # result even when its assertion fails. Select from the filesystem-derived
     # set: the new specifications cannot land without the current recorder.
+    # That they landed at all is the derived claim above; this is about which
+    # `e2e/` helpers they were rebased onto (#67).
     rebased = {
         spec.name: spec
         for spec in SPECS

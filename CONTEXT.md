@@ -1262,23 +1262,23 @@ The general lesson is the one this repository keeps re-buying: **an ambient sing
 correlation ID with no error case.** Any bridge that resolves *who* by counting what is connected
 works perfectly until something else connects, and then fails silently, on stage.
 
-### The two hardest beats have never been asserted on `main`, and #50 is closed (confirmed 2026-08-14, issue #61)
+### The two hardest beats have never been asserted on `main`, and #50 is closed (confirmed 2026-08-14, issue #61; corrected 2026-08-14, issue #67)
 
-`e2e/specs/escalation.spec.ts` and `e2e/specs/troubleshooting.spec.ts` **have never existed on
-`main`.** Their three commits — `834c82bf`, `038f5e6c` and `b095186e` — live only on
-`git-loopy/…/integrate/issue-50`, which `git merge-base --is-ancestor` confirms is not an ancestor
-of `main`. The branch is 7 ahead and **21 behind**, and `e2e/` has moved on both sides:
-`deployedBuild.ts` and `evidence.ts` exist on `main` and not on the branch, `backend.ts` and
+`e2e/specs/escalation.spec.ts` and `e2e/specs/troubleshooting.spec.ts` **had never existed on
+`main`.** Their three commits — `834c82bf`, `038f5e6c` and `b095186e` — lived only on
+`git-loopy/…/integrate/issue-50`, which `git merge-base --is-ancestor` confirmed was not an ancestor
+of `main`. The branch was 7 ahead and **21 behind**, and `e2e/` had moved on both sides:
+`deployedBuild.ts` and `evidence.ts` existed on `main` and not on the branch, `backend.ts` and
 `wire.ts` the reverse.
 
 Issue #50 is **closed**. Its specs ran live against `rg-macae-flw-v1`, found two real defects and
 filed them — #61, the escalation that cannot reach the attempted steps, and #62, the ticket that is
 never drafted at all. Both issues cite *"the Demo validator's escalation beat (#50)"* as the thing
-that found them. Neither the beat nor the spec is on `main`. So the **Demo validator** on `main`
-covers exactly one beat, the cross-platform hop, and the two hardest ones — the pair #50 itself
-called *"the demonstration's strongest single claim"* — are asserted nowhere.
+that found them. Neither the beat nor the spec was on `main`. So the **Demo validator** on `main`
+covered exactly one beat, the cross-platform hop, and the two hardest ones — the pair #50 itself
+called *"the demonstration's strongest single claim"* — were asserted nowhere.
 
-This is invisible in the way that matters here: every **Feedback loop** is green, `main` deploys on
+This was invisible in the way that matters here: every **Feedback loop** was green, `main` deploys on
 every commit (ADR-020), and the deploy gate asks a procedure question, which is beat 1. Nothing that
 runs would notice the absence. It was found only by reading #61's fourth acceptance criterion —
 *"`e2e/specs/escalation.spec.ts` loses its `not reported` branch"* — against the file tree, and
@@ -1287,6 +1287,19 @@ discovering there was no such file.
 It is the same shape as the transparency-signal finding below and the deployment-drift one after it:
 the check that would have caught it is not the one that was running. A closed issue is evidence that
 work was *done*, never that it **landed**.
+
+**Both specs are on `main`** now, rebased onto the current `e2e/` helpers and reached by
+`bash scripts/e2e-tests.sh`, and the escalation beat is reached through the **Follow-on task** inside
+the troubleshooting conversation rather than from a home-screen card. What closes the finding is not
+the landing, though — it is that *the check that would have caught it now runs*.
+`test_each_claimed_beat_has_a_spec_and_every_spec_is_reachable` reads the claimed beats **out of this
+record** — every `*.spec.ts` this file, `AGENTS.md` or `docs/` names — and fails when one of them has
+no spec file behind it. Run against the tree as it stood before the landing, it goes red naming both
+files and this paragraph's own ancestor as the thing that claimed them. A roster of the four spec
+names in the test would not have: it could only have been written once the files were on disk, which
+is the shape of every check that arrives after the fault it would have caught. The other direction —
+every landed spec is named somewhere in the record — is what stops a documentation edit quietly
+emptying the claim.
 
 ### The centrepiece beat is intermittent, and only a browser saw it (confirmed 2026-08-13, issue #47)
 
