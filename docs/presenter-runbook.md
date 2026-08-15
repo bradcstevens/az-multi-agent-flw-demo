@@ -38,7 +38,7 @@ Read the two boxes below before anything else. They are the only two things you 
 | **Screen** | Full screen, and wide enough for the panels on the right to be visible — they are the evidence. Below 900px wide they stack underneath, which is fine to *show* and awkward to *drive*. |
 | **Rehearse** | Run the eight taps once end to end before the meeting. It takes about ten minutes and it is the only way to know today's deployment is healthy. |
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
-| **Between beats** | Use **New chat** between beats 1, 2 and 3. Beat 4 continues beat 3 from its follow-on card. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. |
+| **Between beats** | Use **New chat** between beats 1, 2 and 3. Beat 4 continues beat 3 from its follow-on card. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. If you leave a conversation by mistake, you can reopen it and carry on — see [If you lose your place](#if-you-lose-your-place--reopen-the-chat-and-keep-going). |
 
 **Ask an engineer to clear the deployment before a customer session.** One command does it:
 `bash scripts/sop-rehearsal.sh` ([sop-rehearsal.md](sop-rehearsal.md)) — ten Demo validator runs
@@ -222,6 +222,32 @@ shift; it will not tell you Tanya's leave balance on a shared device."*
 library is mocked and says so on every answer. If somebody asks, *"this is where Workday or UKG
 would sit, and that is a connector, not a rewrite"* — say it out loud rather than letting the
 screen imply it.
+
+---
+
+### If you lose your place — reopen the chat and keep going
+
+**When you need it:** you tapped **New chat** by mistake, or you closed the tab, or a question from
+the room took you off the screen and back to the list. Beat 3 into beat 4 is the sequence this
+protects: the ticket's whole claim is that nothing had to be repeated.
+
+**What to do:** open the conversation again from **Chat history** on the left — every chat is listed
+there, in whatever state it is in, and the one you want is usually the one at the top that did not
+finish — then type into the message box at the bottom. It invites you with *"Ask another question in
+this chat..."*, and what you send continues **that** conversation rather than starting a new one.
+
+**Say nothing about it.** It is a repair, not a beat. Use it and carry on.
+
+**What it does *not* do, and this matters if you are asked:** the assistant does not re-read the
+conversation on your screen. The transcript is there for you, not for it. What carries across is
+what the system wrote down as it went — the steps you said you had already tried, who is signed in,
+which lane the request took, and the ticket. That is precisely what beat 4 needs, and it is the
+whole of what resume promises. Do not say *"it remembers everything we said"*; say *"it kept what it
+recorded"*.
+
+**The follow-on card is still the way to drive beat 4.** Tapping **I can't fix it** is rehearsed,
+carries the right lane and needs no keyboard. Reopening and typing is what you do when you are
+already off the path.
 
 ---
 

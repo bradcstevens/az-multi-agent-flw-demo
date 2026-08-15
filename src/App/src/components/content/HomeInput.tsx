@@ -18,6 +18,7 @@ import { parsePolicyBlock, PolicyBlock } from "../../api/policyBlock";
 import { PersonalAnswer, parsePersonalAnswer } from "../../models/personalAnswer";
 import { forgetSignedInDevice } from "../../models/signedInDevice";
 import PersonalAnswerCard from "../identity/PersonalAnswerCard";
+import PolicyBlockNotice from "../identity/PolicyBlockNotice";
 import { isLane, LANE_LABELS } from "../../models/lane";
 import { SENDING } from "../../models/progressNarration";
 import {
@@ -424,19 +425,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
             arrives as an answer rather than as a failed request.
           */}
           {policyBlock && (
-            <div
-              className="home-input-policy-block"
-              role="note"
-              aria-live="polite"
-              data-testid="policy-block"
-              data-policy-code={policyBlock.code}
-            >
-              <div className="home-input-policy-block-header">
-                <ShieldCheckmark20Regular aria-hidden="true" />
-                <Body1Strong>Store-scoped assistant</Body1Strong>
-              </div>
-              <Caption1>{policyBlock.message}</Caption1>
-
+            <PolicyBlockNotice block={policyBlock}>
               {/*
                 The door in the wall (#27). The boundary is meant to read as a
                 door rather than a wall, and the delta between the refusal above
@@ -463,7 +452,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                   Simulated sign-in — no identity provider is involved.
                 </Caption1>
               </div>
-            </div>
+            </PolicyBlockNotice>
           )}
 
           {/*

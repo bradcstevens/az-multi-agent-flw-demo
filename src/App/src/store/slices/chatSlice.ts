@@ -9,7 +9,17 @@ import { AgentMessageData, ParsedUserClarification } from '@/models';
 export interface ChatState {
     /** Current chat input value */
     input: string;
-    /** Disable the input while a submission is in flight */
+    /**
+     * Disable the input while a submission is in flight.
+     *
+     * Exactly that, since #77. It began `true` and was released only when a
+     * **Clarification** arrived, which made it a second, quieter answer to
+     * *may the box be used at all* — and that answer only ever agreed with
+     * `turnModeFor`'s by coincidence. **Resume** removes the coincidence: a
+     * chat nobody is waiting on is one a turn can be typed into, so a lock
+     * that defaults closed would leave the box permanently shut with a
+     * placeholder inviting a question.
+     */
     submittingChatDisableInput: boolean;
     /** Clarification request from the backend */
     clarificationMessage: ParsedUserClarification | null;
@@ -19,7 +29,8 @@ export interface ChatState {
 
 const initialState: ChatState = {
     input: '',
-    submittingChatDisableInput: true,
+    // Nothing is in flight on a page that has just loaded (#77, ADR-027).
+    submittingChatDisableInput: false,
     clarificationMessage: null,
     agentMessages: [],
 };

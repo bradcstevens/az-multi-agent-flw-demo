@@ -3,29 +3,28 @@ import { Caption1 } from "@fluentui/react-components";
 import ChatInput from "@/commonComponents/modules/ChatInput";
 import { PlanChatProps } from "@/models";
 import { useAppSelector } from "@/store/hooks";
-import { selectHasPendingClarification } from "@/store/slices/chatSlice";
+import { selectPendingClarificationRequestId } from "@/store/slices/chatSlice";
+import {
+    NOTHING_TO_CONTINUE,
+    TURN_STILL_WORKING,
+    placeholderFor,
+    turnModeFor,
+} from "@/models/resume";
 import SendControl, { SEND_MESSAGE } from "./SendControl";
-
-/** What the box invites while it can carry a message. */
-export const TYPE_YOUR_MESSAGE = "Type your message here...";
-
-/**
- * Why the box cannot be used, said out loud (#68).
- *
- * This box answers a **Clarification** and nothing else, so outside one it had
- * nowhere to send what was typed — and sent it anyway, as a clarification
- * answering nothing, under a placeholder inviting the message. A surface may
- * say nothing, but it may not say something that is not so; being unavailable
- * without a reason is the quieter half of the same fault.
- */
-export const NOTHING_TO_ANSWER =
-    "This conversation is not waiting on a reply. The box opens when an agent asks you a question.";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
     planData: any;
     input: string;
     setInput: (input: string) => void;
     submittingChatDisableInput: boolean;
+    /**
+     * Whether this chat has a turn working right now — the surface's own live
+     * signals, not the stored plan's status. A reopened chat whose record says
+     * `in_progress` may have been abandoned hours ago, and closing the box over
+     * that would shut resume out of exactly the chat #74 said is most worth
+     * resuming.
+     */
+    turnInFlight?: boolean;
     OnChatSubmit: (input: string) => void;
 }
 
@@ -34,15 +33,30 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
     input,
     setInput,
     submittingChatDisableInput,
+    turnInFlight = false,
     OnChatSubmit,
 }) => {
     /*
-      The pending-clarification gate lives here, not at the call site, for the
-      reason the **Rehearsed replies** own theirs: a gate the caller owns is a
-      gate a second caller forgets. Availability derived from the in-flight
-      lock alone only *happened* to be closed when nothing was pending.
+      What a turn typed here *is* — the box's own gate, not its caller's, for
+      the reason the **Rehearsed replies** own theirs: a gate the caller owns
+      is a gate a second caller forgets. Read from `resume.ts` so that what the
+      box invites and where `ChatPage` sends it cannot disagree; availability
+      derived from the in-flight lock alone only *happened* to be closed when
+      nothing was pending (#68).
     */
-    const clarificationPending = useAppSelector(selectHasPendingClarification);
+    const clarificationRequestId = useAppSelector(selectPendingClarificationRequestId);
+    const mode = turnModeFor(clarificationRequestId, planData?.plan?.session_id);
+    const unavailable = mode === 'none';
+    /*
+      A **Resume** turn replaces the running one rather than queueing behind it
+      — `process_request` cancels the user's in-flight orchestration before it
+      schedules the next — so the box refuses while this chat is working, and
+      says which of the two closures this is. A pending **Clarification** is
+      exempt: there the spinner is up over a turn that cannot progress until
+      the box is used.
+    */
+    const busy = mode === 'resume' && turnInFlight;
+    const closed = unavailable || busy;
     return (
         <div
             style={{
@@ -59,7 +73,7 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
                 zIndex: 10
             }}
         >
-            {!clarificationPending && (
+            {closed && (
                 /*
                   Outside the dimmed box, because a reason rendered at 30%
                   opacity is a reason nobody reads; and a live region, because
@@ -67,7 +81,7 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
                 */
                 <div role="status" style={{ textAlign: 'center', paddingBottom: '8px' }}>
                     <Caption1 style={{ color: 'var(--colorNeutralForeground3)' }}>
-                        {NOTHING_TO_ANSWER}
+                        {unavailable ? NOTHING_TO_CONTINUE : TURN_STILL_WORKING}
                     </Caption1>
                 </div>
             )}
@@ -75,8 +89,8 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
                 value={input}
                 onChange={setInput}
                 onEnter={() => OnChatSubmit(input)}
-                disabledChat={submittingChatDisableInput || !clarificationPending}
-                placeholder={clarificationPending ? TYPE_YOUR_MESSAGE : ''}
+                disabledChat={submittingChatDisableInput || closed}
+                placeholder={placeholderFor(mode)}
                 style={{
                     fontSize: '16px',
                     borderRadius: '8px',
@@ -89,7 +103,7 @@ const PlanChatBody: React.FC<SimplifiedPlanChatProps> = ({
                 <SendControl
                     label={SEND_MESSAGE}
                     onSend={() => OnChatSubmit(input)}
-                    unavailable={submittingChatDisableInput || !clarificationPending || !input.trim()}
+                    unavailable={submittingChatDisableInput || closed || !input.trim()}
                 />
             </ChatInput>
         </div>

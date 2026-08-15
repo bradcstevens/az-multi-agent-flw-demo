@@ -55,6 +55,10 @@ import {
 import { selectWsConnected } from '../store/slices/appSlice';
 import { selectSelectedTeam } from '../store/slices/teamSlice';
 import { followOnTaskFor, rehearsedRepliesFor } from '../models/rehearsedReply';
+import { CANNOT_CONTINUE, turnModeFor } from '../models/resume';
+import { PersonalAnswer, parsePersonalAnswer } from '../models/personalAnswer';
+import { PolicyBlock, parsePolicyBlock } from '../api/policyBlock';
+import { forgetSignedInDevice } from '../models/signedInDevice';
 import { StartingTask } from '../models/Team';
 import { TaskService } from '../store/TaskService';
 
@@ -64,7 +68,11 @@ import { usePlanActions } from '../hooks/usePlanActions';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { usePlanCancellationAlert } from '../hooks/usePlanCancellationAlert';
 import { useTransparencySignals } from '../hooks/useTransparencySignals';
-import { conversationStarted, requestStarted } from '../store/slices/transparencySlice';
+import {
+    conversationStarted,
+    refusalRecorded,
+    requestStarted,
+} from '../store/slices/transparencySlice';
 import { usePresenterChord } from '../hooks/usePresenterChord';
 
 /* ── Components ──────────────────────────────────────────────── */
@@ -149,8 +157,40 @@ const ChatPage: React.FC = () => {
     /* ── Cancellation alert hook ────────────────────────────── */
     const [pendingNavigation, setPendingNavigation] = React.useState<(() => void) | null>(null);
     const [processingElapsedSeconds, setProcessingElapsedSeconds] = React.useState<number>(0);
-    const [followOnSubmitting, setFollowOnSubmitting] = React.useState(false);
-    const followOnSubmissionRef = React.useRef(false);
+    /*
+      **One** in-flight lock for both continuation paths (#77). The follow-on
+      card acquired one because a second tap lands before React has re-rendered
+      it disabled; **Resume** needs the same guard, and two locks would let the
+      card and the box submit at once — two turns into one session, of which
+      `process_request` cancels the first. It is the seam's, not either
+      caller's, because a lock a caller owns is a lock the next caller forgets.
+    */
+    const [continuationSubmitting, setContinuationSubmitting] = React.useState(false);
+    const continuationSubmissionRef = React.useRef(false);
+    /*
+      What the last continuation turn produced when it produced no plan. Both
+      are ordinary outcomes of a question typed into a chat — the **Identity
+      boundary** gate refusing a personal question, and the **Mocked unlock**
+      answering one — and neither is a failed request. Held here, cleared when
+      the next turn starts and when another chat is opened.
+    */
+    const [continuationAnswer, setContinuationAnswer] = React.useState<PersonalAnswer | null>(null);
+    const [continuationRefusal, setContinuationRefusal] = React.useState<PolicyBlock | null>(null);
+    /*
+      Whether this chat has a turn working *right now* (#77). It matters
+      because a **Resume** turn does not queue: `process_request` cancels
+      whatever orchestration that user already had running before scheduling
+      the next, so a turn typed over a working one takes its place and the
+      answer being waited for never arrives.
+
+      The spinner alone, and deliberately not `showApprovalButtons`. That flag
+      is set from the *stored* `overall_status` on every load, so counting it
+      would close the box on every reopened chat that never finished — which is
+      exactly the chat #74 said is most worth resuming. The spinner is the only
+      signal here that reports a turn *this* browser is watching work, which is
+      all ADR-023 lets the surface claim.
+    */
+    const turnInFlight = showProcessingPlanSpinner;
 
     /* ── The Rehearsed replies for this plan (issue #26) ─────── */
     /*
@@ -319,66 +359,150 @@ const ChatPage: React.FC = () => {
         }
     }, [planApprovalRequest, planData, navigate, showToast, dismissToast, dispatch]);
 
-    const handleFollowOnTask = useCallback(async (task: StartingTask) => {
-        if (followOnSubmissionRef.current) return;
-        const sessionId = planData?.plan?.session_id;
-        if (!sessionId) {
-            showToast('Could not continue this conversation', 'error');
-            return;
-        }
-
-        followOnSubmissionRef.current = true;
-        setFollowOnSubmitting(true);
-        dispatch(requestStarted());
-        // No plan id yet — the follow-on creates one, and `requestRouted` records
-        // it off the response before the navigation, exactly as `HomeInput` does.
-        dispatch(requestSent());
-        const id = showToast(SENDING, 'progress');
-        try {
-            const response = await TaskService.createPlan(
-                task.prompt,
-                planTeam?.team_id,
-                task.lane,
-                sessionId,
-                task.id,
-            );
-            if (!response.plan_id) {
-                throw new Error('The follow-on task did not create a plan');
+    /**
+     * One new turn in **this Chat's Session** (ADR-027).
+     *
+     * The seam both continuation paths go through: the authored **Follow-on
+     * task** card, which is the rehearsed one, and **Resume**, which is the
+     * recovery one. It is one function rather than two because everything
+     * around the request is what a continuation must not forget — the previous
+     * answer's provenance going dark, the **Progress narration**'s three
+     * beats, the socket connected before the navigation (ADR-021), and the
+     * navigation itself. A second caller writing its own copy is a second
+     * caller quietly dropping one of them.
+     *
+     * The `session_id` is read from the plan on screen, so the turn joins the
+     * conversation the associate is looking at rather than starting one beside
+     * it. Fails closed: a chat this build cannot name a session for is not
+     * continued, because minting one here starts a *new* conversation under an
+     * old heading and loses exactly the persisted records resume exists for.
+     */
+    const submitTurnIntoSession = useCallback(
+        async (
+            prompt: string,
+            options: { lane?: string; startingTaskId?: string } = {},
+        ) => {
+            const sessionId = planData?.plan?.session_id;
+            if (!sessionId) {
+                showToast(CANNOT_CONTINUE, 'error');
+                return;
             }
+            if (continuationSubmissionRef.current) return;
+            continuationSubmissionRef.current = true;
+            setContinuationSubmitting(true);
+            dispatch(setSubmittingChatDisableInput(true));
+            // The previous turn's plan-less outcome is about the previous
+            // turn. Left up, a refusal would sit beside the answer that
+            // replaced it and read as though it were still in force.
+            setContinuationAnswer(null);
+            setContinuationRefusal(null);
 
-            dispatch(
-                requestRouted({
-                    lane: isLane(response.lane) ? response.lane : null,
-                    planId: response.plan_id,
-                }),
-            );
-            webSocketService.connect(response.plan_id).catch(() => {
-                // The chat page retries, and the surface degrades to polling.
-            });
-            dismissToast(id);
-            showToast(
-                isLane(response.lane)
-                    ? `Plan created — ${LANE_LABELS[response.lane]}`
-                    : 'Plan created!',
-                'success',
-            );
-            navigate(`/chat/${response.plan_id}`, { state: { lane: response.lane } });
-        } catch {
-            dispatch(requestSettled());
-            dismissToast(id);
-            showToast('Unable to create plan. Please try again.', 'error');
-        } finally {
-            followOnSubmissionRef.current = false;
-            setFollowOnSubmitting(false);
-        }
-    }, [
-        planData,
-        planTeam,
-        dispatch,
-        showToast,
-        dismissToast,
-        navigate,
-    ]);
+            // A new turn produces a new answer, so the previous answer's
+            // provenance goes dark (#24). A Foundry-only turn emits no
+            // replacement `source_used`, and a panel left up would attribute
+            // it to Copilot Studio.
+            dispatch(requestStarted());
+            // No plan id yet — the turn creates one, and `requestRouted` records
+            // it off the response before the navigation, exactly as `HomeInput` does.
+            dispatch(requestSent());
+            const id = showToast(SENDING, 'progress');
+            try {
+                const response = await TaskService.createPlan(
+                    prompt,
+                    planTeam?.team_id,
+                    options.lane,
+                    sessionId,
+                    options.startingTaskId,
+                );
+                /*
+                  The **Mocked unlock**'s answer (#27): a *successful* request
+                  with no plan, because it cost no agent and no tokens.
+                  Checked before the plan id, since a null plan here is not a
+                  failure to create one — and the turn that reaches this from
+                  inside a chat is new with resume, which is what made the old
+                  `throw` reachable.
+                */
+                const answer = parsePersonalAnswer(response);
+                if (answer) {
+                    dispatch(requestSettled());
+                    dismissToast(id);
+                    setContinuationAnswer(answer);
+                    return;
+                }
+                if (!response.plan_id) {
+                    throw new Error('The turn did not create a plan');
+                }
+
+                dispatch(
+                    requestRouted({
+                        lane: isLane(response.lane) ? response.lane : null,
+                        planId: response.plan_id,
+                    }),
+                );
+                webSocketService.connect(response.plan_id).catch(() => {
+                    // The chat page retries, and the surface degrades to polling.
+                });
+                dismissToast(id);
+                showToast(
+                    isLane(response.lane)
+                        ? `Plan created — ${LANE_LABELS[response.lane]}`
+                        : 'Plan created!',
+                    'success',
+                );
+                navigate(`/chat/${response.plan_id}`, { state: { lane: response.lane } });
+            } catch (error: unknown) {
+                dispatch(requestSettled());
+                dismissToast(id);
+                /*
+                  A **Policy block** is the **Identity boundary** gate working,
+                  so it gets the surface `HomeInput` gives it rather than the
+                  error toast (ADR-014). Rendering a governed refusal as a
+                  failed request makes the demo's centrepiece look like a bug —
+                  and resume is what made a personal question typable from
+                  inside a chat at all.
+                */
+                const refusal = parsePolicyBlock(error);
+                if (refusal) {
+                    setContinuationRefusal(refusal);
+                    // A refusal *is* the gate stating that nobody is signed
+                    // in. A header that went on naming an associate the gate
+                    // has just declined to answer for would be the surface
+                    // saying something that is not so.
+                    forgetSignedInDevice();
+                    // And it goes on the **Token meter** (#24, R7): a refused
+                    // request adds nothing, and the row showing a measured
+                    // zero beside rows that cost something is what makes
+                    // "nothing" legible. The meter is one claim about this
+                    // conversation, whichever surface the question was typed
+                    // into.
+                    dispatch(refusalRecorded(refusal));
+                    return;
+                }
+                showToast('Unable to create plan. Please try again.', 'error');
+            } finally {
+                continuationSubmissionRef.current = false;
+                setContinuationSubmitting(false);
+                dispatch(setSubmittingChatDisableInput(false));
+            }
+        },
+        [
+            planData,
+            planTeam,
+            dispatch,
+            showToast,
+            dismissToast,
+            navigate,
+        ],
+    );
+
+    const handleFollowOnTask = useCallback(
+        (task: StartingTask) =>
+            submitTurnIntoSession(task.prompt, {
+                lane: task.lane,
+                startingTaskId: task.id,
+            }),
+        [submitTurnIntoSession],
+    );
 
     /* ── Chat submission ────────────────────────────────────── */
     /*
@@ -395,19 +519,60 @@ const ChatPage: React.FC = () => {
     const handleOnchatSubmit = useCallback(
         async (chatInput: string) => {
             /*
-              This box answers a **Clarification** and nothing else, so with no
-              question pending there is nothing for it to carry (#68). The
-              request is refused here rather than sent against an empty
-              `request_id` — a clarification answering nothing, and the
-              associate's message gone with no explanation on screen. The
-              refusal comes first, so the empty-input toast below can never
-              name a clarification nobody asked for.
+              One box, two acts, and which one this is belongs to `resume.ts`
+              rather than to this callback — `PlanChatBody` decides whether the
+              box may be used at all from the same rule, and a box open over a
+              submit path that disagreed with it is exactly the shape of #68.
+
+              A pending **Clarification** wins: a turn typed while the
+              orchestration is waiting on an answer *is* that answer, and
+              starting a new plan with it strands the turn that asked.
             */
-            if (!clarificationRequestId) return;
+            const answering = clarificationRequestId?.trim() ? clarificationRequestId : null;
+            const mode = turnModeFor(answering, planData?.plan?.session_id);
+            if (mode === 'none') return;
             if (!chatInput.trim()) {
-                showToast('Please enter a clarification', 'error');
+                if (mode === 'clarification') {
+                    showToast('Please enter a clarification', 'error');
+                }
                 return;
             }
+
+            if (mode === 'resume') {
+                /*
+                  **Resume** (#77, ADR-027): a new turn in this Chat's Session,
+                  carrying that session rather than minting a new one. What
+                  travels is the typed words alone — the transcript above them
+                  is display-only and is never replayed into an agent's
+                  context, because the **Workflow cache** is process-local and
+                  keyed by user, so there is no per-Chat agent thread to
+                  restore and claiming one would be a continuity this cannot
+                  keep. What genuinely survives is what was persisted against
+                  the session: the **Attempted steps**, the identity, the
+                  **Lane** and the **Simulated ticket**.
+
+                  No lane is declared, because typed input is free-typed input
+                  and belongs to the **Lane keyword fallback**; no **Quick
+                  Task** id, because none was tapped.
+                */
+                /*
+                  The box's own refusal, restated here because the box is not
+                  the only way in — `RehearsedReplies` calls this directly — and
+                  a guard stated only at the surface is a guard the second
+                  caller does not have. Silent: what is refused is already
+                  said, in the box, by `TURN_STILL_WORKING`.
+                */
+                if (turnInFlight) return;
+                dispatch(setInput(''));
+                await submitTurnIntoSession(chatInput);
+                return;
+            }
+
+            // The mode switch's last arm, written as a guard because the rule
+            // lives in `resume.ts` and TypeScript cannot read it: reaching here
+            // with no question to answer is the empty `request_id` of #68.
+            if (mode !== 'clarification' || !answering) return;
+
             dispatch(setInput(''));
             if (!planData?.plan) return;
             // A clarification produces a new answer, so the previous answer's
@@ -419,7 +584,7 @@ const ChatPage: React.FC = () => {
             const id = showToast('Submitting clarification', 'progress');
             try {
                 await PlanDataService.submitClarification({
-                    request_id: clarificationRequestId,
+                    request_id: answering,
                     answer: chatInput,
                     plan_id: planData.plan.id,
                     m_plan_id: planApprovalRequest?.id || '',
@@ -429,7 +594,7 @@ const ChatPage: React.FC = () => {
                 // clarification left in the store outlives its answer, and the
                 // surface goes on offering to answer it — named, so a slower
                 // answer cannot retire a question asked after it.
-                dispatch(clarificationAnswered(clarificationRequestId));
+                dispatch(clarificationAnswered(answering));
                 dismissToast(id);
                 showToast('Clarification submitted successfully', 'success');
                 const agentMessageData: AgentMessageData = {
@@ -448,7 +613,7 @@ const ChatPage: React.FC = () => {
                   and this answer is the slow one. Re-locking the box then
                   closes it over a question the backend is waiting on (#68).
                 */
-                if (pendingClarificationIdRef.current === clarificationRequestId) {
+                if (pendingClarificationIdRef.current === answering) {
                     dispatch(setSubmittingChatDisableInput(true));
                     dispatch(setShowProcessingPlanSpinner(true));
                     // The associate answered, so the turn is in flight again — the
@@ -464,7 +629,17 @@ const ChatPage: React.FC = () => {
                 showToast('Failed to submit clarification', 'error');
             }
         },
-        [planData, clarificationRequestId, planApprovalRequest, showToast, dismissToast, dispatch, scrollToBottom],
+        [
+            planData,
+            clarificationRequestId,
+            planApprovalRequest,
+            showToast,
+            dismissToast,
+            dispatch,
+            scrollToBottom,
+            submitTurnIntoSession,
+            turnInFlight,
+        ],
     );
 
     /* ── Left-panel handlers ────────────────────────────────── */
@@ -508,6 +683,10 @@ const ChatPage: React.FC = () => {
           Agent is responding..." over a conversation that finished last week.
         */
         dispatch(planOpened(planId));
+        // A refusal and a personal answer are about the turn that produced
+        // them, which was typed into the chat being left.
+        setContinuationAnswer(null);
+        setContinuationRefusal(null);
 
         if (!planId) {
             resetPlanVariables();
@@ -605,7 +784,10 @@ const ChatPage: React.FC = () => {
                                 rehearsedReplies={rehearsedReplies}
                                 followOnTask={followOnTask}
                                 onFollowOnTask={handleFollowOnTask}
-                                followOnSubmitting={followOnSubmitting}
+                                continuationSubmitting={continuationSubmitting}
+                                turnInFlight={turnInFlight}
+                                personalAnswer={continuationAnswer}
+                                policyRefusal={continuationRefusal}
                             />
                         </>
                     )}

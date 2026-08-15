@@ -273,6 +273,12 @@ export function usePlanWebSocket({
                 // handler recognises. Any other status used to hang the
                 // indicator with the answer already on screen (#69).
                 dispatch(requestSettled());
+                // And nothing is in flight, so the box is free (#77, ADR-027).
+                // Released here for #69's reason — on every terminal status,
+                // not on the one branch that remembered — and released rather
+                // than locked, because the chat most worth resuming is the one
+                // that did not finish.
+                dispatch(setSubmittingChatDisableInput(false));
 
                 if (messageStatus === PlanStatus.COMPLETED) {
                     const agentMessageData: AgentMessageData = {
@@ -308,7 +314,6 @@ export function usePlanWebSocket({
                     dispatch(addAgentMessage(errorAgent));
                     dispatch(planFailedFinal());
                     dispatch(setShowBufferingText(false));
-                    dispatch(setSubmittingChatDisableInput(true));
                     scrollToBottom();
                     showToast(errorContent, 'error');
                     webSocketService.disconnect();
@@ -372,7 +377,10 @@ export function usePlanWebSocket({
                 dispatch(requestSettled());
                 processingStartedAtRef.current = null;
                 dispatch(setShowBufferingText(false));
-                dispatch(setSubmittingChatDisableInput(true));
+                // The turn is over, so nothing is in flight (#77, ADR-027).
+                // This used to lock the box, which left the failed chat — the
+                // one most worth resuming — the one chat that could not be.
+                dispatch(setSubmittingChatDisableInput(false));
                 scrollToBottom();
                 showToast(errorContent, 'error');
                 webSocketService.disconnect();

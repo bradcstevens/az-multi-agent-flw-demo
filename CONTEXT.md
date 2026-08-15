@@ -846,6 +846,12 @@ it fire — a second copy in the UI would ride a flag this subsystem writes best
 fail **closed**, mid-beat. It sits above the chat box and below the **Rehearsed reply** chips'
 slot, not in the rail, which stacks *beneath* the conversation below the **Stacking breakpoint**.
 
+The card is **unchanged** by **Resume** (#77, ADR-027) and is still the rehearsed path: it carries
+authored wording and a declared **Lane** and needs no keyboard. Both now go through one seam,
+`ChatPage.submitTurnIntoSession`, because everything around a continuation is what a second caller
+quietly drops — the previous answer's provenance going dark, the **Progress narration**'s three
+beats, the socket connected before the navigation (ADR-021), and the navigation itself.
+
 _Avoid_: next task, chained task, escalation button
 
 Recorded in [docs/quick-tasks.md](docs/quick-tasks.md).
@@ -867,28 +873,86 @@ its caller, for the reason the approval seam owns submission in #22.
 
 _Avoid_: suggested reply, quick reply
 
-**The message box answers a Clarification, and says so when there is none.** The chat surface's box
-is the clarification seam's other half: it posts an answer against a pending question's
-`request_id`, and it can post nothing else. It offered itself regardless — *"Type your message
-here…"* over a submit that defaulted a missing identifier to `''` and posted anyway, a clarification
-answering nothing and the associate's message gone with nothing on screen to say why (#68).
-Availability and the payload are one claim now, `selectPendingClarificationRequestId`: no pending
-question, no box — and the box says *"This conversation is not waiting on a reply. The box opens
-when an agent asks you a question."* rather than only dimming, because being unavailable without a
-reason is the quieter half of the same fault. A question carrying **no identifier is not one this
-surface can answer**, so it is not pending either — refused where the frame arrives, since the
-parser is total and the socket's re-wrapping had that refusal throwing inside a listener and being
-logged there. **Answering one settles it**, since a clarification left in the store outlives its
-answer and the surface goes on offering to answer it — which is what the **Rehearsed reply** chips
-going hidden after a tap has always meant, and what `troubleshooting.spec.ts` already asserted. The
-answer settles **the question it answered**, by name: the backend releases the orchestration before
-it finishes persisting, so the next question can reach the browser while the last answer is still in
-flight, and an answer that settled whatever happened to be stored would close the box over a
-question the backend is waiting on. The gate lives in `PlanChatBody` for the reason the chips own
-theirs. Nothing here was defended before except by coincidence: the in-flight lock happens
-to be closed whenever nothing is pending, and that is exactly the coincidence **Resume** removes
-when a turn typed here becomes a new turn in this **Chat**'s session
-([ADR-027](docs/ADR/027-resume-continues-the-session.md), #77).
+**The message box is one control with two acts.** It answers a pending **Clarification** against
+that question's `request_id`, and outside one it **resumes**. It used to do only the first and offer
+itself regardless — *"Type your message here…"* over a submit that defaulted a missing identifier to
+`''` and posted anyway, a clarification answering nothing and the associate's message gone with
+nothing on screen to say why (#68). Availability and the payload are one claim,
+`turnModeFor` in `src/App/src/models/resume.ts`: `PlanChatBody` decides from it whether the box may
+be used and what it invites, `ChatPage` decides from it where what was typed goes, and a box open
+over a submit path that disagreed is #68 read from the other side. The two acts read differently
+before either happens, because the placeholder is the only place the surface says which is about to
+— *"Type your message here..."* against a question, *"Ask another question in this chat..."*
+outside one. A question carrying **no identifier is not one this surface can answer**, so it is not
+pending either — refused where the frame arrives, since the parser is total and the socket's
+re-wrapping had that refusal throwing inside a listener and being logged there; it is no longer a
+reason to close the box, only a reason for what is typed to be a new turn. **Answering one settles
+it**, since a clarification left in the store outlives its answer and the surface goes on offering
+to answer it — which is what the **Rehearsed reply** chips going hidden after a tap has always
+meant, and what `troubleshooting.spec.ts` already asserted. The answer settles **the question it
+answered**, by name: the backend releases the orchestration before it finishes persisting, so the
+next question can reach the browser while the last answer is still in flight, and an answer that
+settled whatever happened to be stored would close the box over a question the backend is waiting
+on. The gate lives in `PlanChatBody` for the reason the chips own theirs, and the chips keep their
+own — they answer a Clarification and only that.
+
+**Resume continues the Chat's Session** ([ADR-027](docs/ADR/027-resume-continues-the-session.md),
+#77). A turn typed into an open Chat carries **that Chat's** `session_id` rather than minting a new
+one, which needs no backend change: the request notes the turn against the session it names, and
+`troubleshooting.turn.turn_for` — the seam the MCP container's tools resolve a session through — then
+reads the same partition the earlier turns wrote. It is the **recovery** path, for a presenter who
+tapped **New chat** by mistake or came back to the list; the **Follow-on task** card remains the
+**rehearsed** one, authored, lane-carrying and keyboard-free, and is unchanged.
+
+**Resume carries only what was persisted** — the **Attempted steps**, the identity, the **Lane** and
+the **Simulated ticket**. The transcript on screen is display-only and is never replayed into an
+agent's context: the **Workflow cache** is process-local and keyed by *user*, so there is no
+per-Chat agent thread to restore, and replaying the transcript would claim one. Both halves are said
+in `docs/presenter-runbook.md`, because *"it remembers everything we said"* is a claim the next turn
+can falsify in front of the customer.
+
+It is **fail-closed** at both ends: a chat the surface cannot name a session for is not continued —
+the box closes and says why — because minting a session here starts a *new* conversation under an
+old heading and silently loses exactly the records resume exists to carry. A pending clarification
+**wins** over a resumable session, since a turn typed while the orchestration waits on an answer
+*is* that answer and starting a plan with it strands the turn that asked; and a clarification needs
+no session, being posted against a `request_id` and a `plan_id`.
+
+**A resumed turn is an ordinary turn, so it can end without a plan.** A question typed into a chat
+reaches `process_request` exactly as one typed on the home screen does, so the **Identity boundary**
+gate can refuse it and the **Mocked unlock** can answer it out of the associate's record — both
+plan-less, neither a failed request. Until resume the chat surface had no way to produce either and
+so had no surface for them; reporting them through *"Unable to create plan"* would make a governed
+refusal look like a bug, which is the confusion [ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md) exists
+to remove. `PolicyBlockNotice` is now one component both surfaces render, because a refusal styled
+twice is two refusals. The chat surface's carries **no door**: signing in is the home screen's
+rehearsed beat (#27), and a second one is a decision no ADR has taken. It carries the refusal's two
+side effects, though, because they are claims about the conversation rather than about the surface:
+the **Signed-in device** is forgotten, since a refusal *is* the gate saying nobody is signed in and a
+header naming an associate it has just declined to serve says something untrue; and the refusal goes
+on the **Token meter** as a measured zero, since a refused request that left no row is a refusal the
+transparency panels cannot show happened.
+
+**One continuation lock, not two.** The **Follow-on task** card and the box submit through the same
+`submitTurnIntoSession`, and the lock is the seam's rather than either caller's — two locks let the
+card and the box submit at once, and `process_request` **cancels** whatever orchestration that user
+already had running before it schedules the next. Two turns into one Session is one turn cancelled,
+and the cancelled one is the escalation the presenter just tapped.
+
+That same cancellation is why **the box refuses while this chat is working**: a resumed turn does not
+queue behind the running one, it replaces it. The gate is `showProcessingPlanSpinner` and
+deliberately *not* `showApprovalButtons` — that flag is set from the plan's **stored**
+`overall_status` on every load, so counting it would close the box on every reopened chat that never
+finished, which is the chat #74 said is most worth resuming. A pending clarification is exempt:
+there the spinner is up over a turn that cannot progress until the box is used. The two closures say
+different sentences, because "still working" is a wait and "cannot be continued" is a state.
+
+`submittingChatDisableInput` means what it says since #77, and it did not before: it began `true` and
+was released only when a clarification arrived, which made it a second, quieter answer to *may the
+box be used at all* — one that agreed with the first only by coincidence. It now defaults to `false`
+and is released on **every** terminal status rather than on the branch that remembered, which is
+#69's lesson applied to the lock; a final error used to *lock* it, leaving the failed chat — the one
+most worth resuming — the one chat that could not be.
 
 **Rehearsed hit** — the walkthrough's opening tap, and the mirror image of the honest miss:
 `corpus.toml`'s `[rehearsed_hit]` names the question *and the `SOP-NNN` that answers it*. The miss

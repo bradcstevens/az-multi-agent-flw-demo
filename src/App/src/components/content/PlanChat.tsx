@@ -16,6 +16,11 @@ import { useAppSelector } from "@/store/hooks";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
 import { selectProgressNarration } from "@/store/slices/progressSlice";
 import { StartingTask } from "@/models/Team";
+import { PersonalAnswer } from "@/models/personalAnswer";
+import { PolicyBlock } from "@/api/policyBlock";
+import PersonalAnswerCard from "../identity/PersonalAnswerCard";
+import PolicyBlockNotice from "../identity/PolicyBlockNotice";
+import "@/styles/planChatContinuation.css";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
   onPlanReceived?: (planData: MPlanData) => void;
@@ -42,7 +47,21 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   /** The task this conversation can lead to (issue #61, ADR-024). */
   followOnTask?: StartingTask;
   onFollowOnTask?: (task: StartingTask) => void;
-  followOnSubmitting?: boolean;
+  /**
+   * Whether a continuation turn is in flight — one lock for both paths, since
+   * two turns into one session is one turn cancelled (#77).
+   */
+  continuationSubmitting?: boolean;
+  /** Whether this chat has a turn working right now (#77). */
+  turnInFlight?: boolean;
+  /**
+   * What the last continuation turn produced when it produced no plan: the
+   * **Mocked unlock**'s answer, or the **Identity boundary** gate's refusal.
+   * Neither is a failed request, and neither may arrive as an error toast
+   * (ADR-014, #27).
+   */
+  personalAnswer?: PersonalAnswer | null;
+  policyRefusal?: PolicyBlock | null;
 }
 
 const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
@@ -69,7 +88,10 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   rehearsedReplies,
   followOnTask,
   onFollowOnTask,
-  followOnSubmitting = false,
+  continuationSubmitting = false,
+  turnInFlight = false,
+  personalAnswer = null,
+  policyRefusal = null,
 }) => {
   // Read before the early return: hooks may not sit behind a condition.
   const presenterAlerts = useAppSelector(selectPresenterAlerts);
@@ -152,11 +174,29 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         disabled={submittingChatDisableInput}
       />
 
+      {/*
+        A continuation turn that produced no plan, said where the box that
+        produced it can be seen. The refusal carries no door: signing in is the
+        home screen's rehearsed beat (#27), and a second one on this surface is
+        a decision no ADR has taken.
+      */}
+      {(policyRefusal || personalAnswer) && (
+        <div className="plan-chat-continuation-outcome">
+          {policyRefusal && <PolicyBlockNotice block={policyRefusal} />}
+          {personalAnswer && <PersonalAnswerCard answer={personalAnswer} />}
+        </div>
+      )}
+
       {followOnTask && onFollowOnTask && (
         <FollowOnTask
           task={followOnTask}
           onSelect={onFollowOnTask}
-          disabled={followOnSubmitting}
+          /*
+            Also while this chat is working: a continuation turn replaces the
+            running one rather than queueing behind it, and the card is the
+            other way in (#77).
+          */
+          disabled={continuationSubmitting || turnInFlight}
         />
       )}
 
@@ -166,6 +206,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         input={input}
         setInput={setInput}
         submittingChatDisableInput={submittingChatDisableInput}
+        turnInFlight={turnInFlight}
         OnChatSubmit={OnChatSubmit}
         loading={false} />
 

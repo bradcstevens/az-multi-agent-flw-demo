@@ -191,4 +191,30 @@ describe('the troubleshooting follow-on task', () => {
         expect(TaskService.createPlan).toHaveBeenCalledTimes(1);
         resolveCreatePlan!();
     });
+
+    it('does not let the box start a second turn while the card is creating one', async () => {
+        /*
+          Two continuation paths into one **Session**, and they must share one
+          lock (#77). `process_request` cancels whatever orchestration that user
+          already had running before it schedules the next, so a turn typed
+          while the card's is in flight does not join it — it replaces it, and
+          the escalation the presenter just tapped never arrives.
+        */
+        let resolveCreatePlan: () => void;
+        vi.mocked(TaskService.createPlan).mockImplementation(
+            () => new Promise((resolve) => {
+                resolveCreatePlan = () => resolve(ESCALATION_RESPONSE);
+            }),
+        );
+        renderPlan();
+
+        fireEvent.click(await screen.findByRole('button', { name: "I can't fix it" }));
+
+        const box = await screen.findByRole('textbox');
+        fireEvent.change(box, { target: { value: 'Where is the filter stored?' } });
+        fireEvent.keyDown(box, { key: 'Enter' });
+
+        expect(TaskService.createPlan).toHaveBeenCalledTimes(1);
+        resolveCreatePlan!();
+    });
 });

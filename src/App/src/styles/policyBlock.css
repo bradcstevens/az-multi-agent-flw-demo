@@ -1,0 +1,33 @@
+/*
+ * The Policy block's own surface (issue #14, ADR-014).
+ *
+ * Deliberately not error styling. A refusal is the Identity boundary gate
+ * working, and a red box would make the demo's centrepiece read as a bug — the
+ * brand rule on the left edge says "policy" where a red border would say
+ * "broken". Lives here rather than in `HomeInput.css` because the refusal is
+ * rendered on two surfaces now: the home screen, where the door in the wall
+ * sits inside it, and the chat surface, where a resumed turn can be refused
+ * exactly as a first one can (#77).
+ */
+.policy-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--colorNeutralStroke2);
+  border-left: 3px solid var(--colorBrandStroke1);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorNeutralBackground3);
+  color: var(--colorNeutralForeground2);
+  text-align: left;
+}
+
+.policy-block__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--colorNeutralForeground1);
+}

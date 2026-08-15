@@ -391,6 +391,41 @@ class TestProcessRequest:
         assert resp.status_code == 200
         assert resp.json()["session_id"]
 
+    def test_a_named_session_is_continued_rather_than_replaced(self, rt):
+        """Resume joins the Chat's Session (#77, ADR-027).
+
+        The feature is the surface's — the box carries the open Chat's
+        ``session_id`` instead of minting one — and it lands because *this*
+        composes: the session the request names is the session the plan is
+        written into and the session the turn note points at. That note is what
+        ``troubleshooting.turn.turn_for`` resolves for the MCP container's
+        tools, which have no session of their own, so it is the seam a resumed
+        troubleshooting chat reads its **Attempted steps** back through.
+
+        A session minted per submission is exactly why the **Simulated ticket**
+        read an empty **Troubleshooting record**, and why the **Follow-on
+        task** card had to be authored around it.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        turn = router_mod.sole_turn.__globals__
+        turn["forget_turns"]()
+
+        resp = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-troubleshooting",
+                "description": "where is the spare filter kept?",
+            },
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["session_id"] == "sess-troubleshooting"
+        assert turn["turn_for"]("user-1") == "sess-troubleshooting"
+        persisted = rt.store.add_plan.await_args.args[0]
+        assert persisted.session_id == "sess-troubleshooting"
+        turn["forget_turns"]()
+
     def test_the_rehearsed_closing_task_arms_its_sop_lookup(self, rt, monkeypatch):
         rt.store.get_team_by_id.return_value = MagicMock()
         rt.rai_success.return_value = True

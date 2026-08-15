@@ -31,6 +31,7 @@ STORE_PACK = (
 CHORD_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "presenterChord.ts"
 SURFACE_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "storeSurface.ts"
 HOME_INPUT = REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
+RESUME_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "resume.ts"
 SOP_CORPUS = REPO_ROOT / "content" / "sop" / "corpus.toml"
 
 
@@ -384,4 +385,47 @@ def test_the_runbook_says_where_the_chord_works():
         "the runbook does not say that the chord only works while a chat "
         "is open, which is the difference between the beat landing and the key "
         "doing nothing at all"
+    )
+
+
+def test_resume_is_offered_in_the_words_the_box_itself_uses():
+    """The recovery step, quoted from the module that renders it (#77, ADR-027).
+
+    A presenter who taps **New chat** by mistake, or walks away and comes back,
+    used to have no route back into the conversation at all: the box answered a
+    **Clarification** and nothing else, and the escalation card was the only
+    authored continuation. Reopening the chat and typing now continues *that*
+    **Session**.
+
+    The runbook quotes the placeholder rather than describing it, on ADR-019's
+    rule: what the presenter is told to look for has to be what the surface
+    actually says, or a reworded placeholder leaves them hunting for a box that
+    is right in front of them.
+    """
+    invitation = _exported_string(RESUME_MODULE, "CONTINUE_THIS_CHAT")
+    assert invitation in _rendered(), (
+        "the runbook does not quote what the chat box invites when nothing is "
+        f"waiting on a reply ({invitation}), so the presenter has no way to "
+        "recognise the resume step on screen"
+    )
+
+
+def test_resume_does_not_promise_a_memory_it_has_not_got():
+    """ADR-027's negative consequence, said where the presenter reads it.
+
+    Resume carries what was **persisted** against the session — the attempted
+    steps, the identity, the lane, the ticket. The transcript on screen is
+    display-only and is never replayed into an agent's context, because the
+    **Workflow cache** is process-local and keyed by user. A presenter who
+    tells the room the assistant "remembers the whole conversation" has made a
+    claim the next question can falsify in front of the customer, which is the
+    failure mode every *Simulated* badge in this demonstration exists to avoid.
+    """
+    runbook = _rendered()
+    invitation = _exported_string(RESUME_MODULE, "CONTINUE_THIS_CHAT")
+    around = runbook[runbook.index(invitation) - 1200 : runbook.index(invitation) + 1200]
+    assert re.search(r"transcript", around, re.IGNORECASE), (
+        "the runbook offers resume without saying what it does not carry — "
+        "the transcript on screen is not the assistant's memory, and a "
+        "presenter told otherwise makes a claim the next turn can falsify"
     )
