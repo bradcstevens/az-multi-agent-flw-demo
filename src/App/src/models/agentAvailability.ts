@@ -87,9 +87,18 @@ export function availabilityHeading(count: number): string {
     return `${count} specialist${count === 1 ? '' : 's'} available`;
 }
 
-/** The line under the heading that keeps the two claims apart in words. */
+/**
+ * The line under the heading that keeps the two claims apart in words.
+ *
+ * It says *take part* rather than *take this question* because since #79 the
+ * panel is on the home surface too, where it is read **before a question has
+ * been typed** — and a note about "this question" there describes one that does
+ * not exist. The same sentence has to be true on both surfaces, for the reason
+ * the count does: this rail may say nothing, but it may not say something that
+ * is not so.
+ */
 export const AVAILABILITY_NOTE =
-    'Available to answer. Which of them take this question is named as each one responds.';
+    'Available to answer. Which of them take part is named as each one responds.';
 
 /** What the panel says when it genuinely knows of no roster. */
 export const NO_ROSTER_MESSAGE = 'No agent roster loaded for this conversation.';

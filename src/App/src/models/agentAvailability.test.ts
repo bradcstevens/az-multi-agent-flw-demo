@@ -92,4 +92,13 @@ describe('what the panel is allowed to claim', () => {
     it('keeps the empty state, because no roster is a real state', () => {
         expect(NO_ROSTER_MESSAGE).toBe('No agent roster loaded for this conversation.');
     });
+
+    it('presupposes no question, because the rail says it before one is typed', () => {
+        // Since #79 the note is on the home surface too, where nothing has been
+        // asked yet. "Which of them take *this question*" there describes a
+        // question that does not exist — the same failure as claiming
+        // participation, in the grammar rather than in the verb.
+        expect(AVAILABILITY_NOTE).not.toMatch(/this question/i);
+        expect(AVAILABILITY_NOTE.toLowerCase()).toContain('available to answer');
+    });
 });

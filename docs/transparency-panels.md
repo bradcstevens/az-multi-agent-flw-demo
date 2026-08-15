@@ -223,6 +223,38 @@ roster is reachable by heading navigation like everything else on the rail (#57)
 stays: a deployment with no store assistant is a real state and the panel is right to say so. It
 just may not say it about a team the app is already holding.
 
+### And it says it before a question is typed
+
+#79 puts the panel on the **home surface**'s rail as well. Nothing new was needed: the roster is
+`selectedTeam`, which this page already resolves in order to exist at all, and the count is
+`selectTeamAgentCount`. There is no request of the panel's own and nothing on the socket. The home
+surface passes no conversation roster — there is no conversation — which is why `team` and `plan`
+are optional props rather than a `null` standing in for a question nobody asked.
+
+It is rendered only where there **is** a roster, on #78's rule. `selectedTeam` is null for the whole
+of the team fetch and again on a deployment with no store assistant, and the panel's empty state is
+wrong twice over on this surface: it would sit beside the spinner reading *"Starting the store
+assistant…"*, which is exactly the contradiction #65 removed one surface across, and it speaks of
+*"this conversation"* when there is none. `HomeInput` already says the honest version of the second
+case in the middle of the screen, and once is enough.
+
+It is the honest neighbour of the loading copy #64 deleted. *"Initializing AI agents…"* was a
+scripted stage with no signal behind it; **"3 specialists available"** is a fact about the roster,
+stated where a presenter opening the demo used to have nothing to point at.
+
+The home surface is also where it is hardest to get away with. The **Identity boundary gate**
+refuses the boundary probe *there*, above the **Lane router**, so the meter's guardrail row is two
+panels below the roster with a measured **zero** on it. Availability survives that beat unchanged —
+three were available and none was asked — and the note says *"which of them take part"* rather than
+*"which of them take this question"* for the same reason the count says *available*: before
+anything is typed there is no *this question* to speak of, and a note that presumes one is the same
+untruth as a participation claim, in the grammar instead of in the verb.
+
+Availability is deliberately **not** a phase of the **Progress narration**. ADR-023's phases are
+each an observed event and run from a question being sent to its answer arriving; availability is a
+standing fact that is true before any of them and is not advanced past. `progressNarration.test.ts`
+fails if a phase for it is ever added, or if any phase's words mention it.
+
 ## Presenter alert
 
 Rendered as visibly a different object from a reply: `role="alert"`, its own icon, a "Proactive

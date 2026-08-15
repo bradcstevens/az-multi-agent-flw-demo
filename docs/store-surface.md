@@ -211,12 +211,13 @@ and what it cost without reading every word, and the panel titles are what make 
 Rendering them as spans took the rail's argument away from exactly the users who most need it
 stated in structure rather than in layout.
 
-Two levels, declared once in `models/headingOutline.ts`:
+Three levels, declared once in `models/headingOutline.ts`:
 
 | Level | What | Where |
 | --- | --- | --- |
 | `SURFACE_HEADING` (`h1`) | The assistant's name | `ContentToolbar` — the conversation's header |
-| `SECTION_HEADING` (`h2`) | "How can I help?", "Quick tasks", "Plan Overview", each rail panel | `HomeInput`, `PlanPanelRight`, the three transparency panels |
+| `SECTION_HEADING` (`h2`) | "How can I help?", "Quick tasks", "Plan Overview", each rail panel | `HomeInput`, `PlanPanelRight`, the transparency panels |
+| `SUBSECTION_HEADING` (`h3`) | The count of specialists **available**, inside the Agent Team panel | `AgentTeamPanel` |
 
 "Plan Overview" is the one entry that is not always there — see below.
 
@@ -234,6 +235,12 @@ frame — so the chat surface's outline differs by **lane**: the Fast lane's has
 it, the Deliberate lane's does. That is an improvement rather than a regression, because the
 alternative is a heading a screen-reader user skims to and finds nothing behind. What it costs is
 that the outline test has to render both cases, and `headingOutline.test.tsx` does.
+
+"Agent Team" and the availability count beneath it are on **both** surfaces since #79 — the home
+surface's rail states who is available before a question is typed — so the two surfaces' outlines
+now differ only by the chat surface's plan section and by the model's own Markdown headings in a
+reply. `headingOutline.test.tsx` asserts the home surface's `h3` is the count, and that adding it
+did not make the outline skip a level.
 
 It is applied with Fluent's `as` override — `TextSlots.root` accepts `h1` through `h6` — rather
 than by hand-rolled markup, so the typography classes are still there and still beat the user-agent

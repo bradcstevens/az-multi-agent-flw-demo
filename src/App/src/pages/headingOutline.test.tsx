@@ -31,7 +31,7 @@ import { TeamService } from '../store/TeamService';
 import { PlanDataService } from '../store/PlanDataService';
 import { ASSISTANT_NAME, STORE_ASSISTANT_TEAM_ID } from '../models/storeSurface';
 import { AgentMessageType } from '../models';
-import { SECTION_HEADING, SURFACE_HEADING } from '../models/headingOutline';
+import { SECTION_HEADING, SUBSECTION_HEADING, SURFACE_HEADING } from '../models/headingOutline';
 import { sourceFiles } from '@/testing/stylesheets';
 import { FakeSocket } from '@/testing/fakeSocket';
 
@@ -218,8 +218,22 @@ describe('the home surface has a heading outline', () => {
         const sections = outline()
             .filter((heading) => heading.level === levelOf(SECTION_HEADING))
             .map((heading) => heading.text);
+        expect(sections).toContain('Agent Team');
         expect(sections).toContain('Grounding');
         expect(sections).toContain('What this cost');
+    });
+
+    it('heads who is available under the Agent Team panel, before a question is typed', async () => {
+        // #79. The count is a subsection of the panel it counts, so the rail's
+        // roster is reachable by heading navigation on this surface too, and
+        // the outline still descends without skipping.
+        renderHomeSurface();
+
+        await waitFor(() => expect(screen.getByTestId('agent-team-availability')).toBeInTheDocument());
+
+        const heading = screen.getByTestId('agent-team-availability');
+        expect(heading.tagName.toLowerCase()).toBe(SUBSECTION_HEADING);
+        expect(outline().map((entry) => entry.text)).toContain('1 specialist available');
     });
 
     it('descends without skipping a level', async () => {

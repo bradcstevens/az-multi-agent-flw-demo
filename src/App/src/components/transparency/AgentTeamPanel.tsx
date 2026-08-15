@@ -32,16 +32,29 @@ import { SECTION_HEADING, SUBSECTION_HEADING } from '../../models/headingOutline
  * Conflating them puts "3 agents identified" over the beat where the
  * **Identity boundary gate** refuses first and the **Token meter** below it
  * renders a measured `0`.
+ *
+ * Which is why it is on the **home surface**'s rail too (issue #79). There it
+ * has only the one source — the roster — and states the one claim that is true
+ * before anything has been sent. That beat is the boundary probe's: the refusal
+ * happens on the home surface, so the panel and the meter's real `0` are two
+ * panels apart on the one screen where a participation claim would be caught
+ * out immediately.
  */
 export interface AgentTeamPanelProps {
-    /** The workflow roster, from the plan-fetch response's `team`. */
-    team: TeamConfig | null;
-    /** The plan's flat list of member names, used only when there is no roster. */
-    plan: string[] | null;
     /**
-     * The **store assistant roster** the app is already holding, for the
-     * loading window — `selectedTeam`, in Redux since `HomePage`'s mount and
-     * needing nothing from the wire.
+     * The workflow roster, from the plan-fetch response's `team`.
+     *
+     * Optional since #79: the **home surface** has no conversation to have a
+     * roster of, and passing `null` for one there would be a null standing in
+     * for a question that has not been asked.
+     */
+    team?: TeamConfig | null;
+    /** The plan's flat list of member names, used only when there is no roster. */
+    plan?: string[] | null;
+    /**
+     * The **store assistant roster** the app is already holding — `selectedTeam`,
+     * in Redux since `HomePage`'s mount and needing nothing from the wire. It is
+     * the chat surface's loading window and the home surface's *only* source.
      */
     available?: TeamConfig | null;
     /** Its size, from `selectTeamAgentCount`. Not recounted here. */
@@ -49,8 +62,8 @@ export interface AgentTeamPanelProps {
 }
 
 const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({
-    team,
-    plan,
+    team = null,
+    plan = null,
     available = null,
     availableCount = 0,
 }) => {

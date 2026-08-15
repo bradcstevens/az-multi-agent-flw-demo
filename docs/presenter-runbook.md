@@ -51,6 +51,14 @@ the fallback ladder, and it only counts if it is from a green run. A direct prob
 library is **not** a substitute: it answers whether Copilot Studio is up, not whether the Foundry
 orchestrator reaches it, and the hop is the whole claim.
 
+**The rail says who is available before you type anything.** Once the page has finished loading the
+assistant, the Agent Team panel on the right reads **4 specialists available**, with nothing sent
+and no question asked. Point at it in the first thirty seconds — it is the *"several specialists,
+not one black box"* claim made before a single token has been spent, and it costs nothing to show.
+Note what it does **not** say: it says *available*, never that any of them took a question. Which
+ones take part is named as each one answers, and on beat 5 the answer is **none of them**. If the
+panel is not there yet, the assistant is still starting; give it a moment rather than reloading.
+
 **The demonstration opens with nobody signed in**, and that is deliberate — say so early. The
 header reads **Store 223** and **No user signed in**. This is a **shared store device**: one
 tablet behind the counter, used by whoever is on shift, with no individual identity in the
@@ -259,7 +267,7 @@ They are on the right, on both screens. Point at them; they are the evidence, no
 | --- | --- |
 | **Grounding** | *This one answer left Foundry.* It leads with the **platform** — `Copilot Studio` — and then the document. That is the cross-platform architecture proof, made live, per answer. It goes dark when a new question is asked, on purpose: an answer that never left Foundry must not be shown crediting Copilot Studio. |
 | **What this cost** | *Two billing models, side by side, visibly not uniform.* Foundry agents spend **tokens**; the Copilot Studio agent spends **Copilot Credits** (2 per answer, Microsoft's published rate for a generative answer, labelled *Est.*); the refusal spends nothing. The **model** column is how *"cheap models on cheap work"* stops being a slide. |
-| **Agent Team** | *Several specialists, not one black box* — who answered, and which model each one runs on. |
+| **Agent Team** | *Several specialists, not one black box* — who was **available**, and which model each one runs on. It says availability, which is true from the moment the page loads; who actually answered is named in each reply and billed in the cost table. On beat 5 those are four and zero, on the same screen, and that is the point. |
 
 One rule runs through all three, and it is worth saying to an engineering audience: **a dash means
 nobody reported it, a zero means we measured nothing.** The Copilot Studio row's tokens are a dash

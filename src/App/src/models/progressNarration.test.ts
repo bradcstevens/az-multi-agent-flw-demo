@@ -37,6 +37,26 @@ describe('the phases a request passes through', () => {
     });
 });
 
+describe('availability is not a phase of the narration (#79)', () => {
+    // The rail states how many specialists are **available** before a question
+    // is typed. That is a standing fact about the roster, not a step a request
+    // passes through, and folding it in here would make it a claim the phase
+    // machine advances *past* — which on the boundary-probe beat would read as
+    // the three having taken a question the gate refused above the Lane router.
+    it('has no phase for who is available', () => {
+        expect(REQUEST_PHASES).not.toContain('available');
+    });
+
+    it('never narrates availability in any phase', () => {
+        const said = REQUEST_PHASES.flatMap((phase) => [
+            narrate({ phase, lane: 'fast', executor: 'TroubleshootingAgent' }) ?? '',
+            narrate({ phase }) ?? '',
+        ]).join(' ');
+
+        expect(said).not.toMatch(/available|specialists/i);
+    });
+});
+
 describe('what the surface says in each phase', () => {
     it('says nothing before a question has been asked', () => {
         expect(narrate({ phase: 'idle' })).toBeNull();

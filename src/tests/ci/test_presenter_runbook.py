@@ -32,6 +32,9 @@ CHORD_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "presenterChord.ts
 SURFACE_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "storeSurface.ts"
 HOME_INPUT = REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
 RESUME_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "resume.ts"
+AGENT_AVAILABILITY = (
+    REPO_ROOT / "src" / "App" / "src" / "models" / "agentAvailability.ts"
+)
 SOP_CORPUS = REPO_ROOT / "content" / "sop" / "corpus.toml"
 
 
@@ -429,3 +432,56 @@ def test_resume_does_not_promise_a_memory_it_has_not_got():
         "the transcript on screen is not the assistant's memory, and a "
         "presenter told otherwise makes a claim the next turn can falsify"
     )
+
+
+def test_the_runbook_states_the_availability_the_rail_actually_states():
+    """The count on the rail before a question is typed (#79).
+
+    The rail states how many specialists are **available** once the roster has
+    resolved and before any question is sent — the count needs no request of its
+    own — and the runbook tells the presenter to point at it while the home
+    surface is still empty. Both halves are read out of the
+    repository rather than written here: the sentence's shape from
+    `availabilityHeading`, and the number from the store pack's own roster. A
+    fifth agent added to the pack changes what the rail says, and a runbook
+    carrying its own copy of the old number sends the presenter to point at a
+    panel that disagrees with them.
+    """
+    heading = AGENT_AVAILABILITY.read_text(encoding="utf-8")
+    match = re.search(
+        r"return `\$\{count\} (specialist)\$\{count === 1 \? '' : 's'\} (available)`",
+        heading,
+    )
+    assert match, "agentAvailability.ts no longer builds the heading this way"
+
+    roster = len(json.loads(STORE_PACK.read_text(encoding="utf-8"))["agents"])
+    stated = f"{roster} {match.group(1)}{'' if roster == 1 else 's'} {match.group(2)}"
+    assert stated in _rendered(), (
+        f"the runbook does not quote what the rail states before a question is "
+        f"typed ({stated}), so the presenter opens the demonstration pointing at "
+        "a number nobody checked"
+    )
+
+
+def test_the_runbook_does_not_turn_availability_into_participation():
+    """**Available vs participating**, in the presenter's own words.
+
+    The Agent Team panel says who *could* answer. The **Identity boundary gate**
+    refuses the boundary probe above the **Lane router**, so on beat 5 the number
+    that participate is zero and the meter renders a measured `0` two panels
+    below the roster. A runbook that tells the presenter the panel shows "who
+    answered" hands them a sentence the screen contradicts on the one beat the
+    whole governance argument rests on.
+    """
+    row = next(
+        line
+        for line in _runbook().splitlines()
+        if line.startswith("| **Agent Team**")
+    )
+    assert "available" in row.lower(), (
+        "the runbook's Agent Team row does not say the panel states availability"
+    )
+    for forbidden in ("who answered", "who took", "identified", "assigned"):
+        assert forbidden not in row.lower(), (
+            f"the runbook's Agent Team row claims participation: {forbidden!r}"
+        )

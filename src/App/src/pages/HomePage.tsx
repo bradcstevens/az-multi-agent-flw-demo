@@ -6,6 +6,7 @@ import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import HomeInput from '@/components/content/HomeInput';
 import TransparencyRail from '@/components/transparency/TransparencyRail';
+import AgentTeamPanel from '@/components/transparency/AgentTeamPanel';
 import { NewChatService } from '../store/NewChatService';
 import ChatPanelLeft from '@/components/content/ChatPanelLeft';
 import ContentToolbar from '@/commonComponents/components/Content/ContentToolbar';
@@ -17,6 +18,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
     selectSelectedTeam,
     selectIsLoadingTeam,
+    selectTeamAgentCount,
     setSelectedTeam,
     setIsLoadingTeam,
 } from '../store/slices/teamSlice';
@@ -32,6 +34,15 @@ const HomePage: React.FC = () => {
     const selectedTeam = useAppSelector(selectSelectedTeam);
     const isLoadingTeam = useAppSelector(selectIsLoadingTeam);
     const reloadLeftList = useAppSelector(selectReloadLeftList);
+
+    /*
+     * How many specialists are **available**, for the rail (issue #79).
+     *
+     * `selectTeamAgentCount` rather than a `.length` beside it, for the reason
+     * `PlanPanelRight` reads the same selector: the roster has one count, and a
+     * second one derived at a call site is a second thing to disagree with it.
+     */
+    const availableCount = useAppSelector(selectTeamAgentCount);
 
     /*
      * The one assistant, resolved (issue #25).
@@ -125,8 +136,34 @@ const HomePage: React.FC = () => {
                       identity boundary gate refuses a question *here*, and the
                       row proving that refusal cost nothing has to be beside
                       the rows that did cost something.
+
+                      It heads that rail with who is **available** (issue #79).
+                      The **store assistant roster** is the one this page has
+                      already resolved, so the count needs no request of its own
+                      and is the only claim this surface may make: the beat it
+                      owns is the one where the number that participate is zero.
+                      There is no conversation on the home surface, so the panel
+                      is given no conversation roster to prefer.
+
+                      Rendered only where there *is* a roster, on #78's rule.
+                      `selectedTeam` is null for the whole of the team fetch and
+                      again on a deployment with no store assistant, and the
+                      panel's empty state — "No agent roster loaded for this
+                      conversation." — is wrong twice over here: it would sit
+                      beside a spinner reading "Starting the store assistant…",
+                      which is #65's contradiction moved one surface across, and
+                      it speaks of a conversation that does not exist. The
+                      surface already says the honest version of the second case
+                      once, in the middle of the screen, and once is enough.
                     */}
-                    <TransparencyRail team={selectedTeam} />
+                    <TransparencyRail team={selectedTeam}>
+                        {selectedTeam && (
+                            <AgentTeamPanel
+                                available={selectedTeam}
+                                availableCount={availableCount}
+                            />
+                        )}
+                    </TransparencyRail>
                 </CoralShellRow>
             </CoralShellColumn>
         </>

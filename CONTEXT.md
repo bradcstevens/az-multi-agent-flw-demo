@@ -1078,6 +1078,16 @@ one agent at a time, as each speaks, by the **Progress narration**.
 The contradiction it removes was on screen: `PlanPanelRight` renders outside the loading branch, so
 `AgentTeamPanel` — sourced from `planData?.team`, still `null` — read *"No agent roster loaded for
 this conversation."* beside a spinner reading *"Initializing AI agents…"*.
+
+Since #79 the **home surface**'s rail states it too, before a question is typed — the same panel,
+given only the roster, because there is no conversation there to have one, and rendered only once
+there *is* a roster to state, on #78's rule. That is the surface where
+the distinction is hardest to get away with, since the gate's refusal happens on it and the meter's
+measured `0` is two panels below the count. Availability is deliberately **not** a phase of the
+**Progress narration**: the phases are each an observed event running from a question being sent to
+its answer arriving, and availability is a standing fact that is true before any of them. The note
+under the count says *"which of them take part"* rather than *"which of them take this question"*,
+because before anything is typed there is no *this question*.
 _Avoid_: agents assigned, agents identified, agents selected
 
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that
