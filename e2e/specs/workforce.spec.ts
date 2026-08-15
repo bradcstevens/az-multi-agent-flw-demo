@@ -133,6 +133,32 @@ test.describe('the fourth specialist', () => {
                 'than the reply.',
         ).toContain(agentKey(specialist.name));
 
+        // And named once. `agentKey` above answers *which* specialist was
+        // billed, deliberately without the presentation either side applies —
+        // but that tolerance is what would let the meter go back to repeating
+        // the column heading in every cell (#70) with this beat still green.
+        // So the presentation is asserted separately, and only the half #70
+        // decided: the cell must not end in the noun the pack's own name ends
+        // in, which is the suffix the heading already carries. Nothing here
+        // restates how the backend humanises or cases a name — that is the
+        // spelling `agentKey` exists not to have a fourth opinion about.
+        const suffix = /\s*agents?$/i;
+        if (suffix.test(specialist.name)) {
+            const billedAs = billed.find(
+                (cell) => agentKey(cell) === agentKey(specialist.name),
+            );
+            expect(
+                billedAs,
+                `the cost table bills the specialist as ${JSON.stringify(billedAs)}, ` +
+                    `repeating the noun its own column heading carries. The pack ` +
+                    `names it ${JSON.stringify(specialist.name)} and the meter is the ` +
+                    'one panel that drops the suffix (#70) — the roster panel and ' +
+                    'the prose keep it. A meter reading it back means the panel ' +
+                    'stopped going through the shared display-name helper, and the ' +
+                    'name no longer fits the column.',
+            ).not.toMatch(suffix);
+        }
+
         // And words arrived. That is the whole of what is asserted about
         // anything a model wrote.
         expect([...said.spoken, ...said.asked]).not.toHaveLength(0);

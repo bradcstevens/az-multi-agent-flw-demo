@@ -673,14 +673,28 @@ answer cost, losing the number it exists to show.
 
 The share the **Agent** column gets is the one that holds the longest word in the **Store assistant
 roster** (#70). The table is **~257px**, not the 288px the rail's own arithmetic suggests: the panel
-inside the rail is a card with 14px of padding and a hairline border of its own, and 30% of 257
-is 73px against the 90 `Troubleshooting` needs — so the name was snapped after eleven characters in
-the panel whose job is to be the most credible thing in the room. The eight points it wanted came
-from **Model**, and not from Tokens, by the same rule: a model deployment breaks at its own hyphens
-and costs a line, while a token total is `nowrap`, so a column too narrow for a five-figure count
-sets it across the estimated Copilot Credits instead of wrapping it. `overflow-wrap: break-word`
-stays as the last resort for a name nobody sized the column for — under `table-layout: fixed` the
-wrapping mode no longer decides the table's width, only what happens to a word wider than its share.
+inside the rail is a card with 14px of padding and a hairline border of its own. `Troubleshooting`
+measures **96.4px** at 12px and weight 600, so at 30% the name was snapped after eleven characters
+in the panel whose job is to be the most credible thing in the room; the column holds **41%** now,
+which is 101.4px of text. Every number in that sentence is *measured* rather than reckoned, and the
+reckoning is why #70 took two goes: the ticket's own arithmetic and the first fix's each came out
+short by their own several pixels and each was believed, the second of them with a green test
+beneath it. The room came from **Model**, **Calls** and two points of **Tokens** — which keeps
+enough to set the five-figure total #60 sized it for, with 0.9px to spare — by the same rule: a
+model deployment breaks at its own hyphens and costs a line, while a token total is `nowrap`, so a
+column too narrow for a five-figure count sets it across the estimated Copilot Credits instead of
+wrapping it. `overflow-wrap: break-word` stays as the last resort for a name nobody sized the column
+for — under `table-layout: fixed` the wrapping mode no longer decides the table's width, only what
+happens to a word wider than its share — and it is scoped to the **body**, because a heading is a
+label and the one heading that broke, `MODEL` as `MO`/`DEL`, was a column heading obeying a rule
+written for data.
+
+The **column headings are sentence case** for the same arithmetic: uppercase costs about a fifth of
+a label's width, and once the Agent column took what its longest name needs, uppercase headings no
+longer fit their columns. Having nothing telling them to break, they ran into each other. What still
+does not fit is `Calls`, by 9.3px — holding every heading, every figure and a 96.4px name at once
+needs 5.8px more than the table has, so one label overflows into its neighbour, which is what the
+headings have always done and there is less of it than before.
 
 **Agent display name** — one base name, two presentations, and the rule that says which. The base is
 `getAgentDisplayName`: the roster's own name (`WorkforceAgent`, or the wire's humanised

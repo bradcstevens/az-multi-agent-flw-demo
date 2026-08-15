@@ -30,26 +30,88 @@ const STORE_PACK = join(
     'store_assistant.json',
 );
 
-const rosterNames = (): string[] => {
+/** The store assistant roster, read out of the pack that authors it. */
+const roster = (): { name: string; deployment_name: string }[] => {
     const pack = JSON.parse(readFileSync(STORE_PACK, 'utf8'));
-    const names = (pack.agents || []).map((agent: { name: string }) => agent.name);
-    expect(names.length, 'the store pack authors no roster to render').toBeGreaterThan(0);
-    return names;
+    const agents = pack.agents || [];
+    expect(agents.length, 'the store pack authors no roster to render').toBeGreaterThan(0);
+    return agents;
 };
 
+const rosterNames = (): string[] => roster().map((agent) => agent.name);
+
+const rosterDeployments = (): string[] => roster().map((agent) => agent.deployment_name);
+
 /**
- * A conservative advance per character for the meter's own type — 12px at
- * weight 600, in Fluent's Segoe UI stack.
+ * How wide a word is in the meter's own type — 12px at weight 600, in Fluent's
+ * Segoe UI stack — as a sum of per-character advances.
  *
- * jsdom lays nothing out, so this is arithmetic rather than a measurement, and
- * it is rounded **up**: mixed-case Latin at this size measures nearer 5.7px a
- * character, so a name this check calls too long is a name a browser would
- * agree about. It exists to catch the fault #70 is, which no render in this
- * suite can see — a word wider than the column it is given, snapped mid-word by
- * `overflow-wrap` in the panel whose job is to be the most credible thing in
- * the room.
+ * jsdom lays nothing out, so a check about whether a word fits its column has
+ * to model the font, and the model is the part that has to be honest. The one
+ * this replaces was a single average of `6px` a character described as rounded
+ * up. It was rounded *down*: `Workforce` measures 6.80px a character and
+ * `boundary` 7.04, and `Troubleshooting` is 96.4px against the 90 that average
+ * predicted. So the guard agreed with a column six pixels too narrow, and #70's
+ * first fix shipped with every test green and the word still snapped after
+ * eleven characters in a browser.
+ *
+ * These advances are measured — `measureText` in Chromium at `600 12px` in the
+ * stack below — and each is rounded **up** to the nearest quarter-pixel, so a
+ * sum is never less than the width a browser lays out. It over-states
+ * `Troubleshooting` by 3.4px, which is the direction an assertion about fitting
+ * should err in. A character nobody measured counts as the widest there is,
+ * because a name in a script this table has never seen should fail loudly
+ * rather than pass by omission.
  */
-const NAME_CHAR_PX = 6;
+const ADVANCE_12PX_600: ReadonlyArray<readonly [number, string]> = [
+    [3.25, ' '],
+    [3.5, 'ijl'],
+    [3.75, 'I'],
+    [4, ".,'/"],
+    [4.75, 'f'],
+    [5, 't()'],
+    [5.25, 'r'],
+    [6, '1-'],
+    [6.75, 'sxz'],
+    [7, 'Jackvy'],
+    [7.25, 'FLe7'],
+    [7.5, 'Ehnou'],
+    [7.75, 'bdgpq2'],
+    [8, 'PST035'],
+    [8.25, 'BRZ4689'],
+    [8.5, 'KVY'],
+    [8.75, 'AX'],
+    [9, 'CD&'],
+    [9.25, 'GHNU'],
+    [9.5, 'OQ'],
+    [10, 'w'],
+    [10.75, 'M'],
+    [11, 'm'],
+    [12, 'W'],
+];
+
+const ADVANCE = new Map<string, number>(
+    ADVANCE_12PX_600.flatMap(([px, chars]) => [...chars].map((char) => [char, px] as const)),
+);
+
+const WIDEST_ADVANCE = Math.max(...ADVANCE_12PX_600.map(([px]) => px));
+
+const wordPx = (word: string): number =>
+    [...word].reduce((total, char) => total + (ADVANCE.get(char) ?? WIDEST_ADVANCE), 0);
+
+/**
+ * The runs a browser may not break inside.
+ *
+ * Whitespace and a hyphen are wrap opportunities, so `Store SOP Assistant` is
+ * three runs and a deployment like `gpt-5.4-mini` is three more. What has to
+ * fit its column is the widest run, not the whole string — the roster's names
+ * are *expected* to wrap, and #70 is about where.
+ */
+const unbreakableRuns = (text: string): string[] =>
+    text
+        .split(/\s+/)
+        .filter(Boolean)
+        .flatMap((word) => word.split(/(?<=-)/));
 
 const topLevel = (selector: string): Rule => {
     const rule = allRules().find((candidate) => candidate.selector === selector);
@@ -135,6 +197,18 @@ const horizontal = (value: string): number => {
  * chain is read here — rail, panel, column share, and the padding the cascade
  * settles on — because every one of those numbers is a decision somebody may
  * revisit, and the column that stops fitting is not the one they were changing.
+ *
+ * The share is a share of the **table**, and the padding comes out of it. The
+ * application's global reset makes every box a border-box (`:root` declares it
+ * and `*` inherits it), so a percentage on a cell sizes the whole cell and its
+ * padding is spent inside that, not added outside it. Measured against
+ * Chromium with that reset in place, the five columns come out at exactly their
+ * declared shares of 257px and the reading below is exact.
+ *
+ * Which box model this is has decided the answer twice. Read as content-box the
+ * Agent column looks 4px narrower than it is and the Calls column 4px wider,
+ * and it was a harness missing the reset — not the stylesheet — that made a
+ * seven-point Calls column look wide enough for a two-digit count.
  */
 const columnTextPx = (cell: Element, column: number): number => {
     const rail = topLevel('.transparency-rail');
@@ -279,11 +353,39 @@ describe('the Token meter', () => {
 
         screen.getAllByTestId('meter-agent').forEach((cell) => {
             const room = columnTextPx(cell, 1);
-            (cell.textContent || '').split(/\s+/).forEach((word) => {
+            unbreakableRuns(cell.textContent || '').forEach((run) => {
                 expect(
-                    word.length * NAME_CHAR_PX,
-                    `${JSON.stringify(word)} needs about ${word.length * NAME_CHAR_PX}px and the ` +
-                        `Agent column gives it ${room.toFixed(1)}px, so it is broken mid-word`,
+                    wordPx(run),
+                    `${JSON.stringify(run)} needs ${wordPx(run).toFixed(1)}px and the Agent ` +
+                        `column gives it ${room.toFixed(1)}px, so a browser breaks it mid-word`,
+                ).toBeLessThanOrEqual(room);
+            });
+        });
+    });
+
+    it('gives the model column room for the longest run of a deployment name', () => {
+        // The other column that carries words. It is where the Agent column's
+        // room came from (#70), so it is the one that a further point taken for
+        // a longer agent name would silently cost — and a deployment set as
+        // `gp` / `t-` is the same fault one column to the right.
+        let meter = emptyMeter();
+        const deployments: Record<string, string> = {};
+        rosterNames().forEach((name, index) => {
+            const key = `executor-${index}`;
+            meter = recordTokenUsage(meter, usage(key, name, 10, 5));
+            deployments[key] = rosterDeployments()[index];
+        });
+
+        render(<TokenMeterPanel meter={meter} models={deployments} />);
+
+        screen.getAllByTestId('meter-model').forEach((cell) => {
+            const room = columnTextPx(cell, 2);
+            unbreakableRuns(cell.textContent || '').forEach((run) => {
+                expect(
+                    wordPx(run),
+                    `${JSON.stringify(run)} needs ${wordPx(run).toFixed(1)}px and the Model ` +
+                        `column gives it ${room.toFixed(1)}px. A deployment name may wrap at its ` +
+                        'own hyphens and may not be broken anywhere else',
                 ).toBeLessThanOrEqual(room);
             });
         });

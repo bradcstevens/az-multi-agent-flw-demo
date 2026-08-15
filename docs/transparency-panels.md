@@ -132,12 +132,30 @@ made the name too long to fit: `Troubleshoo` / `ting Agent`, in the panel whose 
 believed.
 
 Two things are sized against that, and both are read out of the stylesheets by the frontend loop
-rather than eyeballed. The **Agent** column holds the longest word in the store assistant roster —
-about 90px for `Troubleshooting`, against the 73px that 30% of a ~257px table gave it; the table is
-257px and not the rail's 288 because the panel inside the rail is a padded card with a border of its
-own. And the width it wanted came from **Model**, never from Tokens: a deployment name breaks at its
-own hyphens and costs a line, while a token total may not break at all, so a column too narrow for a
-five-figure count sets it across the estimated Copilot Credits.
+rather than eyeballed. The **Agent** column holds the longest word in the store assistant roster:
+`Troubleshooting` measures **96.4px** at the meter's size and weight, against the 73px that 30% of a
+~257px table gave it, and it has 101.4px at 41%. The table is 257px and not the rail's 288 because
+the panel inside the rail is a padded card with a border of its own. And the width came from
+**Model**, **Calls** and two points of **Tokens**, which keeps the five-figure total #60 sized it
+for and no more: a deployment name breaks at its own hyphens and costs a
+line, while a token total may not break at all, so a column too narrow for a five-figure count sets
+it across the estimated Copilot Credits.
+
+Those pixel figures are measured in a browser, not derived, and that distinction is the whole of why
+#70 took two attempts. The first sized the column from a per-character average of 6px — but
+`Workforce` is 6.80px a character and `boundary` 7.04, so the average was an under-estimate wearing
+the word "conservative", and the column came out six pixels short with the guard agreeing. The guard
+now sums **measured per-character advances**, each rounded up, so what it predicts is never less
+than what Chromium lays out; it over-states `Troubleshooting` by 3.4px, which is the direction a
+check about fitting should be wrong in.
+
+Two smaller consequences of the same arithmetic. `overflow-wrap: break-word` is scoped to the table
+**body**, because the one heading that ever broke was `MODEL` set as `MO` / `DEL` — a label obeying
+a rule written for data. And the headings are **sentence case**: uppercase costs about a fifth of a
+label's width, and it is what makes all five fit their columns rather than run into one another.
+`Calls` still overflows by 9.3px, because holding every heading, every figure and a 96.4px name at
+once needs about 6px more than the table has — the headings have always overflowed, and there is
+less of it now than before.
 
 The guardrail row is the exception. Its name is a constant in `models/meter.ts` rather than anything
 that arrived over a wire, and it is rendered as written — the **Identity boundary gate**, not a

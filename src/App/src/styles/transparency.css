@@ -179,54 +179,98 @@
 
 /*
  * The **Agent** column is sized to hold the longest word in the store assistant
- * roster (#70). `Troubleshooting` needs about 90px at this size and weight, and
- * 30% of a 257px table was 73 — so the word was snapped after eleven
- * characters. #70's own arithmetic said 288px and four points would do it; both
- * numbers were the rail's, and the panel inside the rail is a card with 14px of
- * padding and a hairline border of its own.
+ * roster (#70): `Troubleshooting`, which measures **96.4px** at this size and
+ * weight in a browser. Every earlier number here was arithmetic and every one
+ * of them came out short — the ticket reckoned a 97px word against 78px of
+ * room and asked for four points; the first fix reckoned a 90px word against
+ * 93.7px of room and took eight, and a browser still snapped the word after
+ * eleven characters with every test green. The figures here are measured, and
+ * the frontend loop re-derives them from these declarations rather than
+ * restating them.
  *
- * The eight points come from **Model**, not from Tokens, which is the rule this
- * table already runs on: the width is given up in the names, never the figures.
- * A model name breaks at its own hyphens (`gpt-` / `5.4-` / `mini`) and costs a
- * line; a token total is `nowrap`, so a column too narrow for a five-figure
- * count does not wrap it — it sets it across the estimated Copilot Credits, the
- * number the two-billing-models point is made with, which is the #60 fault
- * again from the inside.
+ * The table is **257px**, not the rail's 320 and not the 288 that 320 less its
+ * own padding suggests: the panel inside the rail is a card with 14px of
+ * padding and a hairline border of its own. Every box here is a border-box —
+ * the application's reset declares it on `:root` and everything inherits it —
+ * so a column is exactly its declared share of those 257px and its padding is
+ * spent inside that. At 41% the Agent column is 105.4px, of which 101.4px is
+ * text, for a 96.4px word; every shorter name in the roster breaks where it
+ * should, on a space.
+ *
+ * The width comes out of **Model**, **Calls** and two points of **Tokens**,
+ * under the rule this table already runs on (#60): the room is given up in the
+ * names, never in the figures. A model deployment breaks at its own hyphens —
+ * `gpt-` / `5.4-` / `mini`, which is three lines here and was three lines
+ * before #70 — and a broken model name costs a line. A token total is
+ * `nowrap`, so a column too narrow for a five-figure count does not wrap it: it
+ * sets it across the estimated Copilot Credits, the number the two-billing-
+ * models point is made with, which is the #60 fault again from the inside.
+ * **Tokens** keeps 42.3px, which still sets the five-figure `12,345` #60
+ * sized it for, by 0.9px. It never held a six-figure one — `128,940` wants
+ * 48.9px and the column was 47.4px before #70 touched it — so that is a limit
+ * this change inherits rather than introduces. **Calls** keeps 16.5px, which
+ * sets a two-digit count by 1.4px; and **Est. Copilot Credits** does not move
+ * at all.
+ *
+ * What does not fit is the `Calls` heading, which wants 25.8px and has 16.5px.
+ * That is the one thing this table cannot have all of: holding every heading
+ * and every figure alongside a 96.4px name needs about 6px more than 257, so a
+ * label overflows into its neighbour. It is the least costly place to spend it
+ * — the headings already behaved this way, and there is less of it than before.
  */
 .token-meter th:nth-child(1) {
-    width: 38%;
+    width: 41%;
 }
 
 .token-meter th:nth-child(2) {
-    width: 11%;
+    width: 13%;
 }
 
 .token-meter th:nth-child(3) {
-    width: 11%;
+    width: 8%;
 }
 
 .token-meter th:nth-child(4) {
-    width: 20%;
+    width: 18%;
 }
 
 .token-meter th:nth-child(5) {
     width: 20%;
 }
 
+/*
+ * Two pixels of gutter a side, not four (#70). In a 257px table every pixel of
+ * padding is a pixel of name, and the columns' own alignment does the
+ * separating: the figures are right-aligned and each is short of its column, so
+ * what stands between one and the next is mostly the empty room to a number's
+ * left. It is the padding that let **Tokens** give two points to the Agent
+ * column and keep its text room to within a pixel of what it had.
+ */
 .token-meter th,
 .token-meter td {
     text-align: right;
-    padding: 6px 4px;
+    padding: 6px 2px;
     border-bottom: 1px solid var(--colorNeutralStroke3);
 }
 
-/* The column headings are labels, not data. */
+/*
+ * The column headings are labels, not data.
+ *
+ * Set in sentence case rather than uppercased (#70). The rail's other labels
+ * are uppercased micro-type and this row was too, but a heading here has a
+ * column to fit inside and uppercase costs about a fifth of its width — at
+ * 10px, `TOKENS` is 44.5px where `Tokens` is 36.7. Once the **Agent** column
+ * took the room its longest name needs, uppercase headings no longer fit their
+ * columns and, having nothing telling them to break, ran into one another:
+ * `MODELCALLSTOKENS` across the top of the table that is meant to be the most
+ * credible thing in the room. Sentence case is what makes all five fit, and it
+ * leaves the uppercase idiom where it still reads — the panel's own title.
+ */
 .token-meter thead th {
     color: var(--colorNeutralForeground3);
     font-size: 10px;
     font-weight: var(--fontWeightSemibold);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    letter-spacing: 0.02em;
     border-bottom-color: var(--colorNeutralStroke2);
 }
 
@@ -246,21 +290,20 @@
  * what happens to a name that is *wider than its share*: broken inside its own
  * cell, or set in one line across the number beside it. The first is ugly, the
  * second overprints the figure the panel exists to show. So the column is sized
- * to hold the longest word in the **store assistant roster** (#70), and this
+ * to hold the longest word in the **store assistant roster** above, and this
  * declaration only catches whatever nobody sized it for.
  *
- * The narrower padding is part of that sizing: 2px a side rather than 4px is
- * four more pixels of name in a 257px table, and these two columns are the ones
- * with a word to fit rather than a figure to keep clear of its neighbour. It is
- * declared against `th`/`td` because `.token-meter th` is a class *and* an
- * element and would otherwise win the cascade — a padding that loses is a
- * padding that changes nothing, and the arithmetic above would have been
- * counting pixels the column never got.
+ * **`tbody` only**, because a column heading is a label and not data. A heading
+ * wider than its column overflows into its neighbour rather than breaking,
+ * because nothing tells it to break — which is what `Calls` does here and has
+ * always done. Applied to the head as well, this declaration made the two name
+ * headings the exception to that: `MODEL` set as `MO` / `DEL` over a column
+ * whose *data* fitted. A heading that overflows is the table's existing
+ * behaviour; a heading snapped in half is a new one.
  */
-.token-meter th.token-meter__name,
-.token-meter td.token-meter__name {
+.token-meter tbody th.token-meter__name,
+.token-meter tbody td.token-meter__name {
     overflow-wrap: break-word;
-    padding: 6px 2px;
 }
 
 /*
