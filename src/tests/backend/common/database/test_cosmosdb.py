@@ -26,7 +26,7 @@ sys.modules['azure.identity.aio'] = Mock()
 # Mock v4 modules — no longer needed (flat layout migration complete)
 
 # Import the REAL modules using backend.* paths for proper coverage tracking
-from backend.common.database.cosmosdb import CosmosDBClient
+from backend.common.database.cosmosdb import CosmosDBClient, MatchConditions
 from backend.common.models.messages import (
     AgentMessage,
     AgentMessageData,
@@ -893,6 +893,21 @@ class TestCosmosDBCurrentTeamOperations:
         client.container.delete_item.assert_any_call("doc2", partition_key="session2")
 
 
+def _settled_chat(status="completed", etag="etag-1"):
+    """A chat whose latest plan has settled, described consistently.
+
+    The status read and the partition enumeration are two reads of the same
+    store, so a fixture that lets them disagree — a latest plan the
+    enumeration never saw — is the concurrency case, not the ordinary one. It
+    has its own tests; every other test here starts from a chat that is simply
+    settled.
+    """
+    return {
+        "latest": [{"overall_status": status, "id": "plan-1", "_etag": etag}],
+        "partition": [{"id": "plan-1", "user_id": "test_user"}],
+    }
+
+
 class TestCosmosDBChatDeletion:
     """**Chat deletion** — the whole session partition, scoped to its owner.
 
@@ -923,22 +938,53 @@ class TestCosmosDBChatDeletion:
         return client
 
     @staticmethod
-    def _cosmos(client, latest=None, partition=None, raises=None):
-        """Stand in for the container's two reads.
+    def _cosmos(
+        client,
+        latest=None,
+        partition=None,
+        raises=None,
+        latest_after=None,
+        remaining=0,
+    ):
+        """Stand in for the container's reads.
 
-        Told apart by what they project: the first asks for the latest plan's
-        ``overall_status``, the second enumerates the partition. ``raises`` is
-        raised while iterating the first, which is where the Azure SDK
-        surfaces a store failure.
+        Told apart by what they project: a status read asks for the latest
+        plan's ``overall_status``, the verification read counts what is left in
+        the partition, and the remaining one enumerates it. ``raises`` is
+        raised while iterating the first status read, which is where the Azure
+        SDK surfaces a store failure.
+
+        The status read happens **twice** — once to refuse early and once after
+        the partition has been enumerated (the concurrency guard). ``latest``
+        answers the first, ``latest_after`` the second when a test wants the
+        chat to change under the sweep; otherwise the store answers the same
+        thing both times. ``remaining`` is what the verification read finds
+        once the deletes are done: anything but ``0`` is a document written
+        into the partition while the sweep ran.
         """
+        status_reads = {"n": 0}
 
         def query_items(**kwargs):
-            status_read = "overall_status" in kwargs["query"]
+            query = kwargs["query"]
+            status_read = "overall_status" in query
+            verification_read = "COUNT" in query
+
+            if status_read:
+                status_reads["n"] += 1
+                rows = latest
+                if status_reads["n"] > 1 and latest_after is not None:
+                    rows = latest_after
+            elif verification_read:
+                rows = [remaining]
+            else:
+                rows = partition
+
+            first_status_read = status_read and status_reads["n"] == 1
 
             async def cursor():
-                if status_read and raises is not None:
+                if first_status_read and raises is not None:
                     raise raises
-                for row in (latest if status_read else partition) or []:
+                for row in rows or []:
                     yield row
 
             return cursor()
@@ -955,7 +1001,8 @@ class TestCosmosDBChatDeletion:
     @staticmethod
     def _sweep_query(client):
         for call in client.container.query_items.call_args_list:
-            if "overall_status" not in call.kwargs["query"]:
+            query = call.kwargs["query"]
+            if "overall_status" not in query and "COUNT" not in query:
                 return call.kwargs
         raise AssertionError("delete_chat never enumerated the partition")
 
@@ -964,7 +1011,7 @@ class TestCosmosDBChatDeletion:
         # The `user_id` predicate is the whole of the authorization: one
         # associate may not delete another's chat, and there is nothing else
         # standing between a session id and an irreversible sweep.
-        self._cosmos(client, latest=[{"overall_status": "completed"}], partition=[])
+        self._cosmos(client, **_settled_chat())
 
         await client.delete_chat("session-1")
 
@@ -1062,7 +1109,7 @@ class TestCosmosDBChatDeletion:
         # survive a control that promised to delete it.
         self._cosmos(
             client,
-            latest=[{"overall_status": "completed"}],
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
             partition=[
                 {"id": "plan-1", "user_id": "test_user"},
                 {"id": "step-1", "user_id": "test_user"},
@@ -1088,7 +1135,7 @@ class TestCosmosDBChatDeletion:
         # Whatever else has been written into a chat's partition since — the
         # sweep is the partition's, so a record added later goes with the chat
         # rather than outliving it as an orphan nobody can reach.
-        self._cosmos(client, latest=[{"overall_status": "completed"}], partition=[])
+        self._cosmos(client, **_settled_chat())
 
         await client.delete_chat("session-1")
 
@@ -1127,14 +1174,20 @@ class TestCosmosDBChatDeletion:
         # every real chat.
         self._cosmos(
             client,
-            latest=[{"overall_status": "completed"}],
-            partition=[{"id": "session_state:session-1", "user_id": None}],
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
+            partition=[
+                {"id": "plan-1", "user_id": "test_user"},
+                {"id": "session_state:session-1", "user_id": None},
+            ],
         )
 
         result = await client.delete_chat("session-1")
 
         assert result.outcome is DeletionOutcome.deleted
-        assert result.deleted == 1
+        assert result.deleted == 2
+        client.container.delete_item.assert_any_call(
+            "session_state:session-1", partition_key="session-1"
+        )
 
     @pytest.mark.asyncio
     async def test_a_sweep_that_left_something_behind_does_not_report_success(
@@ -1145,7 +1198,7 @@ class TestCosmosDBChatDeletion:
         # still in Cosmos and the associate may not be told otherwise.
         self._cosmos(
             client,
-            latest=[{"overall_status": "completed"}],
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
             partition=[{"id": "plan-1"}, {"id": "step-1"}],
         )
         client.container.delete_item = AsyncMock(
@@ -1157,6 +1210,197 @@ class TestCosmosDBChatDeletion:
         assert result.outcome is DeletionOutcome.incomplete
         assert result.deleted == 1
         assert result.failed == 1
+
+
+class _PreconditionFailed(Exception):
+    """Stands in for ``CosmosAccessConditionFailedError``.
+
+    The real class cannot be imported here — this module mocks ``azure.cosmos``
+    out wholesale so the store can be tested without an SDK — and what the
+    store actually reads is the HTTP status the SDK puts on it. 412 is the
+    conditional delete being refused: the document moved.
+    """
+
+    status_code = 412
+
+
+class TestChatDeletionRaces:
+    """The sweep against a chat that changes while it runs (#76, review).
+
+    The status check, the enumeration and the deletes are three operations, and
+    a Chat is a live thing: ``process_request`` can write a new Plan into the
+    session between any two of them. ADR-026 says a running Chat cannot be
+    deleted, so "the chat was settled when we looked" is not enough — these are
+    the guards that make the sentence true of the moment the documents actually
+    go, and the one case they cannot prevent (a document written *behind* the
+    sweep) is reported as ``incomplete`` rather than as a deleted chat.
+    """
+
+    @pytest.fixture
+    def client(self):
+        client = CosmosDBClient(
+            endpoint="https://test.documents.azure.com:443/",
+            credential="test_credential",
+            database_name="test_db",
+            container_name="test_container",
+            session_id="test_session",
+            user_id="test_user",
+        )
+        client._initialized = True
+        client.container = AsyncMock()
+        return client
+
+    _cosmos = staticmethod(
+        lambda client, **kwargs: TestCosmosDBChatDeletion._cosmos(client, **kwargs)
+    )
+
+    @pytest.mark.asyncio
+    async def test_the_latest_plan_goes_first_and_only_if_it_has_not_changed(
+        self, client
+    ):
+        # The conditional delete is the guard. Between the status read and the
+        # first `delete_item` the plan can settle *or* start again, and Cosmos
+        # is the only party that can see the difference: the plan is deleted on
+        # the `_etag` the status read observed, so a plan that moved refuses
+        # the delete instead of taking the conversation with it.
+        self._cosmos(
+            client,
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
+            partition=[
+                {"id": "step-1", "user_id": "test_user"},
+                {"id": "plan-1", "user_id": "test_user"},
+            ],
+        )
+
+        result = await client.delete_chat("session-1")
+
+        assert result.outcome is DeletionOutcome.deleted
+        first = client.container.delete_item.call_args_list[0]
+        assert first.args[0] == "plan-1"
+        assert first.kwargs["etag"] == "e1"
+        assert first.kwargs["match_condition"] is MatchConditions.IfNotModified
+
+    @pytest.mark.asyncio
+    async def test_a_plan_that_moved_under_the_sweep_keeps_the_whole_chat(
+        self, client
+    ):
+        # The precondition failure arrives on the *first* delete, which is why
+        # the latest plan goes first: nothing else has been touched yet, so the
+        # chat is kept whole rather than left half-swept.
+        self._cosmos(
+            client,
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
+            partition=[
+                {"id": "plan-1", "user_id": "test_user"},
+                {"id": "step-1", "user_id": "test_user"},
+            ],
+        )
+        client.container.delete_item = AsyncMock(side_effect=_PreconditionFailed())
+
+        result = await client.delete_chat("session-1")
+
+        assert result.outcome is DeletionOutcome.still_running
+        assert result.deleted == 0
+        assert client.container.delete_item.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_a_turn_that_starts_while_the_partition_is_read_keeps_the_chat(
+        self, client
+    ):
+        # A new Plan written after the enumeration is not in the sweep's list
+        # at all, so its `_etag` cannot refuse anything — but it *is* the
+        # chat's latest plan now, and the chat is therefore running. The status
+        # is read a second time, after the enumeration, for exactly this.
+        self._cosmos(
+            client,
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
+            partition=[{"id": "plan-1", "user_id": "test_user"}],
+            latest_after=[
+                {
+                    "overall_status": PlanStatus.in_progress.value,
+                    "id": "plan-2",
+                    "_etag": "e2",
+                }
+            ],
+        )
+
+        result = await client.delete_chat("session-1")
+
+        assert result.outcome is DeletionOutcome.still_running
+        client.container.delete_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_latest_plan_the_enumeration_never_saw_keeps_the_chat(
+        self, client
+    ):
+        # The same race with a settled status on the newcomer: a plan the sweep
+        # has no id for would survive a delete the surface reported as
+        # complete. Fail-closed, like every other "cannot tell" here.
+        self._cosmos(
+            client,
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
+            partition=[{"id": "plan-1", "user_id": "test_user"}],
+            latest_after=[
+                {"overall_status": "completed", "id": "plan-2", "_etag": "e2"}
+            ],
+        )
+
+        result = await client.delete_chat("session-1")
+
+        assert result.outcome is DeletionOutcome.still_running
+        client.container.delete_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_latest_plan_the_store_did_not_describe_is_kept(self, client):
+        # No `_etag` means no conditional delete, which means no guard. A chat
+        # this build cannot delete safely is kept, for the reason
+        # `is_running` keeps one whose status it cannot read.
+        self._cosmos(
+            client,
+            latest=[{"overall_status": "completed", "id": "plan-1"}],
+            partition=[{"id": "plan-1", "user_id": "test_user"}],
+        )
+
+        result = await client.delete_chat("session-1")
+
+        assert result.outcome is DeletionOutcome.still_running
+        client.container.delete_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_document_written_behind_the_sweep_is_not_a_deleted_chat(
+        self, client
+    ):
+        # The race the guards above cannot close: a record written into the
+        # partition after its enumeration and before the last delete. The
+        # partition is counted once the sweep is done, and anything still in it
+        # makes this `incomplete` — the chat is still in Cosmos, and ADR-026
+        # does not let the surface say otherwise.
+        self._cosmos(
+            client,
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
+            partition=[{"id": "plan-1", "user_id": "test_user"}],
+            remaining=1,
+        )
+
+        result = await client.delete_chat("session-1")
+
+        assert result.outcome is DeletionOutcome.incomplete
+        assert result.deleted == 1
+        assert result.failed == 1
+
+    @pytest.mark.asyncio
+    async def test_an_empty_partition_afterwards_is_the_chat_gone(self, client):
+        self._cosmos(
+            client,
+            latest=[{"overall_status": "completed", "id": "plan-1", "_etag": "e1"}],
+            partition=[{"id": "plan-1", "user_id": "test_user"}],
+            remaining=0,
+        )
+
+        result = await client.delete_chat("session-1")
+
+        assert result.outcome is DeletionOutcome.deleted
+        assert result.deleted == 1
 
 
 class TestDeleteAllChats:
@@ -1218,7 +1462,7 @@ class TestDeleteAllChats:
             ]
         )
 
-        result = await client.delete_all_chats()
+        result = await client.delete_all_chats(team_id="team-1")
 
         assert client.delete_chat.await_args_list == [
             call("session-1"),
@@ -1230,16 +1474,31 @@ class TestDeleteAllChats:
     @pytest.mark.asyncio
     async def test_only_this_users_chats_are_found(self, client):
         # The whole of the authorization, and the reason the enumeration is not
-        # the panel's list handed back: the panel reads plans by *team*, and a
-        # control that swept whatever the browser listed would let one
-        # associate clear another's history.
+        # the panel's list handed back: a control that swept whatever the
+        # browser named would let one associate clear another's history.
         self._sessions(client, [])
 
-        await client.delete_all_chats()
+        await client.delete_all_chats(team_id="team-1")
 
         read = client.container.query_items.call_args.kwargs
         assert "c.user_id=@user_id" in read["query"]
         assert {"name": "@user_id", "value": "test_user"} in read["parameters"]
+
+    @pytest.mark.asyncio
+    async def test_the_sweep_is_the_list_that_was_confirmed(self, client):
+        # Found by review. The panel lists chats by *team*
+        # (`get_all_plans_by_team_id`) and the confirmation counts that list,
+        # so an enumeration scoped only by `user_id` would destroy chats the
+        # dialog never mentioned — an irreversible action reaching past what
+        # the presenter agreed to. The two reads answer the same question, so
+        # they carry the same predicate.
+        self._sessions(client, [])
+
+        await client.delete_all_chats(team_id="team-1")
+
+        read = client.container.query_items.call_args.kwargs
+        assert "c.team_id=@team_id" in read["query"]
+        assert {"name": "@team_id", "value": "team-1"} in read["parameters"]
 
     @pytest.mark.asyncio
     async def test_a_chat_is_swept_once_however_many_plans_it_holds(self, client):
@@ -1258,7 +1517,7 @@ class TestDeleteAllChats:
         )
         client.delete_chat = AsyncMock(return_value=ChatDeletion.swept(1, 0))
 
-        result = await client.delete_all_chats()
+        result = await client.delete_all_chats(team_id="team-1")
 
         assert client.delete_chat.await_args_list == [
             call("session-1"),
@@ -1281,7 +1540,7 @@ class TestDeleteAllChats:
             ]
         )
 
-        result = await client.delete_all_chats()
+        result = await client.delete_all_chats(team_id="team-1")
 
         assert result.deleted == ("session-2",)
         assert result.kept_running == 1
@@ -1306,7 +1565,7 @@ class TestDeleteAllChats:
             ]
         )
 
-        result = await client.delete_all_chats()
+        result = await client.delete_all_chats(team_id="team-1")
 
         assert result.deleted == ("session-3",)
         assert result.failed == 2
@@ -1321,13 +1580,13 @@ class TestDeleteAllChats:
         self._sessions(client, [], raises=Exception("Cosmos unavailable"))
 
         with pytest.raises(Exception, match="Cosmos unavailable"):
-            await client.delete_all_chats()
+            await client.delete_all_chats(team_id="team-1")
 
     @pytest.mark.asyncio
     async def test_an_empty_history_is_a_result_rather_than_an_error(self, client):
         self._sessions(client, [])
 
-        result = await client.delete_all_chats()
+        result = await client.delete_all_chats(team_id="team-1")
 
         assert result.deleted == ()
         assert result.status == "deleted"

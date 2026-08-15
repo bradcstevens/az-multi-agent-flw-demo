@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict, List, Optional, Type
 
 from models.plan_models import MPlan
+from azure.core import MatchConditions
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos.aio._database import DatabaseProxy
 
@@ -22,6 +23,11 @@ from ..models.messages import (
     UserCurrentTeam,
 )
 from .database_base import DatabaseBase
+
+# What Cosmos answers a conditional write it refused. Read off the status
+# rather than by catching `CosmosAccessConditionFailedError`, so the sweep's
+# guard does not depend on which of the SDK's error classes carries it.
+PRECONDITION_FAILED = 412
 
 
 class CosmosDBClient(DatabaseBase):
@@ -529,6 +535,37 @@ class CosmosDBClient(DatabaseBase):
         an unreadable newest plan would promote an older settled one, and an
         outage would report a live chat as no chat at all.
 
+        **A Chat is a live thing while this runs**, and that is the third
+        guard. The status check, the enumeration and the deletes are separate
+        operations, and ``process_request`` can write a new Plan into the
+        session between any two of them — so "the chat was settled when we
+        looked" is not the sentence ADR-026 makes. Three things close that,
+        and the last of them is an admission rather than a fix:
+
+        * The status is read **again** after the partition has been
+          enumerated. A latest plan the enumeration never saw is a turn that
+          started behind it, and the chat is running now.
+        * The latest plan is deleted **first**, conditionally on the ``_etag``
+          that read observed. A plan that moved refuses the delete, and
+          because nothing else has been touched yet the chat is kept whole
+          rather than left half-swept.
+        * The partition is **counted afterwards**. A record written behind the
+          sweep cannot be prevented by either guard, so it is reported: the
+          chat comes back ``incomplete``, never ``deleted``.
+
+        Two residues are left, both known and neither closeable without a
+        deletion fence every session writer honours — its own ticket:
+
+        * A document written after that final count is indistinguishable, from
+          here, from one written after this method returned. The chat *was*
+          deleted; what follows is a new record in a session id somebody still
+          holds.
+        * A sweep that takes the latest plan and then fails on a later document
+          leaves a partition the chat list cannot show, because the list is
+          built from plans. It is reported ``incomplete`` and logged, and the
+          surface deliberately does not tell the associate to retry from a row
+          that is no longer there.
+
         Reports what actually happened. A sweep that could not take every
         document comes back ``incomplete``, because a half-deleted chat is
         still in Cosmos.
@@ -538,25 +575,7 @@ class CosmosDBClient(DatabaseBase):
         # Newest first: a Chat's state is its latest plan's, and this read is
         # also the first half of the ownership check — a session that yields no
         # plan of this user's is, to this caller, no chat at all.
-        latest = self.container.query_items(
-            query=(
-                "SELECT TOP 1 c.overall_status FROM c "
-                "WHERE c.session_id=@session_id AND c.data_type=@data_type "
-                "AND c.user_id=@user_id ORDER BY c._ts DESC"
-            ),
-            parameters=[
-                {"name": "@session_id", "value": session_id},
-                {"name": "@data_type", "value": DataType.plan},
-                {"name": "@user_id", "value": self.user_id},
-            ],
-        )
-
-        status: Any = None
-        found = False
-        async for row in latest:
-            status = row.get("overall_status")
-            found = True
-            break
+        status, _plan_id, _etag, found = await self._latest_plan(session_id)
 
         if not found:
             return ChatDeletion(DeletionOutcome.no_such_chat)
@@ -587,9 +606,52 @@ class CosmosDBClient(DatabaseBase):
                 return ChatDeletion(DeletionOutcome.not_yours)
             doomed.append(doc["id"])
 
+        # Read the state again, now that the sweep knows exactly which
+        # documents it would take. Everything this second read can disagree
+        # with the first about is a turn that started while the partition was
+        # being read, and every disagreement keeps the chat.
+        status, plan_id, etag, found = await self._latest_plan(session_id)
+
+        if not found:
+            return ChatDeletion(DeletionOutcome.no_such_chat)
+
+        if is_running(status) or plan_id not in doomed or not etag:
+            if plan_id not in doomed:
+                self.logger.info(
+                    "Keeping chat %s: plan %s was written after its partition "
+                    "was read",
+                    session_id,
+                    plan_id,
+                )
+            return ChatDeletion(DeletionOutcome.still_running)
+
         deleted = 0
         failed = 0
+
+        # The latest plan goes first, and only if it is still the document that
+        # was read. A refusal here costs nothing — no other document has been
+        # touched — which is the whole reason it is not swept in list order.
+        try:
+            await self.container.delete_item(
+                plan_id,
+                partition_key=session_id,
+                etag=etag,
+                match_condition=MatchConditions.IfNotModified,
+            )
+            deleted += 1
+        except Exception as e:
+            if getattr(e, "status_code", None) == PRECONDITION_FAILED:
+                self.logger.info(
+                    "Keeping chat %s: its latest plan changed under the sweep",
+                    session_id,
+                )
+                return ChatDeletion(DeletionOutcome.still_running)
+            failed += 1
+            self.logger.warning("Failed deleting chat document %s: %s", plan_id, e)
+
         for document_id in doomed:
+            if document_id == plan_id:
+                continue
             try:
                 await self.container.delete_item(
                     document_id, partition_key=session_id
@@ -601,9 +663,60 @@ class CosmosDBClient(DatabaseBase):
                     "Failed deleting chat document %s: %s", document_id, e
                 )
 
+        if not failed:
+            # Nothing refused the sweep, so the only thing that can still be in
+            # this partition is something written into it while the sweep ran.
+            # A chat with a record left in it is not a deleted chat.
+            left_behind = await self._count_partition(session_id)
+            if left_behind:
+                self.logger.warning(
+                    "Chat %s gained %s document(s) while it was being deleted",
+                    session_id,
+                    left_behind,
+                )
+                failed = left_behind
+
         return ChatDeletion.swept(deleted=deleted, failed=failed)
 
-    async def delete_all_chats(self) -> ChatsDeletion:
+    async def _latest_plan(self, session_id: str):
+        """The Chat's latest Plan, read raw: status, id, ``_etag``, found.
+
+        Raw for the reason ``delete_chat`` documents — ``query_items`` would
+        drop a plan it cannot validate and turn an outage into an empty
+        history — and it carries the ``_etag`` because the sweep's first delete
+        is conditional on it.
+        """
+        rows = self.container.query_items(
+            query=(
+                "SELECT TOP 1 c.overall_status, c.id, c._etag FROM c "
+                "WHERE c.session_id=@session_id AND c.data_type=@data_type "
+                "AND c.user_id=@user_id ORDER BY c._ts DESC"
+            ),
+            parameters=[
+                {"name": "@session_id", "value": session_id},
+                {"name": "@data_type", "value": DataType.plan},
+                {"name": "@user_id", "value": self.user_id},
+            ],
+        )
+
+        async for row in rows:
+            return row.get("overall_status"), row.get("id"), row.get("_etag"), True
+
+        return None, None, None, False
+
+    async def _count_partition(self, session_id: str) -> int:
+        """How many documents are left in a Chat's partition."""
+        rows = self.container.query_items(
+            query="SELECT VALUE COUNT(1) FROM c WHERE c.session_id=@session_id",
+            parameters=[{"name": "@session_id", "value": session_id}],
+        )
+
+        async for count in rows:
+            return int(count or 0)
+
+        return 0
+
+    async def delete_all_chats(self, team_id: str) -> ChatsDeletion:
         """**Chat deletion** applied to the whole list (#76, ADR-026).
 
         A presenter clearing the stage between rehearsal runs, in one action.
@@ -615,14 +728,20 @@ class CosmosDBClient(DatabaseBase):
         deleted, and a second copy would be a second place to forget all of it.
 
         The enumeration is this method's own decision, and it is **not** the
-        panel's list handed back. The chat list is read by *team*
-        (``get_all_plans_by_team_id``), so sweeping whatever the browser listed
-        would let one associate clear another's history; the sessions here come
-        from this user's own plans. Deduped in Python rather than by
-        ``DISTINCT``: a Chat holds more than one Plan (#71) — the walkthrough's
-        centrepiece pair is one chat with two — and sweeping the same partition
-        twice reports the second pass as ``no_such_chat``, which would put a
-        phantom failure in front of the presenter.
+        panel's list handed back: sweeping whatever the browser named would let
+        one associate clear another's history. It does have to *be* that list,
+        though, and by review it was not — the chat list is read by **team**
+        (``get_all_plans_by_team_id``) and the confirmation states that list's
+        count, so an enumeration scoped only by ``user_id`` would destroy chats
+        the dialog never mentioned. The two reads therefore ask the same
+        question of the store, in the same two predicates, and the ``team_id``
+        arrives from the caller's *current team* rather than from the request.
+
+        Deduped in Python rather than by ``DISTINCT``: a Chat holds more than
+        one Plan (#71) — the walkthrough's centrepiece pair is one chat with
+        two — and sweeping the same partition twice reports the second pass as
+        ``no_such_chat``, which would put a phantom failure in front of the
+        presenter.
 
         A store failure while enumerating is raised rather than read as an
         empty history: "there was nothing to delete" and "the list could not be
@@ -639,10 +758,12 @@ class CosmosDBClient(DatabaseBase):
         sessions = self.container.query_items(
             query=(
                 "SELECT c.session_id FROM c "
-                "WHERE c.user_id=@user_id AND c.data_type=@data_type"
+                "WHERE c.user_id=@user_id AND c.team_id=@team_id "
+                "AND c.data_type=@data_type"
             ),
             parameters=[
                 {"name": "@user_id", "value": self.user_id},
+                {"name": "@team_id", "value": team_id},
                 {"name": "@data_type", "value": DataType.plan},
             ],
         )

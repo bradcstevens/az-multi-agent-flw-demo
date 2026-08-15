@@ -37,10 +37,11 @@ import {
   CONFIRM_DELETE_ALL_LABEL,
   DELETE_ALL_CHATS_LABEL,
   DELETE_ALL_CHATS_TITLE,
-  DELETE_FAILED_TITLE,
+  DELETE_ALL_FAILED_TITLE,
   canDeleteChat,
   deleteAllChatsWarning,
   keptRunningMessage,
+  sweepFailureMessage,
 } from "../../models/chatDeletion";
 
 const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
@@ -251,8 +252,6 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
         navigate("/");
       }
 
-      setConfirmingDeleteAll(false);
-
       if (result.chats_kept_running > 0) {
         /*
           Named rather than only counted, when it is exactly one (#76). A
@@ -276,6 +275,27 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
         );
       } else {
         setKeptRunningNotice(null);
+      }
+
+      /*
+        A sweep that could not take every chat it tried is not a cleared
+        list, and this is where the first version said it was — found by
+        review. `DELETE /v4/chats` reports `incomplete` and counts what it
+        left behind precisely so the panel can say so; reading only
+        `deleted_sessions` and `chats_kept_running` closed the dialog on a
+        half-destroyed history with nothing on screen about it.
+
+        Reported the way a rejected sweep is, and for the same reason: the
+        confirmation stays open, because the associate is looking at it and
+        the list is not clear. The rows that did go are still pruned above —
+        those chats really are gone — and a chat kept running is still named,
+        because "could not take everything" and "would not take a live chat"
+        are different sentences and the associate is owed both.
+      */
+      if (result.chats_failed > 0) {
+        setDeleteAllFailure(sweepFailureMessage(result.chats_failed));
+      } else {
+        setConfirmingDeleteAll(false);
       }
 
       await loadPlansData(true);
@@ -394,7 +414,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
                 <div>{deleteAllChatsWarning(deletableChatsCount)}</div>
                 {deleteAllFailure !== null && (
                   <div className="task-delete-failure" role="alert">
-                    <strong>{DELETE_FAILED_TITLE}</strong>
+                    <strong>{DELETE_ALL_FAILED_TITLE}</strong>
                     <div>{deleteAllFailure}</div>
                   </div>
                 )}

@@ -219,13 +219,19 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def delete_all_chats(self) -> ChatsDeletion:
-        """Delete every Chat of this user's, on the single delete's terms (#76).
+    async def delete_all_chats(self, team_id: str) -> ChatsDeletion:
+        """Delete every Chat of this user's in one team, on the single delete's
+        terms (#76).
 
         Each chat goes through ``delete_chat`` above, so a running one is kept
         rather than taken and the whole operation is not refused because of it.
         The result names the sessions that went and counts the ones that did
         not, because the outcome has to be able to say a chat was kept.
+
+        Scoped by ``team_id`` as well as by the client's ``user_id``, because
+        that is what the chat list the confirmation counted is scoped by: a
+        sweep broader than the dialog is an irreversible action the presenter
+        did not agree to.
         """
         pass
 

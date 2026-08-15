@@ -1660,7 +1660,8 @@ class TestDeleteAllChats:
     body, and these tests are about it being complete and honest.
     """
 
-    def _reports(self, rt, deletion):
+    def _reports(self, rt, deletion, team_id="team-1"):
+        rt.store.get_current_team.return_value = SimpleNamespace(team_id=team_id)
         rt.store.delete_all_chats = AsyncMock(return_value=deletion)
         return rt.client.delete("/api/v4/chats")
 
@@ -1671,6 +1672,34 @@ class TestDeleteAllChats:
         resp = rt.client.delete("/api/v4/chats")
 
         assert resp.status_code == 400
+        rt.store.delete_all_chats.assert_not_awaited()
+
+    def test_the_sweep_is_scoped_to_the_list_the_panel_showed(self, rt):
+        # Found by review. `GET /plans` lists the *current team's* chats and
+        # the confirmation states that list's count, so a sweep scoped only by
+        # `user_id` would destroy chats the dialog never mentioned. The team
+        # comes from the store, not from the request: a team id in the URL
+        # would be a caller choosing whose history to clear.
+        self._reports(rt, ChatsDeletion(), team_id="team-7")
+
+        rt.store.delete_all_chats.assert_awaited_once_with(team_id="team-7")
+
+    def test_no_current_team_is_a_failure_rather_than_a_cleared_list(self, rt):
+        # Found by review. `get_current_team` reads through `query_items`,
+        # which logs a Cosmos failure and returns `[]` — so an outage and a
+        # genuinely team-less associate arrive here as the same `None`.
+        # Answering that with an empty sweep would tell a presenter their
+        # history is gone while every chat sits in Cosmos, which is the one
+        # thing ADR-026 does not let this surface say. An unscoped sweep in
+        # its place would be worse still: it would take every chat the
+        # associate has, from any team.
+        rt.store.get_current_team.return_value = None
+        rt.store.delete_all_chats = AsyncMock()
+
+        resp = rt.client.delete("/api/v4/chats")
+
+        assert resp.status_code == 500
+        assert "no chats were deleted" in resp.json()["detail"]
         rt.store.delete_all_chats.assert_not_awaited()
 
     def test_says_which_chats_went_rather_than_how_many(self, rt):
@@ -1736,7 +1765,7 @@ class TestDeleteAllChats:
         self._reports(rt, ChatsDeletion())
 
         rt.database_factory.get_database.assert_awaited_with(user_id="user-1")
-        rt.store.delete_all_chats.assert_awaited_once_with()
+        rt.store.delete_all_chats.assert_awaited_once_with(team_id="team-1")
 
     def test_clearing_the_list_never_reaches_the_single_plan_primitive(self, rt):
         rt.store.delete_plan_by_plan_id = AsyncMock()

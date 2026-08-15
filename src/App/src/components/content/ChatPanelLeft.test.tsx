@@ -484,6 +484,57 @@ describe('deleting every chat from the panel (#76)', () => {
         ).toBeInTheDocument();
     });
 
+    it('does not report a partly-finished sweep as a cleared list', async () => {
+        /*
+          Found by review. The route answers 200 with `status: "incomplete"`
+          and a count of the chats it could not take — a chat left in Cosmos
+          under a control that said it cleared the list. The panel read
+          neither, closed the dialog, and said nothing.
+        */
+        renderPanelAt('/chat/plan-somewhere-else');
+        await screen.findByRole('button', { name: /^The coffee machine/ });
+        vi.mocked(apiService.deleteAllChats).mockResolvedValue({
+            status: 'incomplete',
+            deleted_sessions: [],
+            documents_deleted: 2,
+            chats_kept_running: 0,
+            chats_failed: 1,
+        } as never);
+
+        await openDeleteAllDialog();
+        await confirmDeleteAll();
+
+        expect(
+            await screen.findByText(/1 chat could not be deleted/i),
+        ).toBeInTheDocument();
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('still names a chat it kept running when the same sweep also failed', async () => {
+        // Two different sentences: one chat was refused because it is live,
+        // another could not be taken at all. Reporting only the failure would
+        // leave the running chat's row unexplained.
+        renderPanelAt('/chat/plan-somewhere-else');
+        await screen.findByRole('button', { name: /^The coffee machine/ });
+        vi.mocked(apiService.deleteAllChats).mockResolvedValue({
+            status: 'incomplete',
+            deleted_sessions: [],
+            documents_deleted: 0,
+            chats_kept_running: 1,
+            chats_failed: 1,
+        } as never);
+
+        await openDeleteAllDialog();
+        await confirmDeleteAll();
+
+        expect(
+            await screen.findByText(/1 chat could not be deleted/i),
+        ).toBeInTheDocument();
+        expect(
+            await screen.findByText(/Ordering more coffee filters.*kept/i),
+        ).toBeInTheDocument();
+    });
+
     it('keeps the confirmation open and says why when the sweep is refused', async () => {
         vi.mocked(apiService.deleteAllChats).mockRejectedValue(new Error('offline'));
         renderPanelAt('/chat/plan-troubleshooting');

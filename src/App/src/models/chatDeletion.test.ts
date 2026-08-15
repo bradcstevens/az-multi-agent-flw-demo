@@ -14,6 +14,8 @@ import {
     DELETE_ALL_CHATS_TITLE,
     deleteAllChatsWarning,
     keptRunningMessage,
+    sweepFailureMessage,
+    DELETE_ALL_FAILED_TITLE,
 } from './chatDeletion';
 
 describe('which chats may be deleted', () => {
@@ -105,5 +107,22 @@ describe('the list-level control (#76)', () => {
     it('falls back to a count when more than one chat was kept, or none is named', () => {
         expect(keptRunningMessage(2)).toContain('2 chats are');
         expect(keptRunningMessage(1)).toContain('1 chat is');
+    });
+
+    it('says a chat it could not take is still in the record', () => {
+        // Found by review. The route reports `incomplete` and counts what it
+        // left behind so that this can be said; a sweep that failed halfway
+        // and reported nothing would be a partial sweep presented as a
+        // cleared list.
+        expect(sweepFailureMessage(1)).toContain('1 chat could not be deleted');
+        expect(sweepFailureMessage(3)).toContain('3 chats could not be deleted');
+        expect(sweepFailureMessage(1).toLowerCase()).toContain('still in the record');
+    });
+
+    it('does not call a chat it could not take a chat it kept', () => {
+        // A kept chat is the control working; this is the control failing, and
+        // the two must not read as the same outcome.
+        expect(sweepFailureMessage(1)).not.toEqual(keptRunningMessage(1));
+        expect(DELETE_ALL_FAILED_TITLE.toLowerCase()).toContain('could not');
     });
 });

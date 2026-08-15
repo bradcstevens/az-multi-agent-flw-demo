@@ -1031,6 +1031,38 @@ together by `src/tests/ci/test_chat_deletion_contract.py`. The refusal is said i
 shared: the menu's reason and the 409's detail are the same string, and a refused delete is
 reported in the confirmation dialog itself rather than through a Fluent `Toaster` this application
 has never mounted.
+
+The list-level control is #76 — `DELETE /api/v4/chats`, one action clearing the panel between
+rehearsal runs. It cannot answer in a status code, because its chats do not all end the same way
+and a code carrying the worst of them would throw away which rows the panel may drop; it answers
+**200** with the accounting in the body, and every chat that goes goes through `delete_chat` on
+exactly the terms above. Three things make that honest, and all three were found by review of the
+first version:
+
+- **The sweep is the list that was confirmed.** The panel lists chats by **team**
+  (`get_all_plans_by_team_id`) and the confirmation states that list's count, so
+  `delete_all_chats` is scoped by `team_id` as well as `user_id` and the route takes the team from
+  `get_current_team` rather than from the request. No current team is the empty list `GET /plans`
+  answers with, and the store is not reached at all.
+- **A running Chat is kept at the moment the documents go**, not merely when the status was read.
+  The status is read again after the partition is enumerated — a latest plan the enumeration never
+  saw is a turn that started behind it — the latest plan is deleted **first** and conditionally on
+  its `_etag`, so a plan that moved refuses the delete while the chat is still whole, and the
+  partition is counted afterwards: a record written behind the sweep makes the chat `incomplete`.
+- **An incomplete sweep is never reported as a cleared list.** The panel reads `chats_failed`, not
+  just `deleted_sessions`; the confirmation stays open and says how many chats are still in the
+  record, while the rows that did go are pruned and a chat kept running is still named. "Could not
+  take everything" and "would not take a live chat" are different sentences and both are said.
+  Nor is a chat list the route could not *read* reported as one it cleared: `get_current_team` goes
+  through `query_items`, so an outage and a team-less associate both arrive as `None`, and the
+  route answers **500** rather than an empty sweep.
+
+The sweep is still not atomic, and two residues are recorded rather than claimed away: a document
+written after the partition's final count cannot be told apart from one written after the delete
+returned, and a sweep that takes the latest plan and then fails leaves a partition the chat list
+cannot show, because the list is built from plans. Both want a deletion fence every session writer
+honours; neither is closeable inside `delete_chat`, and the surface says nothing that depends on
+either being closed.
 _Avoid_: hidden completed tasks, delete plan, clear history, archive
 
 ## Licensing and capacity

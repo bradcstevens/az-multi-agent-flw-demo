@@ -160,3 +160,28 @@ export const keptRunningMessage = (count: number, name?: string): string => {
     return `${count} ${count === 1 ? 'chat is' : 'chats are'} still running, so ` +
         `${count === 1 ? 'it was' : 'they were'} kept.`;
 };
+
+/** What a refused or partly-finished sweep tells the associate. */
+export const DELETE_ALL_FAILED_TITLE = 'Could not delete every chat';
+
+/**
+ * What the panel says when a sweep could not take every chat it tried.
+ *
+ * Found by review. `DELETE /v4/chats` reports `incomplete` and counts the
+ * chats it left behind precisely so this is sayable, and the first version of
+ * the control read neither — it closed the dialog on a half-cleared list and
+ * reported only the chats it kept running, which is a partial sweep presented
+ * as completion. A chat the sweep could not take is still in Cosmos, and
+ * ADR-026 does not let the surface say otherwise.
+ *
+ * Distinct from `keptRunningMessage`: a kept chat is the control working as
+ * designed, and this is the control failing.
+ *
+ * It does not send the associate to the chat's own row. A sweep that took a
+ * chat's plan and then failed leaves a partition the list cannot show — the
+ * row is gone and the records are not — so naming the row as the remedy would
+ * be a second thing the surface says that is not so.
+ */
+export const sweepFailureMessage = (count: number): string =>
+    `${count} ${count === 1 ? 'chat' : 'chats'} could not be deleted and ` +
+    `${count === 1 ? 'is' : 'are'} still in the record. Try again.`;

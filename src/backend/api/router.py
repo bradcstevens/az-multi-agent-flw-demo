@@ -2142,6 +2142,21 @@ async def delete_all_chats(request: Request):
     Nothing about which chats to take comes from the request: the sessions
     swept come from this user's own plans, read inside the store, not from
     whatever the browser's list happened to show.
+
+    They are, however, the chats the browser was *looking at*. ``GET /plans``
+    above lists the current team's chats and the confirmation states that
+    list's count, so the sweep is scoped to the same team — found by review, as
+    an irreversible action that reached past the list it asked about.
+
+    Without a team there is no list to sweep, and this route **fails** rather
+    than reporting an empty one. ``get_current_team`` reads through
+    ``query_items``, which logs a Cosmos failure and returns ``[]`` — so "this
+    associate has no current team" and "the store could not be reached" arrive
+    here as the same ``None``, and answering the second one with a cleared list
+    would tell a presenter their history is gone while every chat sits in
+    Cosmos. The same reading ``delete_chat`` refuses, for the same reason. A
+    genuinely team-less associate has no chats listed, so the control they
+    would be refused is one the panel has already disabled.
     """
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -2152,7 +2167,16 @@ async def delete_all_chats(request: Request):
         raise HTTPException(status_code=400, detail="no user")
 
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
-    result = await memory_store.delete_all_chats()
+
+    current_team = await memory_store.get_current_team(user_id=user_id)
+    if not current_team:
+        logger.error("Could not read a current team for %s; nothing swept", user_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not read the chat list, so no chats were deleted.",
+        )
+
+    result = await memory_store.delete_all_chats(team_id=current_team.team_id)
 
     track_event_if_configured(
         "Chats_Deleted",
