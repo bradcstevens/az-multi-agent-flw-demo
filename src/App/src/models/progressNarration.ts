@@ -76,9 +76,10 @@ export const LOADING_PLAN = 'Loading plan data...';
  *
  * Both of them, from here, because they are two views of one moment: the plan
  * card in the conversation and the rail's Plan Overview. It is said only where
- * a plan is actually coming — a Fast-lane request says *"No plan to review on
- * this request."*, and "being generated" for that one is a spinner that never
- * resolves.
+ * a plan is actually coming — since #78 the rail renders its Plan Overview only
+ * once a `plan_approval_request` has arrived, so a **Fast lane** request has no
+ * plan section to say it in, and "being generated" for that one would have been
+ * a spinner that never resolves.
  */
 export const PLAN_ARRIVING = 'Plan is being generated...';
 

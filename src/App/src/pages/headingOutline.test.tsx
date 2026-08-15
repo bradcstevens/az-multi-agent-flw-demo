@@ -85,6 +85,30 @@ const PLAN_DATA = {
     steps: [],
 } as any;
 
+/**
+ * The same conversation on the **Deliberate lane**: a `plan_approval_request`
+ * has arrived, so there is a plan to review and the rail heads a section for it.
+ *
+ * The outline has to be asserted for *both* lanes (#78). Making the plan
+ * section conditional makes the outline conditional, and an outline test that
+ * only ever renders one of the two cases is an outline half-guarded.
+ */
+const DELIBERATE_PLAN_DATA = {
+    ...PLAN_DATA,
+    mplan: {
+        id: 'mplan-1',
+        status: 'awaiting_approval',
+        user_request: 'The espresso machine is running cold',
+        team: [],
+        facts: '',
+        steps: [
+            { id: 1, action: 'Confirm the fault:', cleanAction: '', agent: 'TroubleshootingAgent' },
+            { id: 2, action: 'Raise a service ticket', cleanAction: '', agent: 'EscalationAgent' },
+        ],
+        context: { task: '', participant_descriptions: {} },
+    },
+} as any;
+
 const makeStore = () =>
     configureStore({
         reducer: {
@@ -209,10 +233,66 @@ describe('the home surface has a heading outline', () => {
 });
 
 describe('the chat surface has a heading outline', () => {
+    // The **Fast lane**: no `plan_approval_request`, so no plan section and no
+    // heading for one (#78).
     it('exposes exactly one top-level heading, and it names the assistant', async () => {
         renderChatSurface();
 
         await waitFor(() => expect(screen.getByTestId('transparency-rail')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText('Agent Team')).toBeInTheDocument());
+
+        const top = outline().filter((heading) => heading.level === levelOf(SURFACE_HEADING));
+        expect(top.map((heading) => heading.text)).toEqual([ASSISTANT_NAME]);
+    });
+
+    it('makes every transparency panel reachable by heading navigation', async () => {
+        renderChatSurface();
+
+        await waitFor(() => expect(screen.getByText('Agent Team')).toBeInTheDocument());
+
+        const sections = outline()
+            .filter((heading) => heading.level === levelOf(SECTION_HEADING))
+            .map((heading) => heading.text);
+        expect(sections).toContain('Agent Team');
+        expect(sections).toContain('Grounding');
+        expect(sections).toContain('What this cost');
+    });
+
+    it('heads no plan section, because this request has no plan to review', async () => {
+        // A heading a screen-reader user skims to and finds nothing behind is
+        // worse than no heading: the section's only content was the statement
+        // that it was empty.
+        renderChatSurface();
+
+        await waitFor(() => expect(screen.getByText('Agent Team')).toBeInTheDocument());
+
+        const sections = outline()
+            .filter((heading) => heading.level === levelOf(SECTION_HEADING))
+            .map((heading) => heading.text);
+        expect(sections).not.toContain('Plan Overview');
+    });
+
+    it('descends without skipping a level', async () => {
+        renderChatSurface();
+
+        await waitFor(() => expect(screen.getByText('Agent Team')).toBeInTheDocument());
+
+        expect(outline().length, 'no headings at all; this assertion is inert').toBeGreaterThan(0);
+        expect(skippedLevels(), 'the outline jumps a level').toEqual([]);
+    });
+});
+
+describe('the chat surface has a heading outline with a plan up for review', () => {
+    // The **Deliberate lane**. Making the plan section conditional made the
+    // outline conditional, so both cases are asserted rather than one of them
+    // quietly dropped (#78).
+    beforeEach(() => {
+        vi.mocked(PlanDataService.fetchPlanData).mockResolvedValue(DELIBERATE_PLAN_DATA);
+    });
+
+    it('exposes exactly one top-level heading, and it names the assistant', async () => {
+        renderChatSurface();
+
         await waitFor(() => expect(screen.getByText('Plan Overview')).toBeInTheDocument());
 
         const top = outline().filter((heading) => heading.level === levelOf(SURFACE_HEADING));

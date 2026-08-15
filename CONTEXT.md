@@ -606,6 +606,13 @@ section — the question input, the Quick tasks, the plan overview, each **trans
 is one level below it. A third, `SUBSECTION_HEADING`, was added by #65 for a named part *inside* a
 section, and has exactly one user: the Agent Team panel's count of who is available.
 
+The outline is **conditional** (#78). "Plan Overview" heads the rail's plan section only where there
+is a plan to *review* — the `plan_approval_request` frame, ADR-023's *Done* phase — because a `Plan`
+is constructed before the **Lane router** has run and every request has one, so "a plan exists" is
+not the question. On the **Fast lane** the section and its heading are not on screen at all: a
+heading a non-visual user skims to and finds nothing behind is the same defect one step further on.
+The outline is therefore asserted once per lane, and neither skips a level.
+
 It costs the **transparency rail** most. The rail exists to be *skimmed*, and its panel titles are
 what make it skimmable; rendering them as spans took the rail's argument away from exactly the
 users who most need it stated in structure rather than in layout.

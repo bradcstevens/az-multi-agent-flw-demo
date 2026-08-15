@@ -23,6 +23,13 @@
  * (`ContentToolbar`). The left panel's toolbar says the same name, and cannot
  * be the page's heading: it is dropped at the **Stacking breakpoint**, and a
  * heading the associate's phone never renders is not an outline.
+ *
+ * The outline is **conditional**, and deliberately (#78): the rail's "Plan
+ * Overview" is on screen only where there is a plan to review, so the chat
+ * surface's outline differs by **Lane**. A heading over a section whose only
+ * content is the statement that it is empty is the same defect as no heading at
+ * all, one step further on — so `headingOutline.test.tsx` asserts both lanes'
+ * outlines rather than the one that used to always be there.
  */
 
 /** The one top-level heading a surface may expose. */

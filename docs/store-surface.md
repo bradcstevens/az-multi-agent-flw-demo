@@ -218,6 +218,8 @@ Two levels, declared once in `models/headingOutline.ts`:
 | `SURFACE_HEADING` (`h1`) | The assistant's name | `ContentToolbar` — the conversation's header |
 | `SECTION_HEADING` (`h2`) | "How can I help?", "Quick tasks", "Plan Overview", each rail panel | `HomeInput`, `PlanPanelRight`, the three transparency panels |
 
+"Plan Overview" is the one entry that is not always there — see below.
+
 The levels live in the module rather than beside each title for the reason `storeSurface.ts` holds
 the surface's strings: a level chosen at each call site is a level that drifts, and an outline that
 skips one is the same defect this fixes in a different shape.
@@ -225,6 +227,13 @@ skips one is the same defect this fixes in a different shape.
 The page heading has to be the **conversation's header** and not the left panel's, even though both
 say the assistant's name. The left panel is dropped at the stacking breakpoint, and a heading the
 associate's phone never renders is not an outline.
+
+The outline is **conditional**, and since #78 deliberately so. "Plan Overview" is on screen only
+where there is a plan to review — the rail renders the section from the `plan_approval_request`
+frame — so the chat surface's outline differs by **lane**: the Fast lane's has no plan section in
+it, the Deliberate lane's does. That is an improvement rather than a regression, because the
+alternative is a heading a screen-reader user skims to and finds nothing behind. What it costs is
+that the outline test has to render both cases, and `headingOutline.test.tsx` does.
 
 It is applied with Fluent's `as` override — `TextSlots.root` accepts `h1` through `h6` — rather
 than by hand-rolled markup, so the typography classes are still there and still beat the user-agent

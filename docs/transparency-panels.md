@@ -169,8 +169,28 @@ off there is no plan object at all (ADR-013), and the panel previously read
 "No plan available". On the Fast lane, which is most of the walkthrough, the audience saw no agents
 and no panels. The early return is gone, and `PLAN_ARRIVING` — *"Plan is being generated…"*, owned
 by `models/progressNarration.ts` since #64 along with every other string shown while a request is in
-flight — is now rendered only when a plan is actually coming; a Fast-lane request says "No plan to
-review on this request."
+flight — is now rendered only when a plan is actually coming.
+
+### Plan vocabulary only where there is a plan to review
+
+That fix left the rail heading a **Plan Overview** section on every request and choosing, underneath
+it, between `PLAN_ARRIVING` and a sentence saying there was nothing there — a section whose only
+content was the statement that it was empty. #78 removes the second case and the section along with
+it.
+
+The rule cannot be *"only if a plan is actually being created"*, because a `Plan` is constructed
+before the **Lane router** has run and every request therefore has one. What varies is whether a
+plan is put to the associate **for approval**, and that has a real signal already: the
+`plan_approval_request` frame, ADR-023's *Done* phase. No new events. So `PlanPanelRight` renders
+the section when — and only when — it holds a `planApprovalRequest`, and `PLAN_ARRIVING` is what the
+section says between the frame arriving and its steps doing so.
+
+The catch is the heading. It is part of the **Heading outline** (#57, WCAG 1.3.1), so removing it
+makes the outline *conditional* — which is an improvement rather than a regression, because a
+screen-reader user currently skims to a heading and finds nothing behind it. `headingOutline.test.tsx`
+therefore asserts the chat surface's outline **twice**, once per lane, rather than losing the case it
+used to cover: the Fast lane's outline has no `Plan Overview` in it, the Deliberate lane's does, and
+neither skips a level.
 
 ### It states availability, never participation
 

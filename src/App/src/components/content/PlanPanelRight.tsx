@@ -75,6 +75,15 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   };
 
   // Render Plan Section
+  //
+  // Rendered only where there is a plan to *review* (#78). The signal is the
+  // `plan_approval_request` frame — ADR-023's *Done* phase — and not "a plan
+  // exists", because a `Plan` is constructed before the **Lane router** has run
+  // and every request has one. On the **Fast lane** the frame never arrives, so
+  // this section is not on screen at all rather than heading a box whose only
+  // content was the statement that it was empty. The heading is part of the
+  // **Heading outline** (#57), and a heading a screen-reader user skims to and
+  // finds nothing behind is worse than no heading.
   const renderPlanSection = () => {
     const planSteps = extractPlanSteps();
 
@@ -87,14 +96,12 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
         {planSteps.length === 0 ? (
           <div className="plan-section__empty">
             {/*
-              Two different silences, and they must not read alike: a plan on
-              its way, and a request that will never have one because it took
-              the Fast lane. "Plan is being generated…" for the second is a
-              spinner that never resolves.
+              The plan has been announced and its steps have not arrived. The
+              other silence — a request that will never have a plan because it
+              took the Fast lane — is no longer said here at all, because the
+              section itself is not rendered for it.
             */}
-            {planApprovalRequest
-              ? PLAN_ARRIVING
-              : 'No plan to review on this request.'}
+            {PLAN_ARRIVING}
           </div>
         ) : (
           <div className="plan-steps">
@@ -170,8 +177,8 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
       */}
       {raisedTicket && <SimulatedTicketCard ticket={raisedTicket} />}
 
-      {/* Plan section on top */}
-      {renderPlanSection()}
+      {/* Plan section on top, and only where there is a plan to review (#78) */}
+      {planApprovalRequest && renderPlanSection()}
 
       {/* Agents section, and the transparency rail below it */}
       <TransparencyRail team={planData?.team ?? null}>

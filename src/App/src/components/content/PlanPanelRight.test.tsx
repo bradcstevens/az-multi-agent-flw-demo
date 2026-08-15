@@ -60,10 +60,22 @@ describe('the chat surface with Plan review off', () => {
         expect(screen.getByTestId('agent-team-member-ShiftTasksAgent')).toBeInTheDocument();
     });
 
-    it('says there is no plan rather than promising one that is not coming', () => {
+    it('does not render the plan section at all (#78)', () => {
+        // A section whose only content is the statement that it is empty is a
+        // heading a screen-reader user skims to and finds nothing behind. The
+        // Fast lane never puts a plan up for review — no `plan_approval_request`
+        // frame, ADR-023's *Done* phase — so the section is not on screen.
         renderPanel();
 
-        expect(screen.getByText(/No plan to review/i)).toBeInTheDocument();
+        expect(screen.queryByText('Plan Overview')).not.toBeInTheDocument();
+        expect(document.querySelector('.plan-section')).toBeNull();
+    });
+
+    it('says nothing about a plan rather than promising one that is not coming', () => {
+        renderPanel();
+
+        expect(screen.queryByText(/No plan to review/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(PLAN_ARRIVING)).not.toBeInTheDocument();
     });
 
     it('shows the transparency rail, so the panels are reachable in the fast lane', () => {
@@ -129,6 +141,14 @@ describe('the chat surface on the deliberate lane', () => {
         ],
         team: { agents: [] },
     } as any;
+
+    it('renders the plan section, heading and all, when a plan is put up for review', () => {
+        // The other half of #78: the section is conditional, not gone.
+        renderPanel(makeStore(), approvalRequest);
+
+        expect(screen.getByText('Plan Overview')).toBeInTheDocument();
+        expect(document.querySelector('.plan-section')).not.toBeNull();
+    });
 
     it('renders the plan steps a presenter has to approve', () => {
         renderPanel(makeStore(), approvalRequest);
