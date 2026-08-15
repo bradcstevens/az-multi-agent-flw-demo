@@ -340,7 +340,9 @@ describe('deleting a chat from the panel', () => {
 
         await deleteChat('The coffee machine is showing an error');
 
-        await waitFor(() => expect(screen.getByTestId('here')).toHaveTextContent('/'));
+        // Anchored: a plain '/' is a substring of the pathname we started on,
+        // so it would be satisfied before the navigation had happened at all.
+        await waitFor(() => expect(screen.getByTestId('here')).toHaveTextContent(/^\/$/));
         expect(screen.getByTestId('here')).not.toHaveTextContent('plan-escalation');
     });
 
@@ -460,7 +462,7 @@ describe('deleting every chat from the panel (#76)', () => {
         await openDeleteAllDialog();
         await confirmDeleteAll();
 
-        await waitFor(() => expect(screen.getByTestId('here')).toHaveTextContent('/'));
+        await waitFor(() => expect(screen.getByTestId('here')).toHaveTextContent(/^\/$/));
     });
 
     it('names the one chat a sweep kept running, rather than only counting it', async () => {
