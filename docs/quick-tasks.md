@@ -224,7 +224,8 @@ of them, every card is 128px tall, and the badge sits 17px from the top of each.
   actually produces a Copilot Studio hop is asserted about the corpus and the
   roster, not measured against a live Direct Line conversation.
 * **The seventh tap proves routing, not grounding.** The browser beat grades the
-  **cost table** — that `WorkforceAgent` was billed — and the **Policy block**'s
+  **cost table** — that the `workforce` toolbox's holder was billed, read off
+  the pack rather than named — and the **Policy block**'s
   absence. It does not require `WF-401` in the reply: the **Workforce procedure
   library** is reached as a tool with no `source_used` behind it, so its
   identifier lives only in prose a model wrote. See ADR-017's amendment.

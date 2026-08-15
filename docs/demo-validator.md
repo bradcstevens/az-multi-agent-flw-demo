@@ -126,10 +126,18 @@ lane, where approving it must produce the **Simulated ticket**.
 
 ### The workforce beat proves the routing, not the grounding
 
-`workforce.spec.ts` (#52) is the second spec file, and it is graded on the **cost table** — that
-`WorkforceAgent` appears among the agents billed — and on the **Policy block** staying hidden, which
-is the **Identity boundary gate** admitting an **HR process question** rather than refusing it. The
-reply is asserted only to have arrived.
+`workforce.spec.ts` (#52) is the second spec file, and it is graded on the **cost table** — that the
+agent holding the `workforce` toolbox appears among the agents billed — and on the **Policy block**
+staying hidden, which is the **Identity boundary gate** admitting an **HR process question** rather
+than refusing it. The reply is asserted only to have arrived.
+
+Neither the specialist nor the name the meter shows for it is pinned here (#70). The beat reads the
+roster out of the store pack and finds its agent by the **tool domain** it holds, then derives what
+the cost table will call it through the **Agent display name** rule — the base name without the
+`Agent` suffix the column heading already carries. The literal it replaces, `WorkforceAgent`,
+was compared against the meter's inner text, which the backend humanises before it ever reaches the
+browser: an assertion that could not pass against any deployment, sitting unnoticed in a file no
+workflow runs.
 
 It deliberately does **not** require `WF-401` in the answer. The **Workforce procedure library** is
 reached as a tool with no `source_used` behind it, so unlike `SOP-102` its identifier never becomes

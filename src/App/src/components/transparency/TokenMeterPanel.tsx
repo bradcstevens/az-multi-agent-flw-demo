@@ -2,8 +2,9 @@ import React from 'react';
 import { Body1Strong, Caption1 } from '@fluentui/react-components';
 import { GaugeRegular } from '@fluentui/react-icons';
 
-import { MeterRow, MeterState } from '../../models/meter';
+import { GUARDRAIL_ROW_KEY, MeterRow, MeterState } from '../../models/meter';
 import { SECTION_HEADING } from '../../models/headingOutline';
+import { getAgentDisplayName } from '../../utils/agentIconUtils';
 
 /**
  * The Token meter (issue #24, R7).
@@ -36,6 +37,25 @@ export interface TokenMeterPanelProps {
 /** `—` for not reported; the number, grouped, for anything we were told. */
 const count = (value: number | null): string =>
     value === null ? '—' : value.toLocaleString('en-US');
+
+/**
+ * How this table names a row.
+ *
+ * The **Agent display name** rule: one base name, two presentations. The Agent
+ * Team panel names the roster and keeps the suffix (`Troubleshooting Agent`);
+ * this column is *headed* `Agent`, so the cell that repeats the noun is saying
+ * it twice — and in a 320px rail the second word is what pushed the first one
+ * into breaking mid-word. Through the shared roster helper, so the meter is not
+ * the one panel with its own idea of what an agent is called.
+ *
+ * The helper is for names that **arrived off the wire**. The guardrail row's
+ * name is this repository's own constant, written the way the **Identity
+ * boundary gate** is written everywhere else; put through a helper that
+ * title-cases whatever it is handed, the one row whose zeros are measurements
+ * would start calling itself something the glossary does not.
+ */
+const agentLabel = (row: MeterRow): string =>
+    row.key === GUARDRAIL_ROW_KEY ? row.agentName : getAgentDisplayName(row.agentName);
 
 const rowTitle = (row: MeterRow): string => {
     if (row.billing === 'refused') {
@@ -90,7 +110,7 @@ const TokenMeterPanel: React.FC<TokenMeterPanelProps> = ({ meter, models = {} })
                             title={rowTitle(row)}
                         >
                             <th scope="row" className="token-meter__name" data-testid="meter-agent">
-                                {row.agentName}
+                                {agentLabel(row)}
                             </th>
                             <td className="token-meter__name" data-testid="meter-model">
                                 {models[row.key] || '—'}

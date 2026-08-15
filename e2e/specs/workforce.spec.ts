@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { quickTasks } from '../authored';
+import { agentHoldingToolbox, agentKey, quickTasks } from '../authored';
 import { PlanSurface } from '../pages/PlanSurface';
 import { StoreSurface } from '../pages/StoreSurface';
 
@@ -38,13 +38,29 @@ import { StoreSurface } from '../pages/StoreSurface';
 /** The Quick Task the store pack authors for this beat. */
 const SHIFT_SWAP_TASK = 'task-223-shift-swap';
 
-/** The specialist the roster adds, and the meter has to bill. */
-const WORKFORCE_AGENT = 'WorkforceAgent';
+/**
+ * The tool domain that makes an agent *this* specialist — the MCP server's own
+ * `workforce` domain, which is what ADR-017 gave the fourth participant and the
+ * one thing about it that a rename cannot move.
+ *
+ * Everything else about the agent is read off the pack from here: the roster
+ * panel shows the pack's own name, and the **Token meter** shows the
+ * **Agent display name**, which is that name with the suffix the column heading
+ * already carries taken off (#70) — so the cost table is read through
+ * `agentKey`, which compares the two without the presentation either of them
+ * applies. This spec pinned `WorkforceAgent` against the meter's inner text,
+ * which the backend humanises to `Workforce Agent` before the browser ever sees
+ * it: an assertion that could not pass against any deployment, and nothing said
+ * so because no workflow runs the validator.
+ */
+const WORKFORCE_TOOLBOX = 'workforce';
 
 test.describe('the fourth specialist', () => {
     test('answers the HR process question, and the meter says it was the one that did', async ({
         page,
     }) => {
+        const specialist = agentHoldingToolbox(WORKFORCE_TOOLBOX);
+
         const task = quickTasks().find((card) => card.id === SHIFT_SWAP_TASK);
         expect(
             task,
@@ -67,8 +83,8 @@ test.describe('the fourth specialist', () => {
         // speaks. Checked here so a short roster is reported as a short roster
         // rather than as a beat that timed out.
         await expect(
-            store.rail.rosterMember(WORKFORCE_AGENT),
-            `${WORKFORCE_AGENT} is not on the roster the surface shows. The ` +
+            store.rail.rosterMember(specialist.name),
+            `${specialist.name} is not on the roster the surface shows. The ` +
                 'upload can succeed and the agent factory still skip it with ' +
                 'only a warning when its model is outside SUPPORTED_MODELS — ' +
                 'run `python -m store_pack roster` against the deployment.',
@@ -107,14 +123,15 @@ test.describe('the fourth specialist', () => {
         });
 
         expect(
-            billed,
-            `the turn billed ${billed.join(', ') || 'nobody'}. The question ` +
-                'was answered by somebody other than the fourth specialist, ' +
+            billed.map(agentKey),
+            `the turn billed ${billed.join(', ') || 'nobody'}, and the beat ` +
+                `is watching for ${specialist.name}. The question was ` +
+                'answered by somebody other than the fourth specialist, ' +
                 'which is the manager routing an HR process question into the ' +
                 "store's own procedures — a fluent answer from the wrong " +
                 'agent, and the reason this beat grades the cost table rather ' +
                 'than the reply.',
-        ).toContain(WORKFORCE_AGENT);
+        ).toContain(agentKey(specialist.name));
 
         // And words arrived. That is the whole of what is asserted about
         // anything a model wrote.

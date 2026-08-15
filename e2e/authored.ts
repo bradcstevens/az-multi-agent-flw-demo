@@ -55,6 +55,15 @@ export interface QuickTask {
     rehearsedReplies: string[];
 }
 
+/** One member of the **Store assistant roster**, as the pack authors it. */
+export interface RosterAgent {
+    /** The pack's own name — `WorkforceAgent`, and the roster panel's testid. */
+    name: string;
+    /** The tool domain it holds, which is what makes it that specialist. */
+    toolbox: string;
+    deploymentName: string;
+}
+
 export interface RehearsedHit {
     /** The words the presenter taps first. */
     question: string;
@@ -100,6 +109,59 @@ export function quickTasks(): QuickTask[] {
               )
             : [],
     }));
+}
+
+/** The **Store assistant roster**, as the pack authors it. */
+export function rosterAgents(): RosterAgent[] {
+    const pack = JSON.parse(readFileSync(STORE_PACK, 'utf-8'));
+    return (pack.agents || []).map((agent: Record<string, unknown>) => ({
+        name: String(agent.name ?? ''),
+        toolbox: String(agent.toolbox_filter ?? ''),
+        deploymentName: String(agent.deployment_name ?? ''),
+    }));
+}
+
+/**
+ * The specialist that holds one tool domain.
+ *
+ * A beat is about a *specialist*, and the durable thing about a specialist is
+ * the domain it holds — `workforce`, the MCP server's own tool domain — not the
+ * name somebody gave it. Read this way, a renamed agent is followed rather than
+ * reported as a missing one.
+ */
+export function agentHoldingToolbox(toolbox: string): RosterAgent {
+    const found = rosterAgents().filter((agent) => agent.toolbox === toolbox);
+    if (found.length !== 1) {
+        throw new Error(
+            `the store pack roster has ${found.length} agents holding the ` +
+                `${JSON.stringify(toolbox)} toolbox. One domain has one holder, ` +
+                'so this is a pack that needs reading, not a tie-break',
+        );
+    }
+    return found[0];
+}
+
+/**
+ * A roster name and a cost-table cell, compared without their presentation.
+ *
+ * The **Agent display name** rule has three implementations between the pack
+ * and the pixel — the backend humanises the executor id, the frontend strips
+ * the suffix the column heading already carries, and both apply casing rules of
+ * their own (`HRHelperAgent` reaches the screen as `HR Helper`). A fourth copy
+ * here would be a check that goes red on a spelling both of the others agree
+ * about, which is the ADR-019 lesson pointing the other way.
+ *
+ * So the comparison drops everything the presentation decides — case, spaces,
+ * punctuation and the `Agent` suffix — and keeps what identifies the
+ * specialist. `WorkforceAgent`, `workforce_agent`, `Workforce Agent` and
+ * `Workforce` are one agent; `ShiftTasksAgent` is not that agent, which is the
+ * only distinction this beat has to make.
+ */
+export function agentKey(name: string): string {
+    return name
+        .replace(/[^a-z0-9]+/gi, '')
+        .toLowerCase()
+        .replace(/agents?$/, '');
 }
 
 /** The Quick Task carrying a given card title. */

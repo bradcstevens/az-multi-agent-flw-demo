@@ -177,12 +177,28 @@
     table-layout: fixed;
 }
 
+/*
+ * The **Agent** column is sized to hold the longest word in the store assistant
+ * roster (#70). `Troubleshooting` needs about 90px at this size and weight, and
+ * 30% of a 257px table was 73 — so the word was snapped after eleven
+ * characters. #70's own arithmetic said 288px and four points would do it; both
+ * numbers were the rail's, and the panel inside the rail is a card with 14px of
+ * padding and a hairline border of its own.
+ *
+ * The eight points come from **Model**, not from Tokens, which is the rule this
+ * table already runs on: the width is given up in the names, never the figures.
+ * A model name breaks at its own hyphens (`gpt-` / `5.4-` / `mini`) and costs a
+ * line; a token total is `nowrap`, so a column too narrow for a five-figure
+ * count does not wrap it — it sets it across the estimated Copilot Credits, the
+ * number the two-billing-models point is made with, which is the #60 fault
+ * again from the inside.
+ */
 .token-meter th:nth-child(1) {
-    width: 30%;
+    width: 38%;
 }
 
 .token-meter th:nth-child(2) {
-    width: 19%;
+    width: 11%;
 }
 
 .token-meter th:nth-child(3) {
@@ -220,15 +236,31 @@
 }
 
 /*
- * The two name columns give the room up. `anywhere` rather than `break-word`:
- * only `anywhere` lowers the cell's min-content width, and it is the table's
- * min-content width that decides whether the rail can hold it — an agent or
- * deployment name long enough to widen the table pushes the credits column out
- * of the box. Scoped to the names, because a column heading broken as `Toke/ns`
- * is not legible and the headings are short enough not to need it.
+ * The two name columns are where the table gives room up, and the meter's rule
+ * is that it gives it up in the **names, never the figures** (#60).
+ *
+ * `break-word` is the last resort rather than the plan. Under `table-layout:
+ * fixed` a column is a declared share of the rail and no longer a negotiation
+ * with content, so wrapping mode cannot push the credits column out of the box
+ * the way the earlier `anywhere` argument was about — what it decides now is
+ * what happens to a name that is *wider than its share*: broken inside its own
+ * cell, or set in one line across the number beside it. The first is ugly, the
+ * second overprints the figure the panel exists to show. So the column is sized
+ * to hold the longest word in the **store assistant roster** (#70), and this
+ * declaration only catches whatever nobody sized it for.
+ *
+ * The narrower padding is part of that sizing: 2px a side rather than 4px is
+ * four more pixels of name in a 257px table, and these two columns are the ones
+ * with a word to fit rather than a figure to keep clear of its neighbour. It is
+ * declared against `th`/`td` because `.token-meter th` is a class *and* an
+ * element and would otherwise win the cascade — a padding that loses is a
+ * padding that changes nothing, and the arithmetic above would have been
+ * counting pixels the column never got.
  */
-.token-meter__name {
+.token-meter th.token-meter__name,
+.token-meter td.token-meter__name {
     overflow-wrap: break-word;
+    padding: 6px 2px;
 }
 
 /*

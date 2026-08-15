@@ -23,6 +23,7 @@ What they defend is narrow and specific:
 """
 
 from pathlib import Path
+import json
 import os
 import re
 import subprocess
@@ -853,6 +854,47 @@ def test_the_beat_grades_the_meter_rather_than_the_answer():
         "the beat never reads which agents the turn billed, so it passes when "
         "the manager routes the question to somebody else"
     )
-    assert "WorkforceAgent" in spec, (
-        "the beat does not name the agent it exists to watch answer"
+    assert "agentHoldingToolbox" in spec, (
+        "the beat does not read the agent it exists to watch out of the store "
+        "pack roster, so a renamed specialist reads as one that never answered"
     )
+    assert "agentKey" in spec, (
+        "the beat compares the cost table's cells as they are printed, so it "
+        "is pinning a presentation — the meter shows the base name without "
+        "the suffix the column heading already carries (#70), and the backend "
+        "humanises the executor id before that"
+    )
+
+
+def test_the_beat_pins_no_agent_name_of_its_own():
+    """#70: the pinned name was one the meter could never have shown.
+
+    `WORKFORCE_AGENT = 'WorkforceAgent'` was compared against the inner text of
+    `meter-agent`, and the backend humanises the executor id before it ever
+    reaches the browser — `Workforce Agent`, and since #70 `Workforce`. So the
+    assertion could not pass against any deployment, and it went unnoticed
+    because the Demo validator runs against a live surface and no workflow runs
+    it. That is exactly the failure `CONTEXT.md` already forbids: an expectation
+    carrying its own copy passes a rebrand it never saw — and this one failed a
+    rebrand nobody had made.
+    """
+    spec = _code(WORKFORCE_SPEC)
+
+    for name in (agent["name"] for agent in _roster()):
+        assert name not in spec, (
+            f"the beat pins the roster name {name!r} in its code. The roster is "
+            "the store pack's to change, and the meter shows a name derived "
+            "from it rather than the name itself"
+        )
+
+
+def _roster() -> list:
+    """The store assistant roster, out of the pack that authors it."""
+    pack = json.loads(
+        (
+            REPO_ROOT / "content_packs" / "store_assistant" / "agent_teams" / "store_assistant.json"
+        ).read_text(encoding="utf-8")
+    )
+    agents = pack.get("agents", [])
+    assert agents, "the store pack authors no roster"
+    return agents

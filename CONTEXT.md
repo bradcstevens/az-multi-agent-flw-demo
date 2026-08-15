@@ -671,6 +671,31 @@ rather than a negotiation the largest token total wins. Unscoped, the table meas
 320px rail and the column outside the box was the credits one — the panel that proves what an
 answer cost, losing the number it exists to show.
 
+The share the **Agent** column gets is the one that holds the longest word in the **Store assistant
+roster** (#70). The table is **~257px**, not the 288px the rail's own arithmetic suggests: the panel
+inside the rail is a card with 14px of padding and a hairline border of its own, and 30% of 257
+is 73px against the 90 `Troubleshooting` needs — so the name was snapped after eleven characters in
+the panel whose job is to be the most credible thing in the room. The eight points it wanted came
+from **Model**, and not from Tokens, by the same rule: a model deployment breaks at its own hyphens
+and costs a line, while a token total is `nowrap`, so a column too narrow for a five-figure count
+sets it across the estimated Copilot Credits instead of wrapping it. `overflow-wrap: break-word`
+stays as the last resort for a name nobody sized the column for — under `table-layout: fixed` the
+wrapping mode no longer decides the table's width, only what happens to a word wider than its share.
+
+**Agent display name** — one base name, two presentations, and the rule that says which. The base is
+`getAgentDisplayName`: the roster's own name (`WorkforceAgent`, or the wire's humanised
+`Workforce Agent` — the backend's `format_agent_display_name` deliberately does *not* strip the
+suffix, because the surface does) cleaned to spaces with the trailing `Agent` removed. Prose adds it
+back with `getAgentDisplayNameWithSuffix`: the **Agent Team** panel, the **Progress narration** and
+the streamed reply headings all name an agent inside a sentence, where `Troubleshooting Agent` is
+what an agent is called. The **Token meter** does not, because its column is *headed* `Agent` and a
+cell repeating the noun says it twice — in 73px of rail, the second word is what pushed the first
+into breaking mid-word. The meter was also the only panel reading `agent_name` raw off the wire,
+which is why it was the only one that could disagree about a name at all. The exception inside the
+exception: the guardrail row's name is this repository's own constant, not a name that arrived from
+anywhere, so it is rendered as written — the **Identity boundary gate**, which a helper that
+title-cases what it is handed would rename on screen.
+
 **Not reported vs measured** — the rendering rule the whole meter turns on: `—` means *nobody told
 us*, `0` means *we know it was nothing*. The Copilot Studio row's tokens are `—` because Direct Line
 reports no count; the **Identity boundary gate**'s row is a real `0`, because the gate refuses before

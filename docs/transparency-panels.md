@@ -121,6 +121,28 @@ The **model** column is the per-agent assignment from the workflow roster's `dep
 which is how "cheap models on cheap work" becomes checkable rather than asserted. An agent the
 roster does not name renders `—`.
 
+### The agent is named once
+
+The column is headed `Agent`, so the cell does not say it again: the meter reads `Troubleshooting`,
+`Shift Tasks`, `Escalation`, `Workforce`. That is the **Agent display name** rule — one base name
+through `getAgentDisplayName`, two presentations — and it is deliberately *not* the Agent Team
+panel's, which keeps the suffix because it names an agent inside a sentence. Until #70 the meter was
+the only panel in the rail rendering `agent_name` raw off the wire, and the repeated noun is what
+made the name too long to fit: `Troubleshoo` / `ting Agent`, in the panel whose whole job is to be
+believed.
+
+Two things are sized against that, and both are read out of the stylesheets by the frontend loop
+rather than eyeballed. The **Agent** column holds the longest word in the store assistant roster —
+about 90px for `Troubleshooting`, against the 73px that 30% of a ~257px table gave it; the table is
+257px and not the rail's 288 because the panel inside the rail is a padded card with a border of its
+own. And the width it wanted came from **Model**, never from Tokens: a deployment name breaks at its
+own hyphens and costs a line, while a token total may not break at all, so a column too narrow for a
+five-figure count sets it across the estimated Copilot Credits.
+
+The guardrail row is the exception. Its name is a constant in `models/meter.ts` rather than anything
+that arrived over a wire, and it is rendered as written — the **Identity boundary gate**, not a
+title-cased paraphrase of it.
+
 ## Agent Team panel
 
 Populated from the **workflow roster** (`planData.team.agents`), not from the plan. With Plan review
