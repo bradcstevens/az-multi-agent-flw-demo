@@ -450,6 +450,13 @@ async def process_request(
     if span:
         span.set_attribute("session_id", input_task.session_id)
 
+    # The lane router (ADR-013). Below the Identity boundary gate on purpose:
+    # the two are separate components with opposite failure modes — the gate
+    # fails closed, this fails open to the Deliberate lane — and a refused
+    # request must never have paid for routing. This is the one place a Lane
+    # becomes a Plan review value.
+    lane = select_lane(input_task.lane, input_task.description)
+
     try:
         plan_id = str(uuid.uuid4())
         # Initialize memory store and service
@@ -460,6 +467,7 @@ async def process_request(
             session_id=input_task.session_id,
             team_id=team_id,
             initial_goal=input_task.description,
+            lane=lane.value,
             overall_status=PlanStatus.in_progress,
         )
         await memory_store.add_plan(plan)
@@ -496,13 +504,6 @@ async def process_request(
     team_mismatch = (
         current_workflow is not None and cached_team_id != team_id
     )
-
-    # The lane router (ADR-013). Below the Identity boundary gate on purpose:
-    # the two are separate components with opposite failure modes — the gate
-    # fails closed, this fails open to the Deliberate lane — and a refused
-    # request must never have paid for routing. This is the one place a Lane
-    # becomes a Plan review value.
-    lane = select_lane(input_task.lane, input_task.description)
 
     # The lane taken, recorded into server-side session state (issue #20). The
     # plan page is handed it through router state, which a reload throws away —

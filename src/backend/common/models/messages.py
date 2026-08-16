@@ -215,6 +215,8 @@ class Plan(BaseDataModel):
     plan_id: str
     user_id: str
     initial_goal: str
+    # Optional so records created before #102 remain readable without a migration.
+    lane: Optional[str] = None
     overall_status: PlanStatus = PlanStatus.in_progress
     approved: bool = False
     source: str = AgentType.PLANNER.value

@@ -989,6 +989,22 @@ class TestPerRequestPlanReview:
         assert self._post(rt).json()["lane"] == "fast"
         assert self._post(rt, lane="deliberate").json()["lane"] == "deliberate"
 
+    def test_the_plan_record_keeps_the_lane_returned_to_the_client(self, rt):
+        """The request owns the Lane once, then records and reports that value."""
+        response = self._post(rt, lane="fast")
+
+        persisted = rt.store.add_plan.await_args.args[0]
+        assert response.json()["lane"] == persisted.lane == "fast"
+
+    def test_a_plan_written_before_lane_persistence_stays_readable(self):
+        plan = router_mod.Plan(
+            plan_id="legacy-plan",
+            user_id="user-1",
+            initial_goal="How do I close the store?",
+        )
+
+        assert plan.lane is None
+
     def test_the_first_request_after_a_page_load_is_not_served_the_eager_workflow(
         self, rt
     ):

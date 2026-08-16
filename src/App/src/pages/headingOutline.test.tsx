@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -76,7 +76,7 @@ const REPLY = {
 } as any;
 
 const PLAN_DATA = {
-    plan: { id: 'plan-1', overall_status: 'completed' },
+    plan: { id: 'plan-1', overall_status: 'in_progress', lane: 'fast' },
     team: TEAM,
     messages: [REPLY],
     mplan: null,
@@ -169,6 +169,7 @@ const renderChatSurface = () =>
             <MemoryRouter initialEntries={['/chat/plan-1']}>
                 <Routes>
                     <Route path="/chat/:id" element={<ChatPage />} />
+                    <Route path="/" element={<span>New chat started</span>} />
                 </Routes>
             </MemoryRouter>
         </Provider>,
@@ -294,6 +295,14 @@ describe('the chat surface has a heading outline', () => {
         expect(outline().length, 'no headings at all; this assertion is inert').toBeGreaterThan(0);
         expect(skippedLevels(), 'the outline jumps a level').toEqual([]);
     });
+
+    it('starts a new chat without a cancellation warning on the Fast lane', async () => {
+        renderChatSurface();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'New chat' }));
+
+        expect(screen.queryByText('Confirm Plan Cancellation')).not.toBeInTheDocument();
+    });
 });
 
 describe('the chat surface has a heading outline with a plan up for review', () => {
@@ -301,7 +310,10 @@ describe('the chat surface has a heading outline with a plan up for review', () 
     // outline conditional, so both cases are asserted rather than one of them
     // quietly dropped (#78).
     beforeEach(() => {
-        vi.mocked(PlanDataService.fetchPlanData).mockResolvedValue(DELIBERATE_PLAN_DATA);
+        vi.mocked(PlanDataService.fetchPlanData).mockResolvedValue({
+            ...DELIBERATE_PLAN_DATA,
+            plan: { ...DELIBERATE_PLAN_DATA.plan, lane: 'deliberate' },
+        });
     });
 
     it('exposes exactly one top-level heading, and it names the assistant', async () => {
@@ -334,6 +346,14 @@ describe('the chat surface has a heading outline with a plan up for review', () 
 
         expect(outline().length, 'no headings at all; this assertion is inert').toBeGreaterThan(0);
         expect(skippedLevels(), 'the outline jumps a level').toEqual([]);
+    });
+
+    it('warns before abandoning a deliberate request in flight', async () => {
+        renderChatSurface();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'New chat' }));
+
+        expect(await screen.findByText('Confirm Plan Cancellation')).toBeInTheDocument();
     });
 });
 

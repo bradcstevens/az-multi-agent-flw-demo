@@ -22,7 +22,10 @@ export const usePlanCancellationAlert = ({
    * Check if a plan is currently active/running
    */
   const isPlanActive = useCallback(() => {
-    return planData?.plan?.overall_status === PlanStatus.IN_PROGRESS;
+    return (
+      planData?.plan?.lane === 'deliberate' &&
+      planData?.plan?.overall_status === PlanStatus.IN_PROGRESS
+    );
   }, [planData]);
 
   /**
