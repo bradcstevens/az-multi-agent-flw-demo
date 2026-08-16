@@ -55,6 +55,7 @@ import {
 import { APIService } from '@/api/apiService';
 import { ToastIntent } from '@/components/toast/InlineToaster';
 import { formatElapsedTime } from '@/utils';
+import { reportedExecutor } from '@/models/progressNarration';
 
 const apiService = new APIService();
 
@@ -112,6 +113,7 @@ export function usePlanWebSocket({
     const continueWithWebsocketFlow = useAppSelector(selectContinueWithWebsocketFlow);
     const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
     const processingStartedAtRef = React.useRef<number | null>(null);
+    const finalAnswerExecutorRef = React.useRef<string | null>(null);
 
     // Coalesce high-frequency streaming tokens into one flush per animation frame
     // to avoid a synchronous re-render per token freezing the UI on fast streams.
@@ -186,7 +188,9 @@ export function usePlanWebSocket({
                 // The one signal that names *which* specialist is responding
                 // (#64, ADR-023). Taken from the frame rather than from the
                 // plan, which the Fast lane does not have.
-                dispatch(agentResponding(msg.data?.agent ?? null));
+                const executor = reportedExecutor(msg.data?.agent);
+                finalAnswerExecutorRef.current = executor;
+                dispatch(agentResponding(executor));
                 const line = PlanDataService.simplifyHumanClarification(msg.data?.content || msg.content || '');
                 streamingChunkQueueRef.current.push(line);
                 if (streamingFlushHandleRef.current === null) {
@@ -282,7 +286,7 @@ export function usePlanWebSocket({
 
                 if (messageStatus === PlanStatus.COMPLETED) {
                     const agentMessageData: AgentMessageData = {
-                        agent: AgentType.GROUP_CHAT_MANAGER,
+                        agent: finalAnswerExecutorRef.current ?? '',
                         agent_type: AgentMessageType.AI_AGENT,
                         timestamp: Date.now(),
                         steps: [],
@@ -339,6 +343,7 @@ export function usePlanWebSocket({
                     scrollToBottom();
                     webSocketService.disconnect();
                 }
+                finalAnswerExecutorRef.current = null;
             },
         );
         return unsub;
