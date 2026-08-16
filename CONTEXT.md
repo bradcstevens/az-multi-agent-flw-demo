@@ -630,7 +630,10 @@ Foundry answer, a real Copilot Studio hop or a measured token count gives away t
 evidence — and it is why the meter's `—` is out of reach of any disclosure decision: it does not
 disclose invention, it refuses to state a number nobody reported. **An invented person's action
 always carries its provenance in the record**, which is the one case named rather than left to the
-general rule, because *a person decided this* is the strongest claim this system can make.
+general rule, because *a person decided this* is the strongest claim this system can make
+([ADR-037](docs/ADR/037-an-invented-persons-action-is-disclosed-in-the-record-that-carries-it.md)).
+It is carried in the record and **never only in the register**: the **Recorded fallback** is one
+silent `.webm` per beat, and nobody speaks over a video.
 
 **Simulation register** — the section of `docs/presenter-runbook.md` enumerating every invented thing
 in the walkthrough, and the reason *"the presenter will address them conversationally"* is a property

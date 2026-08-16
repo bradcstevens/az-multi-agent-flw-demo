@@ -46,6 +46,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [034](./034-the-identity-boundary-gate-covers-the-clarification-seam.md) | The Identity boundary gate covers the clarification seam | Accepted |
 | [036](./036-a-record-carries-its-own-provenance.md) | A record carries its own provenance, and the surface says nothing about itself | Accepted — retires `CONTEXT.md`'s Simulated label |
 | [038](./038-the-manager-addresses-the-associate-the-session-knows.md) | The manager addresses the associate the session knows, and the addressing stays out of the record | Accepted |
+| [037](./037-an-invented-persons-action-is-disclosed-in-the-record-that-carries-it.md) | An invented person's action is disclosed in the record that carries it | Accepted — sits on 036, binding on spec 4 |
 
 ## Writing a new one
 

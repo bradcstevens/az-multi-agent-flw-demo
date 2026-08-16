@@ -153,7 +153,8 @@ record.** Ten things follow, and they are part of this decision rather than sepa
    one tap. `docs/presenter-runbook.md` is asserted string-for-string by `test_presenter_runbook.py`,
    and a runbook promising *"the manager will say 'Hey Clara'"* writes a cheque a model can decline
    to cash — so it says that before sign-in the assistant cannot know your name, and after it, it
-   does. This rides with the say-out-loud lines ADR-036 decision 6 is already adding to that beat.
+   does. This rides with the **Simulation register** ADR-036 decision 9 is already adding to that
+   runbook.
 
 10. **Voice inherits the words; spec 6 owns delivery.** Everything above is about *what is said* and
     is transport-independent, so voice reuses it whole. A second persona authored for voice would be
@@ -217,13 +218,16 @@ spec 2's.
   clause, one new local, one changed argument, two updated tests.
 - **ADR-036 removed this decision's original justification, and the conclusion survives.** The
   badge question was answered here as *"no new badge — the name is already badged where it is
-  asserted, on the header and the personal answer."* ADR-036 landed while this was being decided and
-  **deletes both of those badges** (`SimulatedBadge` and `SIMULATED_LABEL` deleted;
-  `PERSONAL_ANSWER_NOTE` deleted). The premise is gone; the answer is unchanged and now simpler —
-  there is no badge to add. It also restates cleanly in ADR-036's surviving vocabulary: disclosure
-  *"stays in the words,"* and the surviving prose disclosure is `HomeInput`'s sign-in line, *"Simulated
-  sign-in — no identity provider is involved,"* which decision 2 of that ADR keeps unchanged. **That
-  line and the greeting are produced by the same tap.** The disclosure and the personalisation are
+  asserted, on the header and the personal answer."* ADR-036 was decided while this was being
+  decided and **deletes both of those badges** (`SimulatedBadge` and `SIMULATED_LABEL` deleted).
+  The premise is gone; the answer is unchanged and now simpler — there is no badge to add.
+
+  It also restates cleanly in ADR-036's surviving vocabulary: *the surface asserts nothing about
+  itself; a record carries its own provenance*. `HomeInput`'s sign-in line, *"Simulated sign-in — no
+  identity provider is involved,"* is **removed** by that ADR's decision 2 as surface-authored prose,
+  and the associate record's disclosure **survives and is strengthened** as a **Provenance line**
+  (decision 5). **That line and the greeting are still produced by the same tap** — the tap yields the
+  personal answer, and the personal answer is what carries the provenance. The disclosure and the personalisation are
   not merely compatible, they are simultaneous.
 - **Negative — the manager's warmth is unmeasured, permanently.** Decision 8 checks the structure
   and refuses to check the prose, so *"is it too much?"* is answered by a person watching a
@@ -257,9 +261,9 @@ spec 2's.
   — decision 5 is its boundary applied to prose
 - [ADR-034: The Identity boundary gate covers the clarification seam](./034-the-identity-boundary-gate-covers-the-clarification-seam.md)
   — the failure decision 10 exists to prevent a third time
-- [ADR-036: The Simulated badge comes off, and the disclosure stays in the words](./036-the-simulated-badge-comes-off-and-the-disclosure-stays-in-the-words.md)
+- [ADR-036: A record carries its own provenance, and the surface says nothing about itself](./036-a-record-carries-its-own-provenance.md)
   — removed this ADR's original badge justification; see Consequences
-- [ADR-037: A fabricated human decision is never indistinguishable from a real one](./037-a-fabricated-human-decision-is-never-indistinguishable-from-a-real-one.md)
+- [ADR-037: An invented person's action is disclosed in the record that carries it](./037-an-invented-persons-action-is-disclosed-in-the-record-that-carries-it.md)
 - `CONTEXT.md` — **Address name**, **Addressed turn**, **Mocked unlock**, **Associate record**,
   **Signed-in device**, **Session state**, **Identity boundary gate**, **Policy block**,
   **Follow-on task**, **Lane router**

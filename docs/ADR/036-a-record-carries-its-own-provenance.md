@@ -56,11 +56,11 @@ properties and none of them is this one.
 Eight findings from the inventory, each of which moved the decision.
 
 1. **There are five badge renders, not the four the issue names.** `StoreIdentity` renders two —
-   `<SimulatedBadge what="Store 223" />` (`StoreIdentity.tsx:47`) and, after the mocked sign-in,
-   `<SimulatedBadge what="This sign-in" />` (`:53`) — alongside `SimulatedTicketCard.tsx:41`,
-   `PersonalAnswerCard.tsx:47` and `PresenterAlertCard.tsx:41`. All five resolve to one component,
+   `<SimulatedBadge what={STORE_LABEL} />` (`StoreIdentity.tsx:48`) and, after the mocked sign-in,
+   `<SimulatedBadge what="This sign-in" />` (`:54`) — alongside `SimulatedTicketCard.tsx:38`,
+   `PersonalAnswerCard.tsx:43` and `PresenterAlertCard.tsx:43`. All five resolve to one component,
    `components/branding/SimulatedBadge.tsx`, over one constant, `SIMULATED_LABEL = 'Simulated'`
-   (`models/storeSurface.ts:41`).
+   (`models/storeSurface.ts:40`).
 
 2. **Every one is unconditional, deliberately.** `SimulatedTicketCard.tsx`: *"The badge is
    unconditional and carries no flag from the wire. Every ticket this assistant raises is
@@ -71,7 +71,7 @@ Eight findings from the inventory, each of which moved the decision.
    this walkthrough. No identity provider signed you in and no payroll system was queried — the
    sign-in and these figures are both mocked."* (`associate/answer.py:49`, rendered unconditionally);
    the ticket card's JSX sentence *"No service desk receives this ticket and no engineer is
-   dispatched."* (`SimulatedTicketCard.tsx:47`); `HomeInput`'s *"Simulated sign-in — no identity
+   dispatched."* (`SimulatedTicketCard.tsx:46`); `HomeInput`'s *"Simulated sign-in — no identity
    provider is involved."*; `SIM-223-0007`, rendered at `SimulatedTicketCard.tsx:34`; the workforce
    library's `SIMULATED` string appended to **every** procedure (`workforce_library.py:22`) and the
    `WorkforceAgent` system message ordering the model to say it. **Removing the chip alone would
@@ -87,7 +87,7 @@ Eight findings from the inventory, each of which moved the decision.
    not on the card. The card's similar sentence is a **separate hardcoded JSX literal**.
 
 6. **The ticket id is disclosure that travels with the artefact.** `TICKET_ID_PREFIX = "SIM-223-"`
-   (`ticket.py:28`) is pinned three times — `test_ticket.py:183`, `test_ticket_store.py:239`, and
+   (`ticket.py:32`) is pinned three times — `test_ticket.py:183`, `test_ticket_store.py:239`, and
    `e2e/authored.ts:213`, which reads the constant *out of the Python source* to build
    `ticketNumberPattern()` rather than duplicating the literal. It survives into a screenshot, which
    a badge in a recording does not.
