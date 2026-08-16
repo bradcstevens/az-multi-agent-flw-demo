@@ -10,6 +10,7 @@ import { FakeSocket, frame } from '@/testing/fakeSocket';
 import { WebsocketMessageType } from '@/models';
 import planReducer, {
     planApprovalAccepted,
+    selectPlanApprovalRequest,
     selectShowProcessingPlanSpinner,
     setContinueWithWebsocketFlow,
 } from '@/store/slices/planSlice';
@@ -54,6 +55,7 @@ const Host = ({
         showToast: () => 0,
     });
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
+    const planApprovalRequest = useAppSelector(selectPlanApprovalRequest);
     const ref = React.useRef<HTMLDivElement>(null);
     return (
         <PlanChat
@@ -63,7 +65,7 @@ const Host = ({
             submittingChatDisableInput={false}
             loading={false}
             OnChatSubmit={() => {}}
-            planApprovalRequest={null}
+            planApprovalRequest={planApprovalRequest}
             messagesContainerRef={ref as never}
             finalResultRef={ref as never}
             streamingMessageBuffer=""
@@ -385,5 +387,30 @@ describe('a final result arriving on the socket', () => {
         });
 
         await waitFor(() => expect(inFlightIndicators()).toHaveLength(0));
+    });
+});
+
+describe('a plan approval arriving on the wire', () => {
+    it('renders the approved plan once in the real conversation', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('plan_approval_request', {
+                    plan: {
+                        user_request: 'How do I close the store?',
+                        steps: [{ id: 1, action: 'Read the closing checklist', agent: 'Shift Tasks Agent' }],
+                    },
+                }),
+            );
+        });
+
+        await waitFor(() => {
+            expect(screen.getByRole('heading', { name: 'Plan Overview' })).toBeInTheDocument();
+            expect(screen.getAllByText('Read the closing checklist')).toHaveLength(1);
+        });
+        expect(screen.getAllByRole('heading', { name: 'Plan Overview' })).toHaveLength(1);
     });
 });
