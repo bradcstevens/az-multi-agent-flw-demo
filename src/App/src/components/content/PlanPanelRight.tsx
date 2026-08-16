@@ -1,14 +1,5 @@
 import React from "react";
-import {
-  Body1,
-} from "@fluentui/react-components";
-import {
-  ArrowTurnDownRightRegular,
-} from "@fluentui/react-icons";
 import { PlanDetailsProps } from "../../models";
-import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
-import { PLAN_ARRIVING } from '../../models/progressNarration';
-import { SECTION_HEADING } from '../../models/headingOutline';
 import ContentNotFound from "../NotFound/ContentNotFound";
 import AgentTeamPanel from "../transparency/AgentTeamPanel";
 import TransparencyRail from "../transparency/TransparencyRail";
@@ -51,92 +42,6 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
     return <ContentNotFound subtitle="The requested page could not be found." />;
   }
 
-  // Extract plan steps from the planApprovalRequest
-  const extractPlanSteps = () => {
-    if (!planApprovalRequest?.steps || planApprovalRequest.steps.length === 0) {
-      return [];
-    }
-
-    return planApprovalRequest.steps.map((step, index) => {
-      const action = step.action || step.cleanAction || '';
-      const isHeading = action.trim().endsWith(':');
-      const rawAgent = step.agent || '';
-      const isFallback = !rawAgent || rawAgent.toLowerCase() === 'magenticagent';
-      const agentName = isFallback ? '' : getAgentDisplayNameWithSuffix(rawAgent);
-      const fullText = agentName ? `${agentName} ${action.trim()}` : action.trim();
-
-      return {
-        text: fullText,
-        agentName,
-        isHeading,
-        key: `${index}-${action.substring(0, 20)}`
-      };
-    }).filter(step => step.text.length > 0);
-  };
-
-  // Render Plan Section
-  //
-  // Rendered only where there is a plan to *review* (#78). The signal is the
-  // `plan_approval_request` frame — ADR-023's *Done* phase — and not "a plan
-  // exists", because a `Plan` is constructed before the **Lane router** has run
-  // and every request has one. On the **Fast lane** the frame never arrives, so
-  // this section is not on screen at all rather than heading a box whose only
-  // content was the statement that it was empty. The heading is part of the
-  // **Heading outline** (#57), and a heading a screen-reader user skims to and
-  // finds nothing behind is worse than no heading.
-  const renderPlanSection = () => {
-    const planSteps = extractPlanSteps();
-
-    return (
-      <div className="plan-section">
-        <Body1 as={SECTION_HEADING} className="plan-section__title">
-          Plan Overview
-        </Body1>
-
-        {planSteps.length === 0 ? (
-          <div className="plan-section__empty">
-            {/*
-              The plan has been announced and its steps have not arrived. The
-              other silence — a request that will never have a plan because it
-              took the Fast lane — is no longer said here at all, because the
-              section itself is not rendered for it.
-            */}
-            {PLAN_ARRIVING}
-          </div>
-        ) : (
-          <div className="plan-steps">
-            {planSteps.map((step) => (
-              <div key={step.key} className={`plan-step ${step.isHeading ? 'plan-step--heading' : 'plan-step--substep'}`}>
-                {step.isHeading ? (
-                  // Heading - larger text, bold
-                  <Body1 className="plan-step__heading">
-                    {step.agentName ? (
-                      <><strong>{step.agentName}</strong> {step.text.slice(step.agentName.length + 1)}</>
-                    ) : (
-                      step.text
-                    )}
-                  </Body1>
-                ) : (
-                  // Sub-step - with arrow
-                  <div className="plan-step__content">
-                    <ArrowTurnDownRightRegular className="plan-step__arrow" />
-                    <Body1 className="plan-step__text">
-                      {step.agentName ? (
-                        <><strong>{step.agentName}</strong> {step.text.slice(step.agentName.length + 1)}</>
-                      ) : (
-                        step.text
-                      )}
-                    </Body1>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // Render Agents Section
   //
   // From the **workflow roster** (issue #24), not from the plan. With Plan
@@ -177,10 +82,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
       */}
       {raisedTicket && <SimulatedTicketCard ticket={raisedTicket} />}
 
-      {/* Plan section on top, and only where there is a plan to review (#78) */}
-      {planApprovalRequest && renderPlanSection()}
-
-      {/* Agents section, and the transparency rail below it */}
+      {/* The rail is evidence only; the reviewable plan lives in the conversation. */}
       <TransparencyRail team={planData?.team ?? null}>
         {renderAgentsSection()}
       </TransparencyRail>

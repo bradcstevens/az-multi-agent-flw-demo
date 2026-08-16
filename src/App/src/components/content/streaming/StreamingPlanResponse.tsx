@@ -13,6 +13,7 @@ import {
 import React, { useState } from 'react';
 import { getAgentIcon, getAgentDisplayNameWithSuffix } from '@/utils/agentIconUtils';
 import { PLAN_ARRIVING } from '@/models/progressNarration';
+import { SECTION_HEADING } from '@/models/headingOutline';
 
 // Updated styles to match consistent spacing and remove brand colors from bot elements
 const useStyles = makeStyles({
@@ -377,9 +378,15 @@ const renderPlanResponse = (
                 )}
 
                 {/* Plan Title */}
-                <div className={styles.planTitle}>
-                    {isCreatingPlan ? PLAN_ARRIVING : `Proposed Plan for ${planApprovalRequest.user_request || 'Task'}`}
-                </div>
+                <Body1 as={SECTION_HEADING} className={styles.planTitle}>
+                    Plan Overview
+                </Body1>
+                {isCreatingPlan && <div className={styles.planTitle}>{PLAN_ARRIVING}</div>}
+                {!isCreatingPlan && (
+                    <div className={styles.planTitle}>
+                        {`Proposed Plan for ${planApprovalRequest.user_request || 'Task'}`}
+                    </div>
+                )}
 
                 {/* Plan Steps */}
                 {planSteps.length > 0 && (
