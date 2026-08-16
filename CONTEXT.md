@@ -589,6 +589,16 @@ than produced by a connected system (#25, R11's surviving fragment): **Store 223
 matters as much — a badge on a real Foundry answer, a real Copilot Studio hop or a measured token
 count gives away the demo's strongest evidence. Label the invented things, and only those.
 
+**The badge labels claims, not controls.** A one-tap control *offers* words; the instant the
+associate taps it they have said them, and the words are truly theirs — so a **Rehearsed reply**
+and a **Follow-on task** carry no badge, and neither does the chat box they are a shortcut for.
+Where authored words *become* a claim about the world — `TKT-001`'s attempted-steps field, filled
+from what a tap recorded — the badge is on the thing that claims it, and the **Simulated ticket**
+already wears it
+([ADR-033](docs/ADR/033-a-one-tap-control-never-invents-the-words-it-offers.md), #91). Badging the
+control instead would put *Simulated* immediately upstream of a **real** Foundry answer, which is
+the converse failure above.
+
 **Stacking breakpoint** — 900px, below which the shell's columns stack, the transparency rail sits
 beneath the conversation, and the task-history panel is dropped rather than squeezed (#25, #58).
 The associate is holding a phone in a store. `CoralShellRow`'s layout had to move out of an inline
@@ -880,14 +890,36 @@ submits the authored prompt and the authored **Lane** with *the current plan's* 
 needs no backend change: a Lane is a property of the request, so the escalation keeps its
 **Deliberate lane** and its own approval gate while sharing the session.
 
-**A task named as a follow-on is not a home card** — the roster still declares six and the grid
-renders five. The rule is derived from the pointer rather than being a second flag, and it is what
+**`follow_on` is a list, and a suggestion is an edge in a graph**
+([ADR-033](docs/ADR/033-a-one-tap-control-never-invents-the-words-it-offers.md), #91) — the
+outgoing edges of the Quick Task that produced the *current* turn. That is already how the single
+pointer resolves: `followOnTaskFor` reads the current plan's `initial_goal` and every turn mints a
+new plan, so the chain was there and only its arity was fixed. A **typed** turn matches no prompt
+and resolves to none, so the associate types their way off the graph until a tap puts them back on
+— the honest price of refusing to generate the words. Three assertions a single pointer never
+needed: every named id resolves, the graph is acyclic, and the grid is counted independently of
+the edges.
+
+**A task that reads a record the conversation wrote is not a home card** — the roster declares
+**seven** and the grid renders **six**, the escalation being the one held back. The rule used to be
+derived from the pointer rather than being a second flag (#61, ADR-024) and is now **declared**,
+because a task naming three suggestions would strike three cards off the grid, silently, and the
+grid is the walkthrough's spine. What it always meant is unchanged and now said directly: it
 stops the cold tap that produces the empty ticket, because *a Quick Task is a claim about what will
 happen when somebody taps it* and that claim may not depend on where it was tapped. **The card is
 ungated**: the gate is the agent's offer, driven by `escalation_due`, where the audience can watch
 it fire — a second copy in the UI would ride a flag this subsystem writes best-effort and would
 fail **closed**, mid-beat. It sits above the chat box and below the **Rehearsed reply** chips'
 slot, not in the rail, which stacks *beneath* the conversation below the **Stacking breakpoint**.
+
+**A suggestion hides while a Clarification is pending**, and the chips take the slot — one control
+at a time, so the card yields, the tap answers, the chips go and the card returns. Today it does
+not: `FollowOnTask` reads no clarification state and `handleFollowOnTask` calls
+`submitTurnIntoSession` unconditionally, so a tap while the orchestration waits on an answer
+strands the turn that asked — the failure `turnModeFor` exists to prevent, one component over
+(ADR-033). It follows that **a suggestion always submits a new turn and a Rehearsed reply always
+submits an answer**: neither is ever tappable at a moment when the other is what is wanted, so
+source, visibility and payload cannot disagree.
 
 The card is **unchanged** by **Resume** (#77, ADR-027) and is still the rehearsed path: it carries
 authored wording and a declared **Lane** and needs no keyboard. Both now go through one seam,
@@ -909,12 +941,32 @@ second route around the seam. Every reply is put through the **real matcher**: e
 least one step (a denial records nothing, and a tap that records nothing looks exactly like one
 that worked), together they must reach `ESCALATION_AFTER` (or nobody is ever offered the ticket R4
 raises), each must be anchored in a runbook (or the memory changes no behaviour), and none may trip
-the **Identity boundary gate**. Resolved from the plan's own `initial_goal` rather than router
+the **Identity boundary gate** — which, until
+[ADR-034](docs/ADR/034-the-identity-boundary-gate-covers-the-clarification-seam.md), nothing here
+enforced: the gate runs inside `process_request` alone, so an answer posted to
+`/v4/user_clarification` reached the orchestration ungated and that assertion stood in for a check
+that did not exist, over the authored strings and nothing typed. Resolved from the plan's own `initial_goal` rather than router
 state, which does not survive a reload; a goal matching no prompt resolves to none, exactly as an
 edit gives up the declared **Lane**. The pending-clarification gate belongs to the component, not
 its caller, for the reason the approval seam owns submission in #22.
 
-_Avoid_: suggested reply, quick reply
+_Avoid_: suggested reply, quick reply — the phrase is ambiguous between two controls with
+different sources, gates and payloads, which is a better reason to refuse it than the one first
+recorded.
+
+**A one-tap control never invents the words it offers.** They are authored against a beat or
+derived from a record in front of the associate, and either way they are checked **before** the
+demo rather than judged at run time — a generated chip could record an **Attempted step** nobody
+tried, or trip the **Identity boundary gate** mid-beat, and nothing could assert otherwise until it
+had already happened on stage
+([ADR-033](docs/ADR/033-a-one-tap-control-never-invents-the-words-it-offers.md), #91). The rule
+spans two controls without merging them: a **Rehearsed reply** answers a question the agent asked,
+a **Follow-on task** starts the next turn, and they never share a moment. Only the gate is asserted
+of both — the **Attempted step**, `ESCALATION_AFTER` and runbook-anchoring properties stay the
+Rehearsed reply's own, because holding every suggestion to them would forbid the **honest miss**.
+The one thing no property catches is an edge that is checkable and nonsensical, so every edge on
+the walkthrough's path is quoted in `docs/presenter-runbook.md`: that is where a person's reading
+of the graph is recorded, and CI holds it to the pack.
 
 **The message box is one control with two acts.** It answers a pending **Clarification** against
 that question's `request_id`, and outside one it **resumes**. It used to do only the first and offer
@@ -1266,6 +1318,28 @@ _Avoid_: the requirements doc, the build requirements, the spec (the spec is iss
 **Correction** — one numbered entry in the corrections record, stating the superseded document's
 **claim** and the **correct** position. The ten are a historical record and are append-only: a new
 finding becomes correction 11, it does not rewrite an existing one.
+
+**Routed pair** — the `(model, effort)` a `git-loopy` iteration runs on, resolved from the
+`task-type:` label an issue carries against the `[routing]` table in
+[`git-loopy/config.toml`](git-loopy/config.toml). Seven task types, a closed set — an issue carries
+**exactly one** label, and an unlabelled issue is not skipped but classified into one of the seven by
+a model call. The table is committed and project-scoped precisely so the pair is reviewable:
+precedence is per key, so a partial table would inherit the rest from whichever laptop the run
+happened on. [ADR-029](docs/ADR/029-an-issue-declares-its-model-with-one-task-type-label.md) decides
+the rows and `src/tests/ci/test_routing_table.py` asserts the file and the ADR still agree. The pair
+is a **judgement, not a measurement** — see **Proving set**.
+_Avoid_: the model route, the tier (a tier is `calibrate`'s word for a measured pair, and none exists
+here)
+
+**Proving set** — the replayable closed issues `git-loopy calibrate` would measure a **Routed pair**
+against, five per task type, unanimous. This repository has **none**: `calibrate --status` reports 46
+closed issues qualifying on every rule except the `task-type:` label, and labelling them would still
+yield nothing, because the price staircase is sorted on a premium multiplier the rate card publishes
+for none of its 24 models — `0 rungs x 5` is zero trials however many issues qualify. Recorded so the
+routing table is read as what it is: chosen by judgement, under a rule (*best balance of speed and
+quality, cost ignored, speed wins a tie*) that is not `calibrate`'s (*the cheapest pair that clears
+the gate*) and would not be settled by it even if it could run.
+_Avoid_: the calibration set, the training set (nothing is trained; the issues are replayed)
 
 **Guardrail corpus** — 10 positive probes and 10 negative controls that are simultaneously R5's
 acceptance test and the tuning harness for the Identity boundary gate's similarity threshold
