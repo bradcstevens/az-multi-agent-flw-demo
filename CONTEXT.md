@@ -264,6 +264,32 @@ signed-in user while every personal question was refused.
 
 Recorded in [docs/mocked-unlock.md](docs/mocked-unlock.md).
 
+**Address name** — the name the manager addresses an associate by, **authored** on the **Associate
+record** beside the display name rather than computed from it (#94,
+[ADR-038](docs/ADR/038-the-manager-addresses-the-associate-the-session-knows.md)). Nothing anywhere
+splits a display name: deciding which part of a person's name to say is the same guess the record
+already refuses to make about which *field* a question wants, and it is wrong for mononyms, for
+compound given names, and for a large fraction of humans. Absent or blank, the manager is warm and
+**unnamed** — never a fallback to the full string, because degrading towards saying less is the
+direction everything on this seam degrades in. _Avoid_: first name, given name, nickname.
+
+**Addressed turn** — the manager's view of a submitted turn, carrying who is asking. It exists only
+while the session knows: before the **Mocked unlock** the resolved identity is `ANONYMOUS`, the
+addressing is never composed, and the model is **not given the name** — so it cannot use one for the
+same reason it cannot state a PTO balance, rather than because it was asked not to.
+
+The associate's words are the **record**; the addressing is a **view**. Everything stored, classified
+or shown — the **Plan record**'s goal, the **Identity boundary gate**, the **Lane router**, the chat
+bubble, the plan heading — reads what the associate actually typed, and only the string handed to the
+orchestration carries the addressee. A bug in the addressing therefore cannot corrupt a record, a
+routing decision or a heading. _Avoid_: preamble, prompt prefix, system message.
+
+Warmth is **address**, never **offers**: what to do next is a **Follow-on task**, checked before the
+demo, because prose can offer a step that does not exist. It is uniform across successes, honest
+misses and refusals — a manager warm only when the news is good makes *tone a signal*, and the room
+reads the register before the words. A **Policy block** is raised upstream of the orchestration, so
+the manager is never invoked on the refusal that matters most.
+
 ## Retrieval
 
 **Foundry IQ** — ambiguous on its own. This repository has used the name for two different

@@ -46,6 +46,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [034](./034-the-identity-boundary-gate-covers-the-clarification-seam.md) | The Identity boundary gate covers the clarification seam | Accepted |
 | [036](./036-the-simulated-badge-comes-off-and-the-disclosure-stays-in-the-words.md) | The Simulated badge comes off, and the disclosure stays in the words | Accepted — amends the **Simulated label** rule |
 | [037](./037-a-fabricated-human-decision-is-never-indistinguishable-from-a-real-one.md) | A fabricated human decision is never indistinguishable from a real one | Accepted — bounds 036, binding on spec 4 |
+| [038](./038-the-manager-addresses-the-associate-the-session-knows.md) | The manager addresses the associate the session knows, and the addressing stays out of the record | Accepted |
 
 ## Writing a new one
 
