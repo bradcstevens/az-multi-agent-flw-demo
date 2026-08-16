@@ -153,6 +153,7 @@ def rt(monkeypatch):
     store.delete_current_team = AsyncMock()
     store.add_plan = AsyncMock()
     store.update_plan = AsyncMock()
+    store.delete_item = AsyncMock()
 
     # The generic CRUD the memory container exposes, faked well enough that a
     # session-state record genuinely round-trips (issue #20). Keyed by
@@ -1003,6 +1004,35 @@ class TestPerRequestPlanReview:
         persisted = rt.store.update_plan.await_args.args[0]
         assert lanes_at_creation == [None]
         assert response.json()["lane"] == persisted.lane.value == "fast"
+
+    def test_a_failed_lane_persistence_removes_the_provisional_plan_record(self, rt):
+        """A failed update must not leave a lane-less record in the Chat list."""
+        rt.store.update_plan.side_effect = RuntimeError("Cosmos is unavailable")
+
+        response = self._post(rt, lane="fast")
+
+        provisional_record = rt.store.add_plan.await_args.args[0]
+        assert response.status_code == 500
+        rt.store.delete_item.assert_awaited_once_with(
+            provisional_record.id, provisional_record.session_id
+        )
+
+    def test_lane_persistence_failure_remains_reported_when_cleanup_fails(
+        self, rt, caplog
+    ):
+        """The cleanup failure must not hide the persistence failure that caused it."""
+        rt.store.update_plan.side_effect = RuntimeError("Lane persistence failed")
+        rt.store.delete_item.side_effect = RuntimeError("Cleanup failed")
+
+        with caplog.at_level(logging.ERROR, logger=router_mod.logger.name):
+            response = self._post(rt, lane="fast")
+
+        assert response.status_code == 500
+        assert "Error creating plan: Lane persistence failed" in caplog.messages
+        assert (
+            "Failed to remove provisional Plan record after Lane persistence failed"
+            in caplog.messages
+        )
 
     def test_a_plan_record_written_before_lane_persistence_stays_readable(self):
         plan = router_mod.Plan(

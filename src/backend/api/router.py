@@ -468,7 +468,18 @@ async def process_request(
         # Lane the router selected for it.
         lane = select_lane(input_task.lane, input_task.description)
         plan.lane = lane
-        await memory_store.update_plan(plan)
+        try:
+            await memory_store.update_plan(plan)
+        except Exception:
+            # The pre-routing record is not a valid conversation until its Lane
+            # is persisted, so remove it before surfacing the write failure.
+            try:
+                await memory_store.delete_item(plan.id, plan.session_id)
+            except Exception:
+                logger.exception(
+                    "Failed to remove provisional Plan record after Lane persistence failed"
+                )
+            raise
 
         track_event_if_configured(
             "Plan_Created",
