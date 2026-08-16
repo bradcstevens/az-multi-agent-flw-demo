@@ -2,6 +2,7 @@ import { AgentMessageData } from './agentMessage';
 import { PlanStatus, AgentMessageType } from './enums';
 import { StreamingPlanUpdate } from './messages';
 import { TeamConfig } from './Team';
+import type { Lane } from './lane';
 
 /**
  * Base interface with common fields
@@ -115,6 +116,8 @@ export interface Plan extends BaseModel {
     user_id: string;
     /** Initial goal/title of the plan */
     initial_goal: string;
+    /** The Lane selected for this request, absent on records written before #102. */
+    lane?: Lane;
     /** Current status of the plan */
     overall_status: PlanStatus;
     /** Whether the plan is approved */

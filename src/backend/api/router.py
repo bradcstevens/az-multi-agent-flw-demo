@@ -464,6 +464,12 @@ async def process_request(
         )
         await memory_store.add_plan(plan)
 
+        # The Plan record exists before routing (ADR-028), then retains the
+        # Lane the router selected for it.
+        lane = select_lane(input_task.lane, input_task.description)
+        plan.lane = lane
+        await memory_store.update_plan(plan)
+
         track_event_if_configured(
             "Plan_Created",
             {
@@ -496,13 +502,6 @@ async def process_request(
     team_mismatch = (
         current_workflow is not None and cached_team_id != team_id
     )
-
-    # The lane router (ADR-013). Below the Identity boundary gate on purpose:
-    # the two are separate components with opposite failure modes — the gate
-    # fails closed, this fails open to the Deliberate lane — and a refused
-    # request must never have paid for routing. This is the one place a Lane
-    # becomes a Plan review value.
-    lane = select_lane(input_task.lane, input_task.description)
 
     # The lane taken, recorded into server-side session state (issue #20). The
     # plan page is handed it through router state, which a reload throws away —
