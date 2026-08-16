@@ -75,6 +75,7 @@ FAST_LANE_TERMS: Tuple[str, ...] = (
     # SOP lookup
     "how do i",
     "how do we",
+    "how does",
     "how to",
     "what is the procedure",
     "procedure for",
