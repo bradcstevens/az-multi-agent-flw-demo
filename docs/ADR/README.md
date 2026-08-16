@@ -38,6 +38,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [025](./025-chat-is-the-unit-of-the-surface.md) | Chat is the unit of the surface | Accepted |
 | [026](./026-chats-are-deleted-not-hidden.md) | Chats are deleted, not hidden | Accepted — supersedes 022 |
 | [027](./027-resume-continues-the-session.md) | Resume continues the session | Accepted — supersedes 024 |
+| [028](./028-a-reviewable-plan-is-earned-by-a-transaction.md) | A reviewable plan is earned by a transaction, not by a question | Accepted |
 
 ## Writing a new one
 

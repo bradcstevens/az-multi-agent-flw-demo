@@ -58,6 +58,20 @@ declared by the client at all — the **Lane router** derives it from the reques
 `Lane.plan_review` is the one place "fast means no approval gate" is written down. See
 [ADR-013](docs/ADR/013-per-request-plan-review-over-orchestrator-bypass.md).
 
+**Plan record** — the row every request creates, before a **Lane** has been chosen for it. It is the
+conversation's record and not a plan: the **Chat** list is that query, and the row also carries the
+turn's streaming text and its clarification. It records the **Lane** taken, so a surface holding one
+can tell whether that conversation was ever reviewable
+([ADR-028](docs/ADR/028-a-reviewable-plan-is-earned-by-a-transaction.md)).
+_Avoid_: plan, the plan
+
+**Reviewable plan** — the plan the associate approves, and the only thing "plan" means when spoken
+to an associate. It exists on the **Deliberate lane** and nowhere else, which is why a surface asks
+for the approval frame rather than asking whether a **Plan record** exists. A request earns one when
+it **commits something on the associate's behalf**; a question earns none, however many specialists
+answer it (ADR-028).
+_Avoid_: plan, the plan
+
 ## Request path
 
 **Fast lane** — the request path taken by an SOP lookup, a troubleshooting turn or a task query:
@@ -76,7 +90,8 @@ plan, which is why `TicketStore.read` is **not** total: see **Simulated ticket**
 **Quick Task** and carried on the wire as `InputTask.lane` — the **only** lane declaration on a
 request, because two ways to say the same thing on one message is how a request ends up in a lane
 nobody chose. A Lane decides exactly one thing: **Plan review**. The lane *taken* comes back on the
-`/process_request` response, is recorded into **Session state** so it survives a reload, and is
+`/process_request` response, is recorded into **Session state** so it survives a reload and onto the
+**Plan record** so a conversation carries it, and is
 **surfaced in the UI as a feature** (`LaneBadge`) — on a Quick Task as the lane declared, on a plan
 as the lane taken.
 
@@ -97,6 +112,9 @@ guardrail's **Keyword fast path**: it may miss a Fast lane request — the miss 
 — but it may never claim an escalation or a ticket for the Fast lane, because the approval step *is*
 the associate confirming the ticket before it is raised. Hence the Deliberate vocabulary is matched
 first, wins outright, and is the broader list; the default when nothing matches is Deliberate.
+Because Deliberate wins outright, the Fast vocabulary can be widened without ever costing a
+transaction — which is the only direction that fails silently, and since ADR-028 it guards the shift
+swap as well as the escalation.
 
 **Fast-lane latency** — the measured end-to-end cost of a Fast lane request, against the sub-10s
 target. **Not yet measured.** ADR-013 makes the measurement the sole trigger for reopening the
