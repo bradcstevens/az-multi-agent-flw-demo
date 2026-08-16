@@ -47,6 +47,9 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [036](./036-a-record-carries-its-own-provenance.md) | A record carries its own provenance, and the surface says nothing about itself | Accepted — retires `CONTEXT.md`'s Simulated label |
 | [038](./038-the-manager-addresses-the-associate-the-session-knows.md) | The manager addresses the associate the session knows, and the addressing stays out of the record | Accepted |
 | [037](./037-an-invented-persons-action-is-disclosed-in-the-record-that-carries-it.md) | An invented person's action is disclosed in the record that carries it | Accepted — sits on 036, binding on spec 4 |
+| [039](./039-an-agent-dossier-shows-what-the-agent-was-told-verbatim.md) | An agent dossier shows what the agent was told, verbatim | Accepted — introduces the **Agent dossier** |
+| [040](./040-the-grounding-panel-names-the-hop-it-observed.md) | The Grounding panel names the hop it observed | Accepted — corrects the route; closes the brief's "Direct Line MCP server" |
+| [041](./041-the-copilot-studio-chat-url-is-a-credential.md) | The Copilot Studio chat URL is a credential | Accepted — bounds the deep link |
 
 ## Writing a new one
 

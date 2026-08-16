@@ -1,6 +1,8 @@
 # Triage Labels
 
-The skills speak in terms of five canonical routing roles plus the additive `parallel-safe` marker. This file maps them to the actual label strings used in this repo's issue tracker.
+The skills speak in terms of canonical routing roles, task types, and the additive
+`parallel-safe` marker. This file maps them to the actual label strings used in this
+repo's issue tracker.
 
 | Canonical role    | Label in our tracker | Meaning                                             |
 | ----------------- | -------------------- | --------------------------------------------------- |
@@ -13,7 +15,24 @@ The skills speak in terms of five canonical routing roles plus the additive `par
 
 `parallel-safe` is additive: apply it alongside a routing label rather than instead of one.
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
+## Task-type labels
+
+Every AFK issue carries exactly one of these closed task-type labels. Choose the
+task type by **dominant risk**: the dimension whose failure is most expensive, not
+the one with the most files.
+
+| Task type      | Label in our tracker         |
+| -------------- | ---------------------------- |
+| planning       | `task-type:planning`         |
+| review         | `task-type:review`           |
+| implementation | `task-type:implementation`  |
+| test           | `task-type:test`             |
+| docs           | `task-type:docs`             |
+| chore          | `task-type:chore`            |
+| bugfix         | `task-type:bugfix`           |
+
+When a skill mentions a role or task type, use the corresponding label string from
+these tables. Do not invent a substitute label.
 
 Edit the right-hand column to match whatever vocabulary you actually use.
 
@@ -27,6 +46,9 @@ gh issue edit <number> --remove-label "needs-triage"
 
 # parallel-safe is additive — pair it with a routing label
 gh issue edit <number> --add-label "ready-for-agent,parallel-safe"
+
+# task-type is a separate, exactly-one judgement
+gh issue edit <number> --add-label "task-type:implementation"
 ```
 
 If a label is ever missing, recreate it rather than inventing a substitute:

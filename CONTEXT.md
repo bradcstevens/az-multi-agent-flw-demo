@@ -749,8 +749,17 @@ panel renders `Citation.snippet()`, which truncates `text`; rendering `abstract`
 twice.
 
 The panel leads with the **platform** and not the document — `Copilot Studio`, over the route
-`Foundry orchestrator → Copilot Studio → Dataverse` — because the claim R6 exists to make is that
-*this one answer left Foundry*. **Dataverse**, never SharePoint. It has three states (#24): cited,
+`Foundry orchestrator → search_store_procedures (MCP tool, plain HTTP) → POST /sop/ask → Direct Line
+→ Copilot Studio → Dataverse` — because the claim R6 exists to make is that *this one answer left
+Foundry*. **Dataverse**, never SharePoint. The route **names the MCP tool**
+([ADR-039](docs/ADR/040-the-grounding-panel-names-the-hop-it-observed.md), #99): it used to read
+`Foundry orchestrator → Copilot Studio → Dataverse`, which skipped the middle of its own sentence —
+the tool call is the step that made the hop, and the panel that exists to prove the hop was the one
+place not naming it. There is **no Direct Line MCP server** and that phrase never renders: the tool
+is a plain HTTP relay to `POST /sop/ask`, the only Direct Line client is `src/backend/sop/direct_line.py`,
+and `BRIEF.md`'s sentence describing one is a factual error the ADR records rather than builds.
+Which tools an agent *holds* is a standing fact and belongs to the **Agent dossier**; which hop this
+answer *took* is observed and belongs here. It has three states (#24): cited,
 uncited (the honest miss, rendered explicitly rather than as an empty panel), and **no signal**, in
 which it describes itself and asserts nothing — it does not say the answer came from Foundry,
 because nobody told it that and a swallowed push looks the same from here.
@@ -1239,6 +1248,69 @@ its answer arriving, and availability is a standing fact that is true before any
 under the count says *"which of them take part"* rather than *"which of them take this question"*,
 because before anything is typed there is no *this question*.
 _Avoid_: agents assigned, agents identified, agents selected
+
+**Agent dossier** — the per-agent record the surface opens when an agent's name is clicked in the
+**Agent Team** panel: what that agent is, what it was told, and what it can reach
+([ADR-038](docs/ADR/039-an-agent-dossier-shows-what-the-agent-was-told-verbatim.md), #99). It shows
+`system_message` **verbatim** — byte-identical to the store pack, never paraphrased, summarised or
+redacted — because *"the prompt it's using"* over anything else is a claim nobody can guarantee, in
+the object whose whole value is that it is checkable. `description` leads, an authored preamble
+frames what follows, and everything else renders **only where the pack sets it**: an empty row
+reading `use_file_search: false` is a claim about a feature nobody chose, which is **Not reported vs
+measured** in configuration form.
+
+It is an **overlay**, not a panel and not an expansion. A `system_message` runs to thousands of
+characters and the **Transparency rail** has ~257px to give it (#60, #70); a fourth panel lengthens a
+column already measured collapsing to 32px when stacked. The **Panel drawer**'s desktop-only rule is
+*not* inherited — that rule is about side columns — so the dossier reaches the **home surface** and
+every width, and the home surface is where it earns most: a real prompt read out before a question is
+typed is what settles whether the audience is looking at a mock-up.
+
+It inherits **Available vs participating** at a new seam and answers it out loud — *spoke in this
+answer* or *available, has not spoken*, and on the home surface availability alone, there being no
+conversation to have participated in. Participation is read from the signal the **Progress
+narration** uses and **never from the Token meter**: an agent that spoke and reported no usage sends
+no event, so a meter-sourced dossier would deny an agent the room had just watched answer. The
+**manager** has no dossier — its instructions are composed per request and it does not answer, it
+decides who does, so listing it would falsify the count beneath it.
+
+The three prompt lines that read badly on a projector — EscalationAgent's *"no second confirmation"*
+and *"every ticket is simulated"*, WorkforceAgent's *"there is no employment system connected"* — are
+**left exactly as written**. They are requirements: `test_store_pack.py` pins the first by substring
+and [ADR-017](docs/ADR/017-workforce-agent-answers-process-never-record.md) is the third. Since the
+badges came off they are also **Disclosure in words** at its strongest — an audience watching an
+agent be *told* to disclose.
+_Avoid_: agent card, agent profile, agent info, agent details pane — **card** is already the **Quick
+Task** and the **Presenter alert**
+
+**Copilot Studio link** — the optional way out of the **Agent dossier** to the **Copilot Studio SOP
+agent**'s own chat surface
+([ADR-040](docs/ADR/041-the-copilot-studio-chat-url-is-a-credential.md), #99). It hangs off
+**ShiftTasksAgent**'s dossier as the *tool's* destination, that being the only agent holding
+`search_store_procedures`; the SOP assistant has no `TeamAgent` record and no prompt this repository
+can render.
+
+**The URL is a credential.** The agent is published with no authentication, so knowing the URL *is*
+the access, and every answer it gives is metered at 2 **Copilot Credits**. This repository is public,
+so the URL is **never committed** — not in `infra/environments/`, not in a pack, not in a fixture,
+not in a document. It arrives through an environment variable that is **unset by default**, and unset
+means the affordance is **absent**, never disabled: a disabled control claims a destination the
+surface cannot reach. It is also not derivable — no Microsoft-published formula exists — so nothing
+here can verify it still points anywhere.
+
+Every click opens a **fresh browser context**: `target="_blank"` with **no named target**, plus
+`rel="noopener noreferrer"`. The named target is the trap — `target="copilotStudio"` looks identical,
+reuses one tab, and reintroduces **Publish propagation**, where a tab left open across a publish
+answers from the superseded agent indefinitely. A frontend test reads those attributes off the
+anchor, on the precedent of `CoralShellRow.test` reading layout rules out of the stylesheets.
+
+Enabling it **discloses the URL to the room** — clicked on a projector it is in the address bar, and
+a photograph of that slide is a working key. Recorded rather than prevented, because it is a
+presenter's judgement and must be a knowing one. The **Grounding panel** carries no link: it proves
+*this answer* left Foundry, which is stronger evidence than a second chat window, and it is the
+reason the link is optional at all.
+_Avoid_: deep link, portal link, maker link (the maker canvas needs a licence and is a different
+affordance entirely)
 
 **Settled status** — `completed`, `failed` or `canceled`: the three states in which a **Chat** may
 be deleted. The rule is **total and fail-closed** — any other answer, including none, means running.
