@@ -23,6 +23,14 @@ provider was implied has stopped believing the rest of the demonstration:
 | The header | The **Simulated label**, beside the associate's name |
 | The answer | The **Simulated label**, plus a note naming the record as authored |
 
+**All three change under [ADR-036](ADR/036-a-record-carries-its-own-provenance.md) (#92), which
+retires the Simulated label.** The table above is what ships today. After spec 2 the three become
+**one**: the button's line and the header's badge are the surface talking about itself and both go,
+while the answer keeps its disclosure as a **Provenance line** — the record naming the system that
+was not consulted. Nothing about *"said out loud"* is given up; the sentence above about a
+stakeholder who discovers an identity provider was implied is the reason the answer's line survives
+when the other two do not.
+
 Asserted rather than assumed, on both sides of the socket:
 `test_router.py::test_no_identity_provider_is_involved` reads the backend modules the flow runs
 through, and `test_personal_answer_contract.py` reads the browser's.
