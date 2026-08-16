@@ -72,6 +72,24 @@ it **commits something on the associate's behalf**; a question earns none, howev
 answer it (ADR-028).
 _Avoid_: plan, the plan
 
+**Person step** — a step of a **Reviewable plan** whose assignee is a person rather than an agent,
+carrying a closed `relation` of associate, peer or manager and a `waitsOn` ordering (#85, #106). It
+is its own kind of step, not an agent step with a decoration: the system cannot perform one, only
+ask for it and wait. **A Person step assigned to somebody other than the associate is the only thing
+that creates post-approval waiting** — which is why approval *completes* a support ticket and
+*starts* a shift swap, and why the two are two mechanisms sharing one shape
+([ADR-042](docs/ADR/042-approval-completes-a-ticket-and-starts-a-swap.md)).
+_Avoid_: human step, manual step, approval step
+
+**Verdict** — how a **Person step** resolves: approved or declined. The **outcome** is authored on
+the **Quick Task**, so the beat is rehearsable and pinnable; the **words** that carry it are
+generated per run, which is ADR-038's split of authored fact from riding voice. A decline stops the
+plan at that step and every step that waits on it, and is expressible and specified even though the
+walkthrough never walks it. Because an invented person's action is what a Verdict is, it carries a
+**Provenance line** on its own record (ADR-037); a person who has not yet reached one is set
+dressing and carries nothing.
+_Avoid_: approval, sign-off, response
+
 ## Request path
 
 **Fast lane** — the request path taken by an SOP lookup, a troubleshooting turn or a task query:
