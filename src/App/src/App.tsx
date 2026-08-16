@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import './App.css';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { HomePage, ChatPage } from './pages';
+import PlanApprovalPrototype from './pages/prototype/PlanApprovalPrototype';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAppDispatch } from './store/hooks';
 import { hydrateCurrentUser } from './store/slices/appSlice';
@@ -35,6 +36,8 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/chat/:id" element={<ChatPage />} />
         <Route path="/plan/:planId" element={<LegacyPlanRoute />} />
+        {/* PROTOTYPE — throwaway, issue #85. Never reaches main. */}
+        <Route path="/prototype/plan-approval" element={<PlanApprovalPrototype />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

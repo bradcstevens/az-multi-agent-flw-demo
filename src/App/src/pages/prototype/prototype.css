@@ -1,0 +1,537 @@
+/*
+ * PROTOTYPE — throwaway. Not production code. See issue #85.
+ *
+ * The 900px stacking rules mirror `storeSurface.css` deliberately: item 4 of
+ * #85 is a question about what happens at the Stacking breakpoint, so the
+ * prototype has to reproduce it rather than assume it.
+ */
+
+.p-root {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    background: var(--colorNeutralBackground2);
+    padding-bottom: 132px;
+}
+
+/* --- prototype chrome ------------------------------------------------ */
+
+.p-banner {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 16px;
+    background: #3b2c00;
+    color: #ffe9a8;
+    border-bottom: 1px solid #6b5200;
+}
+
+.p-narration {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--colorNeutralBackground1);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+}
+
+.p-narration__head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.p-narration__phases {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.p-phase {
+    border: 1px solid var(--colorNeutralStroke1);
+    background: var(--colorNeutralBackground1);
+    color: var(--colorNeutralForeground2);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.p-phase--on {
+    background: var(--colorBrandBackground);
+    border-color: var(--colorBrandBackground);
+    color: #fff;
+}
+
+.p-narration__says {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.p-stage {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+
+.p-waiting {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 48px 24px;
+    max-width: 520px;
+    margin: 0 auto;
+    text-align: center;
+    align-self: center;
+}
+
+/* --- the shell being prototyped -------------------------------------- */
+
+.p-shell {
+    display: flex;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.p-conversation {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 280px;
+    gap: 16px;
+    padding: 20px;
+    overflow-y: auto;
+    background: var(--colorNeutralBackground1);
+}
+
+.p-rail {
+    width: 320px;
+    flex: none;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    overflow-y: auto;
+    border-left: 1px solid var(--colorNeutralStroke1);
+    background: var(--colorNeutralBackground2);
+}
+
+.p-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.p-msg {
+    padding: 10px 14px;
+    border-radius: 12px;
+    max-width: 640px;
+}
+
+.p-msg--associate {
+    align-self: flex-end;
+    background: var(--colorBrandBackground2);
+}
+
+.p-msg--assistant {
+    align-self: flex-start;
+    background: var(--colorNeutralBackground3);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.p-bubble {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 640px;
+}
+
+.p-bubble__from {
+    color: var(--colorNeutralForeground3);
+}
+
+.p-card {
+    border: 1px solid var(--colorNeutralStroke1);
+    border-radius: 12px;
+    padding: 16px;
+    background: var(--colorNeutralBackground1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.p-section-title {
+    margin: 0;
+    font-weight: 600;
+}
+
+.p-transparency {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--colorNeutralForeground2);
+}
+
+.p-transparency .p-section-title {
+    margin-top: 12px;
+}
+
+/* --- steps ------------------------------------------------------------ */
+
+.p-steps {
+    list-style: none;
+    counter-reset: step;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.p-steps--tight {
+    gap: 10px;
+}
+
+.p-step {
+    counter-increment: step;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 30px;
+    position: relative;
+}
+
+.p-step::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    background: var(--colorNeutralBackground4);
+    color: var(--colorNeutralForeground2);
+}
+
+/*
+ * A step that leaves the building is drawn as a different kind of thing, not
+ * the same row in another colour. This is the prototype's central claim.
+ */
+.p-step--outbound {
+    border-left: 3px solid var(--colorBrandStroke1);
+    margin-left: -3px;
+    padding-left: 30px;
+    background: var(--colorNeutralBackground2);
+    border-radius: 0 8px 8px 0;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.p-step--outbound::before {
+    left: 6px;
+}
+
+.p-step__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.p-step__action {
+    margin: 0;
+}
+
+.p-step__waiting {
+    color: var(--colorNeutralForeground3);
+}
+
+.p-who {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.p-who--agent {
+    color: var(--colorNeutralForeground3);
+}
+
+.p-who--person {
+    color: var(--colorBrandForeground1);
+}
+
+.p-nothing-run {
+    color: var(--colorNeutralForeground3);
+    font-style: italic;
+}
+
+.p-rail__involves {
+    color: var(--colorNeutralForeground2);
+}
+
+.p-rail__plan {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.p-revision {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--colorNeutralBackground3);
+}
+
+/* --- verdict ---------------------------------------------------------- */
+
+.p-verdict {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+}
+
+.p-verdict--compact .p-verdict__buttons {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.p-verdict__buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.p-verdict__prompt {
+    color: var(--colorNeutralForeground3);
+}
+
+.p-verdict__text {
+    width: 100%;
+}
+
+.p-verdict--approved {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    color: var(--colorBrandForeground1);
+}
+
+.p-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.p-chip {
+    border: 1px solid var(--colorBrandStroke1);
+    background: transparent;
+    color: var(--colorBrandForeground1);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.p-chip:hover {
+    background: var(--colorBrandBackground2);
+}
+
+/* --- sheet ------------------------------------------------------------ */
+
+.p-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.42);
+    z-index: 5;
+}
+
+.p-sheet {
+    position: absolute;
+    z-index: 6;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: min(480px, 100%);
+    box-sizing: border-box;
+    overflow-y: auto;
+    padding: 24px;
+    background: var(--colorNeutralBackground1);
+    border-left: 1px solid var(--colorNeutralStroke1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.p-sheet__request {
+    color: var(--colorNeutralForeground2);
+}
+
+.p-sheet__involves {
+    color: var(--colorNeutralForeground3);
+}
+
+.p-steps--sheet {
+    gap: 16px;
+}
+
+/* --- relay ------------------------------------------------------------ */
+
+.p-relay {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.p-relay__item {
+    position: relative;
+    padding: 0 0 18px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.p-relay__item::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 6px;
+    bottom: -6px;
+    width: 2px;
+    background: var(--colorNeutralStroke2);
+}
+
+.p-relay__item:last-child::before {
+    display: none;
+}
+
+.p-relay__item--person::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--colorBrandBackground);
+}
+
+.p-relay__item--agent {
+    padding-bottom: 12px;
+}
+
+.p-relay__who {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--colorBrandForeground1);
+}
+
+.p-relay__agent {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--colorNeutralForeground3);
+}
+
+/* --- variation switcher ---------------------------------------------- */
+
+.p-switcher {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 16px;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+    max-width: min(720px, calc(100vw - 32px));
+    box-sizing: border-box;
+    border-radius: 14px;
+    background: var(--colorNeutralBackground1);
+    border: 1px solid var(--colorNeutralStroke1);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.p-switcher__blurb {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.p-switcher__buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.p-switch {
+    border: 1px solid var(--colorNeutralStroke1);
+    background: var(--colorNeutralBackground1);
+    color: var(--colorNeutralForeground1);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.p-switch--on {
+    background: var(--colorBrandBackground);
+    border-color: var(--colorBrandBackground);
+    color: #fff;
+}
+
+/* --- the Stacking breakpoint, mirroring storeSurface.css -------------- */
+
+@media (max-width: 900px) {
+    .p-shell {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .p-rail {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        border-left: none;
+        border-top: 1px solid var(--colorNeutralStroke2);
+        max-height: none;
+        overflow: visible;
+    }
+
+    .p-conversation {
+        overflow: visible;
+    }
+
+    /* A sheet on a phone is the whole screen, not a side panel. */
+    .p-sheet {
+        position: fixed;
+        width: 100%;
+        top: auto;
+        height: 82dvh;
+        border-left: none;
+        border-top: 1px solid var(--colorNeutralStroke1);
+        border-radius: 14px 14px 0 0;
+    }
+
+    .p-scrim {
+        position: fixed;
+    }
+}
