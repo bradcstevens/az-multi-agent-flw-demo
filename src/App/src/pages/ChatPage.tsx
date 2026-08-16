@@ -240,7 +240,7 @@ const ChatPage: React.FC = () => {
 
     const laneTaken = laneFromRouterState ?? laneFromSessionState;
 
-    const { isPlanActive } = usePlanCancellationAlert({
+    const { requiresCancellationConfirmation } = usePlanCancellationAlert({
         planData,
         planApprovalRequest,
         onNavigate: pendingNavigation || (() => {}),
@@ -271,14 +271,14 @@ const ChatPage: React.FC = () => {
     /* ── Navigation with cancellation check ─────────────────── */
     const handleNavigationWithAlert = useCallback(
         (navigationFn: () => void) => {
-            if (!isPlanActive()) {
+            if (!requiresCancellationConfirmation()) {
                 navigationFn();
                 return;
             }
             setPendingNavigation(() => navigationFn);
             dispatch(setShowCancellationDialog(true));
         },
-        [isPlanActive, dispatch],
+        [requiresCancellationConfirmation, dispatch],
     );
 
     const handleConfirmCancellation = useCallback(async () => {

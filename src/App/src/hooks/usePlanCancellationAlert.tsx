@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { PlanStatus } from '../models';
 import { APIService } from '../api/apiService';
 
 interface UsePlanCancellationAlertProps {
@@ -8,9 +7,7 @@ interface UsePlanCancellationAlertProps {
   onNavigate: () => void;
 }
 
-/**
- * Custom hook to handle plan cancellation alerts when navigating during active plans
- */
+/** Handles cancellation alerts when navigation leaves a Deliberate request. */
 export const usePlanCancellationAlert = ({
   planData,
   planApprovalRequest,
@@ -18,22 +15,16 @@ export const usePlanCancellationAlert = ({
 }: UsePlanCancellationAlertProps) => {
   const apiService = new APIService();
 
-  /**
-   * Check if a plan is currently active/running
-   */
-  const isPlanActive = useCallback(() => {
-    return (
-      planData?.plan?.lane === 'deliberate' &&
-      planData?.plan?.overall_status === PlanStatus.IN_PROGRESS
-    );
+  const requiresCancellationConfirmation = useCallback(() => {
+    return planData?.plan?.lane === 'deliberate';
   }, [planData]);
 
   /**
    * Handle the confirmation dialog and plan cancellation
    */
   const handleNavigationWithConfirmation = useCallback(async () => {
-    if (!isPlanActive()) {
-      // Plan is not active, proceed with navigation
+    if (!requiresCancellationConfirmation()) {
+      // No cancellation confirmation is required.
       onNavigate();
       return;
     }
@@ -66,10 +57,10 @@ export const usePlanCancellationAlert = ({
       alert('Failed to cancel the plan properly, but navigation will continue.');
       onNavigate();
     }
-  }, [isPlanActive, onNavigate, planApprovalRequest, planData, apiService]);
+  }, [requiresCancellationConfirmation, onNavigate, planApprovalRequest, planData, apiService]);
 
   return {
-    isPlanActive,
+    requiresCancellationConfirmation,
     handleNavigationWithConfirmation
   };
 };

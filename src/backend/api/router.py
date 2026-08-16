@@ -450,13 +450,6 @@ async def process_request(
     if span:
         span.set_attribute("session_id", input_task.session_id)
 
-    # The lane router (ADR-013). Below the Identity boundary gate on purpose:
-    # the two are separate components with opposite failure modes — the gate
-    # fails closed, this fails open to the Deliberate lane — and a refused
-    # request must never have paid for routing. This is the one place a Lane
-    # becomes a Plan review value.
-    lane = select_lane(input_task.lane, input_task.description)
-
     try:
         plan_id = str(uuid.uuid4())
         # Initialize memory store and service
@@ -467,10 +460,15 @@ async def process_request(
             session_id=input_task.session_id,
             team_id=team_id,
             initial_goal=input_task.description,
-            lane=lane.value,
             overall_status=PlanStatus.in_progress,
         )
         await memory_store.add_plan(plan)
+
+        # The Plan record exists before routing (ADR-028), then retains the
+        # Lane the router selected for it.
+        lane = select_lane(input_task.lane, input_task.description)
+        plan.lane = lane
+        await memory_store.update_plan(plan)
 
         track_event_if_configured(
             "Plan_Created",

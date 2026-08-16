@@ -152,6 +152,7 @@ def rt(monkeypatch):
     store.get_all_plans_by_team_id_status = AsyncMock(return_value=[])
     store.delete_current_team = AsyncMock()
     store.add_plan = AsyncMock()
+    store.update_plan = AsyncMock()
 
     # The generic CRUD the memory container exposes, faked well enough that a
     # session-state record genuinely round-trips (issue #20). Keyed by
@@ -989,14 +990,21 @@ class TestPerRequestPlanReview:
         assert self._post(rt).json()["lane"] == "fast"
         assert self._post(rt, lane="deliberate").json()["lane"] == "deliberate"
 
-    def test_the_plan_record_keeps_the_lane_returned_to_the_client(self, rt):
-        """The request owns the Lane once, then records and reports that value."""
+    def test_the_plan_record_receives_the_lane_returned_to_the_client(self, rt):
+        """The record exists before routing, then persists the Lane taken."""
+        lanes_at_creation = []
+
+        async def record_created_lane(plan):
+            lanes_at_creation.append(plan.lane)
+
+        rt.store.add_plan.side_effect = record_created_lane
         response = self._post(rt, lane="fast")
 
-        persisted = rt.store.add_plan.await_args.args[0]
-        assert response.json()["lane"] == persisted.lane == "fast"
+        persisted = rt.store.update_plan.await_args.args[0]
+        assert lanes_at_creation == [None]
+        assert response.json()["lane"] == persisted.lane.value == "fast"
 
-    def test_a_plan_written_before_lane_persistence_stays_readable(self):
+    def test_a_plan_record_written_before_lane_persistence_stays_readable(self):
         plan = router_mod.Plan(
             plan_id="legacy-plan",
             user_id="user-1",
@@ -1004,6 +1012,15 @@ class TestPerRequestPlanReview:
         )
 
         assert plan.lane is None
+
+    def test_a_plan_record_rejects_an_unknown_lane(self):
+        with pytest.raises(ValueError):
+            router_mod.Plan(
+                plan_id="invalid-lane",
+                user_id="user-1",
+                initial_goal="How do I close the store?",
+                lane="quick",
+            )
 
     def test_the_first_request_after_a_page_load_is_not_served_the_eager_workflow(
         self, rt
