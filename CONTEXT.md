@@ -636,6 +636,26 @@ over — so its layout moved to `storeSurface.css` too. The minimum is now 280px
 task-history panel's 280 plus the rail's 320 is 920px of columns in a shell that stacks at 900, and
 the 19px band above the breakpoint was clipped off the rail's end without a scrollbar.
 
+**Panel drawer** — a side panel the associate can open and close, and deliberately **not one
+mechanism applied twice** ([ADR-035](docs/ADR/035-the-rail-pushes-and-the-chat-panel-floats.md)).
+The **Transparency rail** *pushes*: closing it returns its width to the conversation, because the
+rail exists to be read **beside** the answer it explains and an overlay would cover the thing it is
+explaining. The chat-history panel *floats*: opening it covers the conversation, because navigation
+is never read alongside anything and re-wrapping the answer to show it buys nothing. Both are
+**desktop-only** — the drawer is a side-column rule, and the **Stacking breakpoint** releases it
+like every other one, so below 900px the rail is always open and the chat panel stays dropped.
+_Avoid_: sidebar, flyout, minimise, collapse-all
+
+**Pinned panel** — a **Panel drawer** the presenter has touched, which stops it opening or closing
+by itself. The rail alone has an automatic behaviour — it opens on the first **Source used** of a
+conversation, the one signal that proves which platform answered — and a manual touch outranks it
+for **that conversation**, on the **Presenter alert**'s scope rather than the **Token meter**'s: a
+layout choice that outlives the beat it was made for is how the cross-platform hop ends up hidden
+three beats later with nobody remembering why. A pinned-closed rail still says so, once, on its own
+toggle, and claims nothing the signal did not report.
+_Avoid_: sticky, remembered, preference (nothing here is persisted — a stored default would make the
+Demo validator and the Stage driver order-dependent)
+
 **Heading outline** — the surface's structure, stated in headings rather than only in layout (#57).
 A query for every heading element on the deployed page came back **empty**: Fluent's typography
 components render a generic span unless they are told what element to be, so "How can I help?",

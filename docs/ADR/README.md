@@ -41,6 +41,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [028](./028-a-reviewable-plan-is-earned-by-a-transaction.md) | A reviewable plan is earned by a transaction, not by a question | Accepted |
 | [029](./029-an-issue-declares-its-model-with-one-task-type-label.md) | An issue declares its model with one `task-type:` label, over a committed table | Accepted |
 | [031](./031-leaving-a-chat-ends-its-turn.md) | Leaving a Chat ends its turn, and says so | Accepted |
+| [035](./035-the-rail-pushes-and-the-chat-panel-floats.md) | The rail pushes and the chat panel floats | Accepted |
 | [033](./033-a-one-tap-control-never-invents-the-words-it-offers.md) | A one-tap control never invents the words it offers | Accepted — replaces ADR-024's home-card rule |
 | [034](./034-the-identity-boundary-gate-covers-the-clarification-seam.md) | The Identity boundary gate covers the clarification seam | Accepted |
 
