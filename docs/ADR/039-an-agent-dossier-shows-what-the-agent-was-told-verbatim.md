@@ -3,8 +3,8 @@
 ## Status
 
 Accepted — introduces the **Agent dossier** to `CONTEXT.md`, and is the surface half of what
-[ADR-036](./036-the-simulated-badge-comes-off-and-the-disclosure-stays-in-the-words.md) left in the
-words
+[ADR-036](./036-a-record-carries-its-own-provenance.md) left to the
+record
 
 ## Date
 
@@ -55,11 +55,11 @@ demonstration environment ([ADR-020](./020-deploy-main-on-every-commit.md)).
 
 ### ADR-036 changed what this object is for
 
-The **Simulated label** came off every surface a day earlier, and disclosure now lives **in prose,
-never in chrome**. That makes a verbatim prompt one of the few places an audience can *watch* the
-simulation being disclosed — EscalationAgent is told, in its own instructions, not to claim a real
+The **Simulated label** came off every surface a day earlier: **the surface asserts nothing about
+itself, and a record carries its own provenance**. That makes a verbatim prompt one of the few
+places an audience can *watch* the simulation being disclosed — EscalationAgent is told, in its own instructions, not to claim a real
 service desk issued a ticket. A dossier that paraphrased that line would remove a disclosure the
-surface had just finished relocating into words.
+surface had just finished relocating into the record.
 
 ### A dossier can describe an agent that never speaks
 
@@ -184,7 +184,7 @@ audience needs to see who routes, that belongs to the **Progress narration**, no
 - [ADR-017: The Workforce agent answers HR process, and never an individual's record](./017-workforce-agent-answers-process-never-record.md) — the boundary one flagged line states
 - [ADR-023: The loading screen claims only what a signal reports](./023-progress-narration-claims-only-what-a-signal-reports.md) — the rule participation is read under
 - [ADR-035: The rail pushes and the chat panel floats](./035-the-rail-pushes-and-the-chat-panel-floats.md) — why an overlay, and why the rail is not one
-- [ADR-036: The Simulated badge comes off, and the disclosure stays in the words](./036-the-simulated-badge-comes-off-and-the-disclosure-stays-in-the-words.md) — what the verbatim prompt now carries
+- [ADR-036: A record carries its own provenance, and the surface says nothing about itself](./036-a-record-carries-its-own-provenance.md) — what the verbatim prompt now carries
 - [ADR-038: The manager addresses the associate the session knows](./038-the-manager-addresses-the-associate-the-session-knows.md) — why the manager's prompt is composed per session, not authored once
 - [ADR-040: The Grounding panel names the hop it observed](./040-the-grounding-panel-names-the-hop-it-observed.md) — the other half of spec 5's transparency work
 - #95 — the field-by-field survey this decision rests on
