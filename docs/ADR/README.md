@@ -39,6 +39,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [026](./026-chats-are-deleted-not-hidden.md) | Chats are deleted, not hidden | Accepted — supersedes 022 |
 | [027](./027-resume-continues-the-session.md) | Resume continues the session | Accepted — supersedes 024 |
 | [028](./028-a-reviewable-plan-is-earned-by-a-transaction.md) | A reviewable plan is earned by a transaction, not by a question | Accepted |
+| [031](./031-leaving-a-chat-ends-its-turn.md) | Leaving a Chat ends its turn, and says so | Accepted |
 
 ## Writing a new one
 

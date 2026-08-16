@@ -190,6 +190,24 @@ makes rehearsal debris visible and is why **Chat deletion** follows. Each row ca
 menu whose one item is that deletion (#75, ADR-026); the hide control it replaced is gone.
 _Avoid_: plan history, task history, hide completed tasks
 
+**Leaving a Chat** — going somewhere else while a **Chat** has a turn in flight: **New chat**,
+selecting another chat row, or the logo. One act with one declaration, and it **ends that Chat's
+turn** — the orchestration is cancelled and the **Plan record** written `canceled`
+([ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md)). Scoped to the session left, so it can
+never settle another Chat, and it never overwrites a **Settled status** a turn already reached. A
+socket dropping is *not* leaving — a network blip must not kill a live turn — which is why browser
+back and a closed tab remain a named gap rather than a guess. The associate is not asked to confirm
+it: nothing is lost that a confirmation could protect.
+_Avoid_: plan cancellation, cancel the plan, new chat confirmation
+
+**Abandoned turn** — what **Leaving a Chat** produced before ADR-031, and what browser back and a
+closed tab still produce: the client is gone, the orchestration keeps computing against a connection
+that no longer exists, and every frame is dropped. Because the transcript is written only by the
+browser echoing frames back, the turn leaves **no** record — no transcript row, no answer, and a
+**Plan record** stuck at `in_progress` for ever, which no delete route will take. Not a turn that
+was lost, but one whose loss the surface went on denying.
+_Avoid_: orphaned plan, stuck plan, stale chat
+
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
 **retrieval miss** — an honest "that procedure is not in the library" — because conflating the two
 makes a governed refusal look like a bug. On the wire it is HTTP **403** with
@@ -1107,6 +1125,15 @@ its answer arriving, and availability is a standing fact that is true before any
 under the count says *"which of them take part"* rather than *"which of them take this question"*,
 because before anything is typed there is no *this question*.
 _Avoid_: agents assigned, agents identified, agents selected
+
+**Settled status** — `completed`, `failed` or `canceled`: the three states in which a **Chat** may
+be deleted. The rule is **total and fail-closed** — any other answer, including none, means running.
+It is held twice, in `src/backend/chat/deletion.py` and `src/App/src/models/chatDeletion.ts`, and
+the two copies are kept in agreement by `src/tests/ci/test_chat_deletion_contract.py`. `canceled`
+was unreachable until [ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md) gave **Leaving a
+Chat** the write, which is why the way out of `in_progress` is to end the turn and never to loosen
+this rule.
+_Avoid_: terminal state, final status, deletable status
 
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that
 session partition — its plans, transcript, `m_plan`, **Troubleshooting record**, **Simulated
