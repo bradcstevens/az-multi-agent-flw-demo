@@ -516,3 +516,15 @@ temp/
 # Browser artefacts: the Demo validator writes under e2e/artifacts (ignored there),
 # and the Playwright MCP server drops page dumps here.
 .playwright-mcp/
+
+# Superseded input material — the requirements document this build started from and
+# the brief that followed it. Both are superseded by the durable record, and neither
+# is authority: keeping them tracked invites a reader to act on a claim the
+# corrections record already overturned. The README is the exception and must stay
+# tracked, because a marker nobody clones explains nothing —
+# `src/tests/ci/test_durable_record.py` fails if this negation is dropped. Ignore the
+# directory's contents rather than the directory itself: git never descends into an
+# excluded directory, so `.reference/` would make the negation below dead letter and
+# `git add .reference/README.md` refuse.
+.reference/*
+!.reference/README.md

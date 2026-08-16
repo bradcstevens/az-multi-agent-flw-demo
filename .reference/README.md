@@ -10,6 +10,14 @@ there survives a fresh clone.
 that read as perfectly plausible — the region it names is invalid for this template, the fast
 lane it specifies is not implementable, and its A2A justification is out of date.
 
+`BRIEF.md` — the **superseded brief** — is the material that followed it, and it moved here for
+the same reason. Eleven ADRs (028, 029, 031, 033, 035, 036, 037, 038, 039, 040 and 041) and
+[`CONTEXT.md`](../CONTEXT.md) still cite it by name, and those citations are not broken links to
+chase: each one **quotes verbatim the sentence it answers**, so the ask survives in the decision
+that resolved it. Read the ADR, not the brief. It is wrong in the same way the requirements
+document is — ADR-029 records that it is factually wrong about a Direct Line MCP server, and
+`CONTEXT.md` records another of its sentences as an error an ADR documents rather than builds.
+
 ## The durable record
 
 | What you want | Where it lives |
