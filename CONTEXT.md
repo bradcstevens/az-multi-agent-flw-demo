@@ -609,39 +609,21 @@ by name. There is deliberately **no `teams[0]` fallback**: that fallback *is* th
 failing, and a surface branded as one assistant while running another is the identity form of the
 rule the transparency panels run on. No assistant is a state the surface can be in, and it says so.
 
-**Disclosure in words** — how the surface says a thing was authored for the walkthrough rather than
-produced by a connected system. It says it **in prose, never in chrome**
-([ADR-036](docs/ADR/036-the-simulated-badge-comes-off-and-the-disclosure-stays-in-the-words.md),
-#92). There is no badge: `SimulatedBadge` and `SIMULATED_LABEL` are deleted, and a component merely
-no longer rendered would be one import away from returning.
+**Simulated label** — the badge on anything whose content was authored for the walkthrough rather
+than produced by a connected system (#25, R11's surviving fragment): **Store 223** and the
+**Presenter alert**'s rehearsed words and the **Simulated ticket** (#22). The converse
+matters as much — a badge on a real Foundry answer, a real Copilot Studio hop or a measured token
+count gives away the demo's strongest evidence. Label the invented things, and only those.
 
-The badge was removed on the rule's own converse. *A badge on a real Foundry answer, a real Copilot
-Studio hop or a measured token count gives away the demo's strongest evidence* — and six badges in
-one viewport did exactly that **by proximity**, teaching an audience to read the whole surface as a
-mock-up and discount the real evidence with it. Over-labelling was always a failure of this rule; it
-was simply never counted as one.
-
-Three disclosures survive, in the words: `HomeInput`'s *"Simulated sign-in — no identity provider is
-involved."*, the **Simulated ticket**'s *"No service desk receives this ticket and no engineer is
-dispatched."*, and the **Workforce procedure library**'s per-answer `SIMULATED` string, which is the
-half of ADR-017 that lives on the surface. Two surfaces are disclosed **nowhere on screen** and
-depend on the **Presenter runbook** instead: the **Presenter alert**, and the **Associate record**'s
-pay and PTO figures, whose `PERSONAL_ANSWER_NOTE` went with the badge. That is the price, and the
-**Recorded fallback** has no presenter to pay it.
-
-**The far edge is `—`.** **Not reported vs measured** is untouched and is not part of this
-reversal: it is a rendering rule for missing data, not a disclaimer, and rendering `0` for an
-unreported cost would be the surface stating a number nobody gave it. Removing a disclaimer is what
-was decided; stating a falsehood is not.
-
-**A fabricated human decision is never presented as indistinguishable from a real one**
-([ADR-037](docs/ADR/037-a-fabricated-human-decision-is-never-indistinguishable-from-a-real-one.md)).
-Invented *content* is one thing; a named person shown **approving, denying or replying** is another,
-and the rule binds at the decision, not at the person — a peer in a list of colleagues is set
-dressing. Spec 4's manager and peers carry `Assignee.simulated` (#85) and something must render from
-it, because a flag that drives nothing is deleted rather than retained.
-
-_Avoid_: Simulated label, simulated badge (both were the surface's, and both are gone)
+**The badge labels claims, not controls.** A one-tap control *offers* words; the instant the
+associate taps it they have said them, and the words are truly theirs — so a **Rehearsed reply**
+and a **Follow-on task** carry no badge, and neither does the chat box they are a shortcut for.
+Where authored words *become* a claim about the world — `TKT-001`'s attempted-steps field, filled
+from what a tap recorded — the badge is on the thing that claims it, and the **Simulated ticket**
+already wears it
+([ADR-033](docs/ADR/033-a-one-tap-control-never-invents-the-words-it-offers.md), #91). Badging the
+control instead would put *Simulated* immediately upstream of a **real** Foundry answer, which is
+the converse failure above.
 
 **Stacking breakpoint** — 900px, below which the shell's columns stack, the transparency rail sits
 beneath the conversation, and the task-history panel is dropped rather than squeezed (#25, #58).
