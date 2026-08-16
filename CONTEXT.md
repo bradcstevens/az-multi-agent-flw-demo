@@ -583,21 +583,34 @@ by name. There is deliberately **no `teams[0]` fallback**: that fallback *is* th
 failing, and a surface branded as one assistant while running another is the identity form of the
 rule the transparency panels run on. No assistant is a state the surface can be in, and it says so.
 
-**Simulated label** — the badge on anything whose content was authored for the walkthrough rather
-than produced by a connected system (#25, R11's surviving fragment): **Store 223** and the
-**Presenter alert**'s rehearsed words and the **Simulated ticket** (#22). The converse
-matters as much — a badge on a real Foundry answer, a real Copilot Studio hop or a measured token
-count gives away the demo's strongest evidence. Label the invented things, and only those.
+**Provenance line** — the sentence a record carries about its own origin, which **names the system
+that was not consulted**: *"No payroll system was queried — these figures were authored for this
+walkthrough."* The mirror of the **Grounding panel**, which names the document that *did* answer, and
+the third member of that family alongside **Not reported vs measured** — this surface always says
+where an answer came from. **The surface asserts nothing about itself; a record carries its own
+provenance** ([ADR-036](docs/ADR/036-a-record-carries-its-own-provenance.md), #92). A string authored
+in a component is the surface talking about itself and does not belong on screen; a string authored
+in the record travels with the artefact into a screenshot and does. Its floor is behavioural, not
+lexical: a reader who does not know these rules can tell from the line alone that the content was not
+produced by a connected system — below that, vocabulary is free, and *simulated* and *mocked* are not
+required.
+_Avoid_: simulated badge, simulated label, disclaimer
 
-**The badge labels claims, not controls.** A one-tap control *offers* words; the instant the
-associate taps it they have said them, and the words are truly theirs — so a **Rehearsed reply**
-and a **Follow-on task** carry no badge, and neither does the chat box they are a shortcut for.
-Where authored words *become* a claim about the world — `TKT-001`'s attempted-steps field, filled
-from what a tap recorded — the badge is on the thing that claims it, and the **Simulated ticket**
-already wears it
-([ADR-033](docs/ADR/033-a-one-tap-control-never-invents-the-words-it-offers.md), #91). Badging the
-control instead would put *Simulated* immediately upstream of a **real** Foundry answer, which is
-the converse failure above.
+**The invented things have no receipts, and the real ones do.** The contrast that matters is not a
+label but evidence a fabrication cannot produce: the meter's measured counts, the model assignments,
+the **Grounding panel**'s named sources, the Copilot Studio hop. **Store 223** has no receipt; a
+`SIM-223-` ticket links to no service desk. The converse still governs everything — a mark on a real
+Foundry answer, a real Copilot Studio hop or a measured token count gives away the demo's strongest
+evidence — and it is why the meter's `—` is out of reach of any disclosure decision: it does not
+disclose invention, it refuses to state a number nobody reported. **An invented person's action
+always carries its provenance in the record**, which is the one case named rather than left to the
+general rule, because *a person decided this* is the strongest claim this system can make.
+
+**Simulation register** — the section of `docs/presenter-runbook.md` enumerating every invented thing
+in the walkthrough, and the reason *"the presenter will address them conversationally"* is a property
+of this repository rather than of somebody's memory. Pinned by `src/tests/ci/test_presenter_runbook.py`
+against the **Provenance line** constants in the source, so an invented thing that discloses its own
+origin cannot ship without the presenter's script being updated to match.
 
 **Stacking breakpoint** — 900px, below which the shell's columns stack, the transparency rail sits
 beneath the conversation, and the task-history panel is dropped rather than squeezed (#25, #58).

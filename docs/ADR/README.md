@@ -44,6 +44,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [035](./035-the-rail-pushes-and-the-chat-panel-floats.md) | The rail pushes and the chat panel floats | Accepted |
 | [033](./033-a-one-tap-control-never-invents-the-words-it-offers.md) | A one-tap control never invents the words it offers | Accepted — replaces ADR-024's home-card rule |
 | [034](./034-the-identity-boundary-gate-covers-the-clarification-seam.md) | The Identity boundary gate covers the clarification seam | Accepted |
+| [036](./036-a-record-carries-its-own-provenance.md) | A record carries its own provenance, and the surface says nothing about itself | Accepted — retires `CONTEXT.md`'s Simulated label |
 
 ## Writing a new one
 
