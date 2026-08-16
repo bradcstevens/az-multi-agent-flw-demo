@@ -16,6 +16,12 @@ The five canonical triage roles plus the additive `parallel-safe` marker. See `d
 
 Single-context — `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Wayfinder sessions
+
+Model, effort and context window are pinned by an agent file and a launcher that live outside
+this repository, and the launcher passes the skill with `-i`, never `-p` — under `-p` the
+`ask_user` tool is stripped and the session interviews itself. See `docs/agents/wayfinder.md`.
+
 ## Preflight records
 
 Deployment preconditions that were verified before the build started are recorded under
