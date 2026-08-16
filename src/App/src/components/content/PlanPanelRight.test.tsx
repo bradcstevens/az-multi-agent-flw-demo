@@ -142,25 +142,12 @@ describe('the chat surface on the deliberate lane', () => {
         team: { agents: [] },
     } as any;
 
-    it('renders the plan section, heading and all, when a plan is put up for review', () => {
-        // The other half of #78: the section is conditional, not gone.
+    it('keeps plan review out of the evidence rail', () => {
         renderPanel(makeStore(), approvalRequest);
 
-        expect(screen.getByText('Plan Overview')).toBeInTheDocument();
-        expect(document.querySelector('.plan-section')).not.toBeNull();
-    });
-
-    it('renders the plan steps a presenter has to approve', () => {
-        renderPanel(makeStore(), approvalRequest);
-
-        expect(screen.queryByText(/No plan to review/i)).not.toBeInTheDocument();
-        expect(screen.getByText(/Raise a service ticket/)).toBeInTheDocument();
-    });
-
-    it('promises a plan only while one is actually coming', () => {
-        renderPanel(makeStore(), { steps: [], team: { agents: [] } } as any);
-
-        expect(screen.getByText(PLAN_ARRIVING)).toBeInTheDocument();
+        expect(screen.queryByText('Plan Overview')).not.toBeInTheDocument();
+        expect(screen.queryByText(/Raise a service ticket/)).not.toBeInTheDocument();
+        expect(screen.queryByText(PLAN_ARRIVING)).not.toBeInTheDocument();
     });
 
     it('still shows the roster and the rail beside the plan', () => {
