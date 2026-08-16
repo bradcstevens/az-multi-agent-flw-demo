@@ -133,6 +133,7 @@ Notes:
   export GUARDRAIL_EMBEDDING_ENDPOINT="$(grep AZURE_OPENAI_ENDPOINT .azure/macae-flw-v1/.env | cut -d= -f2- | tr -d '"')"
   .venv/bin/python -m pytest src/tests/backend/guardrail/test_guardrail_corpus.py -m integration -s
   ```
+
 - **The Routing probe** is the centrepiece turn measured without a browser — `bash
   scripts/measure-routing.sh --samples 12`. It is not a loop and is not in the table: every
   sample is a live conversation with the deployed agent pool. It drives *"How do I close the

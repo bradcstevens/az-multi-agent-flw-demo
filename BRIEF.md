@@ -1,0 +1,49 @@
+Without a button to toggle the plan-panel-right and its visibility, basically create a drawer where you can expand or minimize the view of this panel. Do the same for panel-left
+
+New Feature: Streaming chat Responses from the Agents
+
+Remove all the "simulated-badge" indicators to make the demo feel more real. If the customer asks questions regarding these simulated-badge items, the presenter will address them conversationally. 
+
+If a user starts a chat, for example, by clicking the quick task of the coffee brewers down, the conversation window opens. The first agent to respond is typically the group chat manager, in this case, to ask additional clarifying questions.
+
+If the user decides not to type in an additional message and prefers to change how they ask their question, instead of using the quick task by clicking the new chat button, they are prompted with a confirmation of plan cancelation. There shouldn't have been any plans included in this conversation yet, as it's just a chat thread between the user and the initial agent, in this case, the group chat manager. No plans should be made at this point.
+
+Additionally, if the user doesn't respond for some time, the group chat manager seems to produce additional responses, such as more questions, after a period where the user hasn't provided an answer. To address this, we need to remove the confirmation and investigate why the group chat manager is sending multiple responses even when the user hasn't replied to the initial output from the agent.
+
+Let's also add suggested button responses within a chat thread. This allows the user to quickly submit a response back to the agent in the chat thread, instead of typing it out and pressing enter.
+
+I'd like to find a way to improve the response time to be as close to instant as possible for a user who is loading the page in their browser for the first time or creating a new chat. When a user loads the page, they currently see a loading icon that says, "Starting the store assistant," with a small loading icon. This loading process seems to take longer than desired, impacting the user experience. 
+
+For a new chat, the goal is for it to start instantly without any loading icons visible to the user. All backend processing should occur out of the user's view. Users should immediately have the option to select a quick task or begin typing in the chat box to interact. If background loading is ongoing, users should not perceive any delay in starting a new chat. The only loading indicators users should see are for specific tasks, such as agent statuses, agent discovery, agent gathering, agent identification, or waiting for an agent response. 
+
+Once users have entered their chat input, they should not encounter any additional loading prompts.
+
+Let's add a couple of different human-in-the-loop mockups as part of this demo. For example, the QuickTask "Swap a Shift" may pull in one or more agents that are appropriate to assist the user, managed by the group chat manager agent.
+
+Let's add some kind of interaction that will simulate another user, in this case, a manager of the store where the user is working. Let's simulate what it looks like to have them be the final approver for swapping a shift by identifying that their approval is required, showcasing some kind of response back from the manager, such as approved or any other comments, to make it seem more real and human-like. This interaction involves agents and the human in the loop, with the manager making the final approval for a shift swap.
+
+I think we should also make this shift swap more interesting by having the agent identify other store associates, frontline workers at the same store as the user, and helping to guide them through selecting the person they want to swap shifts with. Not just the manager approves the shift swap, but also the user and the person they want to swap shifts with. The user has the ability, as part of the human loop, to approve or deny the shift themselves before the manager approves it.
+
+Let's add support for a feature specifically focused on creating a support ticket. For example, if a user selects the "coffee brewer is down" quick task, the agents identified by the group track manager should include, upon gathering enough information, an agent responsible for creating a support ticket in the system. This process needs to be simulated and mocked up for the demo, but it's crucial to clearly depict how an interaction for this scenario might unfold.
+
+The user should have the capability to create the ticket and inquire about its status. Additionally, we may consider involving a human in the loop to verify the ticket's feasibility. I am open to ideas on the implementation, but my goal is to enhance visibility in the demo regarding what a support ticket workflow could entail, involving multiple agents working on behalf of users seeking assistance with issues like the Koffer Brewer malfunctioning or login problems with a POS system, system freezing, etc.
+
+Showcasing planning might make the most sense with something like creating a support ticket, as well as swapping shifts with another employee that the user works with at a given store location. We need to be more strategic on what things would require plans versus what things are just chat threads that might pull information from one or more other agents.
+
+If a plan is created by a planner agent, for example, the plan should always be presented back to the user with everything in the plan, as well as any agents or humans assigned. The user will need to approve the plan before execution. If the user expresses dislike, a new plan should be generated with accompanying questions or suggested responses to help create a plan the user approves. Refer to the image for inspiration of what this might look like if it were tailored to the current frontend design: docs/images/MACAE-GP2.png
+
+Once I add support to interact with this demo using real-time voice interactions, I'd really like to see the use of the latest and greatest Azure Speech Microsoft AI models orchestrated here to manage natural real-time speech. When the user toggles the voice input, everything they say will stream as input into the chat window in real time using speech-to-text. That text will be submitted automatically upon some kind of pause of voice activity detection to the agent managing the conversation. In this case, the chat manager should primarily respond back with actions such as gathering agents, assigning agents, and providing updates like "Hold on a second, I'm going to see what agents are available to help." The agents available to assist should be communicated to the user. 
+
+The idea is to have a single chat voice in real-time that sounds as natural as possible, utilizing the latest Microsoft AI Azure Speech real-time interactions. The user's voice is streamed in real time based on the audio picked up, accounting for background noise, voice activity detection pauses, etc., as input. When the agent responds back, it should be through real-time voice and stream that as text in real time in the chat window as well when the user interacts with this application using voice toggling.
+
+The voice feature should have a pulsing audio-reactive orb, with around 9000 particles or similar. This needs to support two-way voice, using Azure speech-to-text and other mechanisms to enhance the user experience during the demo. To achieve this, we will need a speech token, select a text-to-speech voice, implement a system probe, and establish a method to manage text-to-speech audio. The goal is to stream chat that plays the text-to-speech audio.
+
+To support voice, we're going to need to update the Azure Developer templates. The BICEP templates require additional infrastructure within Microsoft Foundry and the Azure Speech Studio, or wherever the speech services exist, to deploy these model endpoints for us to interact with this demo application.
+
+Change the name of our demo user from Tanya Alvarez to Clara Workman. We need to make the group chat manager personable through voice and text. For instance, when initiating chat interaction and during suitable moments, always address the user by name. For instance, if Clara Workman, our demo user, logs in and opens a new chat, the group chat manager should reply with, "Hey Clara," followed by a response based on Clara's input in the chat thread. It's not necessary to always say "Hey Clara" or mention Clara, but let's aim for a natural approach to make it feel very personable.
+
+What's the feature for more direct visibility into an agent's configuration? Specifically in this case, if a few agents are identified by the group chat manager to assist the user, we should add a way for the user to click in the web interface front-end design. This link could be in the chat or through our panel, providing details that will take the user to that agent's description and the prompt it's using. It should include any other useful information tailored towards a demo audience.
+
+If the agent is a co-pilot studio agent, A link that the user would click for Copilot Studio agent should bring the user to the chat interface directly on Copilot Studio for the user to interact with the Copilot Studio agent directly.
+
+Let's add specific details to the front end concerning which MCP servers are used, if any, in agent interactions. In this scenario, a direct line MCP server might be utilized to facilitate interactions with a Co-pilot Studio Agent incorporated as part of the multi-agent orchestration from the group chat manager. These interactions are based on the user's inquiries and input. Therefore, let's specify any MCP servers currently in use to aid in facilitating agent interactions. Specifically, in this instance, we should demonstrate this as part of the demo for our Copilot Studio Agent.
