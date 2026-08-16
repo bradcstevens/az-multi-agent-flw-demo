@@ -10,7 +10,7 @@ Issues live in GitHub Issues for `bradcstevens/az-multi-agent-flw-demo`, managed
 
 ### Triage labels
 
-The five canonical triage roles plus the additive `parallel-safe` marker. See `docs/agents/triage-labels.md`.
+The canonical routing roles, task types, and the additive `parallel-safe` marker. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
