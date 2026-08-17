@@ -52,3 +52,12 @@ export const PLAN_PANEL_RIGHT_COLLAPSED_CLASS = 'plan-panel-right--collapsed';
 
 /** The class the drawer's control carries, so the breakpoint can take it away. */
 export const TRANSPARENCY_RAIL_TOGGLE_CLASS = 'transparency-rail-toggle';
+
+/** The chat-history drawer's navigation target. */
+export const CHAT_HISTORY_DRAWER_ID = 'chat-history-drawer';
+
+/** The desktop-only disclosure class the Stacking breakpoint removes. */
+export const CHAT_HISTORY_DRAWER_TOGGLE_CLASS = 'chat-history-drawer-toggle';
+
+/** The disclosure to receive focus after the modal drawer closes. */
+export const CHAT_HISTORY_DRAWER_TOGGLE_ID = 'chat-history-drawer-toggle';

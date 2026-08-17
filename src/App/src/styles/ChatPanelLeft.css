@@ -57,10 +57,14 @@ color: #2F2F4A; */
 }
 
 /* Panel Layout Styles */
-.panel-left-container {
-  flex-shrink: 0;
+.panelLeft {
   display: flex;
-  overflow: hidden;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background-color: var(--colorNeutralBackground4);
+  box-sizing: border-box;
+  position: relative;
 }
 
 .team-selector-container {

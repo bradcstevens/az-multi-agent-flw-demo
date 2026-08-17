@@ -40,6 +40,10 @@ Read the two boxes below before anything else. They are the only two things you 
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
 | **Between beats** | Use **New chat** between beats 1, 2 and 3. Beat 4 continues beat 3 from its follow-on card. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. If you leave a conversation by mistake, you can reopen it and carry on — see [If you lose your place](#if-you-lose-your-place--reopen-the-chat-and-keep-going). |
 
+**The chat list is closed at beat 0.** It opens over the conversation only when you choose **Chat
+history** in the content toolbar. **New chat** stays beside that control, so it is always available
+without opening the list.
+
 **Ask an engineer to clear the deployment before a customer session.** One command does it:
 `bash scripts/sop-rehearsal.sh` ([sop-rehearsal.md](sop-rehearsal.md)) — ten Demo validator runs
 against the deployed surface, and it stops at the first red one and names the layer to fix. Ten
@@ -251,10 +255,11 @@ screen imply it.
 the room took you off the screen and back to the list. Beat 3 into beat 4 is the sequence this
 protects: the ticket's whole claim is that nothing had to be repeated.
 
-**What to do:** open the conversation again from **Chat history** on the left — every chat is listed
-there, in whatever state it is in, and the one you want is usually the one at the top that did not
-finish — then type into the message box at the bottom. It invites you with *"Ask another question in
-this chat..."*, and what you send continues **that** conversation rather than starting a new one.
+**What to do:** choose **Chat history** in the content toolbar, then open the conversation from the
+drawer — every chat is listed there, in whatever state it is in, and the one you want is usually the
+one at the top that did not finish. The drawer closes and returns you to the conversation. Type into
+the message box at the bottom; it invites you with *"Ask another question in this chat..."*, and what
+you send continues **that** conversation rather than starting a new one.
 
 **Say nothing about it.** It is a repair, not a beat. Use it and carry on.
 

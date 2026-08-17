@@ -13,6 +13,7 @@ import streamingReducer from './slices/streamingSlice';
 import transparencyReducer from './slices/transparencySlice';
 import ticketReducer from './slices/ticketSlice';
 import progressReducer from './slices/progressSlice';
+import panelDrawerReducer from './slices/panelDrawerSlice';
 
 export const store = configureStore({
     reducer: {
@@ -24,6 +25,7 @@ export const store = configureStore({
         transparency: transparencyReducer,
         ticket: ticketReducer,
         progress: progressReducer,
+        panelDrawer: panelDrawerReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({

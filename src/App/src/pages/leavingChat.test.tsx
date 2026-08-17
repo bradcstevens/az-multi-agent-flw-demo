@@ -36,6 +36,7 @@ import streamingReducer from '../store/slices/streamingSlice';
 import transparencyReducer from '../store/slices/transparencySlice';
 import ticketReducer from '../store/slices/ticketSlice';
 import progressReducer from '../store/slices/progressSlice';
+import panelDrawerReducer from '../store/slices/panelDrawerSlice';
 import webSocketService from '../store/WebSocketService';
 import { FakeSocket, frame } from '../testing/fakeSocket';
 import { PlanStatus, ProcessedPlanData } from '../models';
@@ -78,7 +79,9 @@ const renderLeavingChat = () =>
                     transparency: transparencyReducer,
                     ticket: ticketReducer,
                     progress: progressReducer,
+                    panelDrawer: panelDrawerReducer,
                 },
+                preloadedState: { panelDrawer: { chatHistoryOpen: true } },
                 middleware: (getDefaultMiddleware) =>
                     getDefaultMiddleware({ serializableCheck: false }),
             })}
@@ -152,9 +155,14 @@ describe('leaving a chat', () => {
         'ends the displayed turn once when the associate chooses %s',
         async (_, trigger) => {
             renderLeavingChat();
-            await screen.findByRole('button', {
-                name: /^The freezer needs a new filter/,
-            });
+            if (_ === 'New chat') {
+                fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+                await screen.findByRole('button', { name: 'New chat' });
+            } else {
+                await screen.findByRole('button', {
+                    name: /^The freezer needs a new filter/,
+                });
+            }
             await openInFlightSocket();
 
             fireEvent.click(trigger());
@@ -210,6 +218,7 @@ describe('leaving a chat', () => {
             .mockResolvedValueOnce(PLAN_DATA);
 
         renderLeavingChat();
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
         fireEvent.click(await screen.findByRole('button', { name: 'New chat' }));
 
         await waitFor(() =>

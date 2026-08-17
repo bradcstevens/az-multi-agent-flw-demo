@@ -37,6 +37,7 @@ import streamingReducer from '@/store/slices/streamingSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import progressReducer from '@/store/slices/progressSlice';
+import panelDrawerReducer from '@/store/slices/panelDrawerSlice';
 
 /**
  * The rail states who is **available**, before a question is typed (issue #79).
@@ -87,6 +88,7 @@ const renderHome = () =>
                     transparency: transparencyReducer,
                     ticket: ticketReducer,
                     progress: progressReducer,
+                    panelDrawer: panelDrawerReducer,
                 },
                 middleware: (getDefaultMiddleware) =>
                     getDefaultMiddleware({ serializableCheck: false }),

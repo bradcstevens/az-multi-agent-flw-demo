@@ -88,6 +88,8 @@ import { usePresenterChord } from '../hooks/usePresenterChord';
 import PlanChat from '../components/content/PlanChat';
 import PlanPanelRight from '../components/content/PlanPanelRight';
 import ChatPanelLeft from '../components/content/ChatPanelLeft';
+import ChatHistoryDrawerToggle from '../components/content/ChatHistoryDrawerToggle';
+import NewChatButton from '../components/content/NewChatButton';
 import CoralShellColumn from '../commonComponents/components/Layout/CoralShellColumn';
 import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
@@ -775,6 +777,21 @@ const ChatPage: React.FC = () => {
         dispatch(setReloadLeftList(false));
     }, [dispatch]);
 
+    const contentToolbar = (
+        <ContentToolbar panelTitle={ASSISTANT_NAME}>
+            <NewChatButton onClick={handleNewChatButton} />
+            <ChatHistoryDrawerToggle />
+            <TransparencyRailToggle />
+            <StoreIdentity />
+            {/*
+              The Lane this plan was routed into (ADR-013). It is the lane
+              taken, which is why a reload reads it from session state rather
+              than re-deriving it here.
+            */}
+            {isLane(laneTaken) && <LaneBadge lane={laneTaken} variant="taken" />}
+        </ContentToolbar>
+    );
+
     /* ── Plan execution elapsed timer ───────────────────────── */
     useEffect(() => {
         if (!showProcessingPlanSpinner) {
@@ -822,11 +839,11 @@ const ChatPage: React.FC = () => {
                 <CoralShellRow>
                     <ChatPanelLeft
                         reloadChats={reloadLeftList}
-                        onNewChatButton={handleNewChatButton}
                         restReload={resetReload}
                         onLeavingChat={handleLeavingChat}
                     />
                     <Content>
+                        {contentToolbar}
                         <div className="plan-error-message">
                             <Text size={500}>An error occurred while loading the plan</Text>
                         </div>
@@ -842,12 +859,12 @@ const ChatPage: React.FC = () => {
             <CoralShellRow>
                 <ChatPanelLeft
                     reloadChats={reloadLeftList}
-                    onNewChatButton={handleNewChatButton}
                     restReload={resetReload}
                     onLeavingChat={handleLeavingChat}
                 />
 
                 <Content>
+                    {contentToolbar}
                     {loading || !planData ? (
                         <>
                             <div className="plan-loading-spinner">
@@ -865,21 +882,6 @@ const ChatPage: React.FC = () => {
                         </>
                     ) : (
                         <>
-                            <ContentToolbar panelTitle={ASSISTANT_NAME}>
-                                <TransparencyRailToggle />
-                                <StoreIdentity />
-                                {/*
-                                  The Lane this plan was routed into (ADR-013).
-                                  It is the lane *taken*, which is why it sits
-                                  beside the plan rather than beside the Quick
-                                  Task that declared one — and why a reload
-                                  reads it back from server-side session state
-                                  rather than re-deriving it here.
-                                */}
-                                {isLane(laneTaken) && (
-                                    <LaneBadge lane={laneTaken} variant="taken" />
-                                )}
-                            </ContentToolbar>
                             <PlanChat
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}

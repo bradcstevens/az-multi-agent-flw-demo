@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -19,14 +19,25 @@ vi.mock('@/api', () => ({
 }));
 
 import ChatPanelLeft from './ChatPanelLeft';
+import ChatHistoryDrawerToggle from './ChatHistoryDrawerToggle';
 import appReducer from '../../store/slices/appSlice';
 import { ASSISTANT_NAME } from '../../models/storeSurface';
+import panelDrawerReducer from '../../store/slices/panelDrawerSlice';
+import {
+    CHAT_HISTORY_DRAWER_TOGGLE_CLASS,
+} from '../../models/panelDrawer';
+import {
+    allRulesIncludingMediaQueries,
+    classesIn,
+    stackingRules,
+} from '../../testing/stylesheets';
 import { apiService } from '@/api';
 import { PlanStatus } from '../../models/enums';
 import {
     CONFIRM_DELETE_ALL_LABEL,
     CONFIRM_DELETE_LABEL,
     DELETE_ALL_CHATS_LABEL,
+    DELETE_ALL_CHATS_TITLE,
     DELETE_CHAT_LABEL,
     chatMenuLabel,
 } from '../../models/chatDeletion';
@@ -34,16 +45,96 @@ import type { Plan } from '../../models';
 
 const renderPanel = (props: Record<string, unknown> = {}) =>
     render(
-        <Provider store={configureStore({ reducer: { app: appReducer } })}>
+        <Provider
+            store={configureStore({
+                reducer: { app: appReducer, panelDrawer: panelDrawerReducer },
+                preloadedState: { panelDrawer: { chatHistoryOpen: true } },
+            })}
+        >
             <MemoryRouter>
                 <ChatPanelLeft
                     reloadChats={false}
-                    onNewChatButton={() => undefined}
                     {...props}
                 />
             </MemoryRouter>
         </Provider>,
     );
+
+const renderDrawer = () =>
+    render(
+        <Provider store={configureStore({ reducer: { app: appReducer, panelDrawer: panelDrawerReducer } })}>
+            <MemoryRouter>
+                <ChatHistoryDrawerToggle />
+                <ChatPanelLeft
+                    reloadChats={false}
+                />
+            </MemoryRouter>
+        </Provider>,
+    );
+
+describe('the chat-history panel drawer', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('opens over the conversation and Escape returns focus to its disclosure', async () => {
+        renderDrawer();
+
+        const toggle = screen.getByRole('button', { name: 'Chat history' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('navigation', { name: 'Chat history' })).not.toBeInTheDocument();
+
+        fireEvent.click(toggle);
+
+        expect(await screen.findByRole('navigation', { name: 'Chat history' })).toBeInTheDocument();
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+
+        await waitFor(() =>
+            expect(screen.queryByRole('navigation', { name: 'Chat history' })).not.toBeInTheDocument(),
+        );
+        await waitFor(() => expect(toggle).toHaveFocus());
+    });
+
+    it('releases every chat-history drawer rule at the stacking breakpoint', () => {
+        const drawerRules = allRulesIncludingMediaQueries().filter((rule) =>
+            classesIn(rule.selector).includes(CHAT_HISTORY_DRAWER_TOGGLE_CLASS),
+        );
+
+        expect(drawerRules.length, 'the drawer control has no stylesheet rule').toBeGreaterThan(0);
+        expect(
+            stackingRules().some(
+                (rule) =>
+                    classesIn(rule.selector).includes(CHAT_HISTORY_DRAWER_TOGGLE_CLASS) &&
+                    /display:\s*none/.test(rule.body),
+            ),
+        ).toBe(true);
+    });
+
+    it('keeps chat history dropped below the stacking breakpoint', () => {
+        vi.stubGlobal('matchMedia', () => ({
+            matches: false,
+            addEventListener: () => undefined,
+            removeEventListener: () => undefined,
+        }));
+
+        render(
+            <Provider
+                store={configureStore({
+                    reducer: { app: appReducer, panelDrawer: panelDrawerReducer },
+                    preloadedState: { panelDrawer: { chatHistoryOpen: true } },
+                })}
+            >
+                <MemoryRouter>
+                    <ChatHistoryDrawerToggle />
+                    <ChatPanelLeft reloadChats={false} />
+                </MemoryRouter>
+            </Provider>,
+        );
+
+        expect(screen.queryByRole('button', { name: 'Chat history' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('navigation', { name: 'Chat history' })).not.toBeInTheDocument();
+    });
+});
 
 describe('the store surface has one assistant', () => {
     beforeEach(() => {
@@ -104,7 +195,12 @@ const HereIs = () => <span data-testid="here">{useLocation().pathname}</span>;
 
 const renderPanelAt = (path: string) =>
     render(
-        <Provider store={configureStore({ reducer: { app: appReducer } })}>
+        <Provider
+            store={configureStore({
+                reducer: { app: appReducer, panelDrawer: panelDrawerReducer },
+                preloadedState: { panelDrawer: { chatHistoryOpen: true } },
+            })}
+        >
             <MemoryRouter initialEntries={[path]}>
                 <HereIs />
                 <Routes>
@@ -113,7 +209,6 @@ const renderPanelAt = (path: string) =>
                         element={
                             <ChatPanelLeft
                                 reloadChats={false}
-                                onNewChatButton={() => undefined}
                             />
                         }
                     />
@@ -158,6 +253,7 @@ describe('one chat is one row', () => {
         await waitFor(() =>
             expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation'),
         );
+        expect(screen.queryByRole('navigation', { name: 'Chat history' })).not.toBeInTheDocument();
     });
 
     it('highlights the chat that is open, escalation included', async () => {
@@ -320,7 +416,9 @@ describe('deleting a chat from the panel', () => {
           observes the panel at all.
         */
         await waitFor(() => expect(apiService.getPlans).toHaveBeenCalledTimes(2));
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
+        ).not.toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: /^How do I swap a shift/ }),
         ).not.toBeInTheDocument();
@@ -507,7 +605,7 @@ describe('deleting every chat from the panel (#76)', () => {
         expect(
             await screen.findByText(/1 chat could not be deleted/i),
         ).toBeInTheDocument();
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: DELETE_ALL_CHATS_TITLE })).toBeInTheDocument();
     });
 
     it('still names a chat it kept running when the same sweep also failed', async () => {
@@ -544,7 +642,7 @@ describe('deleting every chat from the panel (#76)', () => {
         await confirmDeleteAll();
 
         await waitFor(() => expect(apiService.deleteAllChats).toHaveBeenCalled());
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: DELETE_ALL_CHATS_TITLE })).toBeInTheDocument();
         expect(screen.getByText('offline')).toBeInTheDocument();
         expect(
             screen.getByRole('button', { name: /^The coffee machine/ }),

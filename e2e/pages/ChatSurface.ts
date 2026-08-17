@@ -25,6 +25,26 @@ export class ChatSurface {
         return this.page.locator('.content .panelContent');
     }
 
+    /** The static-label disclosure that reveals navigation without reflowing the answer. */
+    get chatHistoryToggle(): Locator {
+        return this.page.getByRole('button', { name: 'Chat history' });
+    }
+
+    /** New chat stays in the content toolbar, whether chat history is open or closed. */
+    get newChatButton(): Locator {
+        return this.page.getByRole('button', { name: 'New chat' });
+    }
+
+    /** Chat history is a modal Panel drawer, not a column beside the conversation. */
+    get chatHistoryDrawer(): Locator {
+        return this.page.getByRole('dialog');
+    }
+
+    async openChatHistory(): Promise<void> {
+        await this.chatHistoryToggle.click();
+        await expect(this.chatHistoryDrawer).toBeVisible();
+    }
+
     /**
      * One agent's turn — the message block its own name and "AI Agent" tag sit
      * in, not the whole conversation.

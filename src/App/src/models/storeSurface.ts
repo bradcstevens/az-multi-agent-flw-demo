@@ -50,6 +50,12 @@ export const SIMULATED_LABEL = 'Simulated';
  */
 export const TRANSPARENCY_PANELS_LABEL = 'Transparency panels';
 
+/** The chat-history Panel drawer's disclosure, which does not rename itself. */
+export const CHAT_HISTORY_LABEL = 'Chat history';
+
+/** The action that always stays in the content toolbar. */
+export const NEW_CHAT_LABEL = 'New chat';
+
 /** The rail's one state description when the presenter has pinned it closed. */
 export const TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION = 'Pinned closed for this conversation.';
 

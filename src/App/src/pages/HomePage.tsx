@@ -10,6 +10,8 @@ import TransparencyRailToggle from '@/components/transparency/TransparencyRailTo
 import AgentTeamPanel from '@/components/transparency/AgentTeamPanel';
 import { NewChatService } from '../store/NewChatService';
 import ChatPanelLeft from '@/components/content/ChatPanelLeft';
+import ChatHistoryDrawerToggle from '@/components/content/ChatHistoryDrawerToggle';
+import NewChatButton from '@/components/content/NewChatButton';
 import ContentToolbar from '@/commonComponents/components/Content/ContentToolbar';
 import { TeamService } from '../store/TeamService';
 import { waitForRuntimeBootstrap } from '../api/config';
@@ -121,11 +123,12 @@ const HomePage: React.FC = () => {
                 <CoralShellRow>
                     <ChatPanelLeft
                         reloadChats={reloadLeftList}
-                        onNewChatButton={handleNewChatButton}
                         isLoadingTeam={isLoadingTeam}
                     />
                     <Content>
                         <ContentToolbar panelTitle={ASSISTANT_NAME}>
+                            <NewChatButton onClick={handleNewChatButton} />
+                            <ChatHistoryDrawerToggle />
                             <TransparencyRailToggle />
                             <StoreIdentity />
                         </ContentToolbar>

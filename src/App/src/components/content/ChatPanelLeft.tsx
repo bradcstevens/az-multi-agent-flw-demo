@@ -3,26 +3,22 @@ import PanelLeft from "@/commonComponents/components/Panels/PanelLeft";
 import PanelLeftToolbar from "@/commonComponents/components/Panels/PanelLeftToolbar";
 import PanelFooter from "@/commonComponents/components/Panels/PanelFooter";
 import {
-  Body1Strong,
   Button,
   Caption1,
+  DrawerBody,
   Dialog,
   DialogActions,
   DialogBody,
   DialogContent,
   DialogSurface,
   DialogTitle,
+  OverlayDrawer,
   Toast,
   ToastBody,
   ToastTitle,
-  Tooltip,
   useToastController,
 } from "@fluentui/react-components";
-import {
-  ChatAdd20Regular,
-  Delete20Regular,
-  ErrorCircle20Regular,
-} from "@fluentui/react-icons";
+import { Delete20Regular, ErrorCircle20Regular } from "@fluentui/react-icons";
 import ChatList from "./ChatList";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -34,7 +30,17 @@ import {
 } from "../../api/config";
 import { TaskService } from "@/store";
 import "../../styles/ChatPanelLeft.css";
-import { ASSISTANT_NAME } from "../../models/storeSurface";
+import { ASSISTANT_NAME, CHAT_HISTORY_LABEL } from "../../models/storeSurface";
+import {
+  CHAT_HISTORY_DRAWER_ID,
+  CHAT_HISTORY_DRAWER_TOGGLE_ID,
+} from "../../models/panelDrawer";
+import { useDesktopDrawer } from "../../hooks/usePanelDrawer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import {
+  chatHistoryDrawerSetOpen,
+  selectChatHistoryDrawerOpen,
+} from "../../store/slices/panelDrawerSlice";
 import StoreAssistantLogo from "../branding/StoreAssistantLogo";
 import {
   CANCEL_DELETE_LABEL,
@@ -50,12 +56,14 @@ import {
 
 const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
   reloadChats,
-  onNewChatButton,
   restReload,
   onLeavingChat,
   isLoadingTeam
 }) => {
   const { dispatchToast } = useToastController("toast");
+  const dispatch = useAppDispatch();
+  const isDesktopDrawer = useDesktopDrawer();
+  const drawerOpen = useAppSelector(selectChatHistoryDrawerOpen);
   const navigate = useNavigate();
   /*
     The route is `/chat/:id` and the id in it is a **Plan**'s (ADR-025): a
@@ -84,6 +92,13 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
   const [deletingAll, setDeletingAll] = useState(false);
   const [deleteAllFailure, setDeleteAllFailure] = useState<string | null>(null);
   const [keptRunningNotice, setKeptRunningNotice] = useState<string | null>(null);
+
+  const closeDrawer = useCallback(() => {
+    dispatch(chatHistoryDrawerSetOpen(false));
+    window.setTimeout(() => {
+      document.getElementById(CHAT_HISTORY_DRAWER_TOGGLE_ID)?.focus();
+    }, 0);
+  }, [dispatch]);
 
   const loadPlansData = useCallback(async (forceRefresh = false) => {
     try {
@@ -163,7 +178,10 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
       */
       const selectedChat = chats.find((chat) => chat.id === chatId);
       if (!selectedChat) return;
-      const performNavigation = () => navigate(`/chat/${selectedChat.planId}`);
+      const performNavigation = () => {
+        closeDrawer();
+        navigate(`/chat/${selectedChat.planId}`);
+      };
 
       // Re-opening this Chat at its latest Plan remains ordinary navigation:
       // it leaves no Chat, so it must not end this one's turn.
@@ -178,7 +196,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
         performNavigation();
       }
     },
-    [chats, navigate, onLeavingChat, selectedChatId]
+    [chats, closeDrawer, navigate, onLeavingChat, selectedChatId]
   );
 
   const handleChatDelete = useCallback(
@@ -224,6 +242,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
 
   const handleLogoClick = useCallback(() => {
     const performNavigation = () => {
+      closeDrawer();
       navigate("/");
     };
 
@@ -232,7 +251,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
     } else {
       performNavigation();
     }
-  }, [navigate, onLeavingChat]);
+  }, [closeDrawer, navigate, onLeavingChat]);
 
   // The count the confirmation states (#76) — only the chats the sweep can
   // actually take, so the number said before the fact matches what a running
@@ -324,16 +343,29 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
     }
   }, [chats, loadPlansData, navigate, selectedChatId]);
 
+  if (!isDesktopDrawer) return null;
+
   return (
-    <div className="panel-left-container">
-      <PanelLeft panelWidth={280} panelResize={true}>
+    <OverlayDrawer
+      position="start"
+      aria-label={CHAT_HISTORY_LABEL}
+      open={drawerOpen}
+      onOpenChange={(_, data) => {
+        if (data.open) {
+          dispatch(chatHistoryDrawerSetOpen(true));
+          return;
+        }
+        closeDrawer();
+      }}
+    >
+      <DrawerBody>
+      <PanelLeft id={CHAT_HISTORY_DRAWER_ID}>
         <PanelLeftToolbar
           linkTo={onLeavingChat ? undefined : "/"}
           onTitleClick={onLeavingChat ? handleLogoClick : undefined}
           panelTitle={ASSISTANT_NAME}
           panelIcon={<StoreAssistantLogo />}
         >
-          <Tooltip content="New chat" relationship={"label"} />
         </PanelLeftToolbar>
 
         {/*
@@ -344,24 +376,6 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
           picker with one entry is still a picker, and it was also the last way
           a suppressed stock content pack could reach the surface.
         */}
-        <div
-          className="tab tab-new-task"
-          onClick={onNewChatButton}
-          tabIndex={0} // ✅ allows tab focus
-          role="button" // ✅ announces as button
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onNewChatButton();
-            }
-          }}
-        >
-          <div className="tab tab-new-task-icon">
-            <ChatAdd20Regular />
-          </div>
-          <Body1Strong>New chat</Body1Strong>
-        </div>
-
         {/*
           The list-level control (#76, ADR-026). Disabled with nothing to
           take, the same fail-closed reasoning the row's own menu item uses:
@@ -464,7 +478,8 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
           <div className="panel-footer-content" />
         </PanelFooter>
       </PanelLeft>
-    </div>
+        </DrawerBody>
+    </OverlayDrawer>
   );
 };
 

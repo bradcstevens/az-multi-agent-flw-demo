@@ -49,6 +49,7 @@ import streamingReducer from '@/store/slices/streamingSlice';
 import transparencyReducer, { transparencyRailToggled } from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import progressReducer from '@/store/slices/progressSlice';
+import panelDrawerReducer from '@/store/slices/panelDrawerSlice';
 
 /**
  * The surface's heading outline (issue #57).
@@ -126,6 +127,7 @@ const makeStore = () =>
             transparency: transparencyReducer,
             ticket: ticketReducer,
             progress: progressReducer,
+            panelDrawer: panelDrawerReducer,
         },
         middleware: (getDefaultMiddleware) =>
             getDefaultMiddleware({ serializableCheck: false }),
