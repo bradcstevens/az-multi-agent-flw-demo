@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { useAppDispatch } from '@/store/hooks';
-import { ProcessedPlanData } from '@/models';
+import { PlanStatus, ProcessedPlanData } from '@/models';
 import {
     fetchPlanData,
     resetPlan,
@@ -19,8 +19,7 @@ import {
     resetChat,
 } from '@/store/slices/chatSlice';
 import {
-    setStreamingMessageBuffer,
-    setShowBufferingText,
+    restoreStreamedReply,
     resetStreaming,
 } from '@/store/slices/streamingSlice';
 import { setWsConnected } from '@/store/slices/appSlice';
@@ -80,9 +79,11 @@ export function usePlanActions() {
                     dispatch(setAgentMessages(planResult.messages));
                 }
 
-                if (planResult?.streaming_message?.trim()) {
-                    dispatch(setStreamingMessageBuffer(planResult.streaming_message));
-                    dispatch(setShowBufferingText(true));
+                if (
+                    planResult?.plan?.overall_status !== PlanStatus.COMPLETED
+                    && planResult?.streaming_message?.trim()
+                ) {
+                    dispatch(restoreStreamedReply(planResult.streaming_message));
                 }
 
                 return planResult;

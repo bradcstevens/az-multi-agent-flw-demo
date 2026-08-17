@@ -1583,23 +1583,15 @@ class OrchestrationManager:
                             and executor != current_streaming_agent_ref[0]
                         ):
                             current_streaming_agent_ref[0] = executor
-                            display_name = format_agent_display_name(executor)
-                            header_text = f"\n\n---\n### {display_name}\n\n"
-                            try:
-                                await connection_config.send_status_update_async(
-                                    AgentMessageStreaming(
-                                        agent_name=display_name,
-                                        content=header_text,
-                                        is_final=False,
-                                    ),
-                                    user_id,
-                                    message_type=WebsocketMessageType.AGENT_MESSAGE_STREAMING,
-                                )
-                            except Exception as cb_err:
-                                self.logger.error(
-                                    "Error sending agent header for %s: %s",
-                                    executor, cb_err,
-                                )
+                            await connection_config.send_status_update_async(
+                                AgentMessageStreaming(
+                                    agent_name=format_agent_display_name(executor),
+                                    content="",
+                                    is_final=False,
+                                ),
+                                user_id,
+                                message_type=WebsocketMessageType.AGENT_MESSAGE_STREAMING,
+                            )
 
                         if executor != "magentic_orchestrator":
                             try:
@@ -1640,6 +1632,17 @@ class OrchestrationManager:
                                         "Error in agent callback for %s: %s",
                                         agent_id, cb_err,
                                     )
+                        if agent_id == current_streaming_agent_ref[0]:
+                            await connection_config.send_status_update_async(
+                                AgentMessageStreaming(
+                                    agent_name=format_agent_display_name(agent_id),
+                                    content="",
+                                    is_final=True,
+                                ),
+                                user_id,
+                                message_type=WebsocketMessageType.AGENT_MESSAGE_STREAMING,
+                            )
+                            current_streaming_agent_ref[0] = None
 
             except Exception as e:
                 if "cancelled by user" in str(e):

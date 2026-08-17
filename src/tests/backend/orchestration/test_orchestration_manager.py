@@ -860,11 +860,16 @@ class TestRunOrchestration:
         assert sent_message["data"]["content"] == "Hello world"
 
     @pytest.mark.asyncio
-    async def test_given_new_agent_when_streaming_then_sends_header(self):
+    async def test_given_stream_finished_when_executor_completes_then_sends_completion_frame(self):
         # Arrange
         update = MockAgentResponseUpdate(text="chunk")
         events = [
             _make_event("output", data=update, executor_id="hr_agent"),
+            _make_event(
+                "executor_completed",
+                data=[MockMessage(text="complete")],
+                executor_id="hr_agent",
+            ),
         ]
         mock_workflow = Mock()
         mock_workflow.run = Mock(return_value=_async_iter(events))
@@ -877,12 +882,16 @@ class TestRunOrchestration:
         # Act
         await manager.run_orchestration(user_id="user-1", input_task="task")
 
-        # Assert — header sent for agent switch
-        header_calls = [
+        # Assert — completion is emitted at the executor-completed event, rather
+        # than inferred from the final result frame that arrives later.
+        completion_calls = [
             c for c in connection_config.send_status_update_async.call_args_list
-            if len(c[0]) > 0 and isinstance(c[0][0], MockAgentMessageStreaming)
+            if len(c[0]) > 0
+            and isinstance(c[0][0], MockAgentMessageStreaming)
+            and c[0][0].is_final
         ]
-        assert len(header_calls) >= 1
+        assert len(completion_calls) == 1
+        assert completion_calls[0][0][0].content == ""
 
     @pytest.mark.asyncio
     async def test_given_orchestrator_event_when_run_then_no_error(self):
@@ -1442,7 +1451,7 @@ class TestAttributionWithoutAPlan:
             if isinstance(call[0][0], MockAgentMessageStreaming)
         ]
         assert headers, "no agent header was sent"
-        assert "Shift Tasks Agent" in headers[0].content
+        assert headers[0].agent_name == "Shift Tasks Agent"
 
 
 # ---------------------------------------------------------------------------

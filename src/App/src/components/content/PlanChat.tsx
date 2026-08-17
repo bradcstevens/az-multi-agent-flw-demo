@@ -1,14 +1,13 @@
 import React from "react";
 import { PlanChatProps, MPlanData } from "../../models/plan";
 import InlineToaster from "../toast/InlineToaster";
-import { AgentMessageData } from "@/models";
+import { AgentMessageData, AgentMessageType } from "@/models";
 import renderUserPlanMessage from "./streaming/StreamingUserPlanMessage";
 import renderPlanResponse from "./streaming/StreamingPlanResponse";
 import { renderPlanExecutionMessage, renderThinkingState } from "./streaming/StreamingPlanState";
 import ContentNotFound from "../NotFound/ContentNotFound";
 import PlanChatBody from "./PlanChatBody";
 import renderAgentMessages from "./streaming/StreamingAgentMessage";
-import StreamingBufferMessage from "./streaming/StreamingBufferMessage";
 import PresenterAlertCard from "../transparency/PresenterAlertCard";
 import RehearsedReplies from "./RehearsedReplies";
 import FollowOnTask from "./FollowOnTask";
@@ -29,8 +28,8 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   planApprovalRequest: MPlanData | null;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   finalResultRef: React.RefObject<HTMLDivElement>;
-  streamingMessageBuffer: string;
-  showBufferingText: boolean;
+  streamedReply: { agent: string; content: string } | null;
+  settledReply: string | null;
   agentMessages: AgentMessageData[];
   /**
    * Whether the in-flight indicator belongs below the replies rather than
@@ -81,8 +80,8 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   planApprovalRequest,
   messagesContainerRef,
   finalResultRef,
-  streamingMessageBuffer,
-  showBufferingText,
+  streamedReply,
+  settledReply,
   agentMessages,
   showProcessingPlanSpinner,
   processingElapsedSeconds,
@@ -110,6 +109,17 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     to disagree about what the system was doing.
   */
   const narration = useAppSelector(selectProgressNarration);
+  const streamedReplyMessage: AgentMessageData[] = streamedReply?.content
+    ? [{
+      agent: streamedReply.agent,
+      agent_type: AgentMessageType.AI_AGENT,
+      timestamp: Date.now(),
+      steps: [],
+      next_steps: [],
+      content: streamedReply.content,
+      raw_data: "",
+    }]
+    : [];
 
   if (!planData)
     return (
@@ -147,6 +157,28 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         {/* Plan response with all information */}
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
         {renderAgentMessages(agentMessages, undefined, undefined, finalResultRef)}
+        <div aria-live="off">
+          {renderAgentMessages(streamedReplyMessage)}
+        </div>
+        {settledReply && (
+          <div
+            aria-live="polite"
+            role="status"
+            style={{
+              position: 'absolute',
+              width: '1px',
+              height: '1px',
+              padding: 0,
+              margin: '-1px',
+              overflow: 'hidden',
+              clip: 'rect(0, 0, 0, 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {settledReply}
+          </div>
+        )}
 
         {/*
           Presenter alerts (issue #24, R8). Rendered after the replies rather
@@ -159,15 +191,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         ))}
 
         {showProcessingPlanSpinner && renderPlanExecutionMessage(narration, processingElapsedSeconds)}
-        {/* Streaming plan updates — hidden while an approval prompt is pending so
-            the approval action is presented at the appropriate step instead of
-            after the thinking process visibly completes. */}
-        {showBufferingText && !showApprovalButtons && (
-          <StreamingBufferMessage
-            streamingMessageBuffer={streamingMessageBuffer}
-            isStreaming={true}
-          />
-        )}
       </div>
 
       {/*

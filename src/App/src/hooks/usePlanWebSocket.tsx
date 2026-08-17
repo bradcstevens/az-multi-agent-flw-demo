@@ -34,10 +34,12 @@ import {
     addAgentMessage,
 } from '@/store/slices/chatSlice';
 import {
-    appendToStreamingBuffer,
-    setShowBufferingText,
+    appendToStreamedReply,
+    clearStreamedReply,
+    completeStreamedReply,
+    settleStreamedReply,
     addStreamingMessage,
-    selectStreamingMessageBuffer,
+    selectStreamedReply,
 } from '@/store/slices/streamingSlice';
 import { setWsConnected } from '@/store/slices/appSlice';
 import { setSelectedTeam } from '@/store/slices/teamSlice';
@@ -110,13 +112,14 @@ export function usePlanWebSocket({
     const planApproved = useAppSelector(selectPlanApproved);
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const continueWithWebsocketFlow = useAppSelector(selectContinueWithWebsocketFlow);
-    const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
+    const streamedReply = useAppSelector(selectStreamedReply);
     const processingStartedAtRef = React.useRef<number | null>(null);
 
     // Coalesce high-frequency streaming tokens into one flush per animation frame
     // to avoid a synchronous re-render per token freezing the UI on fast streams.
     const streamingChunkQueueRef = React.useRef<string[]>([]);
     const streamingFlushHandleRef = React.useRef<number | null>(null);
+    const streamingAgentRef = React.useRef('Assistant');
 
     // The plan this page has taken responsibility for a socket for — set when
     // it opens one and when it adopts one opened on the `createPlan` response.
@@ -176,8 +179,10 @@ export function usePlanWebSocket({
             const chunks = streamingChunkQueueRef.current;
             if (chunks.length === 0) return;
             streamingChunkQueueRef.current = [];
-            dispatch(setShowBufferingText(true));
-            dispatch(appendToStreamingBuffer(chunks.join('')));
+            dispatch(appendToStreamedReply({
+                agent: streamingAgentRef.current,
+                content: chunks.join(''),
+            }));
         };
 
         const unsub = webSocketService.on(
@@ -188,8 +193,16 @@ export function usePlanWebSocket({
                 // plan, which the Fast lane does not have.
                 dispatch(agentResponding(msg.data?.agent ?? null));
                 const line = PlanDataService.simplifyHumanClarification(msg.data?.content || msg.content || '');
-                streamingChunkQueueRef.current.push(line);
-                if (streamingFlushHandleRef.current === null) {
+                streamingAgentRef.current = msg.data?.agent || 'Assistant';
+                if (line) streamingChunkQueueRef.current.push(line);
+                if (msg.data?.is_final) {
+                    if (streamingFlushHandleRef.current !== null) {
+                        cancelAnimationFrame(streamingFlushHandleRef.current);
+                        streamingFlushHandleRef.current = null;
+                    }
+                    flushStreamingChunks();
+                    dispatch(completeStreamedReply());
+                } else if (streamingFlushHandleRef.current === null) {
                     streamingFlushHandleRef.current = requestAnimationFrame(flushStreamingChunks);
                 }
             },
@@ -204,7 +217,10 @@ export function usePlanWebSocket({
             if (streamingChunkQueueRef.current.length > 0) {
                 const remaining = streamingChunkQueueRef.current.join('');
                 streamingChunkQueueRef.current = [];
-                dispatch(appendToStreamingBuffer(remaining));
+                dispatch(appendToStreamedReply({
+                    agent: streamingAgentRef.current,
+                    content: remaining,
+                }));
             }
         };
     }, [dispatch]);
@@ -235,7 +251,7 @@ export function usePlanWebSocket({
                 };
                 dispatch(setClarificationMessage(msg.data as ParsedUserClarification));
                 dispatch(addAgentMessage(agentMessageData));
-                dispatch(setShowBufferingText(false));
+                dispatch(clearStreamedReply());
                 dispatch(setShowProcessingPlanSpinner(false));
                 // A question put to the associate is the turn waiting on them,
                 // not a request in flight (#64, ADR-023).
@@ -290,7 +306,7 @@ export function usePlanWebSocket({
                         content: finalContent + completionTimeLine,
                         raw_data: finalMessage,
                     };
-                    dispatch(setShowBufferingText(true));
+                    dispatch(settleStreamedReply(agentMessageData.content));
                     dispatch(addAgentMessage(agentMessageData));
                     dispatch(setSelectedTeam(planData?.team || null));
                     /* P0: single compound action replaces setShowProcessingPlanSpinner(false) + markPlanCompleted() */
@@ -298,7 +314,13 @@ export function usePlanWebSocket({
                     processingStartedAtRef.current = null;
                     scrollToFinalResult();
                     webSocketService.disconnect();
-                    persistAgentMessage(agentMessageData, planData, dispatch, true, streamingMessageBuffer);
+                    persistAgentMessage(
+                        agentMessageData,
+                        planData,
+                        dispatch,
+                        true,
+                        streamedReply?.content || '',
+                    );
                 } else if (messageStatus === 'error') {
                     // Safety net: handle error status sent as FINAL_RESULT_MESSAGE
                     const errorContent = finalContent || 'An unexpected error occurred. Please try again later.';
@@ -313,7 +335,7 @@ export function usePlanWebSocket({
                     };
                     dispatch(addAgentMessage(errorAgent));
                     dispatch(planFailedFinal());
-                    dispatch(setShowBufferingText(false));
+                    dispatch(clearStreamedReply());
                     scrollToBottom();
                     showToast(errorContent, 'error');
                     webSocketService.disconnect();
@@ -333,7 +355,7 @@ export function usePlanWebSocket({
                         };
                         dispatch(addAgentMessage(terminalMessage));
                     }
-                    dispatch(setShowBufferingText(false));
+                    dispatch(clearStreamedReply());
                     dispatch(setShowProcessingPlanSpinner(false));
                     processingStartedAtRef.current = null;
                     scrollToBottom();
@@ -342,7 +364,7 @@ export function usePlanWebSocket({
             },
         );
         return unsub;
-    }, [dispatch, scrollToBottom, scrollToFinalResult, planData, streamingMessageBuffer, formatErrorMessage, showToast]);
+    }, [dispatch, scrollToBottom, scrollToFinalResult, planData, streamedReply, formatErrorMessage, showToast]);
 
     // ── ERROR_MESSAGE ─────────────────────────────────────────────
     useEffect(() => {
@@ -376,7 +398,7 @@ export function usePlanWebSocket({
                 dispatch(planFailedFinal());
                 dispatch(requestSettled());
                 processingStartedAtRef.current = null;
-                dispatch(setShowBufferingText(false));
+                dispatch(clearStreamedReply());
                 // The turn is over, so nothing is in flight (#77, ADR-027).
                 // This used to lock the box, which left the failed chat — the
                 // one most worth resuming — the one chat that could not be.
@@ -420,6 +442,9 @@ export function usePlanWebSocket({
                     agentMessageData.content = PlanDataService.simplifyHumanClarification(
                         agentMessageData?.content,
                     );
+                    if (streamedReply?.agent === agentMessageData.agent) {
+                        dispatch(clearStreamedReply());
+                    }
                     dispatch(addAgentMessage(agentMessageData));
                     dispatch(setShowProcessingPlanSpinner(true));
                     scrollToBottom();
@@ -428,7 +453,7 @@ export function usePlanWebSocket({
             },
         );
         return unsub;
-    }, [dispatch, scrollToBottom, planData, planApproved]);
+    }, [dispatch, scrollToBottom, planData, planApproved, streamedReply]);
 
     // ── WebSocket connect ─────────────────────────────────────────
     /*

@@ -54,8 +54,8 @@ import {
 } from '../store/slices/chatSlice';
 import {
     selectStreamingMessages,
-    selectStreamingMessageBuffer,
-    selectShowBufferingText,
+    selectStreamedReply,
+    selectSettledReply,
 } from '../store/slices/streamingSlice';
 import { selectWsConnected } from '../store/slices/appSlice';
 import { selectSelectedTeam } from '../store/slices/teamSlice';
@@ -154,8 +154,8 @@ const ChatPage: React.FC = () => {
     const clarificationRequestId = useAppSelector(selectPendingClarificationRequestId);
     const agentMessages = useAppSelector(selectAgentMessages);
     const streamingMessages = useAppSelector(selectStreamingMessages);
-    const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
-    const showBufferingText = useAppSelector(selectShowBufferingText);
+    const streamedReply = useAppSelector(selectStreamedReply);
+    const settledReply = useAppSelector(selectSettledReply);
     const wsConnected = useAppSelector(selectWsConnected);
     const selectedTeam = useAppSelector(selectSelectedTeam);
     const showTimeoutDialog = useAppSelector(selectShowTimeoutDialog);
@@ -897,8 +897,8 @@ const ChatPage: React.FC = () => {
                                 planApprovalRequest={planApprovalRequest}
                                 messagesContainerRef={messagesContainerRef}
                                 finalResultRef={finalResultRef}
-                                streamingMessageBuffer={streamingMessageBuffer}
-                                showBufferingText={showBufferingText}
+                                streamedReply={streamedReply}
+                                settledReply={settledReply}
                                 agentMessages={agentMessages}
                                 showProcessingPlanSpinner={showProcessingPlanSpinner}
                                 processingElapsedSeconds={processingElapsedSeconds}

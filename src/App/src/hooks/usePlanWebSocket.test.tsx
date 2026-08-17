@@ -22,6 +22,11 @@ import streamingReducer from '@/store/slices/streamingSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import { useAppSelector } from '@/store/hooks';
+import {
+    selectSettledReply,
+    selectStreamedReply,
+} from '@/store/slices/streamingSlice';
+import { selectAgentMessages } from '@/store/slices/chatSlice';
 import PlanChat from '@/components/content/PlanChat';
 
 /**
@@ -56,6 +61,9 @@ const Host = ({
     });
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const planApprovalRequest = useAppSelector(selectPlanApprovalRequest);
+    const streamedReply = useAppSelector(selectStreamedReply);
+    const settledReply = useAppSelector(selectSettledReply);
+    const agentMessages = useAppSelector(selectAgentMessages);
     const ref = React.useRef<HTMLDivElement>(null);
     return (
         <PlanChat
@@ -68,9 +76,9 @@ const Host = ({
             planApprovalRequest={planApprovalRequest}
             messagesContainerRef={ref as never}
             finalResultRef={ref as never}
-            streamingMessageBuffer=""
-            showBufferingText={false}
-            agentMessages={[]}
+            streamedReply={streamedReply}
+            settledReply={settledReply}
+            agentMessages={agentMessages}
             showProcessingPlanSpinner={showProcessingPlanSpinner}
             processingElapsedSeconds={0}
             showApprovalButtons={false}
@@ -290,6 +298,88 @@ describe('the agent that is responding, named from the frame that names it', () 
         await waitFor(() =>
             expect(screen.getByText('An agent is responding...')).toBeInTheDocument(),
         );
+    });
+});
+
+describe('a streamed specialist reply in the conversation', () => {
+    it('renders each chunk in the reply, then lets the complete result replace it and announce once', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Store SOP Agent',
+                    content: 'Begin by cashing up the tills.',
+                    is_final: false,
+                }),
+            );
+        });
+
+        await screen.findByText('Begin by cashing up the tills.');
+        expect(screen.queryByText('AI Thinking Process')).not.toBeInTheDocument();
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Store SOP Agent',
+                    content: '',
+                    is_final: true,
+                }),
+            );
+        });
+
+        expect(store.getState().streaming.isReplyComplete).toBe(true);
+
+        act(() => {
+            socket.deliver(
+                frame('final_result_message', {
+                    content: 'Follow the complete store closing checklist.',
+                    status: 'completed',
+                }),
+            );
+        });
+
+        await waitFor(() =>
+            expect(screen.getAllByText('Follow the complete store closing checklist.')).not.toHaveLength(0),
+        );
+        expect(screen.queryByText('Begin by cashing up the tills.')).not.toBeInTheDocument();
+        expect(
+            screen.getAllByRole('status').filter(
+                (element) => element.textContent === 'Follow the complete store closing checklist.',
+            ),
+        ).toHaveLength(1);
+    });
+
+    it('starts a new preview when the same specialist begins another completed stream', async () => {
+        const { store } = renderHost('plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Store SOP Agent',
+                    content: 'The first answer.',
+                    is_final: true,
+                }),
+            );
+        });
+        await screen.findByText('The first answer.');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Store SOP Agent',
+                    content: 'The next answer.',
+                    is_final: false,
+                }),
+            );
+        });
+
+        await screen.findByText('The next answer.');
+        expect(screen.queryByText('The first answer.')).not.toBeInTheDocument();
+        expect(store.getState().streaming.isReplyComplete).toBe(false);
     });
 });
 
