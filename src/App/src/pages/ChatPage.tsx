@@ -298,14 +298,19 @@ const ChatPage: React.FC = () => {
       transport event rather than an associate's stated intent.
     */
     const leavingChatRef = React.useRef(false);
-    const leavingChatGenerationRef = React.useRef(0);
+    const leavingChatDecisionRef = React.useRef<Promise<boolean> | null>(null);
     const handleLeavingChat = useCallback(
         async (navigationFn: () => void) => {
             if (leavingChatRef.current) return;
             leavingChatRef.current = true;
-            leavingChatGenerationRef.current += 1;
+            let resolveLeavingChat: (ended: boolean) => void = () => undefined;
+            const leavingChatDecision = new Promise<boolean>((resolve) => {
+                resolveLeavingChat = resolve;
+            });
+            leavingChatDecisionRef.current = leavingChatDecision;
 
             let sessionId = planData?.plan?.session_id;
+            let turnEnded = false;
             try {
                 /*
                   On a direct link, an associate can leave before the initial
@@ -324,6 +329,7 @@ const ChatPage: React.FC = () => {
                     return;
                 }
                 await apiService.endChatTurn(sessionId);
+                turnEnded = true;
                 webSocketService.disconnect();
                 navigationFn();
             } catch (error: unknown) {
@@ -334,6 +340,10 @@ const ChatPage: React.FC = () => {
                 throw error;
             } finally {
                 leavingChatRef.current = false;
+                resolveLeavingChat(turnEnded);
+                if (leavingChatDecisionRef.current === leavingChatDecision) {
+                    leavingChatDecisionRef.current = null;
+                }
             }
         },
         [planData?.plan?.session_id, planId, showToast],
@@ -442,7 +452,6 @@ const ChatPage: React.FC = () => {
             prompt: string,
             options: { lane?: string; startingTaskId?: string } = {},
         ) => {
-            const leavingChatGeneration = leavingChatGenerationRef.current;
             const sessionId = planData?.plan?.session_id;
             if (!sessionId) {
                 showToast(CANNOT_CONTINUE, 'error');
@@ -475,7 +484,8 @@ const ChatPage: React.FC = () => {
                     sessionId,
                     options.startingTaskId,
                 );
-                if (leavingChatGeneration !== leavingChatGenerationRef.current) {
+                const leavingChatDecision = leavingChatDecisionRef.current;
+                if (leavingChatDecision && await leavingChatDecision) {
                     return;
                 }
                 /*
@@ -515,7 +525,8 @@ const ChatPage: React.FC = () => {
                 );
                 navigate(`/chat/${response.plan_id}`, { state: { lane: response.lane } });
             } catch (error: unknown) {
-                if (leavingChatGeneration !== leavingChatGenerationRef.current) {
+                const leavingChatDecision = leavingChatDecisionRef.current;
+                if (leavingChatDecision && await leavingChatDecision) {
                     return;
                 }
                 dispatch(requestSettled());
