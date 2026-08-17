@@ -299,6 +299,7 @@ const ChatPage: React.FC = () => {
     */
     const leavingChatRef = React.useRef(false);
     const leavingChatDecisionRef = React.useRef<Promise<boolean> | null>(null);
+    const chatGenerationRef = React.useRef(0);
     const handleLeavingChat = useCallback(
         async (navigationFn: () => void) => {
             if (leavingChatRef.current) return;
@@ -330,6 +331,7 @@ const ChatPage: React.FC = () => {
                 }
                 await apiService.endChatTurn(sessionId);
                 turnEnded = true;
+                chatGenerationRef.current += 1;
                 webSocketService.disconnect();
                 navigationFn();
             } catch (error: unknown) {
@@ -452,6 +454,7 @@ const ChatPage: React.FC = () => {
             prompt: string,
             options: { lane?: string; startingTaskId?: string } = {},
         ) => {
+            const chatGeneration = chatGenerationRef.current;
             const sessionId = planData?.plan?.session_id;
             if (!sessionId) {
                 showToast(CANNOT_CONTINUE, 'error');
@@ -486,6 +489,9 @@ const ChatPage: React.FC = () => {
                 );
                 const leavingChatDecision = leavingChatDecisionRef.current;
                 if (leavingChatDecision && await leavingChatDecision) {
+                    return;
+                }
+                if (chatGeneration !== chatGenerationRef.current) {
                     return;
                 }
                 /*
@@ -527,6 +533,9 @@ const ChatPage: React.FC = () => {
             } catch (error: unknown) {
                 const leavingChatDecision = leavingChatDecisionRef.current;
                 if (leavingChatDecision && await leavingChatDecision) {
+                    return;
+                }
+                if (chatGeneration !== chatGenerationRef.current) {
                     return;
                 }
                 dispatch(requestSettled());
@@ -781,6 +790,9 @@ const ChatPage: React.FC = () => {
 
     /* ── Initial plan load ──────────────────────────────────── */
     useEffect(() => {
+        // `/chat/:id` reuses this page instance. A leave outcome belongs to
+        // the previous Chat, while the generation keeps its late responses stale.
+        leavingChatDecisionRef.current = null;
         // A different plan is a different conversation, so the provenance and
         // the alerts pushed into the previous one go (#24). Dispatched here
         // rather than only inside `resetPlanVariables`, which runs on the
