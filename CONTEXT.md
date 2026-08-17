@@ -212,7 +212,9 @@ _Avoid_: plan history, task history, hide completed tasks
 selecting another chat row, or the logo. One act with one declaration, and it **ends that Chat's
 turn** — the orchestration is cancelled and the **Plan record** written `canceled`
 ([ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md)). Scoped to the session left, so it can
-never settle another Chat, and it never overwrites a **Settled status** a turn already reached. A
+never settle another Chat, and it never overwrites a **Settled status** a turn already reached —
+a rule that is now every writer's rather than this control's
+([ADR-043](docs/ADR/043-the-server-settles-the-turn-it-ended.md)). A
 socket dropping is *not* leaving — a network blip must not kill a live turn — which is why browser
 back and a closed tab remain a named gap rather than a guess. The associate is not asked to confirm
 it: nothing is lost that a confirmation could protect.
@@ -221,9 +223,14 @@ _Avoid_: plan cancellation, cancel the plan, new chat confirmation
 **Abandoned turn** — what **Leaving a Chat** produced before ADR-031, and what browser back and a
 closed tab still produce: the client is gone, the orchestration keeps computing against a connection
 that no longer exists, and every frame is dropped. Because the transcript is written only by the
-browser echoing frames back, the turn leaves **no** record — no transcript row, no answer, and a
-**Plan record** stuck at `in_progress` for ever, which no delete route will take. Not a turn that
-was lost, but one whose loss the surface went on denying.
+browser echoing frames back, the turn leaves **no** transcript row and no answer — that half stands,
+and closing it is the transcript decision
+[ADR-043](docs/ADR/043-the-server-settles-the-turn-it-ended.md) still declines. What no longer holds
+is the rest of it. The **Plan record** used to sit at `in_progress` for ever, which no delete route
+would take, because the only writer of a **Settled status** was the browser that had gone; ADR-043
+has the server settle the turn it ended, so an abandoned turn's answer is still lost — but lost under
+an accurate label rather than under a claim to still be working. Not a turn that was lost, but one
+whose loss the surface went on denying.
 _Avoid_: orphaned plan, stuck plan, stale chat
 
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
@@ -1337,6 +1344,18 @@ the two copies are kept in agreement by `src/tests/ci/test_chat_deletion_contrac
 was unreachable until [ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md) gave **Leaving a
 Chat** the write, which is why the way out of `in_progress` is to end the turn and never to loosen
 this rule.
+
+**It is written by the server that ended the turn, at the moment the turn ends**
+([ADR-043](docs/ADR/043-the-server-settles-the-turn-it-ended.md)) — off the orchestration's own
+terminal branch, not a heuristic, and not conditional on a live socket or an open tab. Until that
+decision the only writer anywhere was the browser echoing `is_final` back through
+`POST /v4/agent_message`, so a finished turn's record was contingent on a socket, a tab and a fetch,
+and `failed` was written by nothing at all — the same dead enum ADR-031 found in `canceled`. **A
+settled status is never overwritten**: a later write of a different terminal status leaves the first
+alone, which is why the write is made conditional on the `_etag` it read rather than
+read-then-clobber. The first true answer stands, because a record corrected into being wrong is worse
+than one left alone. The set itself does not move for either decision — three members, fail-closed,
+and more Chats become deletable only by more turns actually ending.
 _Avoid_: terminal state, final status, deletable status
 
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that
