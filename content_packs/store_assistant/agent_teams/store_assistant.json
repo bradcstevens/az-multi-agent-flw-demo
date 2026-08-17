@@ -159,7 +159,59 @@
       "created": "",
       "creator": "",
       "logo": "Person",
-      "lane": "fast"
+      "lane": "fast",
+      "plan_steps": [
+        {
+          "id": 1,
+          "action": "Check the swap procedure for this store",
+          "assignee": {
+            "kind": "agent",
+            "name": "WorkforceAgent"
+          }
+        },
+        {
+          "id": 2,
+          "action": "Confirm you want Saturday 14 February covered",
+          "assignee": {
+            "kind": "person",
+            "name": "You",
+            "relation": "associate",
+            "simulated": false
+          },
+          "waitsOn": 1
+        },
+        {
+          "id": 3,
+          "action": "Ask Marcus Bell to take the shift",
+          "assignee": {
+            "kind": "person",
+            "name": "Marcus Bell",
+            "relation": "peer",
+            "simulated": true
+          },
+          "waitsOn": 2
+        },
+        {
+          "id": 4,
+          "action": "Ask Dana Reyes to approve the swap",
+          "assignee": {
+            "kind": "person",
+            "name": "Dana Reyes",
+            "relation": "manager",
+            "simulated": true
+          },
+          "waitsOn": 3
+        },
+        {
+          "id": 5,
+          "action": "Put the swap on the schedule",
+          "assignee": {
+            "kind": "agent",
+            "name": "WorkforceAgent"
+          },
+          "waitsOn": 4
+        }
+      ]
     }
   ]
 }

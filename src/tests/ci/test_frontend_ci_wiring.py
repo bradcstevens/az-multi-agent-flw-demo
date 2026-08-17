@@ -86,6 +86,14 @@ def test_the_mocked_unlock_contract_is_asserted_somewhere():
     )
 
 
+def test_the_reviewable_plan_contract_is_asserted_somewhere():
+    contract = Path(__file__).with_name("test_plan_approval_contract.py")
+
+    assert contract.exists(), (
+        "nothing asserts that Reviewable-plan person steps survive the backend-to-browser seam"
+    )
+
+
 def test_a_change_to_either_end_of_the_contract_runs_the_contract_test():
     # The contract test runs in `test.yml`, which triggers on Python paths — so
     # a backend rename runs it. A *frontend* rename would not have, because
@@ -114,6 +122,8 @@ def test_a_change_to_either_end_of_the_contract_runs_the_contract_test():
         "src/App/src/models/rehearsedReply.ts",
         "src/App/src/models/personalAnswer.ts",
         "src/App/src/models/signedInDevice.ts",
+        "src/App/src/models/plan.tsx",
+        "src/App/src/store/PlanDataService.tsx",
     ):
         assert text.count(f"'{path}'") >= 2, (
             f"a change to {path} does not run the transparency contract test on "

@@ -1929,6 +1929,7 @@ class TestTheApprovalIsTheTicketConfirmation:
         approved=True,
         session="s-1",
         ticket_on_approval=False,
+        plan_steps=None,
         record=None,
     ):
         mock_wait_approval.return_value = MockPlanApprovalResponse(
@@ -1950,8 +1951,31 @@ class TestTheApprovalIsTheTicketConfirmation:
                 task_text="I can't fix it, raise a ticket",
                 user_id="user-1",
                 ticket_on_approval=ticket_on_approval,
+                plan_steps=plan_steps or [],
             )
         return review, responses
+
+    @pytest.mark.asyncio
+    async def test_an_authored_step_list_replaces_the_generated_review_plan(self):
+        """The plan review frame carries the Quick Task's named people and
+        ordering, rather than asking the model to invent either."""
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to take the shift",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
+
+        await self._review(None, plan_steps=steps)
+
+        assert mock_convert.return_value.steps == steps
 
     @pytest.mark.asyncio
     async def test_approving_an_escalation_drafts_from_the_carried_record(self):

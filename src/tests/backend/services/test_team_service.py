@@ -100,6 +100,7 @@ class MockStartingTask:
     ticket_status_reply: Optional[dict] = None
     follow_on: str = None
     ticket_on_approval: bool = False
+    plan_steps: List[dict] = field(default_factory=list)
 
 @dataclass
 class MockTeamConfiguration:
@@ -404,6 +405,29 @@ class TestTeamConfigurationValidation:
                 _valid_task_data(ticket_status_reply=reply)
             ).ticket_status_reply
             == reply
+        )
+
+    def test_authored_person_steps_survive_the_upload(self):
+        """A Reviewable plan reaches the people the Quick Task names, not people
+        the model invents while it is running."""
+        service = TeamService()
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to take the shift",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
+
+        assert (
+            service._validate_and_parse_task(_valid_task_data(plan_steps=steps)).plan_steps
+            == [{**steps[0], "agent": ""}]
         )
 
     def test_rehearsed_replies_survive_the_upload(self):

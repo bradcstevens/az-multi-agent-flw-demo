@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -20,11 +20,36 @@ class PlanStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class AgentAssignee(BaseModel):
+    """An agent that can perform a Reviewable plan step."""
+
+    kind: Literal["agent"] = "agent"
+    name: str
+
+
+class PersonAssignee(BaseModel):
+    """A person the system can ask to complete a Reviewable plan step."""
+
+    kind: Literal["person"] = "person"
+    name: str
+    relation: Literal["associate", "peer", "manager"]
+    simulated: bool
+
+
+Assignee = Annotated[
+    Union[AgentAssignee, PersonAssignee],
+    Field(discriminator="kind"),
+]
+
+
 class MStep(BaseModel):
     """Model of a step in a plan."""
 
+    id: Optional[int] = None
     agent: str = ""
     action: str = ""
+    assignee: Optional[Assignee] = None
+    waitsOn: Optional[int] = None
 
 
 class MPlan(BaseModel):

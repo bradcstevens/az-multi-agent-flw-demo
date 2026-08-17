@@ -4,7 +4,11 @@ PlannerResponseStep, PlannerResponsePlan."""
 
 import uuid
 
+import pytest
+from pydantic import ValidationError
+
 from backend.models.plan_models import (AgentDefinition, MPlan, MStep,
+                                        AgentAssignee, PersonAssignee,
                                         PlannerResponsePlan,
                                         PlannerResponseStep, PlanStatus)
 
@@ -44,7 +48,61 @@ class TestMStep:
     def test_dict_round_trip(self):
         step = MStep(agent="A", action="do thing")
         d = step.model_dump()
-        assert d == {"agent": "A", "action": "do thing"}
+        assert d == {
+            "id": None,
+            "agent": "A",
+            "action": "do thing",
+            "assignee": None,
+            "waitsOn": None,
+        }
+
+    def test_a_person_step_carries_its_relation_simulation_and_order(self):
+        step = MStep(
+            id=3,
+            action="Ask Marcus Bell to take the shift",
+            assignee=PersonAssignee(
+                name="Marcus Bell",
+                relation="peer",
+                simulated=True,
+            ),
+            waitsOn=2,
+        )
+
+        assert step.model_dump() == {
+            "id": 3,
+            "agent": "",
+            "action": "Ask Marcus Bell to take the shift",
+            "assignee": {
+                "kind": "person",
+                "name": "Marcus Bell",
+                "relation": "peer",
+                "simulated": True,
+            },
+            "waitsOn": 2,
+        }
+
+    def test_an_agent_step_has_a_distinct_assignee_kind(self):
+        step = MStep(
+            id=1,
+            action="Check the swap procedure",
+            assignee=AgentAssignee(name="WorkforceAgent"),
+        )
+
+        assert step.assignee.kind == "agent"
+        assert step.assignee.name == "WorkforceAgent"
+
+    def test_a_person_step_rejects_an_unrecognised_relation(self):
+        with pytest.raises(ValidationError):
+            PersonAssignee(
+                name="Taylor Morgan",
+                relation="lead",
+                simulated=True,
+            )
+
+    def test_a_legacy_step_without_an_assignee_remains_readable(self):
+        step = MStep.model_validate({"agent": "WorkforceAgent", "action": "Look up policy"})
+
+        assert step.assignee is None
 
 
 class TestMPlan:

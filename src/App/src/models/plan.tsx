@@ -133,11 +133,29 @@ export interface Plan extends BaseModel {
     human_clarification_response?: string;
 }
 
+export type Assignee =
+    | {
+        kind: 'agent';
+        name: string;
+    }
+    | {
+        kind: 'person';
+        name: string;
+        relation: 'associate' | 'peer' | 'manager';
+        simulated: boolean;
+    };
+
 export interface MStepBE {
-    /** Agent responsible for the step */
-    agent: string;
+    /** The authored step identifier, absent from plan records written before #106. */
+    id?: number;
+    /** Agent responsible for a legacy or agent-assigned step. */
+    agent?: string;
     /** Action to be performed */
     action: string;
+    /** Who performs or receives the step. */
+    assignee?: Assignee;
+    /** The authored step that must resolve first. */
+    waitsOn?: number;
 }
 /**
  * Represents a user request item within the user_request object
@@ -265,6 +283,8 @@ export interface MPlanData {
         action: string;
         cleanAction: string;
         agent?: string;
+        assignee?: Assignee;
+        waitsOn?: number;
     }>;
     context: {
         task: string;
