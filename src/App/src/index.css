@@ -208,3 +208,7 @@ pre {
     left: 12px;
     top: 12px;
 }
+/* The conversation's single readable measure. */
+.conversation-measure {
+  max-width: 800px;
+}

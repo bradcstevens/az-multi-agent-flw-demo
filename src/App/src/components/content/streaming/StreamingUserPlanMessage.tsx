@@ -11,8 +11,7 @@ const renderUserPlanMessage = (planApprovalRequest: MPlanData | null,
     if (!userPlan) return null;
 
     return (
-        <div style={{
-            maxWidth: '800px',
+        <div className="conversation-measure" style={{
             margin: '0 auto 32px auto',
             padding: '0 24px',
             display: 'flex',

@@ -116,7 +116,8 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
       <ContentNotFound subtitle="The requested page could not be found." />
     );
   return (
-    <div style={{
+    <div     className="conversation-measure"
+    style={{
       display: 'flex',
       flexDirection: 'column',
       // `dvh`, not `vh`, for the reason the shell uses it: on iOS Safari
@@ -133,7 +134,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           flex: 1,
           overflow: 'auto',
           padding: '32px 0',
-          maxWidth: '800px',
           margin: '0 auto',
           width: '100%'
         }}

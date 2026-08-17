@@ -20,7 +20,6 @@ interface StreamingAgentMessageProps {
 
 const useStyles = makeStyles({
   container: {
-    maxWidth: '800px',
     margin: '0 auto 32px auto',
     padding: '0 24px',
     display: 'flex',
@@ -165,7 +164,7 @@ const renderAgentMessages = (
             {/* Scroll anchor placed just before the final message */}
             {isLastMessage && finalResultRef && <div ref={finalResultRef} />}
             <div
-              className={styles.container}
+              className={`${styles.container} conversation-measure`}
               style={{
                 flexDirection: isHuman ? 'row-reverse' : 'row'
               }}
