@@ -341,7 +341,7 @@ const ChatPage: React.FC = () => {
             } finally {
                 leavingChatRef.current = false;
                 resolveLeavingChat(turnEnded);
-                if (leavingChatDecisionRef.current === leavingChatDecision) {
+                if (!turnEnded && leavingChatDecisionRef.current === leavingChatDecision) {
                     leavingChatDecisionRef.current = null;
                 }
             }
