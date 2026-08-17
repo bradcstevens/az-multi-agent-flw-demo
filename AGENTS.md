@@ -2,6 +2,32 @@
 
 Repository instructions for coding agents working in this repo.
 
+## Worktrees
+
+**Never `git worktree add ../<anything>`.** A worktree of this repository lives inside
+`az-multi-agent-flw-demo.worktrees/`, never in the parent directory beside it — the parent
+directory is a list of projects, not a scratch space. Make one with the sanctioned path:
+
+```bash
+bash scripts/worktree.sh add issue-123      # creates in the containing folder, then sweeps
+bash scripts/worktree.sh sweep --dry-run    # what would be collected, without acting
+```
+
+A worktree is **collected once every commit in it is reachable from `origin/main`** — fetched and
+compared against the remote ref, never against local `main`, which drifts. The sweep runs on every
+creation, acts by default, and never passes `--force`: uncommitted files are stashed with an
+identifying message before removal, so nothing it does leaves this machine and `git stash list` is
+always the way back. It skips a worktree that is locked or was touched in the last 15 minutes, and
+exits non-zero — having removed nothing — when a stash fails or a worktree holds commits that exist
+on no remote. Worktrees another tool owns — git-loopy's `<run-id>/<lane>` lanes — are reported and
+never collected, because a paused run looks exactly like an abandoned worktree.
+
+[ADR-044](docs/ADR/044-an-agent-worktree-lives-in-the-containing-folder.md) is the decision and the
+evidence: thirteen flat siblings accumulated because no document said where a worktree belongs, and
+twelve separate sessions each answered that question differently. The decision logic is pure and
+lives in `scripts/worktree_hygiene.py`, so the CI-tooling loop tests the ladder that decides whether
+uncommitted work survives without needing a disk.
+
 ## Agent skills
 
 ### Issue tracker
@@ -90,7 +116,7 @@ on `PATH`. Set `DEV_VENV` to share one virtualenv across git worktrees.
 | Backend lint | `bash scripts/backend-lint.sh` | flake8 over `src/backend`, same config as `.github/workflows/pylint.yml`. |
 | Backend tests | `bash scripts/backend-tests.sh` | The Two-phase test invocation over `src/tests/backend` with an advisory 80% coverage report. |
 | MCP server tests | `bash scripts/mcp-tests.sh` | pytest over `src/tests/mcp_server` with MCP coverage; CI appends this coverage to the backend report. |
-| CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the repo's own tooling: the helpers the loops and `test.yml` share (the advisory coverage report and the `scripts/preflight/` checks) plus the durable record's invariants (ADR index, corrections record, documentation links), the presenter runbook's (every string it quotes is the repository's own) and the deploy path's stock-pack suppression. |
+| CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the repo's own tooling: the helpers the loops and `test.yml` share (the advisory coverage report and the `scripts/preflight/` checks) plus the durable record's invariants (ADR index, corrections record, documentation links), the presenter runbook's (every string it quotes is the repository's own), the deploy path's stock-pack suppression, and the worktree sweep's collection ladder. |
 | Frontend tests | `bash scripts/frontend-tests.sh` | vitest over `src/App/src` — the transparency panels and the WebSocket message contract they render. `npm ci` on first use, a no-op afterwards; runs in `.github/workflows/frontend-tests.yml`. |
 | SOP corpus | `python3 -m pytest tools/tests -q` | `content/sop/` and its builder `tools/sop_corpus/`. After editing a source, rebuild with `PYTHONPATH=tools python3 -m sop_corpus build`. |
 | Demo validator | `bash scripts/e2e-tests.sh` | TypeScript `@playwright/test` over `e2e/` — the walkthrough asserted through a real browser against a **running deployment**. The only loop here that observes one; every other loop runs against fakes. `--target local` runs the same specs against a local surface. Not in any workflow, deliberately (see below). |
