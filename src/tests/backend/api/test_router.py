@@ -7,6 +7,7 @@ interpreter state for other test files that import the same real modules.
 """
 
 import contextlib
+import asyncio
 import json
 import logging
 import os
@@ -337,7 +338,7 @@ class TestInitTeam:
         rt.team_service.get_team_configuration.return_value = team_conf
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
-        assert resp.json()["status"] == "Request started successfully"
+        assert resp.json() == {"team_id": "team-abc"}
 
     def test_current_team_used(self, rt):
         current = MagicMock()
@@ -347,6 +348,18 @@ class TestInitTeam:
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
         assert resp.json()["team_id"] == "team-current"
+
+    def test_attaches_the_team_without_building_a_workflow(self, rt):
+        current = MagicMock()
+        current.team_id = "team-current"
+        rt.store.get_current_team.return_value = current
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+
+        response = rt.client.get("/api/v4/init_team")
+
+        assert response.status_code == 200
+        assert response.json() == {"team_id": "team-current"}
+        rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
 
     def test_team_configuration_missing_clears(self, rt):
         current = MagicMock()
@@ -381,6 +394,42 @@ class TestProcessRequest:
         rt.store.get_team_by_id.return_value = None
         resp = rt.client.post("/api/v4/process_request", json=self._payload())
         assert resp.status_code == 400
+
+    def test_request_attaches_its_known_team_when_initialization_is_in_flight(
+        self, rt, monkeypatch
+    ):
+        class CapturedTask:
+            def done(self):
+                return True
+
+        def discard(coroutine):
+            coroutine.close()
+            return CapturedTask()
+
+        monkeypatch.setattr(router_mod.asyncio, "create_task", discard)
+        team = MagicMock()
+        rt.store.get_current_team.return_value = None
+        rt.store.get_team_by_id = AsyncMock(
+            side_effect=lambda team_id: team if team_id == "team-current" else None
+        )
+        rt.rai_success.return_value = True
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-1",
+                "description": "do the thing",
+                "team_id": "team-current",
+            },
+        )
+
+        assert response.status_code == 200
+        rt.team_service.handle_team_selection.assert_awaited_once_with(
+            user_id="user-1", team_id="team-current"
+        )
+        rt.team_config.set_current_team.assert_called_once_with(
+            user_id="user-1", team_configuration=team
+        )
 
     def test_rai_failure(self, rt):
         rt.store.get_team_by_id.return_value = MagicMock()
@@ -894,8 +943,8 @@ class TestTheMockedSignIn:
 
 
 # ---------------------------------------------------------------------------
-# /process_request — the lane router and the Workflow cache (issues #15 and
-# #16, ADR-013)
+# /process_request — the lane router and Workflow construction (issues #15,
+# #16, and #118, ADR-013)
 # ---------------------------------------------------------------------------
 class TestPerRequestPlanReview:
     """The Lane a request takes reaches the orchestration call as Plan review.
@@ -921,38 +970,6 @@ class TestPerRequestPlanReview:
             .call_args.kwargs["plan_review"]
         )
 
-    def _eagerly_built_workflow(self, rt, plan_review=True):
-        """What /init_team leaves in the Workflow cache before any task.
-
-        The manager is mocked, so it is wired here to do what the real one does
-        on a rebuild — install the new Workflow in the cache — otherwise the
-        stale one would still be installed at the end of a "rebuild" and the
-        test could not tell the difference.
-        """
-        workflow = MagicMock()
-        workflow._terminated = False
-        workflow._is_running = False
-        workflow._team_id = None
-        workflow._plan_review = plan_review
-        cache = {"current": workflow}
-        rt.orchestration_config.get_current_orchestration.side_effect = (
-            lambda _user_id: cache["current"]
-        )
-
-        async def rebuild(**kwargs):
-            rebuilt = MagicMock()
-            rebuilt._terminated = False
-            rebuilt._is_running = False
-            # None matches the team_id the router resolves for this fixture, so
-            # the team term cannot mask the lane term being tested.
-            rebuilt._team_id = None
-            rebuilt._plan_review = kwargs["plan_review"]
-            cache["current"] = rebuilt
-            return rebuilt
-
-        rt.orchestration_manager.get_current_or_new_orchestration.side_effect = rebuild
-        return cache
-
     def test_a_deliberate_lane_request_keeps_the_approval_gate(self, rt):
         assert self._post(rt, lane="deliberate").status_code == 200
         assert self._plan_review_passed(rt) is True
@@ -960,6 +977,65 @@ class TestPerRequestPlanReview:
     def test_a_fast_lane_request_turns_the_approval_gate_off(self, rt):
         assert self._post(rt, lane="fast").status_code == 200
         assert self._plan_review_passed(rt) is False
+
+    def test_a_fast_first_question_builds_once_for_its_lane(self, rt, monkeypatch):
+        scheduled = []
+
+        class CapturedTask:
+            def done(self):
+                return True
+
+        def capture(coroutine):
+            scheduled.append(coroutine)
+            return CapturedTask()
+
+        monkeypatch.setattr(router_mod.asyncio, "create_task", capture)
+        current = MagicMock()
+        current.team_id = "team-current"
+        rt.store.get_current_team.return_value = current
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+
+        assert rt.client.get("/api/v4/init_team").json() == {
+            "team_id": "team-current"
+        }
+        assert self._post(rt, lane="fast").status_code == 200
+
+        # The response attaches the team and starts the request task before a
+        # Workflow exists. Running that captured task is the real route's
+        # asynchronous continuation, not a second implementation of it.
+        rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
+        assert len(scheduled) == 1
+        asyncio.run(scheduled.pop())
+        rt.orchestration_manager.get_current_or_new_orchestration.assert_awaited_once()
+        assert self._plan_review_passed(rt) is False
+
+    def test_a_workflow_build_failure_finishes_the_accepted_request(
+        self, rt, monkeypatch
+    ):
+        scheduled = []
+
+        class CapturedTask:
+            def done(self):
+                return True
+
+        def capture(coroutine):
+            scheduled.append(coroutine)
+            return CapturedTask()
+
+        monkeypatch.setattr(router_mod.asyncio, "create_task", capture)
+        rt.orchestration_manager.get_current_or_new_orchestration.side_effect = (
+            RuntimeError("agent pool unavailable")
+        )
+
+        assert self._post(rt, lane="fast").status_code == 200
+
+        asyncio.run(scheduled.pop())
+
+        persisted = rt.store.add_plan.await_args.args[0]
+        assert persisted.overall_status is router_mod.PlanStatus.failed
+        sent = rt.connection_config.send_status_update_async.await_args
+        assert sent.args[0]["type"] is WebsocketMessageType.FINAL_RESULT_MESSAGE
+        assert sent.args[0]["data"]["status"] == "error"
 
     def test_an_authored_ticket_status_inquiry_turns_the_approval_gate_off(self, rt):
         """The word ``ticket`` cannot override the reply's declared Fast lane."""
@@ -1019,41 +1095,6 @@ class TestPerRequestPlanReview:
         """
         assert self._post(rt).json()["lane"] == "fast"
         assert self._post(rt, lane="deliberate").json()["lane"] == "deliberate"
-
-    def test_the_first_request_after_a_page_load_is_not_served_the_eager_workflow(
-        self, rt
-    ):
-        """The Workflow cache fix, at the endpoint.
-
-        /init_team eagerly builds a Workflow with Plan review on before any
-        task is submitted. Without the fix the very first Fast lane request
-        reuses it and silently runs in the Deliberate lane.
-        """
-        cache = self._eagerly_built_workflow(rt, plan_review=True)
-        eager = cache["current"]
-
-        assert self._post(rt, lane="fast").status_code == 200
-
-        rt.orchestration_manager.get_current_or_new_orchestration.assert_awaited()
-        assert self._plan_review_passed(rt) is False
-        # The stale Workflow is gone from the cache, replaced by a Fast lane one
-        assert cache["current"] is not eager
-        assert cache["current"]._plan_review is False
-
-    def test_a_workflow_already_built_for_this_lane_is_reused(self, rt):
-        """The complement: matching lane, matching team, nothing to rebuild.
-
-        Together with the test above this isolates the Plan review term — the
-        two differ in nothing but the lane the cached Workflow was built for.
-        """
-        cache = self._eagerly_built_workflow(rt, plan_review=False)
-        cached = cache["current"]
-
-        assert self._post(rt, lane="fast").status_code == 200
-
-        rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
-        assert cache["current"] is cached
-
 
 # ---------------------------------------------------------------------------
 # /session_state — server-side session state (issue #20)

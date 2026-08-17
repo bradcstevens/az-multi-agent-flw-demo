@@ -121,6 +121,18 @@ beforeEach(() => {
 });
 
 describe('the rail states who is available, before a question is typed', () => {
+    it('accepts a question once the team is known while initialization continues', async () => {
+        vi.mocked(TeamService.initializeTeam).mockReturnValue(
+            new Promise(() => {}) as never,
+        );
+        renderHome();
+
+        const textbox = await screen.findByRole('textbox');
+        await userEvent.type(textbox, 'How do I close the store?');
+
+        expect(textbox).toHaveValue('How do I close the store?');
+    });
+
     it('counts the specialists from the roster with nothing yet sent', async () => {
         renderHome();
 

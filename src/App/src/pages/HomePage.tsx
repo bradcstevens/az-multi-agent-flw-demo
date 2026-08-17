@@ -77,13 +77,16 @@ const HomePage: React.FC = () => {
                 dispatch(setSelectedTeam(storeAssistant));
                 TeamService.storageTeam(storeAssistant);
 
-                // The backend still has to build the workflow for it; the
-                // response is only interesting when it fails.
-                const initResponse = await TeamService.initializeTeam();
-                if (!initResponse.success) {
-                    console.error('Store assistant init failed:', initResponse.error);
-                    showToast('The store assistant could not be started. Please try again.', 'warning');
-                }
+                // Attaching the known team is enough for the associate to ask.
+                // Workflow construction continues without becoming a surface
+                // phase; no signal reports it (ADR-023).
+                void (async () => {
+                    const initResponse = await TeamService.initializeTeam();
+                    if (!initResponse.success) {
+                        console.error('Store assistant init failed:', initResponse.error);
+                        showToast('The store assistant could not be started. Please try again.', 'warning');
+                    }
+                })();
             } catch (error) {
                 console.error('Store assistant initialization error:', error);
                 dispatch(setSelectedTeam(null));

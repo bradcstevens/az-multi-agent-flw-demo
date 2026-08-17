@@ -20,15 +20,13 @@ export class TeamService {
     }
 
     /**
-     * Initialize user's team with default HR team configuration
-     * This calls the backend /init_team endpoint which sets up the default team
+     * Attach the user's current team.
+     * This calls /init_team, which returns the attached team identifier.
      */
     static async initializeTeam(team_switched: boolean = false): Promise<{
         success: boolean;
         data?: {
-            status: string;
             team_id?: string;
-            team?: any;
             requires_team_upload?: boolean;
         };
         error?: string;

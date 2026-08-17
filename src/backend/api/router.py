@@ -165,7 +165,7 @@ async def init_team(
     request: Request,
     team_switched: bool = Query(False),
 ):  # add team_switched: bool parameter
-    """Initialize the user's current team of agents"""
+    """Attach the user's current team."""
 
     # Get first available team from 4 to 1 (RFP -> Retail -> Marketing -> HR)
     # Falls back to HR if no teams are available.
@@ -232,18 +232,8 @@ async def init_team(
             user_id=user_id, team_configuration=team_configuration
         )
 
-        # Initialize agent team for this user session
-        await OrchestrationManager.get_current_or_new_orchestration(
-            user_id=user_id,
-            team_config=team_configuration,
-            team_switched=team_switched,
-            team_service=team_service,
-        )
-
         return {
-            "status": "Request started successfully",
             "team_id": init_team_id,
-            "team": team_configuration,
         }
 
     except Exception as e:
@@ -394,14 +384,28 @@ async def process_request(
         if memory_store is None:
             memory_store = await DatabaseFactory.get_database(user_id=user_id)
         user_current_team = await memory_store.get_current_team(user_id=user_id)
-        team_id = None
-        if user_current_team:
-            team_id = user_current_team.team_id
+        team_id = (
+            user_current_team.team_id
+            if user_current_team is not None
+            else input_task.team_id
+        )
         team = await memory_store.get_team_by_id(team_id=team_id)
         if not team:
             raise HTTPException(
                 status_code=404,
                 detail=f"Team configuration '{team_id}' not found or access denied",
+            )
+        if user_current_team is None:
+            attached_team = await TeamService(memory_store).handle_team_selection(
+                user_id=user_id, team_id=team_id
+            )
+            if attached_team is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not attach team configuration '{team_id}'",
+                )
+            team_config.set_current_team(
+                user_id=user_id, team_configuration=team
             )
     except Exception as e:
         raise HTTPException(
@@ -490,13 +494,9 @@ async def process_request(
         )
         raise HTTPException(status_code=500, detail="Failed to create plan") from e
 
-    # Ensure the workflow is valid (rebuild if terminated or stuck from a prior run)
+    # A currently running workflow cannot serve a new turn. The background
+    # request task below will rebuild its shell after the prior turn is cancelled.
     current_workflow = orchestration_config.get_current_orchestration(user_id)
-
-    cached_team_id = getattr(current_workflow, "_team_id", None)
-    team_mismatch = (
-        current_workflow is not None and cached_team_id != team_id
-    )
 
     # The lane router (ADR-013). Below the Identity boundary gate on purpose:
     # the two are separate components with opposite failure modes — the gate
@@ -521,59 +521,55 @@ async def process_request(
                 exc_info=True,
             )
 
-    # The cache-invalidation predicate's lane term (ADR-013). /init_team eagerly
-    # builds a workflow before any task is submitted, so without this the first
-    # request after a page load reuses that workflow and silently ignores the
-    # lane this request was routed into.
-    cached_plan_review = getattr(current_workflow, "_plan_review", None)
-    plan_review_mismatch = (
-        current_workflow is not None
-        and cached_plan_review != lane.plan_review
-    )
-
-    workflow_unusable = (
-        current_workflow is None
-        or getattr(current_workflow, "_terminated", False)
-        or getattr(current_workflow, "_is_running", False)
-        or team_mismatch
-        or plan_review_mismatch
-    )
-    if workflow_unusable:
-        logger.info(
-            "Workflow unusable for user '%s' (None=%s, terminated=%s, is_running=%s, "
-            "team_mismatch=%s cached_team=%s selected_team=%s, "
-            "plan_review_mismatch=%s cached_plan_review=%s lane=%s) "
-            "— rebuilding",
-            user_id,
-            current_workflow is None,
-            getattr(current_workflow, "_terminated", False),
-            getattr(current_workflow, "_is_running", False),
-            team_mismatch,
-            cached_team_id,
-            team_id,
-            plan_review_mismatch,
-            cached_plan_review,
-            lane.value,
-        )
-
-        # Force-clear the running flag so get_current_or_new_orchestration
-        # sees it as terminated and takes the lightweight reset path.
-        if current_workflow is not None and getattr(current_workflow, "_is_running", False):
-            current_workflow._is_running = False
-            current_workflow._terminated = True
-        team_service = TeamService(memory_store)
-        await OrchestrationManager.get_current_or_new_orchestration(
-            user_id=user_id,
-            team_config=team,
-            team_switched=False,
-            team_service=team_service,
-            plan_review=lane.plan_review,
-        )
+    if current_workflow is not None and getattr(current_workflow, "_is_running", False):
+        current_workflow._is_running = False
+        current_workflow._terminated = True
 
     try:
 
         async def run_orchestration_task(rehearsal_token):
             try:
+                # A Workflow's Plan review tag belongs to the Lane this request
+                # took. Team attachment never guesses it, so a Fast first
+                # question builds its only workflow with review disabled.
+                try:
+                    await OrchestrationManager.get_current_or_new_orchestration(
+                        user_id=user_id,
+                        team_config=team,
+                        team_switched=False,
+                        team_service=TeamService(memory_store),
+                        plan_review=lane.plan_review,
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to build Workflow for plan '%s'", plan_id
+                    )
+                    plan.overall_status = PlanStatus.failed
+                    try:
+                        await memory_store.update_item(plan)
+                    except Exception:
+                        logger.exception(
+                            "Failed to mark plan '%s' as failed", plan_id
+                        )
+                    try:
+                        await connection_config.send_status_update_async(
+                            {
+                                "type": WebsocketMessageType.FINAL_RESULT_MESSAGE,
+                                "data": {
+                                    "content": f"Unable to start the request: {exc}",
+                                    "status": "error",
+                                    "timestamp": asyncio.get_running_loop().time(),
+                                },
+                            },
+                            user_id,
+                            message_type=WebsocketMessageType.FINAL_RESULT_MESSAGE,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to report Workflow build failure for plan '%s'",
+                            plan_id,
+                        )
+                    return
                 await OrchestrationManager().run_orchestration(user_id, input_task)
             finally:
                 # The rehearsal marker's bound (#54). It stands for every SOP
