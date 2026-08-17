@@ -952,6 +952,19 @@ class TestPerRequestPlanReview:
         assert self._post(rt).status_code == 200
         assert self._plan_review_passed(rt) is False
 
+    def test_a_typed_shift_swap_procedure_question_skips_plan_review(self, rt):
+        """A free-typed question is a Fast lookup, not a transaction.
+
+        The Plan record still exists for the chat history; the observable
+        difference is that this request reaches orchestration with Plan review
+        off, so it asks the associate to approve nothing.
+        """
+        response = self._post(rt, description="How does swapping shifts work?")
+
+        assert response.status_code == 200
+        assert response.json()["lane"] == "fast"
+        assert self._plan_review_passed(rt) is False
+
     def test_free_typed_escalation_keeps_the_approval_gate(self, rt):
         resp = self._post(rt, description="I can't fix it, please escalate this")
 
