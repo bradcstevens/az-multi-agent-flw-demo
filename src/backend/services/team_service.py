@@ -176,11 +176,12 @@ class TeamService:
             # typing the answer on stage.
             rehearsed_replies=list(task_data.get("rehearsed_replies") or []),
             ticket_status_reply=task_data.get("ticket_status_reply"),
-            # The follow-on is optional because most tasks begin and end their
-            # own conversation. It is nevertheless explicit: omitted here,
-            # it is silently lost during upload and the escalation returns to
+            # The Follow-on tasks are optional because most tasks begin and end
+            # their own conversation. They are nevertheless explicit: omitted
+            # here, they are silently lost during upload and the task returns to
             # the home grid with a fresh session.
-            follow_on=task_data.get("follow_on"),
+            follow_on=list(task_data.get("follow_on") or []),
+            context_dependent=task_data.get("context_dependent", False),
             ticket_on_approval=task_data.get("ticket_on_approval", False),
             plan_steps=[
                 MStep.model_validate(step).model_dump(mode="json")

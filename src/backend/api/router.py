@@ -473,6 +473,7 @@ async def process_request(
             session_id=input_task.session_id,
             team_id=team_id,
             initial_goal=input_task.description,
+            starting_task_id=input_task.starting_task_id,
             overall_status=PlanStatus.in_progress,
         )
         await memory_store.add_plan(plan)

@@ -46,6 +46,8 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   rehearsedReplies: string[];
   /** The task this conversation can lead to (issue #61, ADR-024). */
   followOnTask?: StartingTask;
+  /** The Quick Tasks the current turn can lead to (issue #132, ADR-033). */
+  followOnTasks?: StartingTask[];
   onFollowOnTask?: (task: StartingTask) => void;
   /** The authored inquiry this Chat offers after it raises its Simulated ticket. */
   ticketStatusReply?: TicketStatusReplyModel;
@@ -91,6 +93,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   processingApproval,
   rehearsedReplies,
   followOnTask,
+  followOnTasks,
   onFollowOnTask,
   ticketStatusReply,
   onTicketStatusReply,
@@ -225,17 +228,20 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         </div>
       )}
 
-      {followOnTask && onFollowOnTask && (
-        <FollowOnTask
-          task={followOnTask}
-          onSelect={onFollowOnTask}
-          /*
-            Also while this chat is working: a continuation turn replaces the
-            running one rather than queueing behind it, and the card is the
-            other way in (#77).
-          */
-          disabled={continuationSubmitting || turnInFlight}
-        />
+      {(followOnTasks ?? (followOnTask ? [followOnTask] : [])).map((task) =>
+        onFollowOnTask ? (
+          <FollowOnTask
+            key={task.id}
+            task={task}
+            onSelect={onFollowOnTask}
+            /*
+              Also while this chat is working: a continuation turn replaces the
+              running one rather than queueing behind it, and the card is the
+              other way in (#77).
+            */
+            disabled={continuationSubmitting || turnInFlight}
+          />
+        ) : null,
       )}
 
       {/* Chat Input - only show if no plan is waiting for approval */}

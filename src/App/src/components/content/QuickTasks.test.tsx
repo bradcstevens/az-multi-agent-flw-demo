@@ -35,13 +35,13 @@ const renderInput = (team: any) =>
 const SEVEN_TASKS = [
     { id: 'task-223-procedure', name: 'Close the store', prompt: 'How do I close the store?', created: '', creator: '', logo: 'BookMarked', lane: 'fast' },
     { id: 'task-223-honest-miss', name: 'Restart the car wash', prompt: 'How do I restart the car wash?', created: '', creator: '', logo: 'Search', lane: 'fast' },
-    { id: 'task-223-troubleshooting', name: 'The coffee brewer is down', prompt: 'The coffee brewer is down.', created: '', creator: '', logo: 'Wrench', lane: 'fast', follow_on: 'task-223-escalation' },
-    { id: 'task-223-escalation', name: "I can't fix it", prompt: 'I have tried everything and I need someone to come out.', created: '', creator: '', logo: 'Document', lane: 'deliberate' },
+    { id: 'task-223-troubleshooting', name: 'The coffee brewer is down', prompt: 'The coffee brewer is down.', created: '', creator: '', logo: 'Wrench', lane: 'fast', follow_on: ['task-223-escalation'] },
+    { id: 'task-223-escalation', name: "I can't fix it", prompt: 'I have tried everything and I need someone to come out.', created: '', creator: '', logo: 'Document', lane: 'deliberate', context_dependent: true },
     { id: 'task-223-identity', name: 'How much PTO do I have?', prompt: 'My name is Tanya, how much PTO do I have?', created: '', creator: '', logo: 'Shield', lane: 'fast' },
     { id: 'task-223-shift-tasks', name: 'What is due this shift?', prompt: 'What tasks are due on this shift?', created: '', creator: '', logo: '📋', lane: 'fast' },
     { id: 'task-223-shift-swap', name: 'Swap a shift', prompt: 'Marcus Bell and I have agreed to swap our Saturday shifts. Start the swap.', created: '', creator: '', logo: 'People', lane: 'deliberate' },
 ];
-const HOME_TASKS = SEVEN_TASKS.filter((task) => task.id !== 'task-223-escalation');
+const HOME_TASKS = SEVEN_TASKS.filter((task) => !task.context_dependent);
 
 const walkthrough = (tasks: any[] = SEVEN_TASKS) => ({
     team_id: '00000000-0000-0000-0000-000000000223',
@@ -69,6 +69,16 @@ describe('the walkthrough as one-tap tasks', () => {
             expect(screen.getByText(task.name)).toBeInTheDocument();
         }
         expect(screen.queryByText("I can't fix it")).not.toBeInTheDocument();
+    });
+
+    it('keeps a task on the home grid when another task merely names it as a Follow-on', () => {
+        const connectedHomeTask = {
+            ...SEVEN_TASKS[5],
+            follow_on: ['task-223-escalation'],
+        };
+        renderInput(walkthrough([...SEVEN_TASKS.slice(0, 5), connectedHomeTask, SEVEN_TASKS[6]]));
+
+        expect(screen.getByText(connectedHomeTask.name)).toBeInTheDocument();
     });
 
     it('lays the tasks out as the grid, not inside one cell of it', () => {

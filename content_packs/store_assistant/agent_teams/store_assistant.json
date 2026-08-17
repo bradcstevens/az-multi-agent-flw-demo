@@ -113,7 +113,7 @@
       "creator": "",
       "logo": "Wrench",
       "lane": "fast",
-      "follow_on": "task-223-escalation",
+      "follow_on": ["task-223-escalation"],
       "rehearsed_replies": [
         "I switched it off at the wall and back on again.",
         "I put a fresh paper filter in and rinsed the brew head.",
@@ -128,6 +128,7 @@
       "creator": "",
       "logo": "Document",
       "lane": "deliberate",
+      "context_dependent": true,
       "ticket_on_approval": true,
       "ticket_status_reply": {
         "prompt": "What's happening with my ticket?",

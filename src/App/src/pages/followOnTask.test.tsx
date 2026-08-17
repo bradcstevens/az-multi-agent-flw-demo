@@ -86,7 +86,7 @@ const TEAM = {
             creator: '',
             logo: 'Wrench',
             lane: 'fast',
-            follow_on: 'task-223-escalation',
+            follow_on: ['task-223-escalation', 'task-223-honest-miss'],
         },
         {
             id: 'task-223-escalation',
@@ -102,6 +102,15 @@ const TEAM = {
                 lane: 'fast',
             },
         },
+        {
+            id: 'task-223-honest-miss',
+            name: 'Restart the car wash',
+            prompt: 'How do I restart the car wash?',
+            created: '',
+            creator: '',
+            logo: 'Search',
+            lane: 'fast',
+        },
     ],
 } satisfies TeamConfig;
 
@@ -110,6 +119,7 @@ const PLAN_DATA = {
         id: 'plan-troubleshooting',
         data_type: 'plan',
         initial_goal: 'The coffee brewer is down.',
+        starting_task_id: 'task-223-troubleshooting',
         session_id: 'session-223-troubleshooting',
         timestamp: '',
         plan_id: 'plan-troubleshooting',
@@ -168,7 +178,7 @@ const makeStore = () => {
     return store;
 };
 
-const renderPlan = (planData = PLAN_DATA) => {
+const renderPlan = (planData: ProcessedPlanData = PLAN_DATA) => {
     const store = makeStore();
     vi.mocked(PlanDataService.fetchPlanData).mockResolvedValue(planData);
     const result = render(
@@ -205,6 +215,37 @@ describe('the troubleshooting follow-on task', () => {
                 'deliberate',
                 'session-223-troubleshooting',
                 'task-223-escalation',
+            ),
+        );
+    });
+
+    it('offers no Follow-on task for free-typed words matching an authored prompt', async () => {
+        renderPlan({
+            ...PLAN_DATA,
+            plan: {
+                ...PLAN_DATA.plan,
+                starting_task_id: undefined,
+            },
+        } as ProcessedPlanData);
+
+        expect(
+            await screen.findByRole('textbox'),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: "I can't fix it" })).not.toBeInTheDocument();
+    });
+
+    it('continues the viewed session on the declared lane of each offered Quick Task', async () => {
+        renderPlan();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Restart the car wash' }));
+
+        await waitFor(() =>
+            expect(TaskService.createPlan).toHaveBeenCalledWith(
+                'How do I restart the car wash?',
+                'team-223',
+                'fast',
+                'session-223-troubleshooting',
+                'task-223-honest-miss',
             ),
         );
     });
