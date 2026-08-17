@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Prototype: transparency rail disclosure</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; margin: 2rem auto; max-width: 44rem; color: #1f2937; }
+    button { margin: .25rem; padding: .5rem .75rem; }
+    .state { background: #eef6f8; border-left: 4px solid #007f86; margin: 1rem 0; padding: 1rem; }
+    .scenario { border-top: 1px solid #d1d5db; margin-top: 1.5rem; padding-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Transparency rail disclosure prototype</h1>
+  <p>
+    Question: does a Redux-only rail state let the presenter close the transparency panels without
+    losing the first cross-platform provenance signal, while a new conversation returns to the
+    expanded default? Manual choice must win for the current conversation.
+  </p>
+
+  <h2>Current state</h2>
+  <div class="state" id="state"></div>
+
+  <h2>Free play</h2>
+  <button onclick="dispatch({ type: 'toggle' })">Toggle transparency panels</button>
+  <button onclick="dispatch({ type: 'sourceUsed' })">Receive first provenance signal</button>
+  <button onclick="dispatch({ type: 'conversationStarted' })">Start a new conversation</button>
+
+  <section class="scenario">
+    <h2>Manual close before provenance</h2>
+    <p>Close the rail, then receive provenance. The rail stays closed because the presenter chose it.</p>
+    <button onclick="run([{ type: 'toggle' }, { type: 'sourceUsed' }])">Run scenario</button>
+  </section>
+
+  <section class="scenario">
+    <h2>Automatic expansion</h2>
+    <p>Close and reopen the rail before provenance. The unpinned rail is already open; provenance changes nothing.</p>
+    <button onclick="run([{ type: 'toggle' }, { type: 'toggle' }, { type: 'sourceUsed' }])">Run scenario</button>
+  </section>
+
+  <section class="scenario">
+    <h2>New conversation</h2>
+    <p>Close the rail, then start a new conversation. The new conversation begins expanded and unpinned.</p>
+    <button onclick="run([{ type: 'toggle' }, { type: 'conversationStarted' }])">Run scenario</button>
+  </section>
+
+  <script>
+    const initialState = { expanded: true, manuallyPinned: false, sourceSeen: false };
+
+    function reduce(state, action) {
+      switch (action.type) {
+        case 'toggle':
+          return { ...state, expanded: !state.expanded, manuallyPinned: true };
+        case 'sourceUsed':
+          return {
+            ...state,
+            sourceSeen: true,
+            expanded: state.manuallyPinned ? state.expanded : true,
+          };
+        case 'conversationStarted':
+          return initialState;
+        default:
+          return state;
+      }
+    }
+
+    let state = initialState;
+    function render() {
+      document.getElementById('state').innerHTML =
+        '<strong>Transparency panels:</strong> ' + (state.expanded ? 'expanded' : 'collapsed') + '<br>' +
+        '<strong>Manual choice for this conversation:</strong> ' + (state.manuallyPinned ? 'yes' : 'no') + '<br>' +
+        '<strong>Provenance signal received:</strong> ' + (state.sourceSeen ? 'yes' : 'no');
+    }
+    function dispatch(action) {
+      state = reduce(state, action);
+      render();
+    }
+    function run(actions) {
+      state = initialState;
+      actions.forEach(dispatch);
+    }
+    render();
+  </script>
+</body>
+</html>
