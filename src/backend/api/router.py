@@ -21,6 +21,7 @@ from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
 from associate.answer import personal_answer_detail
 from associate.records import DEMO_ASSOCIATE, lookup_associate
 from chat.deletion import STILL_RUNNING_DETAIL, DeletionOutcome
+from chat.turn import TurnOutcome, end_turn
 from guardrail.gate import identity_boundary_gate
 from guardrail.identity import ANONYMOUS
 from guardrail.refusal import policy_block_detail
@@ -593,23 +594,28 @@ async def process_request(
                 # asynchronously and could otherwise outlive its successor's
                 # arming — the presenter asking the rehearsed question twice.
                 end_rehearsal_turn(input_task.session_id, rehearsal_token)
-                # Clear our slot if we're still the registered active task
-                current = orchestration_config.active_tasks.get(user_id)
-                if current is not None and current.done():
-                    orchestration_config.active_tasks.pop(user_id, None)
+                # Give up our slot, by identity: a cancelled turn's cleanup
+                # runs after its successor has already registered, and a
+                # release keyed on the user alone would take that successor
+                # with it.
+                orchestration_config.release_active_turn(user_id, asyncio.current_task())
 
-        # Cancel any in-flight orchestration for this user before starting a new one
-        prior_task = orchestration_config.active_tasks.get(user_id)
-        if prior_task is not None and not prior_task.done():
+        # Cancel any turn this user already has in flight, whichever Chat it
+        # belongs to, before starting a new one — the Workflow is cached per
+        # user, so a second turn replaces the first rather than running beside
+        # it. **Ending a turn** is the session-scoped operation (ADR-031 §6);
+        # this one is not, deliberately, and does not write a status.
+        prior = orchestration_config.active_turn(user_id)
+        if prior is not None:
             try:
-                prior_task.cancel()
+                prior.task.cancel()
                 # Give the cancelled task a chance to clean up
                 await asyncio.sleep(0)
             except Exception:
                 logger.exception(
                     "Failed to cancel prior orchestration task for user '%s'", user_id
                 )
-            orchestration_config.active_tasks.pop(user_id, None)
+            orchestration_config.release_active_turn(user_id, prior.task)
 
         # Schedule new task and register it so subsequent requests can cancel it
         # The marker is armed here, after the prior turn's cancellation has had
@@ -619,7 +625,9 @@ async def process_request(
                 note_rehearsal(input_task.session_id) if is_rehearsal else None
             )
         )
-        orchestration_config.active_tasks[user_id] = new_task
+        orchestration_config.register_active_turn(
+            user_id, input_task.session_id, new_task
+        )
 
         return {
             "status": "Request started successfully",
@@ -2253,6 +2261,69 @@ async def get_plans(request: Request):
     )
 
     return all_plans
+
+
+@app_router.post("/chats/{session_id}/end_turn")
+async def end_chat_turn(session_id: str, request: Request):
+    """End one Chat's turn — the primitive, at the wire (#120, ADR-031).
+
+    ---
+    tags:
+      - Chats
+
+    **Leaving a Chat** reaches it through here. So will deleting a running
+    Chat (#122) and a **Clarification** that expires (#123), and all three are
+    the same act: the in-flight orchestration for *this session* is cancelled
+    and this session's **Plan record** is written `canceled`. That is not new
+    behaviour dressed as a fix — the turn is already destroyed today, silently,
+    leaving an **Abandoned turn** and a record stuck at `in_progress` for ever
+    that no delete route will take.
+
+    ADR-031 names this endpoint as a cost of its own decisions: nothing
+    session-scoped could say *"end this Chat's turn"*, only the destructive
+    `/plan_approval` rejection and the implicit per-user cancel inside
+    `process_request`. It is deliberately **not** the approval route: ending is
+    not rejecting, and #108 made `approved: false` mean *"send it back"*.
+
+    A Chat that has already reached a **Settled status** answers 200 saying so
+    and is left exactly as it is, and a session this user has no Plan record in
+    is 404 — the same reading ``delete_chat`` takes of a session id, which is
+    not a secret.
+    """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        track_event_if_configured(
+            "Error_User_Not_Found", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    result = await end_turn(
+        user_id=user_id,
+        session_id=session_id,
+        memory_store=memory_store,
+        orchestration=orchestration_config,
+    )
+
+    if result.outcome is TurnOutcome.no_such_chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    track_event_if_configured(
+        "Turn_Ended",
+        {
+            "status": result.outcome.value,
+            "cancelled": result.cancelled,
+            "session_id": session_id,
+            "user_id": user_id,
+        },
+    )
+
+    return {
+        "status": result.outcome.value,
+        "session_id": session_id,
+        "cancelled": result.cancelled,
+    }
 
 
 @app_router.delete("/chats")

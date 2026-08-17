@@ -239,6 +239,30 @@ browser echoing frames back, the turn leaves **no** record — no transcript row
 was lost, but one whose loss the surface went on denying.
 _Avoid_: orphaned plan, stuck plan, stale chat
 
+**Ending a turn** — the one primitive behind every end-of-turn behaviour, with one declaration in
+`src/backend/chat/turn.py` and one route, `POST /api/v4/chats/{session_id}/end_turn` (#120,
+[ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md)). It cancels the in-flight orchestration for
+**one session** and writes `canceled` onto that session's **Plan record**. **Leaving a Chat**,
+deleting a running Chat and an expired **Clarification** all reach it, and they reach *it* rather
+than each growing a copy of the cancellation flow.
+
+Three properties are the whole of it. It is **session-scoped**: the turn registry records which Chat
+its task belongs to, so a turn running for another conversation is left running — the registry is
+keyed by `user_id`, and the request path deliberately cancels across sessions on that key, because
+the Workflow is cached per user. It **never overwrites a Settled status**, deciding by the same
+fail-closed `is_running` **Chat deletion** refuses on, so a Chat that reached `completed` a moment
+earlier keeps saying so. And it is **never a verdict on a plan**: nothing here reaches the approval
+path, including for a **Reviewable plan** awaiting one, because ending is not rejecting and
+`approved: false` means *"send it back"*. A cancelled task raises out of its own approval wait,
+which is how the waiting review learns the turn is over.
+
+It **names what already happens** rather than adding behaviour, which is the discipline **Not
+reported vs measured** holds everywhere else: the turn was already destroyed, silently. A turn that
+ends *itself* — an expired **Clarification**, inside the orchestration task — is not cancelled, only
+recorded; cancelling there would raise before the write and leave the Chat at `in_progress`, which
+is the state the primitive exists to leave.
+_Avoid_: cancel the plan, plan cancellation, abort the request
+
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
 **retrieval miss** — an honest "that procedure is not in the library" — because conflating the two
 makes a governed refusal look like a bug. On the wire it is HTTP **403** with
@@ -1352,9 +1376,10 @@ affordance entirely)
 be deleted. The rule is **total and fail-closed** — any other answer, including none, means running.
 It is held twice, in `src/backend/chat/deletion.py` and `src/App/src/models/chatDeletion.ts`, and
 the two copies are kept in agreement by `src/tests/ci/test_chat_deletion_contract.py`. `canceled`
-was unreachable until [ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md) gave **Leaving a
-Chat** the write, which is why the way out of `in_progress` is to end the turn and never to loosen
-this rule.
+was unreachable until [ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md) gave **Ending a turn**
+the write (#120), which is why the way out of `in_progress` is to end the turn and never to loosen
+this rule. That the status has a writer at all is asserted, in the same file: three places permitted
+and rendered a state the system could not produce, and one of them was this one.
 _Avoid_: terminal state, final status, deletable status
 
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that

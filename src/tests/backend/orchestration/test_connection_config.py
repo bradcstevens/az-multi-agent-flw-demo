@@ -178,6 +178,97 @@ class TestOrchestrationClarification:
         assert "r1" not in cfg._clarification_events
 
 
+class TestTheTurnInFlight:
+    """Which Chat a user's in-flight turn belongs to (#120, ADR-031 §6).
+
+    The registry was keyed by ``user_id`` alone, so nothing here could tell
+    which conversation the task it holds was answering. **Ending a turn** has
+    to know: one associate with two Chats open must not have the second one
+    cancelled by leaving the first. One associate, one tab, one live turn is
+    true in rehearsal, which is exactly why the failure would surface once, in
+    front of an audience.
+    """
+
+    @staticmethod
+    async def _pending():
+        """A task that is genuinely in flight, and cleans up when cancelled."""
+        async def _sleep():
+            await asyncio.sleep(60)
+
+        return asyncio.create_task(_sleep())
+
+    @pytest.mark.asyncio
+    async def test_a_registered_turn_names_the_chat_it_belongs_to(self):
+        cfg = OrchestrationConfig()
+        task = await self._pending()
+        cfg.register_active_turn("user-1", "sess-1", task)
+
+        turn = cfg.active_turn("user-1")
+        assert turn is not None
+        assert turn.session_id == "sess-1"
+        assert turn.task is task
+
+        task.cancel()
+
+    @pytest.mark.asyncio
+    async def test_asking_for_another_chats_turn_finds_nothing(self):
+        # The registry is storage, and it stores *both* halves. Which Chat the
+        # turn belongs to is what **Ending a turn** reads to scope itself
+        # (ADR-031 §6); the rule lives with the primitive, and this is the fact
+        # it reads.
+        cfg = OrchestrationConfig()
+        task = await self._pending()
+        cfg.register_active_turn("user-1", "sess-1", task)
+
+        assert cfg.active_turn("user-1").session_id == "sess-1"
+
+        task.cancel()
+
+    @pytest.mark.asyncio
+    async def test_a_finished_turn_is_no_longer_in_flight(self):
+        cfg = OrchestrationConfig()
+
+        async def _done():
+            return None
+
+        task = asyncio.create_task(_done())
+        await task
+        cfg.register_active_turn("user-1", "sess-1", task)
+
+        assert cfg.active_turn("user-1") is None
+
+    @pytest.mark.asyncio
+    async def test_a_turn_releases_only_its_own_slot(self):
+        # The orchestration task clears its slot as it ends, and by then the
+        # associate's *next* request may already have registered a new turn
+        # there. Releasing by identity is what keeps the cleanup of a cancelled
+        # turn from taking its successor with it.
+        cfg = OrchestrationConfig()
+        first = await self._pending()
+        second = await self._pending()
+        cfg.register_active_turn("user-1", "sess-1", first)
+        cfg.register_active_turn("user-1", "sess-2", second)
+
+        cfg.release_active_turn("user-1", first)
+
+        turn = cfg.active_turn("user-1")
+        assert turn is not None and turn.task is second
+
+        first.cancel()
+        second.cancel()
+
+    @pytest.mark.asyncio
+    async def test_releasing_the_registered_turn_empties_the_slot(self):
+        cfg = OrchestrationConfig()
+        task = await self._pending()
+        cfg.register_active_turn("user-1", "sess-1", task)
+
+        cfg.release_active_turn("user-1", task)
+
+        assert cfg.active_turn("user-1") is None
+        task.cancel()
+
+
 # ----------------------------------------------------------------------- #
 # ConnectionConfig
 # ----------------------------------------------------------------------- #

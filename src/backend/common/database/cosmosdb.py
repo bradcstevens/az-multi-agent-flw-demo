@@ -235,6 +235,36 @@ class CosmosDBClient(DatabaseBase):
         ]
         return await self.query_items(query, parameters, Plan)
 
+    async def get_plan_by_session(self, session_id: str) -> Optional[Plan]:
+        """A Chat's **latest** Plan record — the one **Ending a turn** settles.
+
+        A Chat's state is its latest Plan's (#71) and every turn mints a new
+        one, so the newest is the only one a turn's end may write. ``TOP 1`` is
+        what makes that true rather than nearly true: ``query_items`` drops a
+        document it cannot validate into the model, so a query that fetched the
+        session's plans and took the first would quietly promote an *older*
+        settled plan whenever the newest failed to parse — and write `canceled`
+        onto a turn that had already finished, while the one actually running
+        went on running. Asked for one, an unreadable newest plan comes back as
+        no chat at all, and nothing is written.
+
+        Scoped by ``user_id``, which is the whole of the authorization for the
+        reason :meth:`delete_chat` records: a session id is not a secret, and
+        ``process_request`` takes one from the caller.
+        """
+        query = (
+            "SELECT TOP 1 * FROM c WHERE c.session_id=@session_id "
+            "AND c.data_type=@data_type AND c.user_id=@user_id "
+            "ORDER BY c._ts DESC"
+        )
+        parameters = [
+            {"name": "@session_id", "value": session_id},
+            {"name": "@data_type", "value": DataType.plan},
+            {"name": "@user_id", "value": self.user_id},
+        ]
+        results = await self.query_items(query, parameters, Plan)
+        return results[0] if results else None
+
     async def get_all_plans_by_team_id_status(
         self, user_id: str, team_id: str, status: str
     ) -> List[Plan]:

@@ -135,6 +135,30 @@ def test_the_single_plan_primitive_has_no_caller_left():
     assert callers == []
 
 
+def test_the_canceled_status_is_one_something_writes():
+    # ADR-031: `canceled` sat in the settled-status set above, in its frontend
+    # mirror and in `chatStateLabel` while **nothing in `src/backend` could
+    # produce it** — three places permitting and rendering a state the system
+    # could not reach. #120 gave it a writer, which is what makes the way out
+    # of `in_progress` a door: end the turn, never loosen the guard.
+    #
+    # Counted as an assignment onto a record, not as a mention: the member is
+    # named in prose, in this file, and in the enum that declares it.
+    backend = REPO_ROOT / "src" / "backend"
+    declaration = backend / "common" / "models" / "messages.py"
+    writers = [
+        source.relative_to(REPO_ROOT).as_posix()
+        for source in backend.rglob("*.py")
+        if source != declaration
+        and re.search(
+            r"overall_status\s*=\s*PlanStatus\.canceled",
+            source.read_text(encoding="utf-8"),
+        )
+    ]
+
+    assert writers, "nothing in src/backend writes PlanStatus.canceled"
+
+
 def test_the_hide_feature_is_gone_rather_than_standing_beside_the_delete():
     # ADR-026 supersedes ADR-022. Two controls, one of which quietly leaves the
     # record behind, is the ambiguity the delete label exists to remove.

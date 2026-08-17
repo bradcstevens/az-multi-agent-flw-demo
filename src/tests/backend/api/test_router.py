@@ -171,6 +171,11 @@ def rt(monkeypatch):
     store.get_all_plans_by_team_id_status = AsyncMock(return_value=[])
     store.delete_current_team = AsyncMock()
     store.add_plan = AsyncMock()
+    # The Chat's latest Plan record and the write **Ending a turn** makes onto
+    # it (#120). No chat by default, so a route that reached this without a
+    # session behind it answers 404 rather than settling something.
+    store.get_plan_by_session = AsyncMock(return_value=None)
+    store.update_plan = AsyncMock()
 
     # The generic CRUD the memory container exposes, faked well enough that a
     # session-state record genuinely round-trips (issue #20). Keyed by
@@ -230,7 +235,11 @@ def rt(monkeypatch):
     orchestration_config.approvals = {}
     orchestration_config.clarifications = {}
     orchestration_config.plans = {}
-    orchestration_config.active_tasks = {}
+    # The turn-in-flight registry. It is storage: it hands back the record of
+    # the turn this user has running, and *which Chat that turn belongs to* is
+    # decided by the end-of-turn primitive (#120, ADR-031 §6), which is real
+    # here.
+    orchestration_config.active_turn = MagicMock(return_value=None)
     orchestration_config.get_current_orchestration = MagicMock(return_value=None)
     orchestration_config.set_approval_result = MagicMock()
     orchestration_config.set_clarification_result = MagicMock()
@@ -521,6 +530,51 @@ class TestProcessRequest:
         persisted = rt.store.add_plan.await_args.args[0]
         assert persisted.session_id == "sess-troubleshooting"
         turn["forget_turns"]()
+
+    def test_the_turn_in_flight_records_the_chat_it_belongs_to(self, rt):
+        """ADR-031 §6, at the only place the registry is written.
+
+        The registry was keyed by `user_id` alone, so nothing could tell which
+        conversation the task it held was answering. **Ending a turn** reads
+        that to scope itself; a turn registered without its session would make
+        the primitive either cancel nothing or cancel whatever was running.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+
+        response = rt.client.post(
+            "/api/v4/process_request", json=self._payload()
+        )
+
+        assert response.status_code == 200
+        registered = rt.orchestration_config.register_active_turn.call_args.args
+        assert registered[0] == "user-1"
+        assert registered[1] == "sess-1"
+
+    def test_a_prior_turn_is_replaced_rather_than_run_beside(self, rt):
+        """Not session-scoped, and deliberately so.
+
+        The Workflow is cached per user, so a second turn *replaces* the first
+        rather than running beside it — including one begun in another Chat.
+        **Ending a turn** is the session-scoped operation (ADR-031 §6); this
+        one is not, and it writes no status, so it can never mislabel the
+        conversation it displaced.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        prior = MagicMock()
+        prior.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="another-chat", task=prior
+        )
+
+        response = rt.client.post(
+            "/api/v4/process_request", json=self._payload()
+        )
+
+        assert response.status_code == 200
+        prior.cancel.assert_called_once_with()
+        rt.store.update_plan.assert_not_awaited()
 
     def test_the_rehearsed_closing_task_arms_its_sop_lookup(self, rt, monkeypatch):
         rt.store.get_team_by_id.return_value = MagicMock()
@@ -2081,6 +2135,143 @@ class TestDeleteChat:
         self._reports(rt, ChatDeletion.swept(deleted=1, failed=0))
 
         rt.store.delete_plan_by_plan_id.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# POST /chats/{session_id}/end_turn
+# ---------------------------------------------------------------------------
+class TestEndingATurn:
+    """The end-of-turn primitive, at the route (#120, ADR-031).
+
+    The net-new endpoint ADR-031 names as a cost of its decisions 1, 3 and 6:
+    nothing session-scoped could say *"end this Chat's turn"*, only the
+    destructive `/plan_approval` rejection and the implicit per-user cancel
+    inside `process_request`. **Leaving a Chat** reaches the primitive through
+    here.
+    """
+
+    def _plan(self, status=None, session_id="sess-1"):
+        return SimpleNamespace(
+            id="plan-1",
+            plan_id="plan-1",
+            session_id=session_id,
+            overall_status=status or "in_progress",
+        )
+
+    def _end(self, rt, session_id="sess-1"):
+        return rt.client.post(f"/api/v4/chats/{session_id}/end_turn")
+
+    def test_no_user(self, rt):
+        _no_user(rt)
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 400
+        rt.store.update_plan.assert_not_awaited()
+
+    def test_the_chats_record_is_written_canceled(self, rt):
+        # `PlanStatus.canceled` made producible for the first time (ADR-031
+        # §1). It sat in the settled-status set, its frontend mirror and the
+        # chat state label while nothing in `src/backend` could write it.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ended"
+        written = rt.store.update_plan.await_args.args[0]
+        assert written.overall_status == "canceled"
+
+    def test_the_chats_orchestration_is_cancelled(self, rt):
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        task = MagicMock()
+        task.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="sess-1", task=task
+        )
+
+        resp = self._end(rt)
+
+        task.cancel.assert_called_once_with()
+        assert resp.json()["cancelled"] is True
+
+    def test_a_turn_running_for_another_chat_is_left_running(self, rt):
+        # ADR-031 §6. The registry is keyed by `user_id` and `process_request`
+        # deliberately cancels across sessions on that key; ending a turn is
+        # the case where that would be wrong. One associate, one tab, one live
+        # turn is true in rehearsal, which is why this would surface once, in
+        # front of an audience.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        task = MagicMock()
+        task.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="sess-2", task=task
+        )
+
+        resp = self._end(rt)
+
+        task.cancel.assert_not_called()
+        assert resp.json()["cancelled"] is False
+
+    def test_only_the_named_chat_is_read(self, rt):
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+
+        self._end(rt, session_id="sess-9")
+
+        rt.store.get_plan_by_session.assert_awaited_once_with("sess-9")
+
+    @pytest.mark.parametrize("settled", ["completed", "failed", "canceled"])
+    def test_a_chat_that_already_settled_keeps_the_status_it_reached(
+        self, rt, settled
+    ):
+        # A turn that finished a moment before the associate left keeps saying
+        # `Completed`. Replacing a status that lied in one direction with one
+        # that lies in the other is not a fix.
+        rt.store.get_plan_by_session = AsyncMock(
+            return_value=self._plan(status=settled)
+        )
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "already_settled"
+        rt.store.update_plan.assert_not_awaited()
+
+    def test_a_session_with_no_chat_is_not_found(self, rt):
+        rt.store.get_plan_by_session = AsyncMock(return_value=None)
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 404
+        rt.store.update_plan.assert_not_awaited()
+
+    def test_ending_a_turn_is_never_a_verdict_on_a_plan(self, rt):
+        # ADR-031 §2. #108 gave `approved: false` the meaning *"send it
+        # back"*, so an end-of-turn that reached the approval path would file a
+        # revision request nobody wrote — and before #108 it deleted the Plan
+        # record outright, taking the conversation out of the history.
+        rt.store.get_plan_by_session = AsyncMock(
+            return_value=self._plan(status="approved")
+        )
+        rt.store.delete_plan_by_plan_id = AsyncMock()
+        rt.orchestration_config.approvals = {"m-1": None}
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 200
+        rt.plan_service.handle_plan_approval.assert_not_awaited()
+        rt.orchestration_config.set_approval_result.assert_not_called()
+        rt.store.delete_plan_by_plan_id.assert_not_awaited()
+
+    def test_the_store_is_reached_as_this_user(self, rt):
+        # The `user_id` predicate lives in the store and is taken from the
+        # client it was built for. A session id is not a secret, and this route
+        # takes one from the caller.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+
+        self._end(rt)
+
+        rt.database_factory.get_database.assert_awaited_with(user_id="user-1")
 
 
 # ---------------------------------------------------------------------------

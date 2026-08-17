@@ -565,6 +565,62 @@ class TestCosmosDBPlanOperations:
         client.query_items.assert_called_once_with(expected_query, expected_params, Plan)
 
 
+class TestTheChatsLatestPlan:
+    """The read **Ending a turn** settles onto (#120, ADR-031).
+
+    A Chat's state is its **latest** Plan's (#71) and every turn mints a new
+    one, so the primitive has to be handed the newest and nothing else. An
+    older plan reached by mistake would be written ``canceled`` while the turn
+    that is actually running went on running.
+    """
+
+    @pytest.fixture
+    def client(self):
+        client = CosmosDBClient(
+            endpoint="https://test.documents.azure.com:443/",
+            credential="test_credential",
+            database_name="test_db",
+            container_name="test_container",
+            session_id="test_session",
+            user_id="test_user",
+        )
+        client._initialized = True
+        client.container = AsyncMock()
+        client.query_items = AsyncMock()
+        return client
+
+    @pytest.mark.asyncio
+    async def test_the_newest_plan_in_the_session_is_the_one_returned(self, client):
+        newest = Mock(spec=Plan)
+        client.query_items.return_value = [newest]
+
+        result = await client.get_plan_by_session("session-1")
+
+        assert result is newest
+        query, parameters, model = client.query_items.call_args.args
+        assert model is Plan
+        # `TOP 1` is the whole guard, not a tidiness: `query_items` drops a
+        # document it cannot validate, so a query that asked for the session's
+        # plans and took the first would silently promote an *older* settled
+        # plan when the newest one failed to parse — and write `canceled` onto
+        # the wrong turn. Asking Cosmos for one means an unreadable newest plan
+        # comes back as no chat at all, which writes nothing.
+        assert "SELECT TOP 1 *" in query
+        assert "ORDER BY c._ts DESC" in query
+        assert {"name": "@session_id", "value": "session-1"} in parameters
+        assert {"name": "@user_id", "value": "test_user"} in parameters
+        assert {"name": "@data_type", "value": DataType.plan} in parameters
+
+    @pytest.mark.asyncio
+    async def test_a_session_this_user_has_no_plan_in_is_no_chat(self, client):
+        # Scoped by `user_id` in the query, which is the whole of the
+        # authorization here for the reason `delete_chat` records: a session id
+        # is not a secret, and `process_request` takes one from the caller.
+        client.query_items.return_value = []
+
+        assert await client.get_plan_by_session("session-1") is None
+
+
 class TestCosmosDBStepOperations:
     """Test CosmosDB step-related operations."""
     

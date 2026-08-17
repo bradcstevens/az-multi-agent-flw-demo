@@ -9,6 +9,7 @@ and TeamConfig — the three singletons imported together by the router.
 import asyncio
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from common.models.messages import TeamConfiguration
@@ -17,6 +18,23 @@ from models.messages import WebsocketMessageType
 from models.plan_models import MPlan
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ActiveTurn:
+    """A user's turn in flight, and the **Chat** it is answering.
+
+    The session is half of the record rather than an afterthought (#120,
+    ADR-031 §6). Keyed by ``user_id`` alone, this registry could say *that* a
+    turn was running but not *which conversation* it belonged to, so **Ending a
+    turn** had nothing to scope itself by: leaving one Chat would cancel
+    whatever the associate had running and mislabel a second conversation. One
+    associate, one tab, one live turn is true in rehearsal, which is precisely
+    why that would surface once, in front of an audience.
+    """
+
+    session_id: str
+    task: asyncio.Task
 
 
 class OrchestrationConfig:
@@ -33,7 +51,10 @@ class OrchestrationConfig:
         self.sockets: Dict[str, WebSocket] = {}        # user_id -> WebSocket
         self.clarifications: Dict[str, str] = {}       # plan_id -> clarification response
         self.max_rounds: int = 30
-        self.active_tasks: Dict[str, asyncio.Task] = {}  # user_id -> running asyncio.Task
+        # user_id -> the one turn that user has in flight, and its Chat. One
+        # slot per user because the Workflow itself is cached per user: a
+        # second turn does not run beside the first, it replaces it.
+        self.active_turns: Dict[str, ActiveTurn] = {}
         self.default_timeout: float = 300.0
 
         self._approval_events: Dict[str, asyncio.Event] = {}
@@ -42,6 +63,46 @@ class OrchestrationConfig:
     def get_current_orchestration(self, user_id: str) -> Any:
         """Get existing orchestration workflow instance for user_id."""
         return self.orchestrations.get(user_id)
+
+    # ------------------------------------------------------------------ #
+    # The turn in flight
+    # ------------------------------------------------------------------ #
+
+    def register_active_turn(
+        self, user_id: str, session_id: str, task: asyncio.Task
+    ) -> None:
+        """Record the turn ``user_id`` has in flight, and the Chat it answers."""
+        self.active_turns[user_id] = ActiveTurn(session_id=session_id, task=task)
+
+    def active_turn(self, user_id: str) -> Optional[ActiveTurn]:
+        """The turn this user has in flight, if there is one still running.
+
+        Storage, not judgement: the record carries the **Chat** it belongs to
+        and **Ending a turn** is what compares that against the Chat being
+        left (ADR-031 §6). Keeping the comparison with the primitive is what
+        keeps it to one declaration.
+
+        A task that has already finished is not in flight, so a Chat whose turn
+        settled a moment ago is reported as having none. That is what keeps
+        **Ending a turn** from cancelling a completed task and calling it a
+        cancellation.
+        """
+        turn = self.active_turns.get(user_id)
+        if turn is None or turn.task.done():
+            return None
+        return turn
+
+    def release_active_turn(self, user_id: str, task: asyncio.Task) -> None:
+        """Give up a turn's slot — but only if ``task`` is still the one in it.
+
+        By identity, because the orchestration task clears its own slot as it
+        ends and the associate's *next* request may already have registered a
+        new turn there. A cancelled turn is cleaned up asynchronously, so a
+        release that keyed on the user alone would take its successor with it.
+        """
+        turn = self.active_turns.get(user_id)
+        if turn is not None and turn.task is task:
+            self.active_turns.pop(user_id, None)
 
     # ------------------------------------------------------------------ #
     # Approval helpers
