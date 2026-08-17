@@ -165,6 +165,27 @@ Outside a clarification the chips are a second way to start a turn, competing
 with the box — and a gate the caller owns is a gate the second caller forgets.
 That is #22's move at a smaller seam.
 
+**And the follow-on card yields the slot to them** (#131,
+[ADR-033](ADR/033-a-one-tap-control-never-invents-the-words-it-offers.md)). One
+control at a time: the card hides while a clarification is pending, the chips
+take the slot, the tap answers, the chips go and the card returns.
+`task-223-troubleshooting` is the one task carrying both, so beats 3 and 4 are
+where they were live together — and the card, reading no clarification state,
+submitted a *new turn* while the orchestration waited on an answer.
+`process_request` cancels whatever that user already had running, so the tap
+stranded the turn that asked. The gate is `FollowOnTask`'s own for the reason
+the chips' is theirs, and it is the card's only condition: what decides that a
+suggestion is offered at all is still the agent's own offer.
+
+**The slot is handed to a control that exists.** A Chat resolves both from the
+*plan's* team, which is `convertTeamConfiguration`'s output — and that
+conversion carried `follow_on` while dropping `rehearsed_replies`, so on the
+chat surface the chips had nothing to render and the card would have yielded
+the slot to nothing. Found while wiring the hand-off, and asserted where it can
+be seen: `oneControlAtATime.test.tsx` stubs `getPlanById` rather than
+`fetchPlanData`, so the plan payload reaches the conversation through the real
+conversion.
+
 **And they are resolved from the plan's own `initial_goal`, not carried in
 router state.** State does not survive a reload, and a presenter who reloads
 mid-beat is exactly the presenter who needs the tap — the same reason the lane
