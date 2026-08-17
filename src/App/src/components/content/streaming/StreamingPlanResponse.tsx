@@ -264,7 +264,6 @@ const renderPlanResponse = (
     const { factsContent, planSteps } = extractDynamicContent(planApprovalRequest);
     const factsPreview = getFactsPreview(factsContent);
     const { revision, feedback } = pendingVerdictFor(planApprovalRequest);
-    const askedToChange = feedback[feedback.length - 1];
 
     // Check if this is a "creating plan" state
     const isCreatingPlan = !planSteps.length && !factsContent;
@@ -353,14 +352,15 @@ const renderPlanResponse = (
                 {!isCreatingPlan && (
                     <div className={styles.revisionLine} data-testid="plan-revision">
                         <Text className={styles.revisionNumber}>{`Revision ${revision}`}</Text>
-                        {askedToChange && (
+                        {feedback.map((askedToChange, index) => (
                             <Text
+                                key={`${index}-${askedToChange}`}
                                 className={styles.revisionFeedback}
                                 data-testid="plan-revision-feedback"
                             >
                                 {`You asked to change: ${askedToChange}`}
                             </Text>
-                        )}
+                        ))}
                     </div>
                 )}
 

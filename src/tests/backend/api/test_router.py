@@ -1294,17 +1294,28 @@ class TestPlanApproval:
         resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
         assert resp.status_code == 500
 
-    def test_plan_service_value_error(self, rt):
+    def test_plan_service_value_error_leaves_the_verdict_pending(self, rt):
         rt.orchestration_config.approvals = {"m-1": None}
         rt.plan_service.handle_plan_approval = AsyncMock(side_effect=ValueError("bad"))
         resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
-        assert resp.status_code == 200
+        assert resp.status_code == 500
+        rt.orchestration_config.set_approval_result.assert_not_called()
 
-    def test_plan_service_generic_error(self, rt):
+    def test_plan_service_generic_error_leaves_the_verdict_pending(self, rt):
         rt.orchestration_config.approvals = {"m-1": None}
         rt.plan_service.handle_plan_approval = AsyncMock(side_effect=Exception("boom"))
         resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
-        assert resp.status_code == 200
+        assert resp.status_code == 500
+        rt.orchestration_config.set_approval_result.assert_not_called()
+
+    def test_a_persistence_failure_leaves_the_verdict_pending(self, rt):
+        rt.orchestration_config.approvals = {"m-1": None}
+        rt.plan_service.handle_plan_approval = AsyncMock(return_value=False)
+
+        resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
+
+        assert resp.status_code == 500
+        rt.orchestration_config.set_approval_result.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

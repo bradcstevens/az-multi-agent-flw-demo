@@ -750,48 +750,22 @@ async def plan_approval(
                     )
                     return {"status": "verdict already recorded"}
 
+                result = await PlanService.handle_plan_approval(
+                    human_feedback, user_id
+                )
+                if not result:
+                    raise RuntimeError("Plan verdict could not be persisted")
+                logger.debug("Plan approval processed: %s", result)
+
+                # Waking the review makes this verdict terminal, so it happens
+                # only after the Plan record durably carries its status or
+                # revision lineage.
                 orchestration_config.set_approval_result(
                     human_feedback.m_plan_id,
                     human_feedback.approved,
                     feedback=feedback or None,
                 )
                 logger.debug("Plan approval received: %s", human_feedback)
-
-                try:
-                    result = await PlanService.handle_plan_approval(
-                        human_feedback, user_id
-                    )
-                    logger.debug("Plan approval processed: %s", result)
-
-                except ValueError as ve:
-                    logger.error(f"ValueError processing plan approval: {ve}")
-                    await connection_config.send_status_update_async(
-                        {
-                            "type": WebsocketMessageType.ERROR_MESSAGE,
-                            "data": {
-                                "content": "Approval failed due to invalid input.",
-                                "status": "error",
-                                "timestamp": asyncio.get_event_loop().time(),
-                            },
-                        },
-                        user_id,
-                        message_type=WebsocketMessageType.ERROR_MESSAGE,
-                    )
-
-                except Exception:
-                    logger.error("Error processing plan approval", exc_info=True)
-                    await connection_config.send_status_update_async(
-                        {
-                            "type": WebsocketMessageType.ERROR_MESSAGE,
-                            "data": {
-                                "content": "An unexpected error occurred while processing the approval.",
-                                "status": "error",
-                                "timestamp": asyncio.get_event_loop().time(),
-                            },
-                        },
-                        user_id,
-                        message_type=WebsocketMessageType.ERROR_MESSAGE,
-                    )
 
                 # Use dynamic event name based on the verdict given
                 approval_status = (

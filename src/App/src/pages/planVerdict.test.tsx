@@ -172,6 +172,19 @@ describe('the verdict on a Reviewable plan', () => {
         );
     });
 
+    it('leaves approval available to retry when its request fails', async () => {
+        vi.mocked(apiService.approvePlan)
+            .mockRejectedValueOnce(new Error('offline'))
+            .mockResolvedValueOnce({} as never);
+        await renderPlanUnderReview();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Approve Task Plan' }));
+        await waitFor(() => expect(apiService.approvePlan).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Approve Task Plan' }));
+        await waitFor(() => expect(apiService.approvePlan).toHaveBeenCalledTimes(2));
+    });
+
     it('sends the plan back carrying what the associate would change', async () => {
         await renderPlanUnderReview();
 
@@ -188,6 +201,22 @@ describe('the verdict on a Reviewable plan', () => {
                 feedback: 'Ask Priya, Marcus is on holiday.',
             }),
         );
+    });
+
+    it('leaves send-back available to retry when its request fails', async () => {
+        vi.mocked(apiService.approvePlan)
+            .mockRejectedValueOnce(new Error('offline'))
+            .mockResolvedValueOnce({} as never);
+        await renderPlanUnderReview();
+
+        fireEvent.change(screen.getByLabelText('What would you change?'), {
+            target: { value: 'Ask Priya, Marcus is on holiday.' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Send back with changes' }));
+        await waitFor(() => expect(apiService.approvePlan).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Send back with changes' }));
+        await waitFor(() => expect(apiService.approvePlan).toHaveBeenCalledTimes(2));
     });
 
     it('stays in the conversation when the plan is sent back', async () => {

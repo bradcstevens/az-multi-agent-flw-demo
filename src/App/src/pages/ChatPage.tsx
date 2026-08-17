@@ -349,16 +349,17 @@ const ChatPage: React.FC = () => {
     const [verdict, setVerdict] = useState<PlanVerdictState>(() =>
         pendingVerdictFor(planApprovalRequest ?? {}),
     );
+    const verdictSubmissionRef = React.useRef(false);
 
     useEffect(() => {
         setVerdict(pendingVerdictFor(planApprovalRequest ?? {}));
     }, [planApprovalRequest?.id, planApprovalRequest?.revision]);
 
     const handleApprovePlan = useCallback(async () => {
-        if (!planApprovalRequest) return;
+        if (!planApprovalRequest || verdictSubmissionRef.current) return;
         const next = applyPlanVerdict(verdict, { kind: 'approve' });
         if (next === verdict) return;
-        setVerdict(next);
+        verdictSubmissionRef.current = true;
         dispatch(setProcessingApproval(true));
         const id = showToast('Submitting Approval', 'progress');
         try {
@@ -369,22 +370,24 @@ const ChatPage: React.FC = () => {
                 feedback: 'Plan approved by user',
             });
             dismissToast(id);
+            setVerdict(next);
             /* P0: single compound action replaces 3 separate dispatches */
             dispatch(planApprovalAccepted());
         } catch {
             dismissToast(id);
             showToast('Failed to submit approval', 'error');
         } finally {
+            verdictSubmissionRef.current = false;
             dispatch(setProcessingApproval(false));
         }
     }, [planApprovalRequest, planData, verdict, showToast, dismissToast, dispatch]);
 
     const handleRejectPlan = useCallback(
         async (feedback: string) => {
-            if (!planApprovalRequest) return;
+            if (!planApprovalRequest || verdictSubmissionRef.current) return;
             const next = applyPlanVerdict(verdict, { kind: 'revise', feedback });
             if (next === verdict) return;
-            setVerdict(next);
+            verdictSubmissionRef.current = true;
             dispatch(setProcessingApproval(true));
             const id = showToast('Sending the plan back', 'progress');
             try {
@@ -395,12 +398,15 @@ const ChatPage: React.FC = () => {
                     feedback: feedback.trim(),
                 });
                 dismissToast(id);
+                setVerdict(next);
                 /* The revised plan arrives in this same conversation. */
                 dispatch(planSentBack());
             } catch {
                 dismissToast(id);
                 showToast('Failed to send the plan back', 'error');
-                dispatch(planSentBack());
+            } finally {
+                verdictSubmissionRef.current = false;
+                dispatch(setProcessingApproval(false));
             }
         },
         [planApprovalRequest, planData, verdict, showToast, dismissToast, dispatch],

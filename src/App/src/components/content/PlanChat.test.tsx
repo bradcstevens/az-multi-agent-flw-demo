@@ -185,7 +185,7 @@ describe('the conversation offers the rehearsed replies', () => {
         expect(screen.queryByRole('button', { name: /reject|cancel/i })).not.toBeInTheDocument();
     });
 
-    it('says which revision this is and what was asked to change', () => {
+    it('says which revision this is and every change that produced it', () => {
         renderChat(
             {
                 showApprovalButtons: true,
@@ -193,17 +193,21 @@ describe('the conversation offers the rehearsed replies', () => {
                     id: 'review-1',
                     user_request: 'Swap Saturday',
                     facts: '',
-                    revision: 2,
-                    revision_feedback: ['Ask somebody other than Marcus Bell.'],
+                    revision: 3,
+                    revision_feedback: [
+                        'Ask somebody other than Marcus Bell.',
+                        'Ask Dana Reyes next.',
+                    ],
                     steps: [{ id: 1, action: 'Check the rota', agent: 'Rota_Agent' }],
                 },
             } as never,
             { pending: false },
         );
 
-        expect(screen.getByTestId('plan-revision')).toHaveTextContent('Revision 2');
-        expect(screen.getByTestId('plan-revision-feedback')).toHaveTextContent(
+        expect(screen.getByTestId('plan-revision')).toHaveTextContent('Revision 3');
+        expect(screen.getAllByTestId('plan-revision-feedback').map((item) => item.textContent)).toEqual([
             'You asked to change: Ask somebody other than Marcus Bell.',
-        );
+            'You asked to change: Ask Dana Reyes next.',
+        ]);
     });
 });

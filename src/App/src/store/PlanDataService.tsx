@@ -314,6 +314,10 @@ export class PlanDataService {
               ...(step.waitsOn === undefined ? {} : { waitsOn: step.waitsOn }),
             };
           }).filter((s: any) => s.cleanAction.length > 3 && !/^(?:involvement|certainly|given|here is)/i.test(s.cleanAction));
+          const revision = Number.isInteger(mplan.revision) ? mplan.revision : undefined;
+          const revisionFeedback = Array.isArray(mplan.revision_feedback)
+            ? mplan.revision_feedback.filter((item: unknown): item is string => typeof item === 'string')
+            : undefined;
 
 
           const result: MPlanData = {
@@ -331,6 +335,8 @@ export class PlanDataService {
             team_id: mplan.team_id,
             plan_id: mplan.plan_id,
             overall_status: mplan.overall_status,
+            ...(revision === undefined ? {} : { revision }),
+            ...(revisionFeedback === undefined ? {} : { revision_feedback: revisionFeedback }),
             raw_data: rawData
           };
           return result;
@@ -361,6 +367,13 @@ export class PlanDataService {
       const user_id = pick(/user_id='([^']*)'/) || '';
       const team_id = pick(/team_id='([^']*)'/) || '';
       const plan_id = pick(/plan_id='([^']*)'/) || '';
+      const revisionValue = pick(/revision=(\d+)/);
+      const revision = revisionValue === undefined ? undefined : Number(revisionValue);
+      const revisionFeedbackSource = body.match(/revision_feedback=\[([\s\S]*?)\]/)?.[1];
+      const revisionFeedback = revisionFeedbackSource
+        ? [...revisionFeedbackSource.matchAll(/'([^']*)'|"([^"]*)"/g)]
+          .map((match) => match[1] ?? match[2])
+        : undefined;
       let overall_status =
         pick(/overall_status=<PlanStatus\.([a-zA-Z_]+):/, true) ||
         pick(/overall_status='([^']+)'/, true) ||
@@ -455,6 +468,8 @@ export class PlanDataService {
         team_id,
         plan_id,
         overall_status,
+        ...(revision === undefined ? {} : { revision }),
+        ...(revisionFeedback === undefined ? {} : { revision_feedback: revisionFeedback }),
         raw_data: rawData
       };
 
