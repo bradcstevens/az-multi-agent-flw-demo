@@ -1,7 +1,7 @@
 # RB-204 Walk-In Cooler Running Warm
 
 Document ID: RB-204
-Site: Brightpath Convenience Store 223
+Site: Circle K Store 223
 Equipment: Backroom walk-in cooler with four-door reach-in front
 Asset tag: BC-223-WIC-01
 Owner: Store Equipment Support

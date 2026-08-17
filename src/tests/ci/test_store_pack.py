@@ -41,13 +41,37 @@ from store_pack import __main__ as main_mod  # noqa: E402
 from store_pack import content as content_mod  # noqa: E402
 from store_pack import pack as pack_mod  # noqa: E402
 from store_pack import roster as roster_mod  # noqa: E402
+from escalation.ticket import SITE  # noqa: E402
 
 STORE_SURFACE_TS = REPO_ROOT / "src" / "App" / "src" / "models" / "storeSurface.ts"
+_STORE_NAME = re.compile(
+    r"\b(?:[A-Z][A-Za-z]*(?:[ -][A-Z][A-Za-z]*)*) Store \d+\b"
+)
 
 
 @pytest.fixture(scope="module")
 def store_pack():
     return pack_mod.load_pack(REPO_ROOT)
+
+
+def _strings_in(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for nested in value.values():
+            yield from _strings_in(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from _strings_in(nested)
+
+
+def _foreign_store_names(authored, site):
+    return {
+        found
+        for text in authored
+        for found in _STORE_NAME.findall(text)
+        if found != site
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +387,33 @@ def test_given_the_troubleshooting_tools_when_named_then_the_container_registers
 # ---------------------------------------------------------------------------
 # The authored content
 # ---------------------------------------------------------------------------
+
+
+def test_given_the_shipped_store_strings_when_read_then_they_match_the_sop_manifest(
+    store_pack,
+):
+    """The ticket module and pack are separate carriers of the same store."""
+    manifest = pack_mod.sop_manifest(REPO_ROOT)
+    site = f"{manifest['banner']} {manifest['store']}"
+    authored = list(_strings_in(store_pack.team)) + list(_strings_in(store_pack.pack))
+    documents = store_pack.all_documents()
+    authored.extend(path.read_text(encoding="utf-8") for path in documents)
+
+    assert SITE == site
+    assert len(store_pack.agents) == 4
+    assert all(site in agent["system_message"] for agent in store_pack.agents)
+    assert len(documents) == 6
+    assert sum(
+        path.read_text(encoding="utf-8").count(site) for path in documents
+    ) == 9
+    assert _foreign_store_names(authored, site) == set()
+    assert "Brightpath" not in "\n".join(authored)
+
+
+def test_given_a_foreign_store_name_when_checked_then_it_is_rejected():
+    assert _foreign_store_names(
+        ["Circle K Store 223", "Acme Store 223"], "Circle K Store 223"
+    ) == {"Acme Store 223"}
 
 
 @pytest.fixture(scope="module")
