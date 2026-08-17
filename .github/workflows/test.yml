@@ -65,6 +65,11 @@ on:
       # contract asserts that the browser authors no associate name of its own.
       - 'src/App/src/models/personalAnswer.ts'
       - 'src/App/src/models/signedInDevice.ts'
+      # The Reviewable-plan step contract (#106). These are the browser's
+      # frame and parser; the Python contract test is the only check that
+      # compares them to the backend model.
+      - 'src/App/src/models/plan.tsx'
+      - 'src/App/src/store/PlanDataService.tsx'
       # The SOP corpus, for the six Quick Tasks (#26). Two of the walkthrough's
       # taps are read out of `content/sop/corpus.toml` rather than restated —
       # the rehearsed honest miss and the rehearsed hit — and the hit names a
@@ -142,6 +147,11 @@ on:
       # contract asserts that the browser authors no associate name of its own.
       - 'src/App/src/models/personalAnswer.ts'
       - 'src/App/src/models/signedInDevice.ts'
+      # The Reviewable-plan step contract (#106). These are the browser's
+      # frame and parser; the Python contract test is the only check that
+      # compares them to the backend model.
+      - 'src/App/src/models/plan.tsx'
+      - 'src/App/src/store/PlanDataService.tsx'
       # The SOP corpus, for the six Quick Tasks (#26). Two of the walkthrough's
       # taps are read out of `content/sop/corpus.toml` rather than restated —
       # the rehearsed honest miss and the rehearsed hit — and the hit names a

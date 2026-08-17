@@ -1106,6 +1106,43 @@ def test_given_the_shift_swap_task_when_routed_then_it_takes_the_fast_lane(
     assert lane_mod.select_lane(None, task["prompt"]) is lane_mod.Lane.FAST
 
 
+def test_given_the_shift_swap_task_when_read_then_its_people_and_order_are_authored(
+    store_pack,
+):
+    task = _shift_swap_task(store_pack)
+    steps = task["plan_steps"]
+
+    assert [(step["id"], step.get("waitsOn")) for step in steps] == [
+        (1, None),
+        (2, 1),
+        (3, 2),
+        (4, 3),
+        (5, 4),
+    ]
+    assert [
+        step["assignee"] for step in steps if step["assignee"]["kind"] == "person"
+    ] == [
+        {
+            "kind": "person",
+            "name": "You",
+            "relation": "associate",
+            "simulated": False,
+        },
+        {
+            "kind": "person",
+            "name": "Marcus Bell",
+            "relation": "peer",
+            "simulated": True,
+        },
+        {
+            "kind": "person",
+            "name": "Dana Reyes",
+            "relation": "manager",
+            "simulated": True,
+        },
+    ]
+
+
 def test_given_the_shift_swap_task_when_read_then_it_is_the_measured_control(
     store_pack, guardrail_corpus, gate_keywords
 ):

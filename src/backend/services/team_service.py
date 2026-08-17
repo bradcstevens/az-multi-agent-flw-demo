@@ -10,6 +10,7 @@ from common.config.app_config import config
 from common.database.database_base import DatabaseBase
 from common.models.messages import (StartingTask, TeamAgent, TeamConfiguration,
                                     UserCurrentTeam)
+from models.plan_models import MStep
 from services.foundry_service import FoundryService
 
 
@@ -181,6 +182,10 @@ class TeamService:
             # the home grid with a fresh session.
             follow_on=task_data.get("follow_on"),
             ticket_on_approval=task_data.get("ticket_on_approval", False),
+            plan_steps=[
+                MStep.model_validate(step).model_dump(mode="json")
+                for step in task_data.get("plan_steps") or []
+            ],
         )
 
     async def save_team_configuration(self, team_config: TeamConfiguration) -> str:

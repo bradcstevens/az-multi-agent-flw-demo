@@ -170,7 +170,7 @@ export class PlanDataService {
 
     // Convert MStepBE[] to the MPlanData steps format
     const steps = mplanBE.steps.map((stepBE: MStepBE, index: number) => ({
-      id: index + 1, // MPlanData expects numeric id starting from 1
+      id: stepBE.id ?? index + 1,
       action: stepBE.action,
       cleanAction: stepBE.action
         .replace(/\*\*/g, '') // Remove markdown bold
@@ -181,7 +181,9 @@ export class PlanDataService {
         .replace(/^[-•]\s*/, '')
         .replace(/\s+/g, ' ')
         .trim(),
-      agent: stepBE.agent
+      agent: stepBE.agent,
+      assignee: stepBE.assignee,
+      waitsOn: stepBE.waitsOn,
     }));
 
     return {
@@ -305,11 +307,14 @@ export class PlanDataService {
               .replace(/^[-•]\s*/, '')
               .replace(/\s+/g, ' ')
               .trim();
+            const agent = step.agent || step._agent;
             return {
-              id: i + 1,
+              id: step.id ?? i + 1,
               action,
               cleanAction,
-              agent: step.agent || step._agent || 'System'
+              ...(agent ? { agent } : {}),
+              ...(step.assignee ? { assignee: step.assignee } : {}),
+              ...(typeof step.waitsOn === 'number' ? { waitsOn: step.waitsOn } : {}),
             };
           }).filter((s: any) => s.cleanAction.length > 3 && !/^(?:involvement|certainly|given|here is)/i.test(s.cleanAction));
 

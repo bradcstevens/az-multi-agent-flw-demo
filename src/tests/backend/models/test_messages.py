@@ -22,7 +22,8 @@ from backend.models.messages import (AgentMessage, AgentMessageStreaming,
                                      ReplanApprovalResponse,
                                      UserClarificationRequest,
                                      UserClarificationResponse)
-from backend.models.plan_models import MPlan, PlanStatus
+from backend.models.plan_models import (MPlan, MStep, PersonAssignee,
+                                        PlanStatus)
 
 
 class TestAgentMessage:
@@ -116,6 +117,40 @@ class TestPlanApprovalRequest:
         plan = MPlan()
         req = PlanApprovalRequest(plan=plan, status=PlanStatus.RUNNING, context={"key": "val"})
         assert req.context == {"key": "val"}
+
+    def test_the_frame_serializes_person_steps_and_their_order(self):
+        request = PlanApprovalRequest(
+            plan=MPlan(
+                steps=[
+                    MStep(
+                        id=3,
+                        action="Ask Marcus Bell to take the shift",
+                        assignee=PersonAssignee(
+                            name="Marcus Bell",
+                            relation="peer",
+                            simulated=True,
+                        ),
+                        waitsOn=2,
+                    )
+                ]
+            ),
+            status=PlanStatus.CREATED,
+        )
+
+        assert request.to_dict()["plan"]["steps"] == [
+            {
+                "id": 3,
+                "agent": "",
+                "action": "Ask Marcus Bell to take the shift",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
 
 
 class TestPlanApprovalResponse:

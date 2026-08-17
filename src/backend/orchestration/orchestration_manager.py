@@ -420,6 +420,7 @@ class OrchestrationManager:
         ticket_on_approval = self._task_requires_ticket_on_approval(
             workflow, input_task
         )
+        plan_steps = self._task_plan_steps(workflow, input_task)
         self.logger.debug("Task: %s", task_text)
 
         # ---- Team-scope gate (generic, team-agnostic) -------------------
@@ -493,6 +494,7 @@ class OrchestrationManager:
                             task_text=task_text,
                             user_id=user_id,
                             ticket_on_approval=ticket_on_approval,
+                            plan_steps=plan_steps,
                         )
                         if plan_responses is None:
                             raise RuntimeError("Plan execution cancelled by user")
@@ -897,6 +899,7 @@ class OrchestrationManager:
         task_text: str,
         user_id: str,
         ticket_on_approval: bool = False,
+        plan_steps: list | None = None,
     ) -> dict | None:
         """Present collected plan review requests to the user and gather responses.
 
@@ -918,6 +921,8 @@ class OrchestrationManager:
                 task_text=task_text,
                 user_id=user_id,
             )
+            if plan_steps:
+                mplan.steps = plan_steps
 
             # Store plan
             try:
@@ -991,6 +996,29 @@ class OrchestrationManager:
             task_id,
         )
         return False
+
+    def _task_plan_steps(self, workflow, input_task) -> list:
+        """Return the active Quick Task's authored Reviewable plan steps.
+
+        The browser can name a Quick Task but cannot choose its people or
+        ordering. Those facts belong to the active team's content pack.
+        """
+        task_id = getattr(input_task, "starting_task_id", None)
+        team_config = getattr(workflow, "_team_config", None)
+        tasks = getattr(team_config, "starting_tasks", None)
+        if not isinstance(task_id, str) or not task_id or not isinstance(tasks, list):
+            return []
+
+        for task in tasks:
+            if getattr(task, "id", None) == task_id:
+                plan_steps = getattr(task, "plan_steps", None)
+                if not isinstance(plan_steps, list):
+                    return []
+                from models.plan_models import MStep
+
+                return [MStep.model_validate(step) for step in plan_steps]
+
+        return []
 
     async def _handle_tool_approvals(
         self,
