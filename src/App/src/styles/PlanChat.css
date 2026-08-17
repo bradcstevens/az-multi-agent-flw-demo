@@ -34,7 +34,6 @@
 .plan-chat-input-wrapper {
     display: flex;
     width: 100%;
-    max-width: 768px;
     margin: 0px 16px;
 }
 

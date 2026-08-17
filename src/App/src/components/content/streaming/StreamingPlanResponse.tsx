@@ -20,7 +20,6 @@ import { PlanVerdictControls } from './PlanVerdictControls';
 // Updated styles to match consistent spacing and remove brand colors from bot elements
 const useStyles = makeStyles({
     container: {
-        maxWidth: '800px',
         margin: '0 auto 32px auto',
         padding: '0 24px',
         fontFamily: tokens.fontFamilyBase
@@ -272,7 +271,7 @@ const renderPlanResponse = (
     let stepCounter = 0;
 
     return (
-        <div className={styles.container}>
+        <div className={`${styles.container} conversation-measure`}>
             {/* Agent Header */}
             <div className={styles.agentHeader}>
                 {/* Hide avatar when creating plan */}

@@ -26,6 +26,7 @@ export interface Rule {
 export const SRC = join(__dirname, '..');
 export const STYLES = join(SRC, 'styles');
 export const SHELL_STYLESHEET = join(STYLES, 'storeSurface.css');
+export const indexStylesheet = join(SRC, 'index.css');
 export const RAIL_STYLESHEET = join(STYLES, 'transparency.css');
 export const PLAN_PANEL_STYLESHEET = join(STYLES, 'planpanelright.css');
 export const STACKING_BREAKPOINT = '@media (max-width: 900px)';

@@ -49,8 +49,7 @@ const StreamingBufferMessage: React.FC<StreamingBufferMessageProps> = ({
     const formattedBuffer = formatJsonInText(streamingMessageBuffer);
  
     return (
-        <div style={{
-            maxWidth: '800px',
+        <div className="conversation-measure" style={{
             margin: '0 auto 32px auto',
             padding: '0 24px'
         }}>
