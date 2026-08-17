@@ -141,7 +141,7 @@ def agent_response_callback(
 
 async def streaming_agent_response_callback(
     agent_id: str,
-    update: AgentResponseUpdate,
+    update: "AgentResponseUpdate | None",
     is_final: bool,
     user_id: str | None = None,
 ) -> None:
@@ -178,7 +178,7 @@ async def streaming_agent_response_callback(
             )
             logger.info("Tool calls streamed from %s: %d", agent_id, len(tool_calls))
 
-        if cleaned:
+        if cleaned or is_final:
             streaming_payload = AgentMessageStreaming(
                 agent_name=display_name,
                 content=cleaned,

@@ -35,9 +35,12 @@ import {
 } from '@/store/slices/chatSlice';
 import {
     appendToStreamingBuffer,
+    clearStreamingAnswer,
+    completeStreamingAnswer,
+    startStreamingAnswer,
+    setStreamingAgent,
     setShowBufferingText,
     addStreamingMessage,
-    selectStreamingMessageBuffer,
 } from '@/store/slices/streamingSlice';
 import { setWsConnected } from '@/store/slices/appSlice';
 import { setSelectedTeam } from '@/store/slices/teamSlice';
@@ -110,7 +113,6 @@ export function usePlanWebSocket({
     const planApproved = useAppSelector(selectPlanApproved);
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const continueWithWebsocketFlow = useAppSelector(selectContinueWithWebsocketFlow);
-    const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
     const processingStartedAtRef = React.useRef<number | null>(null);
 
     // Coalesce high-frequency streaming tokens into one flush per animation frame
@@ -183,14 +185,32 @@ export function usePlanWebSocket({
         const unsub = webSocketService.on(
             WebsocketMessageType.AGENT_MESSAGE_STREAMING,
             (msg: any) => {
+                const streamed = msg.data ?? msg;
                 // The one signal that names *which* specialist is responding
                 // (#64, ADR-023). Taken from the frame rather than from the
                 // plan, which the Fast lane does not have.
-                dispatch(agentResponding(msg.data?.agent ?? null));
-                const line = PlanDataService.simplifyHumanClarification(msg.data?.content || msg.content || '');
-                streamingChunkQueueRef.current.push(line);
-                if (streamingFlushHandleRef.current === null) {
-                    streamingFlushHandleRef.current = requestAnimationFrame(flushStreamingChunks);
+                dispatch(agentResponding(streamed.agent ?? null));
+                if (streamed.agent) {
+                    dispatch(setStreamingAgent(streamed.agent));
+                }
+                const line = PlanDataService.simplifyHumanClarification(streamed.content || '');
+                if (line) {
+                    dispatch(startStreamingAnswer());
+                    streamingChunkQueueRef.current.push(line);
+                    if (streamingFlushHandleRef.current === null) {
+                        streamingFlushHandleRef.current = requestAnimationFrame(flushStreamingChunks);
+                    }
+                }
+                if (streamed.is_final) {
+                    if (streamingFlushHandleRef.current !== null) {
+                        cancelAnimationFrame(streamingFlushHandleRef.current);
+                        streamingFlushHandleRef.current = null;
+                    }
+                    flushStreamingChunks();
+                    // This is the stream's own terminal signal. A final result
+                    // settles the transcript later, but cannot define when the
+                    // model stopped streaming.
+                    dispatch(completeStreamingAnswer());
                 }
             },
         );
@@ -269,6 +289,11 @@ export function usePlanWebSocket({
                     : '';
                 const messageStatus = finalMessage?.status ?? finalMessage?.data?.status;
                 const finalContent = finalMessage?.content ?? finalMessage?.data?.content ?? '';
+                if (streamingFlushHandleRef.current !== null) {
+                    cancelAnimationFrame(streamingFlushHandleRef.current);
+                    streamingFlushHandleRef.current = null;
+                }
+                streamingChunkQueueRef.current = [];
                 // Done, on every terminal status rather than on the one the
                 // handler recognises. Any other status used to hang the
                 // indicator with the answer already on screen (#69).
@@ -289,8 +314,11 @@ export function usePlanWebSocket({
                         next_steps: [],
                         content: finalContent + completionTimeLine,
                         raw_data: finalMessage,
+                        announce: true,
                     };
-                    dispatch(setShowBufferingText(true));
+                    // The persisted whole result is authoritative. The stream
+                    // was a preview and must disappear even if it missed words.
+                    dispatch(clearStreamingAnswer());
                     dispatch(addAgentMessage(agentMessageData));
                     dispatch(setSelectedTeam(planData?.team || null));
                     /* P0: single compound action replaces setShowProcessingPlanSpinner(false) + markPlanCompleted() */
@@ -298,7 +326,7 @@ export function usePlanWebSocket({
                     processingStartedAtRef.current = null;
                     scrollToFinalResult();
                     webSocketService.disconnect();
-                    persistAgentMessage(agentMessageData, planData, dispatch, true, streamingMessageBuffer);
+                    persistAgentMessage(agentMessageData, planData, dispatch, true);
                 } else if (messageStatus === 'error') {
                     // Safety net: handle error status sent as FINAL_RESULT_MESSAGE
                     const errorContent = finalContent || 'An unexpected error occurred. Please try again later.';
@@ -313,7 +341,7 @@ export function usePlanWebSocket({
                     };
                     dispatch(addAgentMessage(errorAgent));
                     dispatch(planFailedFinal());
-                    dispatch(setShowBufferingText(false));
+                    dispatch(clearStreamingAnswer());
                     scrollToBottom();
                     showToast(errorContent, 'error');
                     webSocketService.disconnect();
@@ -333,7 +361,7 @@ export function usePlanWebSocket({
                         };
                         dispatch(addAgentMessage(terminalMessage));
                     }
-                    dispatch(setShowBufferingText(false));
+                    dispatch(clearStreamingAnswer());
                     dispatch(setShowProcessingPlanSpinner(false));
                     processingStartedAtRef.current = null;
                     scrollToBottom();
@@ -342,13 +370,18 @@ export function usePlanWebSocket({
             },
         );
         return unsub;
-    }, [dispatch, scrollToBottom, scrollToFinalResult, planData, streamingMessageBuffer, formatErrorMessage, showToast]);
+    }, [dispatch, scrollToBottom, scrollToFinalResult, planData, formatErrorMessage, showToast]);
 
     // ── ERROR_MESSAGE ─────────────────────────────────────────────
     useEffect(() => {
         const unsub = webSocketService.on(
             WebsocketMessageType.ERROR_MESSAGE,
             (errorMessage: any) => {
+                if (streamingFlushHandleRef.current !== null) {
+                    cancelAnimationFrame(streamingFlushHandleRef.current);
+                    streamingFlushHandleRef.current = null;
+                }
+                streamingChunkQueueRef.current = [];
                 let errorContent = 'An unexpected error occurred. Please try again later.';
                 if (errorMessage?.data?.data?.content) {
                     const c = errorMessage.data.data.content.trim();
@@ -376,7 +409,7 @@ export function usePlanWebSocket({
                 dispatch(planFailedFinal());
                 dispatch(requestSettled());
                 processingStartedAtRef.current = null;
-                dispatch(setShowBufferingText(false));
+                dispatch(clearStreamingAnswer());
                 // The turn is over, so nothing is in flight (#77, ADR-027).
                 // This used to lock the box, which left the failed chat — the
                 // one most worth resuming — the one chat that could not be.

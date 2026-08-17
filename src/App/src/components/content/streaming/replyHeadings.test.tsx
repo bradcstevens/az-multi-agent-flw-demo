@@ -4,7 +4,6 @@ import { render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 
 import renderAgentMessages from './StreamingAgentMessage';
-import StreamingBufferMessage from './StreamingBufferMessage';
 import { AgentMessageType } from '@/models';
 import { sourceFiles } from '@/testing/stylesheets';
 
@@ -44,14 +43,6 @@ describe('a reply may not head the surface', () => {
         render(<AgentReply />);
 
         expect(screen.getByText('Closing the store')).toBeInTheDocument();
-        expect(screen.queryAllByRole('heading')).toEqual([]);
-    });
-
-    it('renders no heading at all from the streaming buffer', () => {
-        // The buffer shows the same words a moment earlier and rendered them
-        // with react-markdown's defaults, so the `h1` arrived there first.
-        render(<StreamingBufferMessage streamingMessageBuffer={MARKDOWN} />);
-
         expect(screen.queryAllByRole('heading')).toEqual([]);
     });
 

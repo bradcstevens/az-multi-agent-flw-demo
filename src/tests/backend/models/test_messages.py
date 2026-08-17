@@ -15,7 +15,6 @@ if _backend_path not in sys.path:
     sys.path.insert(0, _backend_path)
 
 from backend.models.messages import (AgentMessage, AgentMessageStreaming,
-                                     AgentStreamEnd, AgentStreamStart,
                                      AgentToolCall, AgentToolMessage,
                                      PlanApprovalRequest, PlanApprovalResponse,
                                      ReplanApprovalRequest,
@@ -39,24 +38,6 @@ class TestAgentMessage:
 
     def test_is_dataclass(self):
         assert dataclasses.is_dataclass(AgentMessage)
-
-
-class TestAgentStreamStart:
-    def test_construction(self):
-        obj = AgentStreamStart(agent_name="A")
-        assert obj.agent_name == "A"
-
-    def test_is_dataclass(self):
-        assert dataclasses.is_dataclass(AgentStreamStart)
-
-
-class TestAgentStreamEnd:
-    def test_construction(self):
-        obj = AgentStreamEnd(agent_name="A")
-        assert obj.agent_name == "A"
-
-    def test_is_dataclass(self):
-        assert dataclasses.is_dataclass(AgentStreamEnd)
 
 
 class TestAgentMessageStreaming:

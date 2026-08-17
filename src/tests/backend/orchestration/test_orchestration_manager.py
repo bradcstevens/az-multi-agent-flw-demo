@@ -813,6 +813,25 @@ class TestRunOrchestration:
         agent_response_callback.assert_called_once_with("hr_agent", agent_msg, "user-1")
 
     @pytest.mark.asyncio
+    async def test_given_specialist_stream_completion_when_run_then_sends_an_explicit_final_frame(self):
+        agent_msg = MockMessage(text="Agent output")
+        events = [
+            _make_event("executor_completed", data=[agent_msg], executor_id="hr_agent"),
+        ]
+        mock_workflow = Mock()
+        mock_workflow.run = Mock(return_value=_async_iter(events))
+        mock_workflow._executors = {}
+        mock_workflow.executors = {}
+        mock_workflow.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = mock_workflow
+
+        await OrchestrationManager().run_orchestration(user_id="user-1", input_task="task")
+
+        streaming_agent_response_callback.assert_awaited_once_with(
+            "hr_agent", None, True, "user-1",
+        )
+
+    @pytest.mark.asyncio
     async def test_given_streaming_output_when_run_then_calls_streaming_callback(self):
         # Arrange
         update = MockAgentResponseUpdate(text="chunk")

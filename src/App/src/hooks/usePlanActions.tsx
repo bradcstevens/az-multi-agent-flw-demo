@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { useAppDispatch } from '@/store/hooks';
-import { ProcessedPlanData } from '@/models';
+import { PlanStatus, ProcessedPlanData } from '@/models';
 import {
     fetchPlanData,
     resetPlan,
@@ -80,7 +80,10 @@ export function usePlanActions() {
                     dispatch(setAgentMessages(planResult.messages));
                 }
 
-                if (planResult?.streaming_message?.trim()) {
+                if (
+                    planResult?.streaming_message?.trim()
+                    && planResult.plan?.overall_status === PlanStatus.IN_PROGRESS
+                ) {
                     dispatch(setStreamingMessageBuffer(planResult.streaming_message));
                     dispatch(setShowBufferingText(true));
                 }

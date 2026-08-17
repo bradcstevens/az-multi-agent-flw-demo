@@ -16,6 +16,7 @@ import planReducer, {
 } from '@/store/slices/planSlice';
 import progressReducer, { requestRouted, requestSent } from '@/store/slices/progressSlice';
 import chatReducer from '@/store/slices/chatSlice';
+import { selectAgentMessages } from '@/store/slices/chatSlice';
 import appReducer from '@/store/slices/appSlice';
 import teamReducer from '@/store/slices/teamSlice';
 import streamingReducer from '@/store/slices/streamingSlice';
@@ -23,6 +24,12 @@ import transparencyReducer from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import { useAppSelector } from '@/store/hooks';
 import PlanChat from '@/components/content/PlanChat';
+import {
+    selectShowBufferingText,
+    selectStreamingAgent,
+    selectStreamingComplete,
+    selectStreamingMessageBuffer,
+} from '@/store/slices/streamingSlice';
 
 /**
  * The chat page's half of the connection lifecycle (issue #63, ADR-021).
@@ -56,6 +63,10 @@ const Host = ({
     });
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const planApprovalRequest = useAppSelector(selectPlanApprovalRequest);
+    const agentMessages = useAppSelector(selectAgentMessages);
+    const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
+    const showBufferingText = useAppSelector(selectShowBufferingText);
+    const streamingAgent = useAppSelector(selectStreamingAgent);
     const ref = React.useRef<HTMLDivElement>(null);
     return (
         <PlanChat
@@ -68,9 +79,10 @@ const Host = ({
             planApprovalRequest={planApprovalRequest}
             messagesContainerRef={ref as never}
             finalResultRef={ref as never}
-            streamingMessageBuffer=""
-            showBufferingText={false}
-            agentMessages={[]}
+            streamingMessageBuffer={streamingMessageBuffer}
+            showBufferingText={showBufferingText}
+            streamingAgent={streamingAgent}
+            agentMessages={agentMessages}
             showProcessingPlanSpinner={showProcessingPlanSpinner}
             processingElapsedSeconds={0}
             showApprovalButtons={false}
@@ -244,6 +256,7 @@ describe('the agent that is responding, named from the frame that names it', () 
                 }),
             );
         });
+        expect(selectStreamingComplete(store.getState())).toBe(false);
 
         await waitFor(() =>
             expect(screen.getByText('Troubleshooting Agent is responding...')).toBeInTheDocument(),
@@ -303,6 +316,7 @@ describe('a final result arriving on the socket', () => {
                 }),
             );
         });
+
     };
 
     const expectNothingInFlightAfter = async (status: string) => {
@@ -387,6 +401,78 @@ describe('a final result arriving on the socket', () => {
         });
 
         await waitFor(() => expect(inFlightIndicators()).toHaveLength(0));
+    });
+});
+
+describe('a specialist answer arriving on the wire', () => {
+    it('appears progressively in the conversation, then the complete result replaces it once', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Troubleshooting Agent',
+                    content: 'The stream lost this opening.',
+                    is_final: false,
+                }),
+            );
+        });
+
+        await waitFor(() =>
+            expect(screen.getByText('The stream lost this opening.')).toBeInTheDocument(),
+        );
+        expect(screen.queryByText('AI Thinking Process')).not.toBeInTheDocument();
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Troubleshooting Agent',
+                    content: '',
+                    is_final: true,
+                }),
+            );
+        });
+        expect(selectStreamingComplete(store.getState())).toBe(true);
+
+        act(() => {
+            socket.deliver(
+                frame('final_result_message', {
+                    content: 'The complete answer includes the missing opening and the conclusion.',
+                    status: 'completed',
+                }),
+            );
+        });
+
+        const settledAnswer = await screen.findByRole('status', { name: 'Settled answer' });
+        expect(settledAnswer).toHaveTextContent(
+            'The complete answer includes the missing opening and the conclusion.',
+        );
+        expect(screen.queryByText('The stream lost this opening.')).not.toBeInTheDocument();
+        expect(screen.queryByText('AI Thinking Process')).not.toBeInTheDocument();
+    });
+
+    it('does not restore queued stream text after the turn fails', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Troubleshooting Agent',
+                    content: 'This preview must not return.',
+                    is_final: false,
+                }),
+            );
+            socket.deliver(frame('error_message', { content: 'The orchestration failed.' }));
+        });
+
+        await waitFor(() =>
+            expect(screen.getByText('The orchestration failed.')).toBeInTheDocument(),
+        );
+        expect(screen.queryByText('This preview must not return.')).not.toBeInTheDocument();
     });
 });
 

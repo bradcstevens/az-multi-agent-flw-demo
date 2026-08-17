@@ -1602,6 +1602,17 @@ class OrchestrationManager:
                             if isinstance(msg, Message) and msg.text:
                                 final_output_ref[0] = msg.text
                     else:
+                        try:
+                            # ``executor_completed`` is the framework signal
+                            # that this specialist's output stream is over.
+                            await streaming_agent_response_callback(
+                                agent_id, None, True, user_id,
+                            )
+                        except Exception as cb_err:
+                            self.logger.error(
+                                "Error completing stream for %s: %s",
+                                agent_id, cb_err,
+                            )
                         for msg in event.data:
                             if isinstance(msg, Message) and msg.text:
                                 try:

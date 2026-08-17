@@ -56,6 +56,7 @@ import {
     selectStreamingMessages,
     selectStreamingMessageBuffer,
     selectShowBufferingText,
+    selectStreamingAgent,
 } from '../store/slices/streamingSlice';
 import { selectWsConnected } from '../store/slices/appSlice';
 import { selectSelectedTeam } from '../store/slices/teamSlice';
@@ -156,6 +157,7 @@ const ChatPage: React.FC = () => {
     const streamingMessages = useAppSelector(selectStreamingMessages);
     const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
     const showBufferingText = useAppSelector(selectShowBufferingText);
+    const streamingAgent = useAppSelector(selectStreamingAgent);
     const wsConnected = useAppSelector(selectWsConnected);
     const selectedTeam = useAppSelector(selectSelectedTeam);
     const showTimeoutDialog = useAppSelector(selectShowTimeoutDialog);
@@ -887,6 +889,7 @@ const ChatPage: React.FC = () => {
                                 finalResultRef={finalResultRef}
                                 streamingMessageBuffer={streamingMessageBuffer}
                                 showBufferingText={showBufferingText}
+                                streamingAgent={streamingAgent}
                                 agentMessages={agentMessages}
                                 showProcessingPlanSpinner={showProcessingPlanSpinner}
                                 processingElapsedSeconds={processingElapsedSeconds}

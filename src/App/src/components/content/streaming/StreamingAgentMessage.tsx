@@ -166,6 +166,10 @@ const renderAgentMessages = (
             {isLastMessage && finalResultRef && <div ref={finalResultRef} />}
             <div
               className={styles.container}
+              role={msg.announce ? 'status' : undefined}
+              aria-label={msg.announce ? 'Settled answer' : undefined}
+              aria-live={msg.announce ? 'polite' : 'off'}
+              aria-atomic={msg.announce || undefined}
               style={{
                 flexDirection: isHuman ? 'row-reverse' : 'row'
               }}
