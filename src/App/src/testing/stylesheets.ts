@@ -138,10 +138,9 @@ export const allRules = (): Rule[] =>
 
 /** Every rule the stylesheets declare, inside media queries as well as out. */
 export const allRulesIncludingMediaQueries = (): Rule[] =>
-    readdirSync(STYLES)
-        .filter((entry) => entry.endsWith('.css'))
-        .flatMap((entry) => {
-            const css = withoutComments(readFileSync(join(STYLES, entry), 'utf8'));
+    ['index.css', ...readdirSync(STYLES).filter((entry) => entry.endsWith('.css'))].flatMap((entry) => {
+        const path = entry === 'index.css' ? indexStylesheet : join(STYLES, entry);
+        const css = withoutComments(readFileSync(path, 'utf8'));
             // Media-query bodies are parsed as their own stylesheets, so a rule
             // inside one is read exactly like a rule outside one.
             const inner = Array.from(css.matchAll(/@media[^{]*\{/g)).flatMap((match) => {
@@ -157,4 +156,4 @@ export const allRulesIncludingMediaQueries = (): Rule[] =>
                 return [];
             });
             return [...rulesIn(css, entry), ...inner];
-        });
+    });

@@ -1,10 +1,18 @@
 import { readFileSync } from "node:fs";
-import { indexStylesheet } from "./stylesheets";
+import { allRulesIncludingMediaQueries, indexStylesheet } from "./stylesheets";
 
 describe("conversation measure stylesheet seam", () => {
-  it("declares the winning 800px measure once", () => {
-    const css = readFileSync(indexStylesheet, "utf8");
-    expect(css.match(/max-width:\s*800px/g)).toHaveLength(1);
-    expect(css).toContain(".conversation-measure");
+  it("reads the one winning 800px declaration from the loaded stylesheets", () => {
+    const declarations = allRulesIncludingMediaQueries().filter((rule) =>
+      /max-width:\s*800px/.test(rule.body),
+    );
+    const measureRules = allRulesIncludingMediaQueries().filter((rule) =>
+      rule.selector.split(",").some((selector) => selector.trim() === ".conversation-measure"),
+    );
+
+    expect(declarations).toHaveLength(1);
+    expect(measureRules).toHaveLength(1);
+    expect(measureRules[0].body).toContain("max-width: 800px");
+    expect(readFileSync(indexStylesheet, "utf8")).toContain(".conversation-measure");
   });
 });

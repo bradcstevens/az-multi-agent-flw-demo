@@ -15,7 +15,7 @@ const TicketStatusReply: React.FC<TicketStatusReplyProps> = ({
   onReply,
   disabled,
 }) => (
-  <div className="rehearsed-replies" data-testid="ticket-status-reply">
+  <div className="rehearsed-replies conversation-measure" data-testid="ticket-status-reply">
     <Button
       appearance="outline"
       size="small"

@@ -43,7 +43,7 @@ const RehearsedReplies: React.FC<RehearsedRepliesProps> = ({
   if (!clarificationPending || replies.length === 0) return null;
 
   return (
-    <div className="rehearsed-replies" data-testid="rehearsed-replies">
+    <div className="rehearsed-replies conversation-measure" data-testid="rehearsed-replies">
       {replies.map((reply) => (
         <Button
           key={reply}
