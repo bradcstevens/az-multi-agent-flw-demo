@@ -168,8 +168,8 @@ def test_every_follow_on_edge_is_quoted_in_the_presenter_runbook():
     """A Follow-on task is an authored transition the presenter has to rehearse.
 
     The general prompt test protects each Quick Task in isolation. This seam
-    protects the graph transition: both endpoint prompts must appear, in the
-    order the runbook tells the presenter to tap them.
+    protects the graph transition: the runbook quotes the exact source-to-target
+    edge the presenter is expected to tap.
     """
     tasks = {task["id"]: task for task in _quick_tasks()}
     edges = [
@@ -180,15 +180,13 @@ def test_every_follow_on_edge_is_quoted_in_the_presenter_runbook():
     runbook = _rendered()
 
     assert edges, "the store pack authors no Follow-on edges to rehearse"
+    unresolved = [target_id for _, target_id in edges if target_id not in tasks]
+    assert not unresolved, f"Follow-on edges name unknown Quick Tasks: {unresolved}"
     missing = [
-        f"{source_id} -> {target_id}"
+        f"`{tasks[source_id]['prompt']}` -> `{tasks[target_id]['prompt']}`"
         for source_id, target_id in edges
-        if source_id not in tasks
-        or target_id not in tasks
-        or tasks[source_id]["prompt"] not in runbook
-        or tasks[target_id]["prompt"] not in runbook
-        or runbook.index(tasks[source_id]["prompt"])
-        >= runbook.index(tasks[target_id]["prompt"])
+        if f"`{tasks[source_id]['prompt']}` -> `{tasks[target_id]['prompt']}`"
+        not in runbook
     ]
     assert not missing, f"the runbook does not quote Follow-on edges: {missing}"
 

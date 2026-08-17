@@ -15,7 +15,6 @@ import TicketStatusReply from "./TicketStatusReply";
 import { useAppSelector } from "@/store/hooks";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
 import { selectProgressNarration } from "@/store/slices/progressSlice";
-import { selectHasPendingClarification } from "@/store/slices/chatSlice";
 import { StartingTask, TicketStatusReply as TicketStatusReplyModel } from "@/models/Team";
 import { PersonalAnswer } from "@/models/personalAnswer";
 import { PolicyBlock } from "@/api/policyBlock";
@@ -113,7 +112,6 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     to disagree about what the system was doing.
   */
   const narration = useAppSelector(selectProgressNarration);
-  const clarificationPending = useAppSelector(selectHasPendingClarification);
   const streamedReplyMessage: AgentMessageData[] = streamedReply?.content
     ? [{
       agent: streamedReply.agent,
@@ -230,7 +228,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         </div>
       )}
 
-      {!clarificationPending && (followOnTasks ?? (followOnTask ? [followOnTask] : [])).map((task) =>
+      {(followOnTasks ?? (followOnTask ? [followOnTask] : [])).map((task) =>
         onFollowOnTask ? (
           <FollowOnTask
             key={task.id}

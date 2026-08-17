@@ -134,9 +134,8 @@ describe('the conversation offers the rehearsed replies', () => {
         });
 
         it('yields the slot to the chips while a clarification is pending', () => {
-            // One control at a time (#131, ADR-033). Wired here as well as in
-            // the card, because a gate the conversation forgets to honour is a
-            // tap that strands the turn the agent is waiting on.
+            // One control at a time (#131, ADR-033). The card owns this gate,
+            // so every conversation caller gets the same protection.
             renderChat({ followOnTask: FOLLOW_ON, onFollowOnTask: vi.fn() });
 
             expect(screen.queryByTestId('follow-on-task')).not.toBeInTheDocument();
