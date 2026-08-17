@@ -226,18 +226,22 @@ class TestTheTurnInFlight:
         task.cancel()
 
     @pytest.mark.asyncio
-    async def test_asking_for_another_chats_turn_finds_nothing(self):
-        # The registry is storage, and it stores *both* halves. Which Chat the
-        # turn belongs to is what **Ending a turn** reads to scope itself
-        # (ADR-031 §6); the rule lives with the primitive, and this is the fact
-        # it reads.
+    async def test_one_associates_turn_is_never_anothers(self):
+        # The slot is per associate, and an associate with no turn in flight
+        # has none rather than somebody else's — the registry is what
+        # **Ending a turn** reads before it cancels anything.
         cfg = OrchestrationConfig()
-        task = await self._pending()
-        cfg.register_active_turn("user-1", "sess-1", "plan-1", task)
+        mine = await self._pending()
+        theirs = await self._pending()
+        cfg.register_active_turn("user-1", "sess-1", "plan-1", mine)
+        cfg.register_active_turn("user-2", "sess-2", "plan-2", theirs)
 
-        assert cfg.active_turn("user-1").session_id == "sess-1"
+        assert cfg.active_turn("user-1").task is mine
+        assert cfg.active_turn("user-2").task is theirs
+        assert cfg.active_turn("user-3") is None
 
-        task.cancel()
+        mine.cancel()
+        theirs.cancel()
 
     @pytest.mark.asyncio
     async def test_a_finished_turn_is_no_longer_in_flight(self):
