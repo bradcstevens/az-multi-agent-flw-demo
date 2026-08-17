@@ -254,21 +254,31 @@ class TestPlanService:
         mock_approval = MockPlanApprovalResponse(
             plan_id="test-plan-123",
             m_plan_id="test-m-plan-456",
-            approved=False
+            approved=False,
+            feedback="Ask Marcus instead.",
         )
         mock_mplan = MagicMock()
         mock_mplan.plan_id = "existing-plan-id"
+        mock_mplan.revision = 1
+        mock_mplan.revision_feedback = []
+        mock_mplan.model_dump.return_value = {"revision": 2}
         mock_orchestration_config.plans = {"test-m-plan-456": mock_mplan}
 
         mock_db = MagicMock()
-        mock_db.delete_plan_by_plan_id = AsyncMock()
+        mock_plan = MagicMock()
+        mock_plan.revision = 1
+        mock_plan.revision_feedback = []
+        mock_db.get_plan = AsyncMock(return_value=mock_plan)
+        mock_db.update_plan = AsyncMock()
         mock_database_factory.DatabaseFactory.get_database = AsyncMock(return_value=mock_db)
 
         with patch.object(plan_service_module, 'orchestration_config', mock_orchestration_config):
             result = await PlanService.handle_plan_approval(mock_approval, "test-user")
 
         assert result is True
-        mock_db.delete_plan_by_plan_id.assert_called_once_with("test-plan-123")
+        assert mock_plan.revision == 2
+        assert mock_plan.revision_feedback == ["Ask Marcus instead."]
+        mock_db.update_plan.assert_called_once_with(mock_plan)
 
     @pytest.mark.asyncio
     async def test_handle_plan_approval_no_orchestration_config(self):

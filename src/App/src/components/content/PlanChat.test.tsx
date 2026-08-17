@@ -128,4 +128,37 @@ describe('the conversation offers the rehearsed replies', () => {
 
         expect(screen.queryByTestId('ticket-status-reply')).not.toBeInTheDocument();
     });
+
+    it('sends selected feedback back with the Reviewable plan', () => {
+        const handleRejectPlan = vi.fn();
+        renderChat(
+            {
+                showApprovalButtons: true,
+                handleRejectPlan,
+                planApprovalRequest: {
+                    id: 'review-1',
+                    user_request: 'Swap Saturday',
+                    facts: '',
+                    steps: [
+                        {
+                            id: 1,
+                            action: 'Ask Marcus Bell to take the shift',
+                            assignee: {
+                                kind: 'person',
+                                name: 'Marcus Bell',
+                                relation: 'peer',
+                                simulated: true,
+                            },
+                        },
+                    ],
+                },
+            } as never,
+            { pending: false },
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Ask a different associate.' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Send back with feedback' }));
+
+        expect(handleRejectPlan).toHaveBeenCalledWith('Ask a different associate.');
+    });
 });

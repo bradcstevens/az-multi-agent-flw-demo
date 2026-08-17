@@ -1236,6 +1236,30 @@ class TestPlanApproval:
         )
         assert resp.status_code == 200
 
+    def test_send_back_records_feedback_for_the_waiting_review(self, rt):
+        rt.orchestration_config.approvals = {"m-1": True}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval",
+            json=self._payload(approved=False, feedback="Ask Marcus instead."),
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "revision requested"
+        rt.orchestration_config.set_approval_feedback.assert_called_once_with(
+            "m-1", "Ask Marcus instead.", "p-1"
+        )
+
+    def test_send_back_requires_associate_feedback(self, rt):
+        rt.orchestration_config.approvals = {"m-1": True}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval",
+            json=self._payload(approved=False, feedback="  "),
+        )
+
+        assert resp.status_code == 422
+
     def test_no_active_plan(self, rt):
         # The 404 raised in the else-branch is caught by the surrounding
         # `except Exception` block and surfaced as a 500 by the endpoint.

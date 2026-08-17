@@ -35,6 +35,16 @@ export interface ReviewablePlanStep {
     waitingDescription: string | null;
 }
 
+export interface PlanVerdictState {
+    revision: number;
+    feedback: string[];
+    verdict: 'pending' | 'approved';
+}
+
+export type PlanVerdictAction =
+    | { kind: 'approve' }
+    | { kind: 'revise'; feedback: string };
+
 export const isPersonRelation = (value: unknown): value is PersonRelation =>
     value === 'associate' || value === 'peer' || value === 'manager';
 
@@ -123,3 +133,34 @@ export const reviewablePlanSteps = (steps: readonly PlanApprovalStep[]): Reviewa
             waitingDescription: describeWaiting(assignee),
         };
     });
+
+/** Authored feedback starters, selected deterministically from this Reviewable plan. */
+export const revisionSuggestionsFor = (
+    steps: readonly PlanApprovalStep[],
+): string[] => {
+    const reviewSteps = reviewablePlanSteps(steps);
+    const suggestions: string[] = [];
+    if (reviewSteps.some((step) => step.assignee.kind === 'person' && step.assignee.relation === 'peer')) {
+        suggestions.push('Ask a different associate.');
+    }
+    if (reviewSteps.filter((step) => step.assignee.kind === 'person').length > 1) {
+        suggestions.push('Change the order people are asked.');
+    }
+    if (reviewSteps.some((step) => step.assignee.kind === 'agent')) {
+        suggestions.push('Use a different specialist.');
+    }
+    return suggestions;
+};
+
+/** The review verdict is binary: approval is terminal; feedback asks for a revision. */
+export const applyPlanVerdict = (
+    state: PlanVerdictState,
+    action: PlanVerdictAction,
+): PlanVerdictState => {
+    if (state.verdict === 'approved') return state;
+    if (action.kind === 'approve') return { ...state, verdict: 'approved' };
+    const feedback = action.feedback.trim();
+    return feedback
+        ? { ...state, revision: state.revision + 1, feedback: [...state.feedback, feedback] }
+        : state;
+};

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    applyPlanVerdict,
     isPersonRelation,
+    revisionSuggestionsFor,
     reviewablePlanSteps,
     type ProposedStep,
 } from './reviewablePlan';
@@ -91,5 +93,32 @@ describe('the Reviewable plan model', () => {
                 } as never,
             ]),
         ).toThrow('Unknown person relation: director');
+    });
+
+    it('derives authored send-back suggestions from the plan in front of the associate', () => {
+        expect(revisionSuggestionsFor(STEPS)).toEqual([
+            'Ask a different associate.',
+            'Change the order people are asked.',
+            'Use a different specialist.',
+        ]);
+        expect(revisionSuggestionsFor([STEPS[0]])).toEqual([
+            'Use a different specialist.',
+        ]);
+    });
+
+    it('keeps revision feedback and makes approval terminal', () => {
+        const revised = applyPlanVerdict(
+            { revision: 1, feedback: [], verdict: 'pending' },
+            { kind: 'revise', feedback: 'Ask Marcus instead.' },
+        );
+        expect(revised).toEqual({
+            revision: 2,
+            feedback: ['Ask Marcus instead.'],
+            verdict: 'pending',
+        });
+        const approved = applyPlanVerdict(revised, { kind: 'approve' });
+        expect(applyPlanVerdict(approved, { kind: 'revise', feedback: 'Actually, Dana.' })).toEqual(
+            approved,
+        );
     });
 });

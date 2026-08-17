@@ -262,6 +262,10 @@ export interface MPlanData {
     team: string[];
     facts: string;
     steps: PlanApprovalStep[];
+    /** The Reviewable plan revision currently awaiting the associate's verdict. */
+    revision?: number;
+    /** Associate feedback that produced the current revision, oldest first. */
+    revision_feedback?: string[];
     context: {
         task: string;
         participant_descriptions: Record<string, string>;

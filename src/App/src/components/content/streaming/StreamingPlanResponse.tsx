@@ -14,7 +14,7 @@ import React, { useState } from 'react';
 import { getAgentIcon, getAgentDisplayNameWithSuffix } from '@/utils/agentIconUtils';
 import { PLAN_ARRIVING } from '@/models/progressNarration';
 import { SECTION_HEADING } from '@/models/headingOutline';
-import { reviewablePlanSteps } from '@/models/reviewablePlan';
+import { revisionSuggestionsFor, reviewablePlanSteps } from '@/models/reviewablePlan';
 
 // Updated styles to match consistent spacing and remove brand colors from bot elements
 const useStyles = makeStyles({
@@ -233,7 +233,7 @@ const getFactsPreview = (content: string): string => {
 const renderPlanResponse = (
     planApprovalRequest: MPlanData | null, 
     handleApprovePlan: () => void, 
-    handleRejectPlan: () => void, 
+    handleRejectPlan: (feedback: string) => void, 
     processingApproval: boolean, 
     showApprovalButtons: boolean
 ) => {
@@ -245,6 +245,10 @@ const renderPlanResponse = (
     const agentName = getAgentDisplayNameFromPlan(planApprovalRequest);
     const { factsContent, planSteps } = extractDynamicContent(planApprovalRequest);
     const factsPreview = getFactsPreview(factsContent);
+    const [feedback, setFeedback] = useState('');
+    const revision = planApprovalRequest.revision ?? 1;
+    const feedbackHistory = planApprovalRequest.revision_feedback ?? [];
+    const suggestions = revisionSuggestionsFor(planApprovalRequest.steps);
 
     // Check if this is a "creating plan" state
     const isCreatingPlan = !planSteps.length && !factsContent;
@@ -330,6 +334,16 @@ const renderPlanResponse = (
                         {`Proposed Plan for ${planApprovalRequest.user_request || 'Task'}`}
                     </div>
                 )}
+                {!isCreatingPlan && (
+                    <div className={styles.instructionText}>
+                        <strong>Revision {revision}</strong>
+                        {feedbackHistory.length > 0 && (
+                            <div>
+                                What you asked to change: {feedbackHistory.at(-1)}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Plan Steps */}
                 {planSteps.length > 0 && (
@@ -376,12 +390,38 @@ const renderPlanResponse = (
                         <Button
                             appearance="secondary"
                             size="medium"
-                            onClick={handleRejectPlan}
-                            disabled={processingApproval}
+                            onClick={() => handleRejectPlan(feedback)}
+                            disabled={processingApproval || !feedback.trim()}
                         >
-                            Cancel
+                            Send back with feedback
                         </Button>
                     </div>
+                )}
+                {showApprovalButtons && !isCreatingPlan && (
+                    <div className={styles.buttonContainer}>
+                        {suggestions.map((suggestion) => (
+                            <Button
+                                key={suggestion}
+                                appearance="secondary"
+                                size="small"
+                                onClick={() => setFeedback(suggestion)}
+                                disabled={processingApproval}
+                            >
+                                {suggestion}
+                            </Button>
+                        ))}
+                    </div>
+                )}
+                {showApprovalButtons && !isCreatingPlan && (
+                    <label>
+                        What would you change?
+                        <textarea
+                            aria-label="What would you change?"
+                            value={feedback}
+                            onChange={(event) => setFeedback(event.target.value)}
+                            disabled={processingApproval}
+                        />
+                    </label>
                 )}
             </div>
         </div>

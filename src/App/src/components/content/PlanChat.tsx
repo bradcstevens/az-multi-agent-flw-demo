@@ -41,7 +41,7 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   processingElapsedSeconds: number;
   showApprovalButtons: boolean;
   handleApprovePlan: () => Promise<void>;
-  handleRejectPlan: () => Promise<void>;
+  handleRejectPlan: (feedback: string) => Promise<void>;
   processingApproval: boolean;
   /** The Rehearsed replies for this plan (issue #26), if it began as a tap. */
   rehearsedReplies: string[];
