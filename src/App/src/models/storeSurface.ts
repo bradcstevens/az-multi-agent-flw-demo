@@ -50,6 +50,9 @@ export const SIMULATED_LABEL = 'Simulated';
  */
 export const TRANSPARENCY_PANELS_LABEL = 'Transparency panels';
 
+/** The rail's one state description when the presenter has pinned it closed. */
+export const TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION = 'Pinned closed for this conversation.';
+
 /**
  * The one assistant, resolved out of whatever the backend returned.
  *

@@ -4,6 +4,7 @@ import {
     ASSISTANT_NAME,
     STORE_LABEL,
     STORE_ASSISTANT_TEAM_ID,
+    TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION,
     TRANSPARENCY_PANELS_LABEL,
     selectStoreAssistant,
 } from './storeSurface';
@@ -37,6 +38,12 @@ describe('the store surface', () => {
         // pinned here so the one place it is written is the one place it can
         // change.
         expect(TRANSPARENCY_PANELS_LABEL).toBe('Transparency panels');
+    });
+
+    it('describes only a rail the presenter pinned closed', () => {
+        expect(TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION).toBe(
+            'Pinned closed for this conversation.',
+        );
     });
 
     it('resolves the store assistant by its identifier', () => {

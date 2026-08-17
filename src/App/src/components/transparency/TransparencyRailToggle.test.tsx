@@ -9,7 +9,10 @@ import AgentTeamPanel from './AgentTeamPanel';
 import TransparencyRail from './TransparencyRail';
 import TransparencyRailToggle from './TransparencyRailToggle';
 import transparencyReducer, { transparencyRailToggled } from '@/store/slices/transparencySlice';
-import { TRANSPARENCY_PANELS_LABEL } from '@/models/storeSurface';
+import {
+    TRANSPARENCY_PANELS_LABEL,
+    TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION,
+} from '@/models/storeSurface';
 import {
     TRANSPARENCY_RAIL_COLLAPSED_CLASS,
     TRANSPARENCY_RAIL_ID,
@@ -63,6 +66,10 @@ describe('the transparency rail disclosure', () => {
         expect(screen.queryByRole('heading', { name: 'Agent Team' })).not.toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: 'Grounding' })).not.toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: 'What this cost' })).not.toBeInTheDocument();
+        expect(toggle).toHaveAttribute(
+            'aria-description',
+            TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION,
+        );
     });
 
     it('reopens the rail, and gives the conversation its width back in between', async () => {
@@ -77,6 +84,20 @@ describe('the transparency rail disclosure', () => {
             TRANSPARENCY_RAIL_COLLAPSED_CLASS,
         );
         expect(screen.getByRole('heading', { name: 'Grounding' })).toBeInTheDocument();
+    });
+
+    it('only describes the rail as pinned while the presenter has left it closed', async () => {
+        renderDisclosure();
+
+        const toggle = screen.getByRole('button', { name: TRANSPARENCY_PANELS_LABEL });
+        await userEvent.click(toggle);
+        expect(toggle).toHaveAttribute(
+            'aria-description',
+            TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION,
+        );
+
+        await userEvent.click(toggle);
+        expect(toggle).not.toHaveAttribute('aria-description');
     });
 
     it('says which way it will go in its glyph rather than in its name', async () => {

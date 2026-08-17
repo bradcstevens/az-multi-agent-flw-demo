@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -6,7 +6,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import PlanPanelRight from './PlanPanelRight';
+import { useTransparencySignals } from '@/hooks/useTransparencySignals';
 import transparencyReducer, {
+    conversationStarted,
     sourceUsedReceived,
     tokenUsageReceived,
     transparencyRailToggled,
@@ -19,6 +21,8 @@ import {
     TRANSPARENCY_RAIL_COLLAPSED_CLASS,
 } from '@/models/panelDrawer';
 import { SRC } from '@/testing/stylesheets';
+import { FakeSocket, frame } from '@/testing/fakeSocket';
+import webSocketService from '@/store/WebSocketService';
 import { PLAN_ARRIVING } from '@/models/progressNarration';
 
 const makeStore = () =>
@@ -55,7 +59,39 @@ const renderPanel = (store = makeStore(), approvalRequest: any = null) =>
         </Provider>,
     );
 
+const SocketDrivenPanel = () => {
+    useTransparencySignals();
+    return <PlanPanelRight planData={planData} loading={false} planApprovalRequest={null} />;
+};
+
+const renderSocketDrivenPanel = (store = makeStore()) =>
+    render(
+        <Provider store={store}>
+            <SocketDrivenPanel />
+        </Provider>,
+    );
+
+async function connectedSocket(): Promise<FakeSocket> {
+    const connecting = webSocketService.connect('plan-rail');
+    const socket = FakeSocket.latest()!;
+    socket.open();
+    await connecting;
+    return socket;
+}
+
 describe('the chat surface with Plan review off', () => {
+    beforeEach(() => {
+        FakeSocket.instances = [];
+        webSocketService.disconnect();
+        vi.stubGlobal('WebSocket', FakeSocket);
+        window.appConfig = { API_URL: 'https://backend.example/api' } as never;
+    });
+
+    afterEach(() => {
+        webSocketService.disconnect();
+        vi.unstubAllGlobals();
+    });
+
     it('shows the agent roster even though there is no plan to review', () => {
         // The Fast lane produces no plan object at all (ADR-013). The panel
         // used to bail out entirely on that, so the Agent Team was empty for
@@ -132,6 +168,57 @@ describe('the chat surface with Plan review off', () => {
 
         expect(screen.getByTestId('grounding-platform')).toHaveTextContent('Copilot Studio');
         expect(screen.getByText('SOP-102 Store Closing Procedure.docx')).toBeInTheDocument();
+    });
+
+    it('opens the unpinned rail from a Source used frame on the real socket seam', async () => {
+        const store = makeStore();
+        store.dispatch(transparencyRailToggled());
+        store.dispatch(conversationStarted());
+        renderSocketDrivenPanel(store);
+
+        expect(screen.getByTestId('transparency-rail')).toHaveClass(
+            TRANSPARENCY_RAIL_COLLAPSED_CLASS,
+        );
+
+        const socket = await connectedSocket();
+        act(() => {
+            socket.deliver(
+                frame('source_used', {
+                    platform: 'Copilot Studio',
+                    source: 'Dataverse',
+                    agent_name: 'Store SOP Assistant',
+                    citations: [],
+                }),
+            );
+        });
+
+        expect(screen.getByTestId('transparency-rail')).not.toHaveClass(
+            TRANSPARENCY_RAIL_COLLAPSED_CLASS,
+        );
+        expect(screen.getByTestId('grounding-platform')).toHaveTextContent('Copilot Studio');
+    });
+
+    it('keeps a presenter-pinned rail closed when Source used arrives on the socket', async () => {
+        const store = makeStore();
+        store.dispatch(transparencyRailToggled());
+        renderSocketDrivenPanel(store);
+
+        const socket = await connectedSocket();
+        act(() => {
+            socket.deliver(
+                frame('source_used', {
+                    platform: 'Copilot Studio',
+                    source: 'Dataverse',
+                    agent_name: 'Store SOP Assistant',
+                    citations: [],
+                }),
+            );
+        });
+
+        expect(screen.getByTestId('transparency-rail')).toHaveClass(
+            TRANSPARENCY_RAIL_COLLAPSED_CLASS,
+        );
+        expect(store.getState().transparency.source?.platform).toBe('Copilot Studio');
     });
 });
 

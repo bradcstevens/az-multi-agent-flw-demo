@@ -47,6 +47,10 @@ export interface TransparencyState {
      * roster is on screen before a question is typed.
      */
     railExpanded: boolean;
+    /** The presenter's choice, which outranks automatic expansion for this conversation. */
+    railPinned: boolean;
+    /** Whether this conversation has already received its first valid `source_used` signal. */
+    railSourceUsed: boolean;
 }
 
 const initialState: TransparencyState = {
@@ -54,6 +58,8 @@ const initialState: TransparencyState = {
     meter: emptyMeter(),
     alerts: [],
     railExpanded: true,
+    railPinned: false,
+    railSourceUsed: false,
 };
 
 const transparencySlice = createSlice({
@@ -66,6 +72,10 @@ const transparencySlice = createSlice({
             if (!source) return;
             state.source = source;
             state.meter = recordSourceUsed(state.meter, source);
+            if (!state.railPinned && !state.railSourceUsed) {
+                state.railExpanded = true;
+            }
+            state.railSourceUsed = true;
         },
         /** `WebsocketMessageType.TOKEN_USAGE` — one executor's reported cost. */
         tokenUsageReceived(state, action: PayloadAction<unknown>) {
@@ -118,25 +128,18 @@ const transparencySlice = createSlice({
         conversationStarted(state) {
             state.source = null;
             state.alerts = [];
+            state.railPinned = false;
+            state.railSourceUsed = false;
         },
         /**
          * The associate opens or closes the **Transparency rail**.
          *
-         * The only thing that moves it. The rail's automatic behaviour and the
-         * **Pinned panel** that outranks it are #128's, and until they land a
-         * signal moves panels rather than furniture.
+         * The presenter's choice pins the panel for this conversation, so the
+         * first Source used cannot re-open it mid-sentence.
          */
         transparencyRailToggled(state) {
             state.railExpanded = !state.railExpanded;
-        },
-        /** A new conversation, and every panel back to claiming nothing. */
-        transparencyReset() {
-            return {
-                source: null,
-                meter: emptyMeter(),
-                alerts: [],
-                railExpanded: true,
-            };
+            state.railPinned = true;
         },
     },
 });
@@ -149,7 +152,6 @@ export const {
     requestStarted,
     conversationStarted,
     transparencyRailToggled,
-    transparencyReset,
 } = transparencySlice.actions;
 
 export const selectGroundingSource = (state: RootState): SourceUsed | null =>
@@ -159,5 +161,7 @@ export const selectPresenterAlerts = (state: RootState): PresenterAlert[] =>
     state.transparency.alerts;
 export const selectTransparencyRailExpanded = (state: RootState): boolean =>
     state.transparency.railExpanded;
+export const selectTransparencyRailPinned = (state: RootState): boolean =>
+    state.transparency.railPinned;
 
 export default transparencySlice.reducer;

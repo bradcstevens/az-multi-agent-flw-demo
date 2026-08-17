@@ -8,8 +8,10 @@ import { TRANSPARENCY_PANELS_LABEL } from '@/models/storeSurface';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
     selectTransparencyRailExpanded,
+    selectTransparencyRailPinned,
     transparencyRailToggled,
 } from '@/store/slices/transparencySlice';
+import { TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION } from '@/models/storeSurface';
 
 /**
  * The **Transparency rail**'s drawer control (issue #127, ADR-035).
@@ -32,6 +34,7 @@ const TransparencyRailToggle: React.FC = () => {
     const dispatch = useAppDispatch();
     const isDesktopDrawer = useDesktopDrawer();
     const expanded = useAppSelector(selectTransparencyRailExpanded);
+    const pinned = useAppSelector(selectTransparencyRailPinned);
 
     if (!isDesktopDrawer) return null;
 
@@ -49,6 +52,9 @@ const TransparencyRailToggle: React.FC = () => {
             icon={expanded ? <PanelRightContract20Regular /> : <PanelRightExpand20Regular />}
             aria-controls={TRANSPARENCY_RAIL_ID}
             aria-expanded={expanded}
+            aria-description={
+                pinned && !expanded ? TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION : undefined
+            }
             onClick={() => dispatch(transparencyRailToggled())}
         >
             {TRANSPARENCY_PANELS_LABEL}

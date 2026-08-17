@@ -41,7 +41,8 @@ surface ends up saying something that is not so:
 | --- | --- | --- |
 | `source` | **One answer** | `requestStarted` — HomeInput submission, Quick Task activation, and `ChatPage.handleOnchatSubmit` |
 | `alerts` | **One conversation** | `conversationStarted` — the `planId` effect, and `resetPlanVariables` |
-| `meter` | **The whole walkthrough** | nothing but `transparencyReset` |
+| `railPinned`, `railSourceUsed` | **One conversation** | `conversationStarted` — the presenter's **Pinned panel** choice and the rail's one automatic expansion reset together |
+| `meter` | **The whole walkthrough** | nothing in the browser |
 
 The Grounding panel is the one that matters. Only the SOP hop emits `source_used`; a troubleshooting
 question answered inside Foundry emits nothing at all. So a panel that simply held its last value
