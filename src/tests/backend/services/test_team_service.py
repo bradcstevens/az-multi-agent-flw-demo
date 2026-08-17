@@ -98,7 +98,8 @@ class MockStartingTask:
     lane: str = None
     rehearsed_replies: List[str] = field(default_factory=list)
     ticket_status_reply: Optional[dict] = None
-    follow_on: str = None
+    follow_on: List[str] = field(default_factory=list)
+    context_dependent: bool = False
     ticket_on_approval: bool = False
     plan_steps: List[dict] = field(default_factory=list)
 
@@ -372,15 +373,27 @@ class TestTeamConfigurationValidation:
 
         assert service._validate_and_parse_task(task_data).lane == "fast"
 
-    def test_a_declared_follow_on_survives_the_upload(self):
-        """The task that continues this conversation (issue #61, ADR-024)."""
+    def test_declared_follow_on_tasks_survive_the_upload(self):
+        """The Quick Tasks that continue this conversation (issue #132, ADR-033)."""
         service = TeamService()
 
         assert (
             service._validate_and_parse_task(
-                _valid_task_data(follow_on="task-223-escalation")
+                _valid_task_data(
+                    follow_on=["task-223-escalation", "task-223-honest-miss"]
+                )
             ).follow_on
-            == "task-223-escalation"
+            == ["task-223-escalation", "task-223-honest-miss"]
+        )
+
+    def test_context_dependence_survives_the_upload(self):
+        service = TeamService()
+
+        assert (
+            service._validate_and_parse_task(
+                _valid_task_data(context_dependent=True)
+            ).context_dependent
+            is True
         )
 
     def test_a_ticket_on_approval_task_survives_the_upload(self):

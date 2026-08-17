@@ -118,7 +118,7 @@ const TEAM = {
             creator: '',
             logo: 'Wrench',
             lane: 'fast',
-            follow_on: 'task-223-escalation',
+            follow_on: ['task-223-escalation'],
             rehearsed_replies: [REHEARSED_REPLY],
         },
         {

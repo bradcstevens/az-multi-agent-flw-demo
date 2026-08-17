@@ -4,8 +4,20 @@ Issues #26 and #52. The presenter runs the whole scripted walkthrough by
 tapping. Seven tasks, one per beat, each declaring the **Lane** it takes — and each held to
 the corpus, the router and the gate it depends on by a test, because a Quick
 Task is a claim about what will happen when somebody taps it. Six appear on
-the home grid: **I can't fix it** is a follow-on inside the troubleshooting
-conversation, so it carries that conversation's session into the escalation.
+the home grid: **I can't fix it** is context-dependent, so it appears only
+inside the troubleshooting conversation and carries that conversation's session
+into the escalation.
+
+## Follow-on tasks are graph edges
+
+`follow_on` is a list of Quick Task ids. Each id is an outgoing edge of the
+Quick Task that produced the current turn, so every offered control is still a
+Quick Task with its own prompt and declared Lane. A typed turn matches no
+authored prompt and offers no edges; tapping a Quick Task re-enters the graph.
+
+`context_dependent` is declared on the target task. Only that flag removes a
+card from the home grid; naming a task in `follow_on` does not. The escalation
+is context-dependent because it reads the conversation's **Attempted steps**.
 
 ## The walkthrough
 
