@@ -10,16 +10,21 @@ import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism";
 import { formatJsonInText } from "@/utils/jsonFormatter";
 import { resolveApiAssetUrl } from "@/api/config";
- 
+import { reportedExecutor } from "@/models/progressNarration";
+import { getAgentDisplayName } from "@/utils/agentIconUtils";
+
 interface StreamingBufferMessageProps {
     streamingMessageBuffer: string;
     isStreaming?: boolean;
+    /** The executor `agent_message_streaming` reported, if any. */
+    executor?: string | null;
 }
  
 // Convert to a proper React component instead of a function
 const StreamingBufferMessage: React.FC<StreamingBufferMessageProps> = ({
     streamingMessageBuffer,
-    isStreaming = false
+    isStreaming = false,
+    executor,
 }) => {
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [shouldFade, setShouldFade] = useState<boolean>(false);
@@ -45,8 +50,10 @@ const StreamingBufferMessage: React.FC<StreamingBufferMessageProps> = ({
     }, [streamingMessageBuffer, isStreaming, isExpanded]);
  
     if (!streamingMessageBuffer || streamingMessageBuffer.trim() === "") return null;
- 
+
     const formattedBuffer = formatJsonInText(streamingMessageBuffer);
+    const reported = reportedExecutor(executor);
+    const header = reported ? getAgentDisplayName(reported) : null;
  
     return (
         <div style={{
@@ -87,14 +94,16 @@ const StreamingBufferMessage: React.FC<StreamingBufferMessageProps> = ({
                             height: '20px',
                             flexShrink: 0
                         }} />
-                        <span style={{
-                            fontWeight: '500',
-                            color: 'var(--colorNeutralForeground1)',
-                            fontSize: '14px',
-                            lineHeight: '20px'
-                        }}>
-                            AI Thinking Process
-                        </span>
+                        {header && (
+                            <span style={{
+                                fontWeight: '500',
+                                color: 'var(--colorNeutralForeground1)',
+                                fontSize: '14px',
+                                lineHeight: '20px'
+                            }}>
+                                {header}
+                            </span>
+                        )}
                     </div>
  
                     <Button

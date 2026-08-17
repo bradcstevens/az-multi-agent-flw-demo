@@ -14,7 +14,10 @@ import RehearsedReplies from "./RehearsedReplies";
 import FollowOnTask from "./FollowOnTask";
 import { useAppSelector } from "@/store/hooks";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
-import { selectProgressNarration } from "@/store/slices/progressSlice";
+import {
+  selectProgressNarration,
+  selectRespondingExecutor,
+} from "@/store/slices/progressSlice";
 import { StartingTask } from "@/models/Team";
 import { PersonalAnswer } from "@/models/personalAnswer";
 import { PolicyBlock } from "@/api/policyBlock";
@@ -102,6 +105,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
     to disagree about what the system was doing.
   */
   const narration = useAppSelector(selectProgressNarration);
+  const respondingExecutor = useAppSelector(selectRespondingExecutor);
 
   if (!planData)
     return (
@@ -158,6 +162,7 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
           <StreamingBufferMessage
             streamingMessageBuffer={streamingMessageBuffer}
             isStreaming={true}
+            executor={respondingExecutor}
           />
         )}
       </div>

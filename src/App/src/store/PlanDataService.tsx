@@ -661,7 +661,7 @@ export class PlanDataService {
    * Parse streaming agent message fragments.
    * Supports:
    *  - { type: 'agent_message_streaming', data: "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)" }
-   *  - { type: 'agent_message_streaming', data: { agent_name: 'X', content: 'partial', is_final: true } }
+   *  - { type: 'agent_message_streaming', data: { agent_name?: 'X', content: 'partial', is_final: true } }
    *  - "AgentMessageStreaming(agent_name='X', content='partial', is_final=False)"
    */
   static parseAgentMessageStreaming(rawData: any): StreamingMessage | null {
@@ -678,7 +678,7 @@ export class PlanDataService {
 
       // Unwrap wrapper - handle object format
       if (rawData && typeof rawData === 'object' && rawData.type === 'agent_message_streaming') {
-        if (typeof rawData.data === 'object' && rawData.data.agent_name) {
+        if (rawData.data && typeof rawData.data === 'object') {
           // New format: { type: 'agent_message_streaming', data: { agent_name: '...', content: '...', is_final: true } }
           const data = rawData.data;
           return {

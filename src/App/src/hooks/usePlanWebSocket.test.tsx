@@ -18,7 +18,10 @@ import progressReducer, { requestRouted, requestSent } from '@/store/slices/prog
 import chatReducer, { selectAgentMessages } from '@/store/slices/chatSlice';
 import appReducer from '@/store/slices/appSlice';
 import teamReducer from '@/store/slices/teamSlice';
-import streamingReducer from '@/store/slices/streamingSlice';
+import streamingReducer, {
+    selectShowBufferingText,
+    selectStreamingMessageBuffer,
+} from '@/store/slices/streamingSlice';
 import transparencyReducer, { selectMeter } from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import { useAppSelector } from '@/store/hooks';
@@ -60,6 +63,8 @@ const Host = ({
     const planApprovalRequest = useAppSelector(selectPlanApprovalRequest);
     const agentMessages = useAppSelector(selectAgentMessages);
     const meter = useAppSelector(selectMeter);
+    const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
+    const showBufferingText = useAppSelector(selectShowBufferingText);
     useTransparencySignals();
     const ref = React.useRef<HTMLDivElement>(null);
     return (
@@ -74,8 +79,8 @@ const Host = ({
                 planApprovalRequest={planApprovalRequest}
                 messagesContainerRef={ref as never}
                 finalResultRef={ref as never}
-                streamingMessageBuffer=""
-                showBufferingText={false}
+                streamingMessageBuffer={streamingMessageBuffer}
+                showBufferingText={showBufferingText}
                 agentMessages={agentMessages}
                 showProcessingPlanSpinner={showProcessingPlanSpinner}
                 processingElapsedSeconds={0}
@@ -390,7 +395,7 @@ describe('a final result arriving on the socket', () => {
                 );
             });
 
-            expect(screen.getAllByText('Troubleshooting')).toHaveLength(1);
+            expect(screen.getAllByText('Troubleshooting')).toHaveLength(2);
         } finally {
             vi.useRealTimers();
         }
@@ -499,6 +504,51 @@ describe('a final result arriving on the socket', () => {
         });
 
         await waitFor(() => expect(inFlightIndicators()).toHaveLength(0));
+    });
+});
+
+describe('a Fast lane answer streamed over the socket', () => {
+    it('names the specialist on the visible streamed answer without a terminal frame', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Troubleshooting Agent',
+                    content: 'Cash up the tills before the shutters come down.',
+                }),
+            );
+        });
+
+        await waitFor(() => {
+            expect(
+                screen.getByText('Cash up the tills before the shutters come down.'),
+            ).toBeInTheDocument();
+            expect(screen.getByText('Troubleshooting', { exact: true })).toBeInTheDocument();
+        });
+    });
+
+    it('omits the specialist label when the streamed answer has no named executor', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    content: 'Cash up the tills before the shutters come down.',
+                }),
+            );
+        });
+
+        await waitFor(() => {
+            expect(
+                screen.getByText('Cash up the tills before the shutters come down.'),
+            ).toBeInTheDocument();
+        });
+        expect(screen.queryByText('AI Thinking Process')).not.toBeInTheDocument();
     });
 });
 
