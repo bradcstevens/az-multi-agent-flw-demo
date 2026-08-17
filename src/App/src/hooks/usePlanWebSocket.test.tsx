@@ -318,6 +318,7 @@ describe('a streamed specialist reply in the conversation', () => {
         });
 
         await screen.findByText('Begin by cashing up the tills.');
+        expect(inFlightIndicators()).toHaveLength(0);
         expect(screen.queryByText('AI Thinking Process')).not.toBeInTheDocument();
 
         act(() => {

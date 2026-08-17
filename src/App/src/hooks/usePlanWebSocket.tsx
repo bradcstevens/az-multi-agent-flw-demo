@@ -183,6 +183,8 @@ export function usePlanWebSocket({
                 agent: streamingAgentRef.current,
                 content: chunks.join(''),
             }));
+            // The specialist's words replace the claim that they are responding.
+            dispatch(requestSettled());
         };
 
         const unsub = webSocketService.on(
