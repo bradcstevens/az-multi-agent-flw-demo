@@ -98,19 +98,24 @@ export const routedTo = (lane: Lane): string => `Routed — ${LANE_LABELS[lane]}
 const UNRESOLVED = new Set(['unknown', 'unknownagent', 'assistant', 'magenticagent']);
 
 /**
- * The executor, resolved through the display-name pipeline the roster panels use.
- *
- * Returns `null` for a name that cannot be resolved rather than the pipeline's
- * own `Assistant Agent` fallback, which is an agent nobody configured appearing
- * on screen as though the frame had named it. The stand-ins the wire parsers
- * substitute — `UnknownAgent`, `unknown` — are the same claim in a different
- * spelling and are refused for the same reason.
+ * The executor exactly as a streaming signal reported it, or `null` when it
+ * reported no name. Parser and orchestration stand-ins are not reported names.
  */
-export const respondingAgent = (executor: string | null | undefined): string | null => {
+export const reportedExecutor = (executor: string | null | undefined): string | null => {
     const raw = executor?.trim();
     if (!raw) return null;
     if (UNRESOLVED.has(raw.toLowerCase())) return null;
-    return getAgentDisplayNameWithSuffix(raw);
+    return raw;
+};
+
+/**
+ * The reported executor, resolved through the display-name pipeline the roster
+ * panels use.
+ */
+export const respondingAgent = (executor: string | null | undefined): string | null => {
+    const reported = reportedExecutor(executor);
+    if (!reported) return null;
+    return getAgentDisplayNameWithSuffix(reported);
 };
 
 /**

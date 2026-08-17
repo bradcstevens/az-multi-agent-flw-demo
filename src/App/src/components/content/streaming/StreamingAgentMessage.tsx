@@ -182,7 +182,7 @@ const renderAgentMessages = (
             {/* Message Content */}
             <div className={`${styles.messageContent} ${isHuman ? styles.humanMessageContent : styles.botMessageContent}`}>
               {/* Agent Header (only for bots) */}
-              {!isHuman && (
+              {!isHuman && msg.agent && (
                 <div className={styles.agentHeader}>
                   <Body1 className={styles.agentName}>
                     {getAgentDisplayName(msg.agent)}

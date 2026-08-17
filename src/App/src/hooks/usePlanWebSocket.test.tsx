@@ -15,14 +15,16 @@ import planReducer, {
     setContinueWithWebsocketFlow,
 } from '@/store/slices/planSlice';
 import progressReducer, { requestRouted, requestSent } from '@/store/slices/progressSlice';
-import chatReducer from '@/store/slices/chatSlice';
+import chatReducer, { selectAgentMessages } from '@/store/slices/chatSlice';
 import appReducer from '@/store/slices/appSlice';
 import teamReducer from '@/store/slices/teamSlice';
 import streamingReducer from '@/store/slices/streamingSlice';
-import transparencyReducer from '@/store/slices/transparencySlice';
+import transparencyReducer, { selectMeter } from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import { useAppSelector } from '@/store/hooks';
 import PlanChat from '@/components/content/PlanChat';
+import TokenMeterPanel from '@/components/transparency/TokenMeterPanel';
+import useTransparencySignals from '@/hooks/useTransparencySignals';
 
 /**
  * The chat page's half of the connection lifecycle (issue #63, ADR-021).
@@ -56,29 +58,35 @@ const Host = ({
     });
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const planApprovalRequest = useAppSelector(selectPlanApprovalRequest);
+    const agentMessages = useAppSelector(selectAgentMessages);
+    const meter = useAppSelector(selectMeter);
+    useTransparencySignals();
     const ref = React.useRef<HTMLDivElement>(null);
     return (
-        <PlanChat
-            planData={{ plan: { id: planId ?? 'plan-1' } } as never}
-            input=""
-            setInput={() => {}}
-            submittingChatDisableInput={false}
-            loading={false}
-            OnChatSubmit={() => {}}
-            planApprovalRequest={planApprovalRequest}
-            messagesContainerRef={ref as never}
-            finalResultRef={ref as never}
-            streamingMessageBuffer=""
-            showBufferingText={false}
-            agentMessages={[]}
-            showProcessingPlanSpinner={showProcessingPlanSpinner}
-            processingElapsedSeconds={0}
-            showApprovalButtons={false}
-            handleApprovePlan={async () => {}}
-            handleRejectPlan={async () => {}}
-            processingApproval={false}
-            rehearsedReplies={[]}
-        />
+        <>
+            <PlanChat
+                planData={{ plan: { id: planId ?? 'plan-1' } } as never}
+                input=""
+                setInput={() => {}}
+                submittingChatDisableInput={false}
+                loading={false}
+                OnChatSubmit={() => {}}
+                planApprovalRequest={planApprovalRequest}
+                messagesContainerRef={ref as never}
+                finalResultRef={ref as never}
+                streamingMessageBuffer=""
+                showBufferingText={false}
+                agentMessages={agentMessages}
+                showProcessingPlanSpinner={showProcessingPlanSpinner}
+                processingElapsedSeconds={0}
+                showApprovalButtons={false}
+                handleApprovePlan={async () => {}}
+                handleRejectPlan={async () => {}}
+                processingApproval={false}
+                rehearsedReplies={[]}
+            />
+            <TokenMeterPanel meter={meter} />
+        </>
     );
 };
 
@@ -316,6 +324,110 @@ describe('a final result arriving on the socket', () => {
 
         await waitFor(() => expect(inFlightIndicators()).toHaveLength(0));
     };
+
+    it('names the specialist that answered and that the cost table bills', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Troubleshooting Agent',
+                    content: 'I found the closing procedure.',
+                }),
+            );
+            socket.deliver(
+                frame('token_usage', {
+                    agent_name: 'Troubleshooting Agent',
+                    executor_id: 'TroubleshootingAgent',
+                    input_tokens: 3232,
+                    output_tokens: 1294,
+                    total_tokens: 4526,
+                }),
+            );
+            socket.deliver(
+                frame('final_result_message', {
+                    content: 'Cash up the tills before the shutters come down.',
+                    status: 'completed',
+                }),
+            );
+        });
+
+        await waitFor(() => {
+            expect(
+                screen.getByText('Cash up the tills before the shutters come down.'),
+            ).toBeInTheDocument();
+            expect(screen.getAllByText('Troubleshooting')).toHaveLength(2);
+        });
+    });
+
+    it('keeps the reported executor when the socket reconnects before the answer', async () => {
+        vi.useFakeTimers();
+        try {
+            const { store } = renderHost('plan-1');
+            askAQuestion(store, 'plan-1');
+            const socket = await openedOnTheResponse('plan-1');
+
+            act(() => {
+                socket.deliver(
+                    frame('agent_message_streaming', {
+                        agent_name: 'Troubleshooting Agent',
+                        content: 'I found the closing procedure.',
+                    }),
+                );
+                socket.onclose?.({ code: 1006 });
+                vi.advanceTimersByTime(1000);
+            });
+            FakeSocket.latest()!.open();
+
+            act(() => {
+                FakeSocket.latest()!.deliver(
+                    frame('final_result_message', {
+                        content: 'Cash up the tills before the shutters come down.',
+                        status: 'completed',
+                    }),
+                );
+            });
+
+            expect(screen.getAllByText('Troubleshooting')).toHaveLength(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does not name a specialist when no streaming frame named one', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('token_usage', {
+                    agent_name: 'Shift Tasks Agent',
+                    executor_id: 'ShiftTasksAgent',
+                    input_tokens: 3232,
+                    output_tokens: 1294,
+                    total_tokens: 4526,
+                }),
+            );
+            socket.deliver(
+                frame('final_result_message', {
+                    content: 'Cash up the tills before the shutters come down.',
+                    status: 'completed',
+                }),
+            );
+        });
+
+        await waitFor(() =>
+            expect(
+                screen.getByText('Cash up the tills before the shutters come down.'),
+            ).toBeInTheDocument(),
+        );
+        expect(screen.getAllByText('Shift Tasks')).toHaveLength(1);
+        expect(screen.queryByText('Group Chat Manager')).not.toBeInTheDocument();
+        expect(screen.queryByText('Assistant')).not.toBeInTheDocument();
+    });
 
     it('leaves nothing in flight on the Fast lane, which has no plan to approve', async () => {
         // ADR-013: no `plan_approval_request` arrives on this lane, so the final

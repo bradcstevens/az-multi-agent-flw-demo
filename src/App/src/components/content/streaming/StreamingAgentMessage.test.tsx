@@ -34,12 +34,9 @@ describe('a reply names the specialist that produced it', () => {
         expect(screen.getByText(/Store SOP/i)).toBeInTheDocument();
     });
 
-    it('says Assistant rather than a blank when the executor was unnamed', () => {
-        // A blank where a name belongs reads as a broken layout. The reply
-        // still has to be attributable to *something*, and an honest generic
-        // beats an empty header.
+    it('omits the agent header when the executor was unnamed', () => {
         render(<Harness agent="" />);
 
-        expect(screen.getByText('Assistant')).toBeInTheDocument();
+        expect(screen.queryByText('Assistant')).not.toBeInTheDocument();
     });
 });
