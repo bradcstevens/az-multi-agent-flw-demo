@@ -1,7 +1,7 @@
 # RB-201 Coffee Brewer Not Brewing
 
 Document ID: RB-201
-Site: Brightpath Convenience Store 223
+Site: Circle K Store 223
 Equipment: Twin-head filter coffee brewer, front counter
 Asset tag: BC-223-COF-01
 Owner: Store Equipment Support

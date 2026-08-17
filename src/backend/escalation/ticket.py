@@ -18,7 +18,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 # The site this assistant runs for. Not a caller's to set: a ticket naming
 # another site is a van sent to the wrong forecourt, and the model has no way
 # of knowing it got it wrong.
-SITE = "Brightpath Convenience Store 223"
+SITE = "Circle K Store 223"
 SITE_NUMBER = "223"
 
 # TKT-001's answer for a field nothing answered. It is not left blank — a blank
