@@ -4,7 +4,10 @@ import { Spinner, Text } from '@fluentui/react-components';
 
 /* ── Services / API ──────────────────────────────────────────── */
 import { APIService } from '../api/apiService';
-import { HttpError } from '../api/httpClient';
+import {
+    isRuntimeBootstrapPending,
+    waitForRuntimeBootstrap,
+} from '../api/config';
 import { PlanDataService } from '../store/PlanDataService';
 import webSocketService from '../store/WebSocketService';
 
@@ -295,10 +298,12 @@ const ChatPage: React.FC = () => {
       transport event rather than an associate's stated intent.
     */
     const leavingChatRef = React.useRef(false);
+    const leavingChatGenerationRef = React.useRef(0);
     const handleLeavingChat = useCallback(
         async (navigationFn: () => void) => {
             if (leavingChatRef.current) return;
             leavingChatRef.current = true;
+            leavingChatGenerationRef.current += 1;
 
             let sessionId = planData?.plan?.session_id;
             try {
@@ -308,22 +313,11 @@ const ChatPage: React.FC = () => {
                   navigating without a session and creating an Abandoned turn.
                 */
                 if (!sessionId && planId) {
-                    try {
-                        const currentPlan = await PlanDataService.fetchPlanData(planId, false);
-                        sessionId = currentPlan?.plan?.session_id;
-                    } catch (error: unknown) {
-                        /*
-                          A missing Plan record names no Chat and therefore no
-                          turn to end. Let the associate leave the broken route;
-                          every other failed read remains visible rather than
-                          risking an Abandoned turn.
-                        */
-                        if (error instanceof HttpError && error.status === 404) {
-                            navigationFn();
-                            return;
-                        }
-                        throw error;
+                    if (isRuntimeBootstrapPending()) {
+                        await waitForRuntimeBootstrap();
                     }
+                    const currentPlan = await PlanDataService.fetchPlanData(planId, false);
+                    sessionId = currentPlan?.plan?.session_id;
                 }
                 if (!sessionId) {
                     showToast('Unable to end this chat. Please try again.', 'error');
@@ -332,8 +326,12 @@ const ChatPage: React.FC = () => {
                 await apiService.endChatTurn(sessionId);
                 webSocketService.disconnect();
                 navigationFn();
-            } catch {
-                showToast('Unable to end this chat. Please try again.', 'error');
+            } catch (error: unknown) {
+                if (error instanceof Error) {
+                    showToast('Unable to end this chat. Please try again.', 'error');
+                    return;
+                }
+                throw error;
             } finally {
                 leavingChatRef.current = false;
             }
@@ -444,6 +442,7 @@ const ChatPage: React.FC = () => {
             prompt: string,
             options: { lane?: string; startingTaskId?: string } = {},
         ) => {
+            const leavingChatGeneration = leavingChatGenerationRef.current;
             const sessionId = planData?.plan?.session_id;
             if (!sessionId) {
                 showToast(CANNOT_CONTINUE, 'error');
@@ -476,6 +475,9 @@ const ChatPage: React.FC = () => {
                     sessionId,
                     options.startingTaskId,
                 );
+                if (leavingChatGeneration !== leavingChatGenerationRef.current) {
+                    return;
+                }
                 /*
                   The **Mocked unlock**'s answer (#27): a *successful* request
                   with no plan, because it cost no agent and no tokens.
@@ -513,6 +515,9 @@ const ChatPage: React.FC = () => {
                 );
                 navigate(`/chat/${response.plan_id}`, { state: { lane: response.lane } });
             } catch (error: unknown) {
+                if (leavingChatGeneration !== leavingChatGenerationRef.current) {
+                    return;
+                }
                 dispatch(requestSettled());
                 dismissToast(id);
                 /*

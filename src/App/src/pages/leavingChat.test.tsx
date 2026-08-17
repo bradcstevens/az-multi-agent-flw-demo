@@ -39,7 +39,6 @@ import progressReducer from '../store/slices/progressSlice';
 import webSocketService from '../store/WebSocketService';
 import { FakeSocket, frame } from '../testing/fakeSocket';
 import { PlanStatus, ProcessedPlanData } from '../models';
-import { HttpError } from '../api/httpClient';
 
 const PLAN_DATA = {
     plan: {
@@ -50,7 +49,7 @@ const PLAN_DATA = {
         timestamp: '2026-08-17T10:00:00Z',
         plan_id: 'plan-troubleshooting',
         user_id: 'user-223',
-        overall_status: PlanStatus.IN_PROGRESS,
+        overall_status: PlanStatus.APPROVED,
     },
     team: null,
     messages: [],
@@ -66,7 +65,7 @@ const OTHER_PLAN = {
     initial_goal: 'The freezer needs a new filter.',
 };
 
-const renderLeavingChat = (initialPath = '/chat/plan-troubleshooting') =>
+const renderLeavingChat = () =>
     render(
         <Provider
             store={configureStore({
@@ -84,7 +83,7 @@ const renderLeavingChat = (initialPath = '/chat/plan-troubleshooting') =>
                     getDefaultMiddleware({ serializableCheck: false }),
             })}
         >
-            <MemoryRouter initialEntries={[initialPath]}>
+            <MemoryRouter initialEntries={['/chat/plan-troubleshooting']}>
                 <Routes>
                     <Route path="/" element={<div>New chat</div>} />
                     <Route path="/chat/:id" element={<ChatPage />} />
@@ -104,17 +103,23 @@ const openInFlightSocket = async () => {
         socket.deliver(
             frame('agent_message_streaming', {
                 plan_id: 'plan-troubleshooting',
-                agent: 'Store operations agent',
+                agent_name: 'Store operations agent',
                 content: 'Checking the equipment record.',
             }),
         );
     });
+    await screen.findByText('Checking the equipment record.');
 };
 
 describe('leaving a chat', () => {
     beforeEach(() => {
         FakeSocket.instances = [];
         vi.stubGlobal('WebSocket', FakeSocket);
+        vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+            callback(0);
+            return 1;
+        });
+        vi.stubGlobal('cancelAnimationFrame', vi.fn());
         window.appConfig = { API_URL: 'https://backend.example/api' } as never;
         vi.mocked(PlanDataService.fetchPlanData).mockResolvedValue(PLAN_DATA);
         vi.mocked(apiService.getPlans).mockResolvedValue([
@@ -130,6 +135,7 @@ describe('leaving a chat', () => {
 
     afterEach(() => {
         webSocketService.disconnect();
+        vi.unstubAllGlobals();
     });
 
     it.each([
@@ -210,17 +216,5 @@ describe('leaving a chat', () => {
             expect(apiService.endChatTurn).toHaveBeenCalledWith('session-223'),
         );
         settleInitialRead!(PLAN_DATA);
-    });
-
-    it('leaves a Chat route whose Plan record no longer exists', async () => {
-        vi.mocked(PlanDataService.fetchPlanData).mockRejectedValue(
-            new HttpError('Plan not found', 404),
-        );
-
-        renderLeavingChat();
-        fireEvent.click(await screen.findByRole('button', { name: 'New chat' }));
-
-        expect(await screen.findByText('New chat')).toBeInTheDocument();
-        expect(apiService.endChatTurn).not.toHaveBeenCalled();
     });
 });
