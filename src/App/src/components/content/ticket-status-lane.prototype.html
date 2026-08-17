@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PROTOTYPE: Ticket-status Rehearsed reply</title>
+  <style>
+    body { max-width: 840px; margin: 40px auto; padding: 0 20px; color: #1f2937; font: 16px/1.5 system-ui, sans-serif; }
+    h1 { color: #004b87; } section { margin: 24px 0; } button { margin: 4px; padding: 8px 12px; border: 1px solid #004b87; border-radius: 5px; background: white; color: #004b87; font: inherit; cursor: pointer; }
+    button:hover { background: #e6f2fa; } .state { padding: 16px; border-left: 5px solid #0078d4; background: #f3f8fc; }
+    dt { font-weight: 700; } dd { margin: 0 0 10px; } .change { color: #0b6a0b; font-weight: 600; } .steps button { display: block; width: 100%; margin: 8px 0; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Ticket-status Rehearsed reply <small>(PROTOTYPE)</small></h1>
+  <p><strong>Question:</strong> Can one authored Rehearsed reply make a ticket-status inquiry a declared Fast-lane lookup only in the Chat that raised the Simulated ticket, while a fresh Chat has no status action and free typing stays Deliberate?</p>
+
+  <section>
+    <h2>Current Chat state</h2>
+    <div class="state">
+      <dl id="state"></dl>
+      <p class="change" id="change"></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Free play</h2>
+    <button data-action="raise">Approve this Chat's ticket</button>
+    <button data-action="tap">Tap “What's happening with my ticket?”</button>
+    <button data-action="fresh">Open a fresh Chat</button>
+    <button data-action="type">Free-type “What's happening with my ticket?”</button>
+    <button data-action="reset">Reset</button>
+  </section>
+
+  <section class="steps">
+    <h2>Guided walkthroughs</h2>
+    <button data-walkthrough="submitted">1. Raised ticket: approve, then tap the authored status reply.</button>
+    <button data-walkthrough="fresh">2. Fresh Chat: open a new Chat and observe that no ticket-status reply is offered.</button>
+    <button data-walkthrough="typed">3. Free text: type the same words without authored metadata and observe the Deliberate fallback.</button>
+  </section>
+
+  <script>
+    // Pure state model: the HTML shell only dispatches these actions and renders the result.
+    const initialState = () => ({
+      chat: "Ticket conversation",
+      ticketStatus: "not raised",
+      authoredReplyVisible: false,
+      lastRequest: "None",
+      lastChange: "Start in the conversation that can raise a ticket."
+    });
+
+    const reduce = (state, action) => {
+      if (action === "reset") return initialState();
+      if (action === "raise") return {
+        ...state, ticketStatus: "submitted", authoredReplyVisible: true,
+        lastChange: "The submitted ticket makes this Chat's authored status reply available."
+      };
+      if (action === "fresh") return {
+        ...initialState(), chat: "Fresh conversation",
+        lastChange: "A fresh Chat has no ticket, so it offers no status lookup."
+      };
+      if (action === "tap") {
+        if (!state.authoredReplyVisible) return { ...state, lastChange: "Nothing is submitted: there is no status reply to tap." };
+        return {
+          ...state, lastRequest: "Declared Fast lane; Plan review off",
+          lastChange: "The authored reply declares Fast, so the word “ticket” cannot invoke the keyword fallback."
+        };
+      }
+      if (action === "type") return {
+        ...state, lastRequest: "No declaration; Deliberate lane; Plan review on",
+        lastChange: "Free text has no authored declaration, so it retains the existing fail-open fallback."
+      };
+      return state;
+    };
+
+    let state = initialState();
+    const render = () => {
+      document.getElementById("state").innerHTML = Object.entries(state)
+        .filter(([key]) => key !== "lastChange")
+        .map(([key, value]) => `<dt>${key.replace(/([A-Z])/g, " $1")}</dt><dd>${value}</dd>`)
+        .join("");
+      document.getElementById("change").textContent = state.lastChange;
+    };
+    const dispatch = (action) => { state = reduce(state, action); render(); };
+    document.querySelectorAll("[data-action]").forEach((button) =>
+      button.addEventListener("click", () => dispatch(button.dataset.action)));
+    document.querySelectorAll("[data-walkthrough]").forEach((button) =>
+      button.addEventListener("click", () => {
+        state = initialState();
+        const actions = {
+          submitted: ["raise", "tap"],
+          fresh: ["fresh"],
+          typed: ["type"]
+        }[button.dataset.walkthrough];
+        actions.forEach((action) => { state = reduce(state, action); });
+        render();
+      }));
+    render();
+  </script>
+</body>
+</html>
