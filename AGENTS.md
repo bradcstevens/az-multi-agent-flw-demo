@@ -83,7 +83,12 @@ The environment's provisioning inputs live in `infra/environments/macae-flw-v1.e
 Run the loops your change touches before committing. Each command is self-contained: it
 bootstraps a virtualenv from `.github/requirements.txt` on first use and is a no-op
 re-install afterwards, so it can be run from a clean checkout with nothing but `python3`
-on `PATH`. Set `DEV_VENV` to share one virtualenv across git worktrees.
+on `PATH`. That virtualenv is keyed by a hash of its pinned inputs and shared across git
+worktrees ([ADR-043](docs/ADR/043-the-feedback-loops-virtualenv-is-shared-across-worktrees.md)),
+so only the first worktree to want a given dependency set needs the network — which is what
+stops a package index that blinks from turning a merged lane red. `DEV_VENV` still overrides
+the location outright. If a loop exits **3** it did not run: the environment could not be
+provisioned, and nothing was concluded about the code.
 
 | Loop | Command | Covers |
 | --- | --- | --- |

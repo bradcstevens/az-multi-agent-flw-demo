@@ -51,6 +51,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [040](./040-the-grounding-panel-names-the-hop-it-observed.md) | The Grounding panel names the hop it observed | Accepted — corrects the route; closes the brief's "Direct Line MCP server" |
 | [041](./041-the-copilot-studio-chat-url-is-a-credential.md) | The Copilot Studio chat URL is a credential | Accepted — bounds the deep link |
 | [042](./042-approval-completes-a-ticket-and-starts-a-swap.md) | Approval completes a ticket and starts a swap — two mechanisms sharing one shape | Accepted — completes the edge 037 left open |
+| [043](./043-the-feedback-loops-virtualenv-is-shared-across-worktrees.md) | The feedback loops' virtualenv is keyed by its inputs and shared across worktrees | Accepted — amends 005's per-worktree bootstrap |
 
 ## Writing a new one
 
