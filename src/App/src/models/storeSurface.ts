@@ -40,6 +40,17 @@ export const ANONYMOUS_IDENTITY_LABEL = 'No user signed in';
 export const SIMULATED_LABEL = 'Simulated';
 
 /**
+ * The **Transparency rail**'s disclosure control, named (ADR-035).
+ *
+ * A **Panel drawer**'s toggle is a disclosure button: one static accessible
+ * name, plus `aria-expanded` and `aria-controls` for the state and the target.
+ * Never a label flipping between *Show* and *Hide* — a control that renames
+ * itself under a screen reader is a second control, and the associate has to
+ * relearn it every time they use it.
+ */
+export const TRANSPARENCY_PANELS_LABEL = 'Transparency panels';
+
+/**
  * The one assistant, resolved out of whatever the backend returned.
  *
  * Recognition, not position. A store surface with **no** assistant is a demo

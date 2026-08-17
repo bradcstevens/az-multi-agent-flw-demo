@@ -936,6 +936,15 @@ screen: it is Microsoft's published rate, not a measured bill.
 taking props so it can sit on **both** surfaces. It has to: the refusal happens on the home surface
 and the answers happen on the chat surface, while the meter's total spans both.
 
+Closed, it is a zero-width **Panel drawer** and its three panels **unmount** — hiding them would
+leave three section headings in the **Heading outline** with nothing behind them, which is #78's
+defect restated. Both containers obey one rule, `useTransparencyRailOpen`, because the home surface
+renders the rail bare and the chat surface wraps it in `.plan-panel-right`, which is where that
+column's width is declared: two readings of *is the drawer open* would leave the wrapper holding the
+width the rail had just given up. `models/panelDrawer.ts` carries the number, and the frontend loop
+reads `storeSurface.css` and fails if the component and the stylesheet ever release the drawer at
+different widths.
+
 **Presenter alert** — the R8 proactive shift-task message, triggered by a hidden backend route plus
 a keyboard chord and pushed over the existing WebSocket. No wall-clock timer. The route is
 `POST /api/v4/presenter/alert` with `include_in_schema=False` (#23) — hidden rather than

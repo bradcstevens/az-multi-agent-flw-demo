@@ -30,9 +30,14 @@ import TransparencyRail from '@/components/transparency/TransparencyRail';
 import AgentTeamPanel from '@/components/transparency/AgentTeamPanel';
 import { TeamService } from '../store/TeamService';
 import { PlanDataService } from '../store/PlanDataService';
-import { ASSISTANT_NAME, STORE_ASSISTANT_TEAM_ID } from '../models/storeSurface';
+import {
+    ASSISTANT_NAME,
+    STORE_ASSISTANT_TEAM_ID,
+    TRANSPARENCY_PANELS_LABEL,
+} from '../models/storeSurface';
 import { AgentMessageType } from '../models';
 import { SECTION_HEADING, SUBSECTION_HEADING, SURFACE_HEADING } from '../models/headingOutline';
+import { TRANSPARENCY_RAIL_ID } from '@/models/panelDrawer';
 import { sourceFiles } from '@/testing/stylesheets';
 import { FakeSocket } from '@/testing/fakeSocket';
 
@@ -41,10 +46,9 @@ import chatReducer from '@/store/slices/chatSlice';
 import appReducer from '@/store/slices/appSlice';
 import teamReducer from '@/store/slices/teamSlice';
 import streamingReducer from '@/store/slices/streamingSlice';
-import transparencyReducer from '@/store/slices/transparencySlice';
+import transparencyReducer, { transparencyRailToggled } from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import progressReducer from '@/store/slices/progressSlice';
-import { transparencyRailToggled } from '@/store/slices/transparencySlice';
 
 /**
  * The surface's heading outline (issue #57).
@@ -193,9 +197,9 @@ describe('the home surface has a heading outline', () => {
 
         await waitFor(() => expect(screen.getByText('Quick tasks')).toBeInTheDocument());
 
-        const toggle = screen.getByRole('button', { name: 'Transparency panels' });
+        const toggle = screen.getByRole('button', { name: TRANSPARENCY_PANELS_LABEL });
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        expect(toggle).toHaveAttribute('aria-controls', 'transparency-rail');
+        expect(toggle).toHaveAttribute('aria-controls', TRANSPARENCY_RAIL_ID);
     });
 
     it('exposes exactly one top-level heading, and it names the assistant', async () => {
@@ -276,9 +280,9 @@ describe('the chat surface has a heading outline', () => {
 
         await waitFor(() => expect(screen.getByTestId('transparency-rail')).toBeInTheDocument());
 
-        const toggle = screen.getByRole('button', { name: 'Transparency panels' });
+        const toggle = screen.getByRole('button', { name: TRANSPARENCY_PANELS_LABEL });
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        expect(toggle).toHaveAttribute('aria-controls', 'transparency-rail');
+        expect(toggle).toHaveAttribute('aria-controls', TRANSPARENCY_RAIL_ID);
     });
 
     it('makes every transparency panel reachable by heading navigation', async () => {

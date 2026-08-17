@@ -1,14 +1,14 @@
 import React from 'react';
 
 import { useAppSelector } from '@/store/hooks';
-import {
-    selectGroundingSource,
-    selectMeter,
-    selectTransparencyRailExpanded,
-} from '@/store/slices/transparencySlice';
+import { selectGroundingSource, selectMeter } from '@/store/slices/transparencySlice';
 import { modelsByExecutor } from '@/models/roster';
 import { TeamConfig } from '@/models/Team';
-import useDesktopDrawer from '@/hooks/useDesktopDrawer';
+import {
+    TRANSPARENCY_RAIL_COLLAPSED_CLASS,
+    TRANSPARENCY_RAIL_ID,
+} from '@/models/panelDrawer';
+import { useTransparencyRailOpen } from '@/hooks/usePanelDrawer';
 import '@/styles/transparency.css';
 
 import GroundingPanel from './GroundingPanel';
@@ -24,6 +24,18 @@ import TokenMeterPanel from './TokenMeterPanel';
  * any surface the walkthrough visits — and it has to be, because the demo's
  * refusal happens on the home surface and its answers happen on the plan
  * surface, while the meter's running total spans both.
+ *
+ * It is also a **Panel drawer** (#127): closed, it is zero width and the
+ * conversation takes the width back, because the rail is read *beside* the
+ * answer it explains and an overlay would cover the thing it is explaining.
+ * The panels **unmount** rather than hide — a section heading a non-visual user
+ * skims to and finds nothing behind is #78's defect one step further on, and
+ * `display: none` on a rail that still holds them would rebuild it exactly.
+ *
+ * Below the **Stacking breakpoint** the rail is always open, exactly as it
+ * behaved before the drawer existed: the associate's phone has no width beside
+ * the conversation to give back, and #60 fought to make this rail readable
+ * there.
  */
 export interface TransparencyRailProps {
     /** The workflow roster, for the meter's per-agent model column. */
@@ -34,17 +46,15 @@ export interface TransparencyRailProps {
 const TransparencyRail: React.FC<TransparencyRailProps> = ({ team, children }) => {
     const source = useAppSelector(selectGroundingSource);
     const meter = useAppSelector(selectMeter);
-    const isDesktopDrawer = useDesktopDrawer();
-    const expanded = useAppSelector(selectTransparencyRailExpanded);
-    const visible = !isDesktopDrawer || expanded;
+    const open = useTransparencyRailOpen();
 
     return (
         <aside
-            id="transparency-rail"
-            className={`transparency-rail${visible ? '' : ' transparency-rail--collapsed'}`}
+            id={TRANSPARENCY_RAIL_ID}
+            className={open ? 'transparency-rail' : `transparency-rail ${TRANSPARENCY_RAIL_COLLAPSED_CLASS}`}
             data-testid="transparency-rail"
         >
-            {visible && (
+            {open && (
                 <>
                     {children}
                     <GroundingPanel source={source} />

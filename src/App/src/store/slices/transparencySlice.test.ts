@@ -170,12 +170,26 @@ describe('the transparency slice', () => {
         expect(state.meter.rows).toHaveLength(2);
     });
 
-    it('keeps the transparency rail closed after the presenter closes it', () => {
-        let state = reducer(initial(), transparencyRailToggled());
+    it('opens the transparency rail by default, and closes and reopens it on request', () => {
+        // Default expanded, because collapsed-by-default would silently reverse
+        // #79's roster-before-a-question-is-typed (ADR-035).
+        expect(initial().railExpanded).toBe(true);
 
-        state = reducer(state, sourceUsedReceived(sourceUsed));
+        const closed = reducer(initial(), transparencyRailToggled());
+        expect(closed.railExpanded).toBe(false);
 
+        expect(reducer(closed, transparencyRailToggled()).railExpanded).toBe(true);
+    });
+
+    it('leaves the rail where it is when a signal arrives', () => {
+        // The automatic behaviour is #128's, and until it lands a signal moves
+        // panels rather than furniture: a rail that reopened itself here would
+        // be reopening against the one person who closed it.
+        const closed = reducer(initial(), transparencyRailToggled());
+
+        const state = reducer(closed, sourceUsedReceived(sourceUsed));
+
+        expect(state.source).not.toBeNull();
         expect(state.railExpanded).toBe(false);
-        expect(state.railPinned).toBe(true);
     });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { readFileSync } from 'node:fs';
@@ -9,10 +9,15 @@ import PlanPanelRight from './PlanPanelRight';
 import transparencyReducer, {
     sourceUsedReceived,
     tokenUsageReceived,
+    transparencyRailToggled,
 } from '@/store/slices/transparencySlice';
 import ticketReducer, { ticketRaised } from '@/store/slices/ticketSlice';
 import teamReducer, { setSelectedTeam } from '@/store/slices/teamSlice';
 import { NO_ROSTER_MESSAGE } from '@/models/agentAvailability';
+import {
+    PLAN_PANEL_RIGHT_COLLAPSED_CLASS,
+    TRANSPARENCY_RAIL_COLLAPSED_CLASS,
+} from '@/models/panelDrawer';
 import { SRC } from '@/testing/stylesheets';
 import { PLAN_ARRIVING } from '@/models/progressNarration';
 
@@ -302,5 +307,72 @@ describe('the loading window names the specialists standing by (issue #65)', () 
         expect(source, 'recounts the roster beside the selector').not.toMatch(
             /agents\??\.length/,
         );
+    });
+});
+
+describe('the chat surface wraps the rail, and the drawer closes both (issue #127)', () => {
+    // The collapse rule has to name **two** containers. The home surface
+    // renders a bare `.transparency-rail`; the chat surface wraps it in
+    // `.plan-panel-right`, which declares the column's width there. Name only
+    // the rail and this wrapper keeps the width the rail just gave up — a
+    // 320px empty column with a left border down it, on the surface the
+    // walkthrough spends all its time on.
+
+    it('gives the conversation the wrapper width back when the rail closes', () => {
+        const store = makeStore();
+        renderPanel(store);
+
+        const wrapper = screen.getByTestId('plan-panel-right');
+        expect(wrapper).not.toHaveClass(PLAN_PANEL_RIGHT_COLLAPSED_CLASS);
+
+        act(() => {
+            store.dispatch(transparencyRailToggled());
+        });
+
+        expect(wrapper).toHaveClass(PLAN_PANEL_RIGHT_COLLAPSED_CLASS);
+        expect(screen.getByTestId('transparency-rail')).toHaveClass(
+            TRANSPARENCY_RAIL_COLLAPSED_CLASS,
+        );
+        expect(screen.queryByRole('heading', { name: 'Grounding' })).not.toBeInTheDocument();
+    });
+
+    it('takes the Simulated ticket out of the column rather than clipping it away', () => {
+        // Everything the collapsed column holds unmounts, not just the rail's
+        // panels. A zero-width column with `overflow: hidden` leaves the ticket
+        // card invisible to the room and fully present to a screen reader —
+        // #78's defect with the two audiences swapped, and this card is the one
+        // thing in the column carrying a number somebody would repeat aloud.
+        const store = makeStore();
+        store.dispatch(
+            ticketRaised({
+                ticket_id: 'SIM-223-0041',
+                status: 'submitted',
+                fields: [{ name: 'symptom', value: 'left head runs cold and slow' }],
+            }),
+        );
+        renderPanel(store);
+        expect(screen.getByTestId('simulated-ticket')).toBeInTheDocument();
+
+        act(() => {
+            store.dispatch(transparencyRailToggled());
+        });
+
+        expect(screen.queryByTestId('simulated-ticket')).not.toBeInTheDocument();
+    });
+
+    it('obeys the drawer through the rail, rather than deciding a second time', () => {        // Read out of the source, because the failure is two containers that
+        // agree today and drift later: a wrapper that reads the slice and the
+        // breakpoint for itself is a second answer to *is the drawer open*, and
+        // the one that disagrees is the one nobody is looking at.
+        const source = readFileSync(
+            join(SRC, 'components', 'content', 'PlanPanelRight.tsx'),
+            'utf8',
+        );
+
+        expect(source).toContain('useTransparencyRailOpen');
+        expect(source, 'reads the drawer state a second way').not.toContain(
+            'selectTransparencyRailExpanded',
+        );
+        expect(source, 'reads the breakpoint a second way').not.toContain('useDesktopDrawer');
     });
 });

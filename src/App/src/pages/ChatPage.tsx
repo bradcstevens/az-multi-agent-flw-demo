@@ -767,11 +767,8 @@ const ChatPage: React.FC = () => {
 
     /* ── Left-panel handlers ────────────────────────────────── */
     const handleNewChatButton = useCallback(() => {
-        void handleLeavingChat(() => {
-            dispatch(conversationStarted());
-            navigate('/', { state: { focusInput: true } });
-        });
-    }, [dispatch, navigate, handleLeavingChat]);
+        void handleLeavingChat(() => navigate('/', { state: { focusInput: true } }));
+    }, [navigate, handleLeavingChat]);
 
     const resetReload = useCallback(() => {
         dispatch(setReloadLeftList(false));

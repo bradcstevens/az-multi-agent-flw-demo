@@ -36,7 +36,6 @@ import streamingReducer from '../store/slices/streamingSlice';
 import transparencyReducer from '../store/slices/transparencySlice';
 import ticketReducer from '../store/slices/ticketSlice';
 import progressReducer from '../store/slices/progressSlice';
-import { transparencyRailToggled } from '../store/slices/transparencySlice';
 import webSocketService from '../store/WebSocketService';
 import { FakeSocket, frame } from '../testing/fakeSocket';
 import { PlanStatus, ProcessedPlanData } from '../models';
@@ -66,36 +65,32 @@ const OTHER_PLAN = {
     initial_goal: 'The freezer needs a new filter.',
 };
 
-const renderLeavingChat = () => {
-    const store = configureStore({
-        reducer: {
-            plan: planReducer,
-            chat: chatReducer,
-            app: appReducer,
-            team: teamReducer,
-            streaming: streamingReducer,
-            transparency: transparencyReducer,
-            ticket: ticketReducer,
-            progress: progressReducer,
-        },
-        middleware: (getDefaultMiddleware) =>
-            getDefaultMiddleware({ serializableCheck: false }),
-    });
-
-    return {
-        store,
-        ...render(
-            <Provider store={store}>
+const renderLeavingChat = () =>
+    render(
+        <Provider
+            store={configureStore({
+                reducer: {
+                    plan: planReducer,
+                    chat: chatReducer,
+                    app: appReducer,
+                    team: teamReducer,
+                    streaming: streamingReducer,
+                    transparency: transparencyReducer,
+                    ticket: ticketReducer,
+                    progress: progressReducer,
+                },
+                middleware: (getDefaultMiddleware) =>
+                    getDefaultMiddleware({ serializableCheck: false }),
+            })}
+        >
             <MemoryRouter initialEntries={['/chat/plan-troubleshooting']}>
                 <Routes>
                     <Route path="/" element={<div>New chat</div>} />
                     <Route path="/chat/:id" element={<ChatPage />} />
                 </Routes>
             </MemoryRouter>
-            </Provider>,
-        ),
-    };
-};
+        </Provider>,
+    );
 
 const openInFlightSocket = async () => {
     const socket = await waitFor(() => {
@@ -221,21 +216,5 @@ describe('leaving a chat', () => {
             expect(apiService.endChatTurn).toHaveBeenCalledWith('session-223'),
         );
         settleInitialRead!(PLAN_DATA);
-    });
-
-    it('starts the home surface with an unpinned, expanded rail', async () => {
-        const { store } = renderLeavingChat();
-        await screen.findByRole('button', { name: 'New chat' });
-        act(() => {
-            store.dispatch(transparencyRailToggled());
-        });
-
-        fireEvent.click(screen.getByRole('button', { name: 'New chat' }));
-
-        await waitFor(() =>
-            expect(apiService.endChatTurn).toHaveBeenCalledWith('session-223'),
-        );
-        expect(store.getState().transparency.railExpanded).toBe(true);
-        expect(store.getState().transparency.railPinned).toBe(false);
     });
 });

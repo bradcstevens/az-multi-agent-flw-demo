@@ -4,6 +4,7 @@ import {
     ASSISTANT_NAME,
     STORE_LABEL,
     STORE_ASSISTANT_TEAM_ID,
+    TRANSPARENCY_PANELS_LABEL,
     selectStoreAssistant,
 } from './storeSurface';
 import { TeamConfig } from './Team';
@@ -27,6 +28,15 @@ describe('the store surface', () => {
     it('names the assistant and the store it is scoped to', () => {
         expect(ASSISTANT_NAME).toBe('Circle K Frontline Store Assistant');
         expect(STORE_LABEL).toBe('Store 223');
+    });
+
+    it("names the transparency drawer's control once, and never as an instruction", () => {
+        // A disclosure button keeps **one** accessible name (ADR-035). A label
+        // that flipped between *Show* and *Hide* would be a second control to
+        // anybody reading the surface through a screen reader, and the name is
+        // pinned here so the one place it is written is the one place it can
+        // change.
+        expect(TRANSPARENCY_PANELS_LABEL).toBe('Transparency panels');
     });
 
     it('resolves the store assistant by its identifier', () => {

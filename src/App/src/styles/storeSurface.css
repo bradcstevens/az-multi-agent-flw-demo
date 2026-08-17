@@ -165,7 +165,9 @@
     }
 
     .coral-shell-row .transparency-rail,
-    .coral-shell-row .plan-panel-right {
+    .coral-shell-row .transparency-rail--collapsed,
+    .coral-shell-row .plan-panel-right,
+    .coral-shell-row .plan-panel-right--collapsed {
         width: 100%;
         min-width: 0;
         /*
@@ -180,23 +182,35 @@
         border-top: 1px solid var(--colorNeutralStroke2);
     }
 
+    /*
+     * The **Panel drawer** is released here too (#127), because a drawer is a
+     * side-column rule and this is where side-column rules stop being true:
+     * stacked, there is no width beside the conversation to give back, and a
+     * rail closed to nothing is the panels gone from the one surface that has
+     * nowhere else to put them.
+     *
+     * The collapsed rail gets its padding and its gap back by name. It zeroes
+     * both at exactly the specificity `.transparency-rail` declares them at, so
+     * the rule above — which only restates the column's width and its edges —
+     * never reaches them.
+     */
     .coral-shell-row .transparency-rail--collapsed {
-        width: 100%;
-        min-width: 0;
         padding: 16px;
         gap: 12px;
-        overflow: visible;
-        border-left: none;
     }
 
-    .coral-shell-row .plan-panel-right--collapsed {
-        width: 100%;
-        min-width: 0;
-        overflow: visible;
-        border-left: none;
-    }
-
-    .transparency-rail-toggle {
+    /*
+     * And the control goes with the state it controls. Below the breakpoint the
+     * rail cannot be closed, so a toggle here is a control for a state that
+     * cannot exist — worse than no control, because the associate spends a tap
+     * finding that out. Absent rather than disabled, for the same reason.
+     *
+     * Scoped under the shell for #66's reason rather than for tidiness: this is
+     * a Fluent `Button`, whose own `display: inline-flex` is a single atomic
+     * class, and a media query adds no specificity. Unscoped, the tie between
+     * them would be broken by whichever stylesheet the bundler injected second.
+     */
+    .coral-shell-row .transparency-rail-toggle {
         display: none;
     }
 
@@ -218,7 +232,9 @@
      * actually holding.
      */
     .coral-shell-row .transparency-rail,
-    .coral-shell-row .plan-panel-right {
+    .coral-shell-row .transparency-rail--collapsed,
+    .coral-shell-row .plan-panel-right,
+    .coral-shell-row .plan-panel-right--collapsed {
         max-height: none;
         overflow: visible;
     }

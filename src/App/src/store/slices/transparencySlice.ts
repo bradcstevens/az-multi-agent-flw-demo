@@ -36,10 +36,17 @@ export interface TransparencyState {
     meter: MeterState;
     /** Proactive alerts, which are never replies. */
     alerts: PresenterAlert[];
-    /** Whether the transparency rail is open on a desktop surface. */
+    /**
+     * Whether the **Transparency rail** is open (ADR-035).
+     *
+     * Redux only, and deliberately: a stored open state would make the Demo
+     * validator and the Stage driver order-dependent, and server-side **Session
+     * state** carries only what the client cannot re-derive.
+     *
+     * Default open, because closed-by-default would silently reverse #79 — the
+     * roster is on screen before a question is typed.
+     */
     railExpanded: boolean;
-    /** A presenter's choice wins over automatic expansion for this conversation. */
-    railPinned: boolean;
 }
 
 const initialState: TransparencyState = {
@@ -47,7 +54,6 @@ const initialState: TransparencyState = {
     meter: emptyMeter(),
     alerts: [],
     railExpanded: true,
-    railPinned: false,
 };
 
 const transparencySlice = createSlice({
@@ -60,7 +66,6 @@ const transparencySlice = createSlice({
             if (!source) return;
             state.source = source;
             state.meter = recordSourceUsed(state.meter, source);
-            if (!state.railPinned) state.railExpanded = true;
         },
         /** `WebsocketMessageType.TOKEN_USAGE` — one executor's reported cost. */
         tokenUsageReceived(state, action: PayloadAction<unknown>) {
@@ -113,13 +118,16 @@ const transparencySlice = createSlice({
         conversationStarted(state) {
             state.source = null;
             state.alerts = [];
-            state.railExpanded = true;
-            state.railPinned = false;
         },
-        /** The presenter opens or closes the rail for this conversation. */
+        /**
+         * The associate opens or closes the **Transparency rail**.
+         *
+         * The only thing that moves it. The rail's automatic behaviour and the
+         * **Pinned panel** that outranks it are #128's, and until they land a
+         * signal moves panels rather than furniture.
+         */
         transparencyRailToggled(state) {
             state.railExpanded = !state.railExpanded;
-            state.railPinned = true;
         },
         /** A new conversation, and every panel back to claiming nothing. */
         transparencyReset() {
@@ -128,7 +136,6 @@ const transparencySlice = createSlice({
                 meter: emptyMeter(),
                 alerts: [],
                 railExpanded: true,
-                railPinned: false,
             };
         },
     },
