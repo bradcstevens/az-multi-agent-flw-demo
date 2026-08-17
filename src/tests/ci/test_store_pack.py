@@ -1546,6 +1546,25 @@ def test_given_the_follow_on_graph_when_read_then_every_edge_resolves_and_is_acy
         visit(task_id)
 
 
+def test_given_the_walkthrough_when_counted_then_its_home_grid_and_graph_are_independent(
+    store_pack,
+):
+    """The graph must not silently decide which Quick Tasks start cold.
+
+    Before `context_dependent`, subtracting Follow-on targets from the roster
+    happened to produce the six home cards. That calculation agrees with itself:
+    another outgoing edge could remove a walkthrough beat without changing any
+    graph assertion. Count the two authored declarations separately instead.
+    """
+    home_grid_count = sum(
+        task.get("context_dependent") is not True
+        for task in store_pack.starting_tasks
+    )
+    graph_edge_count = len(list(_follow_on_edges(store_pack.starting_tasks)))
+
+    assert (home_grid_count, graph_edge_count) == (6, 1)
+
+
 def test_given_the_home_grid_when_read_then_context_dependence_alone_decides_its_cards(
     store_pack,
 ):

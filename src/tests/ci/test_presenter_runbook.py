@@ -164,6 +164,35 @@ def test_every_prompt_is_quoted_from_the_pack():
     assert not missing, f"the runbook misquotes the prompts: {missing}"
 
 
+def test_every_follow_on_edge_is_quoted_in_the_presenter_runbook():
+    """A Follow-on task is an authored transition the presenter has to rehearse.
+
+    The general prompt test protects each Quick Task in isolation. This seam
+    protects the graph transition: both endpoint prompts must appear, in the
+    order the runbook tells the presenter to tap them.
+    """
+    tasks = {task["id"]: task for task in _quick_tasks()}
+    edges = [
+        (task["id"], target_id)
+        for task in tasks.values()
+        for target_id in task.get("follow_on", [])
+    ]
+    runbook = _rendered()
+
+    assert edges, "the store pack authors no Follow-on edges to rehearse"
+    missing = [
+        f"{source_id} -> {target_id}"
+        for source_id, target_id in edges
+        if source_id not in tasks
+        or target_id not in tasks
+        or tasks[source_id]["prompt"] not in runbook
+        or tasks[target_id]["prompt"] not in runbook
+        or runbook.index(tasks[source_id]["prompt"])
+        >= runbook.index(tasks[target_id]["prompt"])
+    ]
+    assert not missing, f"the runbook does not quote Follow-on edges: {missing}"
+
+
 def test_the_shift_swap_beat_quotes_its_authored_people_and_order():
     """The Reviewable plan names its people in the pack, not in presenter prose."""
     task = next(

@@ -138,6 +138,7 @@ const PLAN_PAYLOAD = {
         id: 'plan-troubleshooting',
         data_type: 'plan',
         initial_goal: 'The coffee brewer is down.',
+        starting_task_id: 'task-223-troubleshooting',
         session_id: 'session-223-troubleshooting',
         timestamp: '',
         plan_id: 'plan-troubleshooting',
