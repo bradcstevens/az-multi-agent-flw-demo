@@ -52,6 +52,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [041](./041-the-copilot-studio-chat-url-is-a-credential.md) | The Copilot Studio chat URL is a credential | Accepted — bounds the deep link |
 | [042](./042-approval-completes-a-ticket-and-starts-a-swap.md) | Approval completes a ticket and starts a swap — two mechanisms sharing one shape | Accepted — completes the edge 037 left open |
 | [043](./043-the-server-settles-the-turn-it-ended.md) | The server settles the turn it ended | Accepted — the decision 031 deferred, narrowed to status only |
+| [044](./044-an-agent-worktree-lives-in-the-containing-folder.md) | An agent worktree lives in the containing folder, and is collected once its commits are on `origin/main` | Accepted — bounds what an agent may create beside this repository |
 
 ## Writing a new one
 
