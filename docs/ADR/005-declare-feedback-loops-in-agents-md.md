@@ -51,6 +51,17 @@ Both scripts source `scripts/dev-venv.sh`, which bootstraps a virtualenv from
 worktree self-provisions and a warm one re-checks a hash instead of re-installing. `DEV_VENV`
 overrides the location so one environment can be shared across git worktrees.
 
+**Amended by [ADR-043](./043-the-feedback-loops-virtualenv-is-shared-across-worktrees.md):** the
+virtualenv is identified by that stamp rather than by the worktree that asked for it, so sharing
+one environment across worktrees is the default and `DEV_VENV` is only the manual override.
+
+**Amended by [ADR-044](./044-the-feedback-loops-table-is-what-the-gate-runs.md):** the table has
+grown past these two rows, and the property that binds every row is stated there — a declared loop
+must hold against fakes in the gate's fresh worktree, so a tool that observes a *deployment* is not
+one. The Demo validator was a row until #115, where it was red at the gate by construction: its
+first assertion is that the Container Apps serve `HEAD` (ADR-018) and deployment happens on a push
+to `main` (ADR-020), which an integration branch has not had.
+
 `scripts/backend-tests.sh` encodes the Two-phase test invocation and the 80% coverage threshold
 that `.github/workflows/test.yml` enforces, so the loop an agent runs locally and the gate the
 runner runs at integration are the same check CI runs.
@@ -65,7 +76,12 @@ filters now watch the root `pyproject.toml` (where that config actually lives) a
 - The loop commands have one definition. Changing how the suite runs means changing one script,
   not an `AGENTS.md` table, a workflow file and every agent's memory of the incantation.
 - A cold worktree pays a one-off dependency install (roughly three to four minutes) on its first
-  gate run; subsequent runs are seconds.
+  gate run; subsequent runs are seconds. **Amended by
+  [ADR-043](./043-the-feedback-loops-virtualenv-is-shared-across-worktrees.md):** this consequence
+  did not anticipate that the integration gate runs every merged lane in a *fresh* worktree, so the
+  install was paid every time and stood between each lane and a green gate. Only the first worktree
+  on a machine to want a given dependency set pays it now, and a bootstrap that cannot provision
+  exits 3 rather than the 1 that means a finding about the code.
 - The scripts install `.github/requirements.txt`, not `src/backend/pyproject.toml`. Those two have
   drifted — the backend project pins the Agent Framework packages and, as of this ADR,
   `agent-framework==1.6.0` and `agent-framework-foundry==1.6.0` do not resolve together against

@@ -151,6 +151,19 @@ caller is known — above the team lookup, above `rai_success` and above the orc
 because the content-safety check instantiates an agent and a refusal that paid for one would
 falsify the cost claim. See [ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md) and
 [ADR-015](docs/ADR/015-two-class-margin-for-the-identity-boundary-gate.md).
+
+**It covers both routes an associate's words take in** ([ADR-034](docs/ADR/034-the-identity-boundary-gate-covers-the-clarification-seam.md),
+#115). `/v4/user_clarification` evaluates it too, on the answer, against the identity resolved for
+the session the *plan* names — the answer names a `request_id` and a `plan_id` and never a session.
+It sits in the same place on that route and for the same reasons: above the team lookup, above
+`rai_success`, and above everything that settles the question. Until #115 the gate was called once,
+inside `process_request`, so **every** answer typed into the box the agent opened reached the
+orchestration ungated, and the store pack's authored-strings assertion was standing in for a
+runtime check that did not exist. A refusal there consumes **nothing** — the **Clarification**
+stays *pending* with the box *open*, because a refused answer is not an answer and the agent is
+still waiting on one, which is also what keeps a refusal out of the 300-second timeout instead of
+resuming on *"No response received from user (timeout)."* A blank answer is not put to the gate,
+exactly as it is not put to the content-safety check: there are no words in it to refuse.
 _Avoid_: guardrail prompt, scope prompt, content filter
 
 **Keyword fast path** — the gate's first tier (`src/backend/guardrail/keywords.py`): pure HR and
@@ -232,7 +245,9 @@ makes a governed refusal look like a bug. On the wire it is HTTP **403** with
 `detail.kind == "policy_block"` (`src/backend/guardrail/refusal.py`), which is what lets the
 frontend give it its own neutral surface instead of the error toast
 (`src/App/src/api/policyBlock.ts`). A retrieval miss is not a failed request at all — it arrives
-as an answer.
+as an answer. It comes back from **both** gated routes (ADR-034): a refused **Clarification**
+answer is the same 403 and the same `PolicyBlockNotice`, never the *"Failed to submit
+clarification"* toast, and it leaves the question pending and the box open.
 
 **Mocked unlock** — the post-"sign-in" state in which the Identity boundary gate admits the
 previously refused question and answers it from mocked data (#27). A parameter of the gate, not a
@@ -1031,10 +1046,13 @@ least one step (a denial records nothing, and a tap that records nothing looks e
 that worked), together they must reach `ESCALATION_AFTER` (or nobody is ever offered the ticket R4
 raises), each must be anchored in a runbook (or the memory changes no behaviour), and none may trip
 the **Identity boundary gate** — which, until
-[ADR-034](docs/ADR/034-the-identity-boundary-gate-covers-the-clarification-seam.md), nothing here
-enforced: the gate runs inside `process_request` alone, so an answer posted to
+[ADR-034](docs/ADR/034-the-identity-boundary-gate-covers-the-clarification-seam.md) and #115,
+nothing here enforced: the gate ran inside `process_request` alone, so an answer posted to
 `/v4/user_clarification` reached the orchestration ungated and that assertion stood in for a check
-that did not exist, over the authored strings and nothing typed. Resolved from the plan's own `initial_goal` rather than router
+that did not exist, over the authored strings and nothing typed. The runtime check exists now, on
+that route, for a typed answer and a tapped one alike; what the store pack still asserts is
+ADR-033's own rule, that a one-tap control's words are checked before the demo rather than judged
+on stage. Resolved from the plan's own `initial_goal` rather than router
 state, which does not survive a reload; a goal matching no prompt resolves to none, exactly as an
 edit gives up the declared **Lane**. The pending-clarification gate belongs to the component, not
 its caller, for the reason the approval seam owns submission in #22.
@@ -1637,7 +1655,12 @@ behind `bash scripts/e2e-tests.sh`, and runs against **either** target — the d
 local one — from one set of specs, because two descriptions of the walkthrough will disagree. Its
 expectation is read out of the repository (the corpus manifest, the store pack, `storeSurface.ts`),
 never pinned in the spec, for the reason [ADR-019](docs/ADR/019-rebrand-the-sop-corpus-to-circle-k.md) taught one
-layer out: a check carrying its own copy passes a rebrand it never saw. See
+layer out: a check carrying its own copy passes a rebrand it never saw. It is **not** a declared
+loop and is not in `AGENTS.md`'s Feedback loops table
+([ADR-044](docs/ADR/044-the-feedback-loops-table-is-what-the-gate-runs.md)): the integration gate
+runs that table in a fresh worktree on a branch nothing has deployed, and the validator's first
+assertion is that the deployment *is* this commit, so gated there it is red before a browser opens.
+Run it deliberately, after deploying. See
 [docs/demo-validator.md](docs/demo-validator.md).
 _Avoid_: e2e test (the accelerator's own suite lived at `tests/e2e-test/`, drove an Entra login
 against the pre-rebrand surface, was wired into no workflow, and was deleted in #47)

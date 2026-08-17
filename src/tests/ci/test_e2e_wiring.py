@@ -130,10 +130,15 @@ def test_the_loop_bootstraps_its_own_toolchain():
 
 
 def test_the_loop_is_declared_in_agents_md():
+    # In the notes, deliberately, not as a row of the Feedback loops table: the
+    # integration gate runs every row unattended on a branch that has not been
+    # deployed, and this suite's first assertion is that the deployment *is*
+    # this commit (ADR-044). `test_feedback_loops.py` keeps the row out; this
+    # keeps the validator from disappearing from `AGENTS.md` along with it.
     agents = _text(AGENTS)
 
     assert "scripts/e2e-tests.sh" in agents, (
-        "the Demo validator is not in the declared Feedback loops table"
+        "AGENTS.md no longer tells anyone how to run the Demo validator"
     )
 
 

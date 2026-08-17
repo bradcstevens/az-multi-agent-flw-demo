@@ -634,6 +634,10 @@ const ChatPage: React.FC = () => {
 
             dispatch(setInput(''));
             if (!planData?.plan) return;
+            // The previous turn's refusal is about the previous turn. Left up
+            // beside the answer that replaced it, it reads as though it were
+            // still in force.
+            setContinuationRefusal(null);
             // A clarification produces a new answer, so the previous answer's
             // provenance goes dark (#24). A Foundry-only follow-up emits no
             // replacement `source_used`, and a panel left up would attribute it
@@ -680,11 +684,36 @@ const ChatPage: React.FC = () => {
                     dispatch(requestSent(planData.plan.id));
                 }
                 scrollToBottom();
-            } catch {
+            } catch (error: unknown) {
                 dispatch(requestSettled());
                 dispatch(setShowProcessingPlanSpinner(false));
                 dismissToast(id);
                 dispatch(setSubmittingChatDisableInput(false));
+                /*
+                  A **Policy block** here is the **Identity boundary** gate
+                  working on the clarification seam (ADR-034, #115), so it gets
+                  the surface a refusal already has rather than the error
+                  toast — a governed refusal reported as a failed submission
+                  reads as a bug, which is the confusion ADR-014 exists to
+                  remove.
+
+                  Nothing is settled: `clarificationAnswered` is only on the
+                  success path, so the question stays pending and the box stays
+                  open — the refusal is of *those words*, not of the turn, and
+                  the associate answers again.
+                */
+                const refusal = parsePolicyBlock(error);
+                if (refusal) {
+                    setContinuationRefusal(refusal);
+                    // The refusal *is* the gate stating that nobody is signed
+                    // in, and the meter carries the measured zero — both are
+                    // claims about this conversation rather than about the
+                    // surface the words were typed into.
+                    forgetSignedInDevice();
+                    dispatch(refusalRecorded(refusal));
+                    scrollToBottom();
+                    return;
+                }
                 showToast('Failed to submit clarification', 'error');
             }
         },

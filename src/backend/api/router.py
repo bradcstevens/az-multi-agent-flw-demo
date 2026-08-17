@@ -1114,6 +1114,34 @@ async def presenter_alert(request: Request):
     return {"status": "alerted"}
 
 
+async def _clarification_answer_identity(
+    memory_store, session_id: Optional[str], user_id: str
+):
+    """The **Session identity** the Identity boundary gate reads on an answer.
+
+    A **Clarification** answer names a `request_id` and a `plan_id` and never a
+    session, so the identity comes from the plan the question was asked
+    against — the server's own record, read through a container scoped to this
+    user, rather than a session the caller names. Fails closed at every step it
+    can: an unreachable container, a plan that named no session and an
+    unreadable session record all resolve to `ANONYMOUS`, which is the refusing
+    state.
+    """
+    if memory_store is None or not session_id:
+        return ANONYMOUS
+    try:
+        session_state = SessionStateStore(memory_store, user_id=user_id)
+    except Exception:
+        logger.warning(
+            "Session state unavailable for session '%s' — the Identity "
+            "boundary gate resolves the anonymous identity, which refuses",
+            session_id,
+            exc_info=True,
+        )
+        return ANONYMOUS
+    return await session_state.resolve_identity(session_id)
+
+
 @app_router.post("/user_clarification")
 async def user_clarification(
     human_feedback: messages.UserClarificationResponse, request: Request
@@ -1172,19 +1200,75 @@ async def user_clarification(
 
     # Attach session_id to span if plan_id is available and capture for events
     session_id = None
+    memory_store = None
 
+    # The container is acquired above the Identity boundary gate for the reason
+    # it is in `process_request`: the gate's identity is its *input*, and a
+    # Cosmos read instantiates no agent. A container that cannot be reached
+    # leaves the identity anonymous, which is the refusing state — and the team
+    # lookup below re-raises the failure as the 400 it has always been.
     try:
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        if human_feedback.plan_id:
-            try:
-                plan = await memory_store.get_plan_by_plan_id(plan_id=human_feedback.plan_id)
-                if plan and plan.session_id:
-                    session_id = plan.session_id
-                    span = trace.get_current_span()
-                    if span:
-                        span.set_attribute("session_id", session_id)
-            except Exception:
-                pass  # Don't fail request if span attribute fails
+    except Exception:
+        logger.warning(
+            "Session state unavailable for the clarification answer to "
+            "request '%s' — the Identity boundary gate resolves the anonymous "
+            "identity, which refuses",
+            human_feedback.request_id,
+            exc_info=True,
+        )
+
+    if memory_store is not None and human_feedback.plan_id:
+        try:
+            plan = await memory_store.get_plan_by_plan_id(plan_id=human_feedback.plan_id)
+            if plan and plan.session_id:
+                session_id = plan.session_id
+                span = trace.get_current_span()
+                if span:
+                    span.set_attribute("session_id", session_id)
+        except Exception:
+            pass  # Don't fail request if span attribute fails
+
+    # The Identity boundary gate on the clarification seam (ADR-034). It used
+    # to be called once, inside `process_request`, so **every** answer typed
+    # into the box the agent opened reached the orchestration ungated — a
+    # personal question walked in through the door a **Clarification** holds
+    # open. It sits where it sits in the request path and for the same reasons:
+    # above `rai_success`, which instantiates an agent, and above the team
+    # lookup, so a refusal costs nothing.
+    #
+    # A refusal consumes **nothing**. Everything that settles the question —
+    # `set_clarification_result`, the plan service, the recorded **Attempted
+    # steps** — is below this, so the Clarification stays *pending* with its
+    # box *open* and the associate answers again. That is what keeps a refusal
+    # out of the 300-second timeout (#87): nothing was consumed, so nothing
+    # resumes on *"No response received from user (timeout)."*.
+    #
+    # A blank answer is not put to the gate, exactly as it is not put to the
+    # content-safety check below: there are no words in it to refuse, and
+    # fail-closed on an empty string would be the gate refusing silence.
+    if human_feedback.answer is not None and str(human_feedback.answer).strip():
+        identity = await _clarification_answer_identity(
+            memory_store, session_id, user_id
+        )
+        verdict = await identity_boundary_gate().evaluate(
+            str(human_feedback.answer), identity
+        )
+        if verdict.refused:
+            track_event_if_configured(
+                "Identity_Boundary_Refusal",
+                {
+                    "status": "Clarification answer refused - identity boundary",
+                    "reason": verdict.reason.value,
+                    "request_id": human_feedback.request_id,
+                    "session_id": session_id,
+                },
+            )
+            raise HTTPException(status_code=403, detail=policy_block_detail())
+
+    try:
+        if memory_store is None:
+            memory_store = await DatabaseFactory.get_database(user_id=user_id)
         user_current_team = await memory_store.get_current_team(user_id=user_id)
         team_id = None
         if user_current_team:
