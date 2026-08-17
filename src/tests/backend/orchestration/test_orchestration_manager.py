@@ -7,6 +7,7 @@ Tests OrchestrationManager:
 - _process_event_stream() — event dispatch
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -718,6 +719,34 @@ class TestGetCurrentOrNewOrchestration:
                     team_switched=False,
                     team_service=MockTeamService(),
                 )
+
+    @pytest.mark.asyncio
+    async def test_cancelled_workflow_initialization_closes_created_agents(self):
+        """A superseding request releases the agent pool its build created."""
+        created_agent = MockAgent(agent_name="CreatedAgent")
+
+        with patch(
+            "backend.orchestration.orchestration_manager.AgentFactory"
+        ) as mock_factory_cls, patch.object(
+            OrchestrationManager,
+            "init_orchestration",
+            new_callable=AsyncMock,
+            side_effect=asyncio.CancelledError,
+        ):
+            mock_factory = Mock()
+            mock_factory.get_agents = AsyncMock(return_value=[created_agent])
+            mock_factory.close_all = AsyncMock()
+            mock_factory_cls.return_value = mock_factory
+
+            with pytest.raises(asyncio.CancelledError):
+                await OrchestrationManager.get_current_or_new_orchestration(
+                    user_id="user-1",
+                    team_config=MockTeamConfiguration(),
+                    team_switched=False,
+                    team_service=MockTeamService(),
+                )
+
+        mock_factory.close_all.assert_awaited_once()
 
 
 # =========================================================================

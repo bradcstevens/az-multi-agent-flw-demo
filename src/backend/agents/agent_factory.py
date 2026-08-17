@@ -6,6 +6,7 @@ Key change: uses AgentTemplate (FoundryChatClient + Agent, GA) instead of
 FoundryAgentTemplate (AzureAIAgentClient + ChatAgent, deprecated).
 """
 
+import asyncio
 import json
 import logging
 from types import SimpleNamespace
@@ -167,7 +168,16 @@ class AgentFactory:
             extra_tools=extra_tools,
         )
 
-        await agent.open()
+        try:
+            await agent.open()
+        except asyncio.CancelledError:
+            try:
+                await agent.close()
+            except Exception:
+                self.logger.exception(
+                    "Failed to close cancelled agent '%s'.", agent_obj.name
+                )
+            raise
         self.logger.info("Initialized agent '%s'.", agent_obj.name)
         return agent
 

@@ -10,6 +10,7 @@ Key changes:
     and unexpected exceptions) rather than propagating them
 """
 
+import asyncio
 import logging
 import sys
 from types import SimpleNamespace
@@ -208,6 +209,21 @@ class TestCreateAgentFromConfig:
         assert result is agent_instance
         mock_agent_template_cls.assert_called_once()
         agent_instance.open.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_open_closes_the_partial_agent(self):
+        """A cancelled background Workflow build cannot leak an opened agent."""
+        agent_instance = Mock()
+        agent_instance.open = AsyncMock(side_effect=asyncio.CancelledError)
+        agent_instance.close = AsyncMock()
+        mock_agent_template_cls.return_value = agent_instance
+
+        with pytest.raises(asyncio.CancelledError):
+            await self.factory.create_agent_from_config(
+                "user123", _agent_obj(), self.team_config, self.memory_store
+            )
+
+        agent_instance.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_with_file_search_config(self):

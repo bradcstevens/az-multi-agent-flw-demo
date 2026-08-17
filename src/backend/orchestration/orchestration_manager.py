@@ -350,6 +350,13 @@ class OrchestrationManager:
                     memory_store=memory_ctx,
                 )
                 cls.logger.info("Created %d agents for user '%s'", len(agents), user_id)
+            except asyncio.CancelledError:
+                cls.logger.info(
+                    "Workflow construction cancelled while creating agents for user '%s'.",
+                    user_id,
+                )
+                await factory.close_all()
+                raise
             except Exception as e:
                 cls.logger.error(
                     "Failed to create agents for user '%s': %s", user_id, e
@@ -364,6 +371,13 @@ class OrchestrationManager:
                         plan_review=plan_review,
                     )
                 )
+            except asyncio.CancelledError:
+                cls.logger.info(
+                    "Workflow construction cancelled while initializing user '%s'.",
+                    user_id,
+                )
+                await factory.close_all()
+                raise
             except Exception as e:
                 cls.logger.error(
                     "Failed to initialize orchestration for user '%s': %s", user_id, e
