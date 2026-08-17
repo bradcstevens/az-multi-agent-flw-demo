@@ -136,7 +136,7 @@ and the suite puts every one of them through the **real matcher**:
 | Each reply parses to at least one Attempted step | A denial, a substituted answer or a single shared word records **nothing**, and a tap that records nothing looks exactly like a tap that worked. |
 | Together they reach `ESCALATION_AFTER` | The escalation offer is what leads into R4. Replies that merge down to two steps leave a walkthrough where nobody is ever offered a ticket. |
 | Two anchor words of each reply appear in a runbook | The skip rule is the beat. A reply naming something no runbook asks for is answered by a runbook that skips nothing, and the memory changed no behaviour. |
-| None of them trips the **Identity boundary gate** | Same one-way requirement as the taps themselves: a refusal mid-repair ends the beat with copy about the assistant being store-scoped. |
+| None of them trips the **Identity boundary gate** | Same one-way requirement as the taps themselves: a refusal mid-repair ends the beat with copy about the assistant being store-scoped. Since [ADR-034](ADR/034-the-identity-boundary-gate-covers-the-clarification-seam.md) the gate runs on `/v4/user_clarification` too, so this is the authored words checked **before** the demo rather than the only check there is. |
 
 **The pending-clarification gate is the component's own, not the call site's.**
 Outside a clarification the chips are a second way to start a turn, competing

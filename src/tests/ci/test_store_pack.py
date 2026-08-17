@@ -1577,6 +1577,19 @@ def test_given_the_rehearsed_replies_when_read_then_none_of_them_trips_the_gate(
     # The same one-way requirement as the Quick Tasks themselves. A reply the
     # Identity boundary gate refuses is a tap that ends the troubleshooting beat
     # with copy about the assistant being store-scoped, mid-repair.
+    #
+    # This assertion is now about the **authored strings and nothing else**.
+    # Until #115 it was standing in for a runtime check that did not exist:
+    # `identity_boundary_gate` was called once, inside `process_request`, so an
+    # answer posted to `/v4/user_clarification` — tapped or typed — reached the
+    # orchestration ungated, and these three strings were the only thing anyone
+    # was checking. ADR-034 put the gate on that seam, and
+    # `TestTheIdentityBoundaryGateOnTheClarificationSeam` in
+    # `src/tests/backend/api/test_router.py` is where a refusal is asserted
+    # against the real router. What is left here is ADR-033's rule: a one-tap
+    # control's words are checked **before** the demo rather than judged on
+    # stage, so a chip that would be refused is caught in CI instead of in
+    # front of the room.
     for reply in _rehearsed_replies(store_pack):
         assert not gate_keywords.matches_personal_keyword(reply), reply
 
