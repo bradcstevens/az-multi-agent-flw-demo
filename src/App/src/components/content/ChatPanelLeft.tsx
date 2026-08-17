@@ -52,7 +52,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
   reloadChats,
   onNewChatButton,
   restReload,
-  onNavigationWithAlert,
+  onLeavingChat,
   isLoadingTeam
 }) => {
   const { dispatchToast } = useToastController("toast");
@@ -154,27 +154,31 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
 
   const handleChatSelect = useCallback(
     (chatId: string) => {
-      const performNavigation = () => {
-        /*
-          The row carries the plan it opens (#71). Searching the plans for one
-          matching the row's session took the *first* match, so on the
-          walkthrough's centrepiece pair — a troubleshooting turn and the
-          escalation that continues its session (ADR-024) — the escalation was
-          unreachable from this panel.
-        */
-        const selectedChat = chats.find((chat) => chat.id === chatId);
-        if (selectedChat) {
-          navigate(`/chat/${selectedChat.planId}`);
-        }
-      };
+      /*
+        The row carries the plan it opens (#71). Searching the plans for one
+        matching the row's session took the *first* match, so on the
+        walkthrough's centrepiece pair — a troubleshooting turn and the
+        escalation that continues its session (ADR-024) — the escalation was
+        unreachable from this panel.
+      */
+      const selectedChat = chats.find((chat) => chat.id === chatId);
+      if (!selectedChat) return;
+      const performNavigation = () => navigate(`/chat/${selectedChat.planId}`);
 
-      if (onNavigationWithAlert) {
-        onNavigationWithAlert(performNavigation);
+      // Re-opening this Chat at its latest Plan remains ordinary navigation:
+      // it leaves no Chat, so it must not end this one's turn.
+      if (chatId === selectedChatId) {
+        performNavigation();
+        return;
+      }
+
+      if (onLeavingChat) {
+        onLeavingChat(performNavigation);
       } else {
         performNavigation();
       }
     },
-    [chats, navigate, onNavigationWithAlert]
+    [chats, navigate, onLeavingChat, selectedChatId]
   );
 
   const handleChatDelete = useCallback(
@@ -223,12 +227,12 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
       navigate("/");
     };
 
-    if (onNavigationWithAlert) {
-      onNavigationWithAlert(performNavigation);
+    if (onLeavingChat) {
+      onLeavingChat(performNavigation);
     } else {
       performNavigation();
     }
-  }, [navigate, onNavigationWithAlert]);
+  }, [navigate, onLeavingChat]);
 
   // The count the confirmation states (#76) — only the chats the sweep can
   // actually take, so the number said before the fact matches what a running
@@ -324,8 +328,8 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
     <div className="panel-left-container">
       <PanelLeft panelWidth={280} panelResize={true}>
         <PanelLeftToolbar
-          linkTo={onNavigationWithAlert ? undefined : "/"}
-          onTitleClick={onNavigationWithAlert ? handleLogoClick : undefined}
+          linkTo={onLeavingChat ? undefined : "/"}
+          onTitleClick={onLeavingChat ? handleLogoClick : undefined}
           panelTitle={ASSISTANT_NAME}
           panelIcon={<StoreAssistantLogo />}
         >
