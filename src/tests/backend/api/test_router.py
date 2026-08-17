@@ -1391,6 +1391,218 @@ class TestUserClarification:
 
 
 # ---------------------------------------------------------------------------
+# /user_clarification — the Identity boundary gate (issue #115, ADR-034)
+# ---------------------------------------------------------------------------
+class TestTheIdentityBoundaryGateOnTheClarificationSeam:
+    """The gate on the second route an associate's words take in.
+
+    Same real gate as ``TestTheIdentityBoundaryGate`` — the real keyword fast
+    path, the real Two-class margin, the real fail-closed rule, with only the
+    embedding deployment stood in for — driven through the route the message
+    box posts an answer to. Until ADR-034 the gate was called once, inside
+    ``process_request``, so a personal question typed into the box the agent
+    opened reached the orchestration ungated.
+    """
+
+    PERSONAL = "actually, while you're there, how much PTO do I have?"
+    IN_SCOPE = "I reset the brewer and checked the water line"
+
+    def _pending(self, rt, session_id="sess-1"):
+        """A **Clarification** the orchestration is waiting on.
+
+        The plan carries the session, because that is where the gate's
+        **Session identity** comes from on this seam — the answer's payload
+        names a `request_id` and a `plan_id`, never a session.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        rt.orchestration_config.clarifications = {"r-1": True}
+        rt.store.get_plan_by_plan_id = AsyncMock(
+            return_value=SimpleNamespace(session_id=session_id, id="p-1")
+        )
+
+    def _answer(self, rt, answer):
+        return rt.client.post(
+            "/api/v4/user_clarification",
+            json={"request_id": "r-1", "answer": answer, "plan_id": "p-1"},
+        )
+
+    def test_a_personal_answer_is_refused_as_a_policy_block(self, rt):
+        """The defect ADR-034 records, at the seam it was found on."""
+        self._pending(rt)
+
+        resp = self._answer(rt, self.PERSONAL)
+
+        assert resp.status_code == 403
+        detail = resp.json()["detail"]
+        assert detail["kind"] == "policy_block"
+        assert detail["code"] == "identity_boundary"
+        assert detail["message"] == IDENTITY_BOUNDARY_REFUSAL
+
+    def test_the_refusal_settles_nothing(self, rt):
+        """A refused answer is not an answer.
+
+        Everything that consumes the **Clarification** is below the gate, so
+        the orchestration is still waiting — which is what keeps a refusal out
+        of the 300-second timeout (#87) instead of turning it into a resume on
+        *"No response received from user (timeout)."*
+        """
+        self._pending(rt)
+
+        self._answer(rt, self.PERSONAL)
+
+        rt.orchestration_config.set_clarification_result.assert_not_called()
+        rt.plan_service.handle_human_clarification.assert_not_awaited()
+
+    def test_the_refusal_consumes_no_part_of_the_questions_lifetime(self, rt):
+        """It neither answers the question nor ends it.
+
+        Asserted as the *absence* of any call into the orchestration rather
+        than as the absence of one particular call, because "nothing about the
+        pending clarification is touched" is the property — a refusal that
+        reset the question's clock would be as wrong as one that answered it.
+        """
+        self._pending(rt)
+        rt.orchestration_config.reset_mock()
+
+        self._answer(rt, self.PERSONAL)
+
+        assert rt.orchestration_config.method_calls == []
+
+    def test_the_clarification_is_still_pending_and_still_answerable(self, rt):
+        """The box stays open, so the next answer lands on the same question.
+
+        The refusal is a refusal of *those words*, not a verdict on the turn,
+        so the associate answers again against the same `request_id`.
+        """
+        self._pending(rt)
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+        resp = self._answer(rt, self.IN_SCOPE)
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "clarification recorded"
+        rt.orchestration_config.set_clarification_result.assert_called_once_with(
+            "r-1", self.IN_SCOPE
+        )
+
+    def test_the_safety_check_agent_is_never_created_for_a_refused_answer(self, rt):
+        """`rai_success` instantiates an agent, so the gate runs above it —
+        the same ordering the request path holds, for the same reason."""
+        self._pending(rt)
+
+        self._answer(rt, self.PERSONAL)
+
+        rt.rai_success.assert_not_awaited()
+
+    def test_it_refuses_before_the_team_is_even_resolved(self, rt):
+        """Ordering, asserted through a failure that would otherwise win: a
+        team this route cannot resolve is a 400, so a 403 here means the gate
+        genuinely ran first."""
+        self._pending(rt)
+        rt.store.get_current_team = AsyncMock(return_value=None)
+        rt.store.get_team_by_id = AsyncMock(return_value=None)
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+    def test_a_paraphrase_with_no_personal_vocabulary_is_still_refused(self, rt):
+        """The similarity tier, through the seam the chips and the box share."""
+        self._pending(rt)
+        paraphrase = "am I working tomorrow evening?"
+        rt.embedder.personal_texts.add(paraphrase)
+
+        assert self._answer(rt, paraphrase).status_code == 403
+
+    def test_a_gate_that_cannot_score_refuses(self, rt, monkeypatch):
+        """Fail closed on this seam too, all the way out to the response."""
+        self._pending(rt)
+
+        async def broken(_texts):
+            raise RuntimeError("the embedding deployment is unreachable")
+
+        monkeypatch.setattr(rt.gate, "_embed", broken)
+
+        assert self._answer(rt, self.IN_SCOPE).status_code == 403
+
+    def test_an_in_scope_answer_is_unaffected(self, rt):
+        """The guardrail must not make the troubleshooting beat unanswerable."""
+        self._pending(rt)
+
+        resp = self._answer(rt, self.IN_SCOPE)
+
+        assert resp.status_code == 200
+        rt.orchestration_config.set_clarification_result.assert_called_once_with(
+            "r-1", self.IN_SCOPE
+        )
+
+    def test_the_mocked_unlock_admits_a_previously_refused_answer(self, rt):
+        """The **Mocked unlock** is a parameter of the gate, not a second gate,
+        so it reaches this seam by reaching the gate — and the identity comes
+        from the session the *plan* names, because the answer names none."""
+        self._pending(rt)
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+        rt.client.post("/api/v4/session_state/sess-1/sign_in", json={})
+        resp = self._answer(rt, self.PERSONAL)
+
+        assert resp.status_code == 200
+        rt.orchestration_config.set_clarification_result.assert_called_once_with(
+            "r-1", self.PERSONAL
+        )
+
+    def test_a_name_in_another_session_does_not_unlock_this_one(self, rt):
+        """Signing in on one device is not signing in on the shared one, and
+        the plan's session is the only one this answer can be read against."""
+        self._pending(rt, session_id="sess-1")
+        rt.client.post("/api/v4/session_state/sess-other/sign_in", json={})
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+    def test_a_plan_that_names_no_session_is_anonymous(self, rt):
+        """Anonymous is the refusing state, so an answer the route cannot
+        resolve a session for refuses rather than admits."""
+        self._pending(rt)
+        rt.store.get_plan_by_plan_id = AsyncMock(return_value=None)
+        rt.client.post("/api/v4/session_state/sess-1/sign_in", json={})
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+    def test_an_unreadable_session_record_refuses_rather_than_admits(self, rt):
+        """An infrastructure failure is not a reason to admit a personal
+        question — the same fail-closed rule the request path holds."""
+        self._pending(rt)
+        rt.client.post("/api/v4/session_state/sess-1/sign_in", json={})
+        rt.store.get_item_by_id = AsyncMock(side_effect=Exception("cosmos is down"))
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+    def test_a_blank_answer_is_not_put_to_the_gate(self, rt):
+        """There are no words in it to refuse, and the content-safety check
+        directly below skips a blank answer for the same reason."""
+        self._pending(rt)
+
+        resp = self._answer(rt, "   ")
+
+        assert resp.status_code == 200
+        rt.orchestration_config.set_clarification_result.assert_called_once_with(
+            "r-1", "   "
+        )
+
+    def test_a_personal_answer_to_a_question_nobody_asked_is_still_refused(self, rt):
+        """The gate refuses the *words*, so it runs before the route decides
+        whether there is a question for them to answer.
+
+        A 404 here would say "no active plan found" about a request the
+        boundary had already declined, and would put the cheapest refusal in
+        the route behind a lookup it does not need.
+        """
+        self._pending(rt)
+        rt.orchestration_config.clarifications = {}
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+
+# ---------------------------------------------------------------------------
 # /agent_message
 # ---------------------------------------------------------------------------
 class TestAgentMessage:
