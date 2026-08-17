@@ -14,6 +14,7 @@ import React, { useState } from 'react';
 import { getAgentIcon, getAgentDisplayNameWithSuffix } from '@/utils/agentIconUtils';
 import { PLAN_ARRIVING } from '@/models/progressNarration';
 import { SECTION_HEADING } from '@/models/headingOutline';
+import { reviewablePlanSteps } from '@/models/reviewablePlan';
 
 // Updated styles to match consistent spacing and remove brand colors from bot elements
 const useStyles = makeStyles({
@@ -152,12 +153,18 @@ const useStyles = makeStyles({
         wordWrap: 'break-word',
         overflowWrap: 'break-word'
     },
-    stepHeading: {
-        marginBottom: '12px',
-        fontSize: '16px',
+    stepRole: {
+        display: 'block',
+        fontSize: '12px',
         fontWeight: '600',
-        color: 'var(--colorNeutralForeground1)',
-        lineHeight: '22px'
+        color: 'var(--colorNeutralForeground2)',
+        lineHeight: '16px',
+        marginBottom: '4px',
+    },
+    stepDetail: {
+        display: 'block',
+        color: 'var(--colorNeutralForeground2)',
+        marginTop: '4px',
     },
     instructionText: {
         color: 'var(--colorNeutralForeground2)',
@@ -184,15 +191,10 @@ const getAgentDisplayNameFromPlan = (planApprovalRequest: MPlanData | null): str
     return getAgentDisplayNameWithSuffix('Planning Agent');
 };
 
-// Dynamically extract content from whatever fields contain data
-const extractDynamicContent = (planApprovalRequest: MPlanData): { 
-    factsContent: string; 
-    planSteps: Array<{ type: 'heading' | 'substep'; text: string; agentName?: string }> 
-} => {
+const extractDynamicContent = (planApprovalRequest: MPlanData) => {
     if (!planApprovalRequest) return { factsContent: '', planSteps: [] };
 
     let factsContent = '';
-    let planSteps: Array<{ type: 'heading' | 'substep'; text: string; agentName?: string }> = [];
 
     // Build facts content from available sources
     const factsSources: string[] = [];
@@ -215,69 +217,10 @@ const extractDynamicContent = (planApprovalRequest: MPlanData): {
     // Combine all facts sources
     factsContent = factsSources.join('\n---\n\n');
 
-    // Extract plan steps from multiple possible sources
-    if (planApprovalRequest.steps && planApprovalRequest.steps.length > 0) {
-        planApprovalRequest.steps.forEach(step => {
-            // Use whichever action field has content
-            const action = step.action || step.cleanAction || '';
-            if (action.trim()) {
-                // Show agent display name unless it's the converter fallback
-                const rawAgent = step.agent || '';
-                const isFallback = !rawAgent || rawAgent.toLowerCase() === 'magenticagent';
-                const agentName = isFallback ? '' : getAgentDisplayNameWithSuffix(rawAgent);
-                const fullText = agentName ? `${agentName} ${action.trim()}` : action.trim();
-                // Check if it ends with colon (heading) or is a regular step
-                if (action.trim().endsWith(':')) {
-                    planSteps.push({ type: 'heading', text: fullText, agentName });
-                } else {
-                    planSteps.push({ type: 'substep', text: fullText, agentName });
-                }
-            }
-        });
-    }
-
-    // If no steps found in steps array, try to extract from other fields
-    if (planSteps.length === 0) {
-        // Look in user_request or facts for plan content
-        const searchContent = planApprovalRequest.user_request || planApprovalRequest.facts || '';
-        const lines = searchContent.split('\n');
-        
-        for (const line of lines) {
-            const trimmedLine = line.trim();
-            
-            // Skip empty lines and section headers
-            if (!trimmedLine || 
-                trimmedLine.toLowerCase().includes('plan created') ||
-                trimmedLine.toLowerCase().includes('user request') ||
-                trimmedLine.toLowerCase().includes('team assembly') ||
-                trimmedLine.toLowerCase().includes('fact sheet')) {
-                continue;
-            }
-            
-            // Look for bullet points, dashes, or numbered items
-            if (trimmedLine.match(/^[-•*]\s+/) || 
-                trimmedLine.match(/^\d+\.\s+/) ||
-                trimmedLine.match(/^[a-zA-Z][\w\s]*:$/)) {
-                
-                // Remove bullet/number prefixes for clean display
-                let cleanText = trimmedLine
-                    .replace(/^[-•*]\s+/, '')
-                    .replace(/^\d+\.\s+/, '')
-                    .trim();
-                
-                if (cleanText.length > 3) {
-                    // Determine if it's a heading (ends with colon) or substep
-                    if (cleanText.endsWith(':')) {
-                        planSteps.push({ type: 'heading', text: cleanText });
-                    } else {
-                        planSteps.push({ type: 'substep', text: cleanText });
-                    }
-                }
-            }
-        }
-    }
-
-    return { factsContent, planSteps };
+    return {
+        factsContent,
+        planSteps: reviewablePlanSteps(planApprovalRequest.steps).filter((step) => step.action.trim()),
+    };
 };
 
 // Process facts for preview
@@ -390,37 +333,26 @@ const renderPlanResponse = (
 
                 {/* Plan Steps */}
                 {planSteps.length > 0 && (
-                    <div className={styles.stepsList}>
+                    <ol className={styles.stepsList} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                         {planSteps.map((step, index) => {
-                            if (step.type === 'heading') {
-                                return (
-                                    <div key={index} className={styles.stepHeading}>
-                                        {step.agentName ? (
-                                            <><strong>{step.agentName}</strong> {step.text.slice(step.agentName.length + 1)}</>
-                                        ) : (
-                                            step.text
+                            stepCounter++;
+                            return (
+                                <li key={index} className={styles.stepItem}>
+                                    <div className={styles.stepNumber}>
+                                        {stepCounter}
+                                    </div>
+                                    <div className={styles.stepText}>
+                                        <Text className={styles.stepRole}>{step.role}</Text>
+                                        <div>{step.action}</div>
+                                        <Text className={styles.stepDetail}>{step.assigneeDescription}</Text>
+                                        {step.waitingDescription && (
+                                            <Text className={styles.stepDetail}>{step.waitingDescription}</Text>
                                         )}
                                     </div>
-                                );
-                            } else {
-                                stepCounter++;
-                                return (
-                                    <div key={index} className={styles.stepItem}>
-                                        <div className={styles.stepNumber}>
-                                            {stepCounter}
-                                        </div>
-                                        <div className={styles.stepText}>
-                                            {step.agentName ? (
-                                                <><strong>{step.agentName}</strong> {step.text.slice(step.agentName.length + 1)}</>
-                                            ) : (
-                                                step.text
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            }
+                                </li>
+                            );
                         })}
-                    </div>
+                    </ol>
                 )}
 
                 {/* Instruction Text */}

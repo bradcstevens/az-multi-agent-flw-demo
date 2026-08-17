@@ -413,4 +413,78 @@ describe('a plan approval arriving on the wire', () => {
         });
         expect(screen.getAllByRole('heading', { name: 'Plan Overview' })).toHaveLength(1);
     });
+
+    it('shows person steps as requests in their declared order', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('plan_approval_request', {
+                    plan: {
+                        user_request: 'Swap my Saturday shift with Marcus Bell',
+                        steps: [
+                            {
+                                id: 1,
+                                action: 'Check the swap procedure',
+                                assignee: { kind: 'agent', name: 'Workforce Agent' },
+                                waitsOn: null,
+                            },
+                            {
+                                id: 2,
+                                action: 'Confirm the request',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'You',
+                                    relation: 'associate',
+                                    simulated: false,
+                                },
+                                waitsOn: 1,
+                            },
+                            {
+                                id: 3,
+                                action: 'Ask Marcus Bell to take the shift',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Marcus Bell',
+                                    relation: 'peer',
+                                    simulated: true,
+                                },
+                                waitsOn: 2,
+                            },
+                            {
+                                id: 4,
+                                action: 'Ask Dana Reyes to approve the swap',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Dana Reyes',
+                                    relation: 'manager',
+                                    simulated: true,
+                                },
+                                waitsOn: 3,
+                            },
+                        ],
+                    },
+                }),
+            );
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('Person step')).toHaveLength(3);
+            expect(screen.getByText('You are asked to confirm this request.')).toBeInTheDocument();
+            expect(
+                screen.getByText('Marcus Bell gets a message. Marcus Bell can say no.'),
+            ).toBeInTheDocument();
+            expect(
+                screen.getByText('Dana Reyes gets a message. Dana Reyes can say no.'),
+            ).toBeInTheDocument();
+        });
+
+        expect(screen.getAllByText(/is asked next/).map((element) => element.textContent)).toEqual([
+            'Marcus Bell, the associate you named, is asked next.',
+            'Dana Reyes, your shift lead, is asked next.',
+        ]);
+        expect(inFlightIndicators()).toHaveLength(0);
+    });
 });
