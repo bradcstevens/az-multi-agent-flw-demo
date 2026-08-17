@@ -65,6 +65,18 @@ const PanelLeft: React.FC<PanelLeftProps> = ({
         (child.type === PanelToolbar || child.type === PanelFooter)
       )
   );
+  const panelStyle: React.CSSProperties & { "--panel-width": string } = {
+    "--panel-width": `${width}px`,
+    backgroundColor: "var(--colorNeutralBackground4)",
+    height: "100%",
+    boxSizing: "border-box",
+    position: "relative",
+    borderRight: panelResize
+      ? isHandleHovered
+        ? "2px solid var(--colorNeutralStroke2)"
+        : "2px solid transparent"
+      : "none",
+  };
 
   return (
     /*
@@ -78,20 +90,7 @@ const PanelLeft: React.FC<PanelLeftProps> = ({
     <nav
       className="panelLeft"
       aria-label="Chat history"
-      style={{
-        width: `${width}px`,
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: "var(--colorNeutralBackground4)",
-        height: "100%",
-        boxSizing: "border-box",
-        position: "relative",
-        borderRight: panelResize
-          ? isHandleHovered
-            ? "2px solid var(--colorNeutralStroke2)"
-            : "2px solid transparent"
-          : "none",
-      }}
+      style={panelStyle}
     >
       {toolbar && <div style={{ flexShrink: 0 }}>{toolbar}</div>}
 

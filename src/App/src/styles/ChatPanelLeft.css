@@ -63,6 +63,12 @@ color: #2F2F4A; */
   overflow: hidden;
 }
 
+.panelLeft {
+  width: var(--panel-width, 500px);
+  display: flex;
+  flex-direction: column;
+}
+
 .team-selector-container {
   margin-top: 8px;
   margin-bottom: 8px;

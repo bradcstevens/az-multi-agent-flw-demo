@@ -84,32 +84,11 @@
   height: 100%;
 }
 
-.plan-left-panel {
-  width: 280px;
-  flex-shrink: 0;
-}
-
-.plan-right-panel {
-  width: 280px;
-  flex-shrink: 0;
-}
-
 .plan-content-center {
   flex: 1;
   min-width: 0; /* Allows flex item to shrink below its min-content size */
   display: flex;
   flex-direction: column;
-}
-
-/* Responsive design */
-@media (max-width: 1200px) {
-  .plan-right-panel {
-    width: 260px;
-  }
-  
-  .plan-left-panel {
-    width: 260px;
-  }
 }
 
 @media (max-width: 768px) {
@@ -126,8 +105,4 @@
     margin-bottom: 16px;
   }
   
-  .plan-left-panel,
-  .plan-right-panel {
-    width: 240px;
-  }
 }
