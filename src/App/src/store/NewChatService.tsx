@@ -10,22 +10,6 @@ export class NewChatService {
     private static readonly RESET_TEXTAREA_EVENT = 'resetTextarea';
 
     /**
-     * Handle new chat action from ChatPage
-     * Navigates to homepage and resets textarea
-     * @param navigate - React Router navigate function
-     */
-    static handleNewChatFromChat(navigate: (to: string) => void): void {
-        // Navigate to homepage
-        navigate('/');
-
-        // Emit event to reset textarea after navigation
-        // Use setTimeout to ensure navigation completes first
-        setTimeout(() => {
-            NewChatService.resetTextarea();
-        }, 100);
-    }
-
-    /**
      * Handle new chat action from HomePage
      * Resets textarea to empty state
      */

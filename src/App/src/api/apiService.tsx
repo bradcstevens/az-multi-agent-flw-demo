@@ -16,6 +16,12 @@ import {
 import { SessionState } from '../models/sessionState';
 import { ChatDeletionResponse, ChatsDeletionResponse } from '../models/chatDeletion';
 
+export interface ChatTurnEndResponse {
+    status: 'ended' | 'already_settled';
+    session_id: string;
+    cancelled: boolean;
+}
+
 // Constants for endpoints
 const API_ENDPOINTS = {
     PROCESS_REQUEST: '/v4/process_request',
@@ -227,6 +233,19 @@ export class APIService {
         );
         this._cache.invalidate(new RegExp(`^plans_`));
         return deleted;
+    }
+
+    /**
+     * **Ending a turn** — settle this Chat's in-flight turn by session
+     * (ADR-031). Leaving a Chat is not a plan verdict, so this is deliberately
+     * separate from plan approval.
+     */
+    async endChatTurn(sessionId: string): Promise<ChatTurnEndResponse> {
+        const ended = await apiClient.post<ChatTurnEndResponse>(
+            `${API_ENDPOINTS.CHATS}/${encodeURIComponent(sessionId)}/end_turn`,
+        );
+        this._cache.invalidate(new RegExp(`^plans_`));
+        return ended;
     }
 
     /**
