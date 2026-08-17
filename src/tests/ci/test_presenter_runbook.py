@@ -164,6 +164,68 @@ def test_every_prompt_is_quoted_from_the_pack():
     assert not missing, f"the runbook misquotes the prompts: {missing}"
 
 
+def test_the_boundary_unlock_and_shift_swap_beats_name_the_same_associate():
+    """The personal-record boundary and the workforce process are one contrast."""
+    runbook = _rendered()
+
+    for heading in (
+        "### 5. How much PTO do I have? — the boundary",
+        "### 6. Sign in to continue — the door in the wall",
+        "### 8. Swap a shift — the fourth specialist",
+    ):
+        start = runbook.index(heading)
+        following = runbook[start + len(heading) :]
+        next_heading = re.search(r" ### \d+\.", following)
+        beat = following[: next_heading.start()] if next_heading else following
+        assert "Clara Workman" in beat
+
+
+def test_every_follow_on_edge_is_quoted_in_the_presenter_runbook():
+    """A Follow-on task is an authored transition the presenter has to rehearse.
+
+    The general prompt test protects each Quick Task in isolation. This seam
+    protects the graph transition: the runbook quotes the exact source-to-target
+    edge the presenter is expected to tap.
+    """
+    tasks = {task["id"]: task for task in _quick_tasks()}
+    edges = [
+        (task["id"], target_id)
+        for task in tasks.values()
+        for target_id in task.get("follow_on", [])
+    ]
+    runbook = _rendered()
+
+    assert edges, "the store pack authors no Follow-on edges to rehearse"
+    unresolved = [target_id for _, target_id in edges if target_id not in tasks]
+    assert not unresolved, f"Follow-on edges name unknown Quick Tasks: {unresolved}"
+    missing = [
+        f"`{tasks[source_id]['prompt']}` -> `{tasks[target_id]['prompt']}`"
+        for source_id, target_id in edges
+        if f"`{tasks[source_id]['prompt']}` -> `{tasks[target_id]['prompt']}`"
+        not in runbook
+    ]
+    assert not missing, f"the runbook does not quote Follow-on edges: {missing}"
+
+
+def test_the_shift_swap_beat_quotes_its_authored_people_and_order():
+    """The Reviewable plan names its people in the pack, not in presenter prose."""
+    task = next(
+        task for task in _quick_tasks() if task["id"] == "task-223-shift-swap"
+    )
+    rendered = _rendered()
+    beat = rendered[rendered.index(task["prompt"]) :][:1800]
+
+    assert "Deliberate" in beat
+    person_steps = [
+        step["assignee"]
+        for step in task["plan_steps"]
+        if step["assignee"]["kind"] == "person"
+    ]
+    for assignee in person_steps:
+        assert assignee["name"] in beat
+    assert "waitsOn" in beat
+
+
 def test_every_rehearsed_reply_chip_is_quoted_from_the_pack():
     """The other affordance nothing on screen reveals until it is too late.
 

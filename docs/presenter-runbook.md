@@ -148,7 +148,10 @@ the service desk.
 
 ### 5. How much PTO do I have? — the boundary
 
-**Tap:** `How much PTO do I have?` — *"My name is Tanya, how much PTO do I have?"*
+**Tap:** `How much PTO do I have?` — *"My name is Clara, how much PTO do I have?"*
+
+**Context:** this is Clara Workman's personal question, but the shared device has not identified
+the person asking it.
 
 **What lands:** it is refused, immediately, under the heading **Store-scoped assistant**. The
 refusal explains that the assistant is set up for the store rather than for individuals, that on a
@@ -173,8 +176,8 @@ separate login screen.
 loud, unprompted. A stakeholder who works this out for themselves afterwards stops believing
 everything else you showed them.
 
-**What happens:** the header gains a name, and the *same question, unedited* is asked again — and
-answered, out of an authored associate record, marked *Simulated*.
+**What happens:** the header gains **Clara Workman**, and the *same question, unedited* is asked
+again — and answered, out of Clara Workman's authored associate record, marked *Simulated*.
 
 **They should be looking at:** the header changing, and the same words getting a different
 outcome.
@@ -224,7 +227,7 @@ said 'shift swap goes here' — it chose from what each one says it does."*
 **The claim:** the routing story, made legible. And the boundary: this specialist answers **how a
 thing is done**, never **what somebody is owed**. Beat 5 is the other half of that sentence, and
 this beat is what makes it a boundary rather than a limitation — *"it will tell you how to swap a
-shift; it will not tell you Tanya's leave balance on a shared device."*
+shift; it will not tell you Clara Workman's leave balance on a shared device."*
 
 **Do not claim an HR integration.** There is no employment system behind this. The procedure
 library is mocked and says so on every answer. If somebody asks, *"this is where Workday or UKG
