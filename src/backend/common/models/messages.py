@@ -221,6 +221,9 @@ class Plan(BaseDataModel):
     m_plan: Optional[Dict[str, Any]] = None
     summary: Optional[str] = None
     team_id: Optional[str] = None
+    # The Quick Task tapped to create this record. Absent means free-typed
+    # input, which must not re-enter the authored Follow-on graph.
+    starting_task_id: Optional[str] = None
     streaming_message: Optional[str] = None
     human_clarification_request: Optional[str] = None
     human_clarification_response: Optional[str] = None
@@ -300,10 +303,14 @@ class StartingTask(BaseModel):
     # conversation may offer the reply.
     ticket_status_reply: Optional[Dict[str, str]] = None
 
-    # The next Quick Task in this conversation (issue #61, ADR-024). Like
-    # ``lane``, the pointer is authored configuration: a missing or unknown
-    # task simply produces no follow-on affordance in the surface.
-    follow_on: Optional[str] = None
+    # The Quick Tasks this conversation can lead to (issue #132, ADR-033).
+    # Like ``lane``, these edges are authored configuration: a missing or
+    # unknown task simply produces no Follow-on task affordance in the surface.
+    follow_on: List[str] = Field(default_factory=list)
+
+    # Whether this Quick Task reads state this conversation wrote and therefore
+    # cannot be offered cold from the home grid.
+    context_dependent: bool = False
 
     # The escalation task's explicit completion behavior (issue #62). This is
     # authored on the task rather than inferred from its wording so a content

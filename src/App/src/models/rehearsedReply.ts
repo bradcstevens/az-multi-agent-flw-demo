@@ -41,6 +41,22 @@ const taskForGoal = (
     );
 };
 
+const taskForId = (
+    team: TeamConfig | null | undefined,
+    taskId: string | null | undefined,
+): StartingTask | undefined =>
+    taskId
+        ? (team?.starting_tasks ?? []).find((candidate) => candidate.id === taskId)
+        : undefined;
+
+const followOnTasksForTask = (
+    team: TeamConfig | null | undefined,
+    task: StartingTask | undefined,
+): StartingTask[] =>
+    (task?.follow_on ?? [])
+        .map((id) => (team?.starting_tasks ?? []).find((candidate) => candidate.id === id))
+        .filter((candidate): candidate is StartingTask => candidate !== undefined);
+
 /**
  * The rehearsed replies for a plan, or none.
  *
@@ -58,16 +74,22 @@ export const rehearsedRepliesFor = (
     );
 };
 
-/** The follow-on task for a plan, or none when it began outside the roster. */
-export const followOnTaskFor = (
+/** The Follow-on tasks for a plan, or none when it began outside the roster. */
+export const followOnTasksFor = (
     team: TeamConfig | null | undefined,
     goal: string | null | undefined,
-): StartingTask | undefined => {
-    const followOnId = taskForGoal(team, goal)?.follow_on;
-    if (!followOnId) return undefined;
-
-    return (team?.starting_tasks ?? []).find((candidate) => candidate.id === followOnId);
+): StartingTask[] => {
+    return followOnTasksForTask(team, taskForGoal(team, goal));
 };
+
+/**
+ * The current plan records the tapped Quick Task id. Free-typed turns record
+ * none, so they cannot re-enter the authored Follow-on graph by matching words.
+ */
+export const followOnTasksForStartingTask = (
+    team: TeamConfig | null | undefined,
+    taskId: string | null | undefined,
+): StartingTask[] => followOnTasksForTask(team, taskForId(team, taskId));
 
 /** The ticket-status inquiry authored for this Chat's ticketing task, or none. */
 export const ticketStatusReplyFor = (

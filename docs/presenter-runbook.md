@@ -133,6 +133,9 @@ until it offers to escalate.
 **Tap:** `I can't fix it` — the follow-on card above the message box — *"I have tried everything
 and I can't fix it. I need someone to come out."*
 
+**Rehearsed Follow-on edge:** `The coffee brewer is down. It is not brewing on the left head.` ->
+`I have tried everything and I can't fix it. I need someone to come out.`
+
 **What happens:** this one takes the **deliberate lane** — a plan appears and waits for you. Press
 **Approve Task Plan**. A service ticket card appears, marked *Simulated*.
 

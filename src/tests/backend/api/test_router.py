@@ -487,6 +487,23 @@ class TestProcessRequest:
         assert body["status"] == "Request started successfully"
         assert body["plan_id"]
 
+    def test_a_tapped_quick_task_is_recorded_on_its_plan(self, rt):
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                **self._payload(),
+                "starting_task_id": "task-223-troubleshooting",
+            },
+        )
+
+        assert response.status_code == 200
+        assert rt.store.add_plan.await_args.args[0].starting_task_id == (
+            "task-223-troubleshooting"
+        )
+
     def test_success_generates_session_id(self, rt):
         rt.store.get_team_by_id.return_value = MagicMock()
         rt.rai_success.return_value = True

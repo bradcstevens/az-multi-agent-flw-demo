@@ -19,6 +19,15 @@ const FOLLOW_ON = {
     logo: 'Document',
     lane: 'deliberate',
 };
+const SECOND_FOLLOW_ON = {
+    id: 'task-223-ticket-status',
+    name: 'Check ticket status',
+    prompt: 'What is happening with my ticket?',
+    created: '',
+    creator: '',
+    logo: 'Document',
+    lane: 'fast',
+};
 
 /**
  * The wiring, not the component (issue #26).
@@ -86,6 +95,35 @@ describe('the conversation offers the rehearsed replies', () => {
     });
 
     describe('the conversation offers its follow-on task', () => {
+        it('yields every offered turn to the pending Clarification', () => {
+            renderChat(
+                {
+                    followOnTasks: [FOLLOW_ON, SECOND_FOLLOW_ON],
+                    onFollowOnTask: vi.fn(),
+                } as never,
+            );
+
+            expect(screen.queryByRole('button', { name: FOLLOW_ON.name })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: SECOND_FOLLOW_ON.name })).not.toBeInTheDocument();
+        });
+
+        it('renders every outgoing Quick Task from the current turn', () => {
+            const onFollowOnTask = vi.fn();
+            renderChat(
+                {
+                    followOnTasks: [FOLLOW_ON, SECOND_FOLLOW_ON],
+                    onFollowOnTask,
+                } as never,
+                { pending: false },
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: FOLLOW_ON.name }));
+            fireEvent.click(screen.getByRole('button', { name: SECOND_FOLLOW_ON.name }));
+
+            expect(onFollowOnTask).toHaveBeenCalledWith(FOLLOW_ON);
+            expect(onFollowOnTask).toHaveBeenCalledWith(SECOND_FOLLOW_ON);
+        });
+
         it('renders the follow-on without waiting for a clarification and submits it on tap', () => {
             const onFollowOnTask = vi.fn();
             renderChat({ followOnTask: FOLLOW_ON, onFollowOnTask }, { pending: false });
@@ -96,9 +134,8 @@ describe('the conversation offers the rehearsed replies', () => {
         });
 
         it('yields the slot to the chips while a clarification is pending', () => {
-            // One control at a time (#131, ADR-033). Wired here as well as in
-            // the card, because a gate the conversation forgets to honour is a
-            // tap that strands the turn the agent is waiting on.
+            // One control at a time (#131, ADR-033). The card owns this gate,
+            // so every conversation caller gets the same protection.
             renderChat({ followOnTask: FOLLOW_ON, onFollowOnTask: vi.fn() });
 
             expect(screen.queryByTestId('follow-on-task')).not.toBeInTheDocument();

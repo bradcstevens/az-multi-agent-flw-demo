@@ -60,7 +60,7 @@ import {
 import { selectWsConnected } from '../store/slices/appSlice';
 import { selectSelectedTeam } from '../store/slices/teamSlice';
 import {
-    followOnTaskFor,
+    followOnTasksForStartingTask,
     rehearsedRepliesFor,
     ticketStatusReplyFor,
 } from '../models/rehearsedReply';
@@ -212,9 +212,9 @@ const ChatPage: React.FC = () => {
         () => rehearsedRepliesFor(planTeam, planData?.plan?.initial_goal),
         [planTeam, planData?.plan?.initial_goal],
     );
-    const followOnTask = React.useMemo(
-        () => followOnTaskFor(planTeam, planData?.plan?.initial_goal),
-        [planTeam, planData?.plan?.initial_goal],
+    const followOnTasks = React.useMemo(
+        () => followOnTasksForStartingTask(planTeam, planData?.plan?.starting_task_id),
+        [planTeam, planData?.plan?.starting_task_id],
     );
     const ticketStatusReply = React.useMemo(
         () => ticketStatusReplyFor(planTeam, planData?.plan?.initial_goal),
@@ -902,7 +902,7 @@ const ChatPage: React.FC = () => {
                                 handleApprovePlan={handleApprovePlan}
                                 handleRejectPlan={handleRejectPlan}
                                 rehearsedReplies={rehearsedReplies}
-                                followOnTask={followOnTask}
+                                followOnTasks={followOnTasks}
                                 onFollowOnTask={handleFollowOnTask}
                                 ticketStatusReply={ticketStatusReply}
                                 onTicketStatusReply={handleTicketStatusReply}
