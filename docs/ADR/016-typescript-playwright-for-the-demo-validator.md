@@ -2,7 +2,12 @@
 
 ## Status
 
-Accepted
+Accepted — amended by [ADR-044](./044-the-feedback-loops-table-is-what-the-gate-runs.md), which
+takes the validator out of the `AGENTS.md` Feedback loops *table*: the integration gate runs that
+table unattended on a branch nothing has deployed, so the row could only ever be red. Everything
+below stands — the language, the entry point, the self-bootstrapping script and the declaration in
+`AGENTS.md` — except that the declaration now lives in the notes beneath the table rather than as a
+row of it.
 
 ## Date
 

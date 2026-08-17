@@ -1655,7 +1655,12 @@ behind `bash scripts/e2e-tests.sh`, and runs against **either** target — the d
 local one — from one set of specs, because two descriptions of the walkthrough will disagree. Its
 expectation is read out of the repository (the corpus manifest, the store pack, `storeSurface.ts`),
 never pinned in the spec, for the reason [ADR-019](docs/ADR/019-rebrand-the-sop-corpus-to-circle-k.md) taught one
-layer out: a check carrying its own copy passes a rebrand it never saw. See
+layer out: a check carrying its own copy passes a rebrand it never saw. It is **not** a declared
+loop and is not in `AGENTS.md`'s Feedback loops table
+([ADR-044](docs/ADR/044-the-feedback-loops-table-is-what-the-gate-runs.md)): the integration gate
+runs that table in a fresh worktree on a branch nothing has deployed, and the validator's first
+assertion is that the deployment *is* this commit, so gated there it is red before a browser opens.
+Run it deliberately, after deploying. See
 [docs/demo-validator.md](docs/demo-validator.md).
 _Avoid_: e2e test (the accelerator's own suite lived at `tests/e2e-test/`, drove an Entra login
 against the pre-rebrand surface, was wired into no workflow, and was deleted in #47)

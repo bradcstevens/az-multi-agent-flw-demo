@@ -26,7 +26,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [013](./013-per-request-plan-review-over-orchestrator-bypass.md) | Vary Plan review per request instead of building an orchestrator bypass | Accepted |
 | [014](./014-deterministic-identity-boundary-gate.md) | The identity boundary gate is deterministic code, not a prompt | Accepted |
 | [015](./015-two-class-margin-for-the-identity-boundary-gate.md) | Score the identity boundary gate's similarity tier as a two-class margin | Accepted |
-| [016](./016-typescript-playwright-for-the-demo-validator.md) | TypeScript `@playwright/test` for the Demo validator, against the Python loop convention | Accepted |
+| [016](./016-typescript-playwright-for-the-demo-validator.md) | TypeScript `@playwright/test` for the Demo validator, against the Python loop convention | Accepted — amended by 044 on where it is declared |
 | [017](./017-workforce-agent-answers-process-never-record.md) | The Workforce agent answers HR process, and never an individual's record | Accepted |
 | [018](./018-deployed-build-provenance-check.md) | Check that the deployed build is the build we think it is | Accepted |
 | [019](./019-rebrand-the-sop-corpus-to-circle-k.md) | Rebrand the SOP corpus to Circle K, reversing the Brightpath position | Accepted |
@@ -52,6 +52,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [041](./041-the-copilot-studio-chat-url-is-a-credential.md) | The Copilot Studio chat URL is a credential | Accepted — bounds the deep link |
 | [042](./042-approval-completes-a-ticket-and-starts-a-swap.md) | Approval completes a ticket and starts a swap — two mechanisms sharing one shape | Accepted — completes the edge 037 left open |
 | [043](./043-the-feedback-loops-virtualenv-is-shared-across-worktrees.md) | The feedback loops' virtualenv is keyed by its inputs and shared across worktrees | Accepted — amends 005's per-worktree bootstrap |
+| [044](./044-the-feedback-loops-table-is-what-the-gate-runs.md) | The Feedback loops table is what the gate runs, so nothing in it may observe a deployment | Accepted — amends 005's table; removes the Demo validator's row |
 
 ## Writing a new one
 

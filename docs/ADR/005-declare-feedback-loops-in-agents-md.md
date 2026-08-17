@@ -55,6 +55,13 @@ overrides the location so one environment can be shared across git worktrees.
 virtualenv is identified by that stamp rather than by the worktree that asked for it, so sharing
 one environment across worktrees is the default and `DEV_VENV` is only the manual override.
 
+**Amended by [ADR-044](./044-the-feedback-loops-table-is-what-the-gate-runs.md):** the table has
+grown past these two rows, and the property that binds every row is stated there — a declared loop
+must hold against fakes in the gate's fresh worktree, so a tool that observes a *deployment* is not
+one. The Demo validator was a row until #115, where it was red at the gate by construction: its
+first assertion is that the Container Apps serve `HEAD` (ADR-018) and deployment happens on a push
+to `main` (ADR-020), which an integration branch has not had.
+
 `scripts/backend-tests.sh` encodes the Two-phase test invocation and the 80% coverage threshold
 that `.github/workflows/test.yml` enforces, so the loop an agent runs locally and the gate the
 runner runs at integration are the same check CI runs.
