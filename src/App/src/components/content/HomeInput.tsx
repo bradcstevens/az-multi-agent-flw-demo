@@ -332,16 +332,13 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
     }
   }, [input]);
 
-  // Convert team starting_tasks to ExtendedQuickTask format
-  const followOnTaskIds = new Set(
-    (selectedTeam?.starting_tasks ?? []).flatMap((task) =>
-      typeof task.follow_on === "string" ? [task.follow_on] : [],
-    ),
-  );
+  // Convert team starting_tasks to ExtendedQuickTask format.
+  // Context dependence, not graph membership, decides whether a Quick Task can
+  // begin cold from the home grid (issue #132, ADR-033).
   const tasksToDisplay: ExtendedQuickTask[] =
     selectedTeam && selectedTeam.starting_tasks
       ? selectedTeam.starting_tasks
-          .filter((task) => !followOnTaskIds.has(task.id))
+          .filter((task) => typeof task === "string" || task.context_dependent !== true)
           .map((task, index) => {
           // Handle both string tasks and StartingTask objects
           if (typeof task === "string") {

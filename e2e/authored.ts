@@ -51,7 +51,7 @@ export interface QuickTask {
     name: string;
     prompt: string;
     lane?: string;
-    followOn?: string;
+    followOn: string[];
     rehearsedReplies: string[];
     planSteps: PlanStep[];
 }
@@ -133,7 +133,7 @@ export function quickTasks(): QuickTask[] {
         name: requiredTaskString(task, 'name'),
         prompt: requiredTaskString(task, 'prompt'),
         lane: optionalTaskString(task, 'lane'),
-        followOn: optionalTaskString(task, 'follow_on'),
+        followOn: optionalTaskStrings(task, 'follow_on'),
         rehearsedReplies: Array.isArray(task.rehearsed_replies)
             ? task.rehearsed_replies.filter(
                   (reply): reply is string =>
@@ -225,7 +225,7 @@ export function quickTaskNamed(name: string): QuickTask {
 export function troubleshootingTask(): QuickTask {
     return sole(
         quickTasks().filter(
-            (task) => task.followOn && task.rehearsedReplies.length > 0,
+            (task) => task.followOn.length > 0 && task.rehearsedReplies.length > 0,
         ),
         'a troubleshooting Quick Task with a follow-on and rehearsed replies',
     );
@@ -233,13 +233,13 @@ export function troubleshootingTask(): QuickTask {
 
 /** The task the authored troubleshooting card continues to. */
 export function followOnTaskFor(task: QuickTask): QuickTask {
-    if (!task.followOn) {
+    if (task.followOn.length === 0) {
         throw new Error(`Quick Task ${task.id} has no follow-on`);
     }
 
     return sole(
-        quickTasks().filter((candidate) => candidate.id === task.followOn),
-        `the follow-on ${task.followOn} for Quick Task ${task.id}`,
+        quickTasks().filter((candidate) => candidate.id === task.followOn[0]),
+        `the first follow-on ${task.followOn[0]} for Quick Task ${task.id}`,
     );
 }
 
@@ -270,6 +270,16 @@ function optionalTaskString(
 ): string | undefined {
     const value = task[key];
     return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function optionalTaskStrings(
+    task: Record<string, unknown>,
+    key: string,
+): string[] {
+    const value = task[key];
+    return Array.isArray(value)
+        ? value.filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+        : [];
 }
 
 /** A module-level `NAME = "value"` read from its authored definition. */

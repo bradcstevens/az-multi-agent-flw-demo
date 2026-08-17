@@ -68,8 +68,10 @@ export interface StartingTaskBE {
     logo: string;
     /** The declared Lane (issue #16, ADR-013), absent on older definitions */
     lane?: string;
-    /** The Quick Task to offer inside this task's conversation (issue #61). */
-    follow_on?: string;
+    /** The Quick Tasks to offer inside this task's conversation (issue #132). */
+    follow_on?: string[];
+    /** Whether this task requires the conversation it continues (issue #132). */
+    context_dependent?: boolean;
     /** Whether approval must persist this task's Simulated ticket (issue #62). */
     ticket_on_approval?: boolean;
     /** The authored Fast-lane inquiry offered after this task raises a ticket. */
@@ -118,6 +120,8 @@ export interface Plan extends BaseModel {
     user_id: string;
     /** Initial goal/title of the plan */
     initial_goal: string;
+    /** The Quick Task tapped to start this turn; absent for free-typed input. */
+    starting_task_id?: string;
     /** Current status of the plan */
     overall_status: PlanStatus;
     /** Whether the plan is approved */

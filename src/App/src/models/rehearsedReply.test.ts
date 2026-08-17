@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-    followOnTaskFor,
+    followOnTasksFor,
+    followOnTasksForStartingTask,
     rehearsedRepliesFor,
     ticketStatusReplyFor,
 } from './rehearsedReply';
@@ -32,6 +33,40 @@ describe('resolving the rehearsed replies for a plan', () => {
     });
 
     describe('resolving the follow-on task for a plan', () => {
+        it('resolves an offered turn from the tapped Quick Task identity', () => {
+            const escalation = task({
+                id: 'task-223-escalation',
+                name: "I can't fix it",
+            });
+            const source = task({ follow_on: [escalation.id] });
+
+            expect(
+                followOnTasksForStartingTask(team([source, escalation]), source.id),
+            ).toEqual([escalation]);
+        });
+
+        it('offers every Quick Task authored as an outgoing edge of the current turn', () => {
+            const escalation = task({
+                id: 'task-223-escalation',
+                name: "I can't fix it",
+            });
+            const status = task({
+                id: 'task-223-ticket-status',
+                name: 'Check ticket status',
+            });
+
+            expect(
+                followOnTasksFor(
+                    team([
+                        task({ follow_on: [escalation.id, status.id] as never }),
+                        escalation,
+                        status,
+                    ]),
+                    task().prompt,
+                ),
+            ).toEqual([escalation, status]);
+        });
+
         it('finds the task authored as the matching task follow-on', () => {
             const escalation = task({
                 id: 'task-223-escalation',
@@ -40,16 +75,21 @@ describe('resolving the rehearsed replies for a plan', () => {
             });
 
             expect(
-                followOnTaskFor(
-                    team([task({ follow_on: escalation.id }), escalation]),
+                followOnTasksFor(
+                    team([task({ follow_on: [escalation.id] }), escalation]),
                     task().prompt,
                 ),
-            ).toEqual(escalation);
+            ).toEqual([escalation]);
         });
 
         it('gives nothing when the plan did not start from a task with a follow-on', () => {
-            expect(followOnTaskFor(team(), task().prompt)).toBeUndefined();
-            expect(followOnTaskFor(team([task({ follow_on: 'missing-task' })]), task().prompt)).toBeUndefined();
+            expect(followOnTasksFor(team(), task().prompt)).toEqual([]);
+            expect(
+                followOnTasksFor(
+                    team([task({ follow_on: ['missing-task'] })]),
+                    task().prompt,
+                ),
+            ).toEqual([]);
         });
     });
 

@@ -1493,6 +1493,15 @@ def test_given_the_troubleshooting_task_when_read_then_it_carries_rehearsed_repl
     assert task["rehearsed_replies"]
 
 
+def _follow_on_edges(tasks):
+    """The authored Follow-on graph, retaining every outgoing edge."""
+    for task in tasks:
+        follow_on = task.get("follow_on", [])
+        assert isinstance(follow_on, list), task["id"]
+        for target_id in follow_on:
+            yield task["id"], target_id
+
+
 def test_given_the_troubleshooting_task_when_read_then_its_follow_on_is_the_escalation(
     store_pack,
 ):
@@ -1502,13 +1511,94 @@ def test_given_the_troubleshooting_task_when_read_then_its_follow_on_is_the_esca
         for task in store_pack.starting_tasks
         if task["id"] == "task-223-troubleshooting"
     )
+    assert troubleshooting["follow_on"] == ["task-223-escalation"]
     escalation = next(
         task
         for task in store_pack.starting_tasks
-        if task["id"] == troubleshooting["follow_on"]
+        if task["id"] == troubleshooting["follow_on"][0]
+    )
+    assert escalation["context_dependent"] is True
+
+
+def test_given_the_follow_on_graph_when_read_then_every_edge_resolves_and_is_acyclic(
+    store_pack,
+):
+    tasks = {task["id"]: task for task in store_pack.starting_tasks}
+    edges = list(_follow_on_edges(store_pack.starting_tasks))
+
+    for source_id, target_id in edges:
+        assert target_id in tasks, f"{source_id} names unknown task {target_id}"
+
+    visiting = set()
+    visited = set()
+
+    def visit(task_id):
+        assert task_id not in visiting, f"Follow-on graph cycles at {task_id}"
+        if task_id in visited:
+            return
+        visiting.add(task_id)
+        for _, target_id in filter(lambda edge: edge[0] == task_id, edges):
+            visit(target_id)
+        visiting.remove(task_id)
+        visited.add(task_id)
+
+    for task_id in tasks:
+        visit(task_id)
+
+
+def test_given_the_home_grid_when_read_then_context_dependence_alone_decides_its_cards(
+    store_pack,
+):
+    context_dependent = [
+        task["id"]
+        for task in store_pack.starting_tasks
+        if task.get("context_dependent") is True
+    ]
+    home_cards = [
+        task["id"]
+        for task in store_pack.starting_tasks
+        if task.get("context_dependent") is not True
+    ]
+
+    assert context_dependent == ["task-223-escalation"]
+    assert home_cards == [
+        "task-223-procedure",
+        "task-223-honest-miss",
+        "task-223-troubleshooting",
+        "task-223-identity",
+        "task-223-shift-tasks",
+        "task-223-shift-swap",
+    ]
+
+
+def test_given_each_follow_on_task_when_read_then_it_keeps_its_lane_and_runbook_quote(
+    store_pack, lane_mod, gate_keywords
+):
+    tasks = {task["id"]: task for task in store_pack.starting_tasks}
+    runbook = re.sub(
+        r"\s+",
+        " ",
+        (REPO_ROOT / "docs" / "presenter-runbook.md").read_text(
+            encoding="utf-8"
+        ).lower(),
     )
 
-    assert escalation["id"] == "task-223-escalation"
+    for source_id, target_id in _follow_on_edges(store_pack.starting_tasks):
+        source = tasks[source_id]
+        task = tasks[target_id]
+        declared = lane_mod.parse_lane(task["lane"])
+
+        assert declared is not None, task["id"]
+        assert lane_mod.select_lane(task["lane"], task["prompt"]) is declared
+        assert lane_mod.select_lane(None, task["prompt"]) is declared
+        assert not gate_keywords.matches_personal_keyword(task["prompt"])
+        assert source["name"].lower() in runbook
+        assert source["prompt"].lower() in runbook
+        assert task["name"].lower() in runbook
+        assert task["prompt"].lower() in runbook
+        assert runbook.index(source["prompt"].lower()) < runbook.index(
+            task["prompt"].lower()
+        )
 
 
 def _rehearsed_replies(store_pack) -> List[str]:
