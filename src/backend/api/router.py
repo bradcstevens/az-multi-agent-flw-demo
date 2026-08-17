@@ -163,6 +163,7 @@ async def start_comms(
 @app_router.get("/init_team")
 async def init_team(
     request: Request,
+    team_id: str | None = Query(None),
     team_switched: bool = Query(False),
 ):  # add team_switched: bool parameter
     """Initialize the user's current team of agents"""
@@ -185,7 +186,9 @@ async def init_team(
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
         team_service = TeamService(memory_store)
 
-        init_team_id = await find_first_available_team(team_service, user_id)
+        init_team_id = team_id or await find_first_available_team(
+            team_service, user_id
+        )
 
         # Get current team if user has one
         user_current_team = await memory_store.get_current_team(user_id=user_id)
@@ -194,14 +197,32 @@ async def init_team(
         if not init_team_id and not user_current_team:
             logger.info("No teams found in database. System ready for custom team upload.")
             return {
-                "status": "No teams configured. Please upload a team configuration to get started.",
                 "team_id": None,
-                "team": None,
                 "requires_team_upload": True,
             }
 
         # Use current team if available, otherwise use found team
-        if user_current_team:
+        team_configuration = None
+        if team_id:
+            logger.debug("Using requested team: %s", init_team_id)
+            team_configuration = await team_service.get_team_configuration(
+                init_team_id, user_id
+            )
+            if team_configuration is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Team configuration '{init_team_id}' not found or access denied",
+                )
+            user_current_team = await team_service.handle_team_selection(
+                user_id=user_id, team_id=init_team_id
+            )
+            if not user_current_team:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Team configuration '{init_team_id}' failed to set",
+                )
+            init_team_id = user_current_team.team_id
+        elif user_current_team:
             init_team_id = user_current_team.team_id
             logger.debug("Using user's current team: %s", init_team_id)
         elif init_team_id:
@@ -213,17 +234,16 @@ async def init_team(
                 init_team_id = user_current_team.team_id
 
         # Verify the team exists and user has access to it
-        team_configuration = await team_service.get_team_configuration(
-            init_team_id, user_id
-        )
+        if team_configuration is None:
+            team_configuration = await team_service.get_team_configuration(
+                init_team_id, user_id
+            )
         if team_configuration is None:
             # If team doesn't exist, clear current team and return empty state
             await memory_store.delete_current_team(user_id)
             logger.warning("Team configuration '%s' not found. Cleared current team.", init_team_id)
             return {
-                "status": "Current team configuration not found. Please select or upload a team configuration.",
                 "team_id": None,
-                "team": None,
                 "requires_team_upload": True,
             }
 
@@ -232,20 +252,10 @@ async def init_team(
             user_id=user_id, team_configuration=team_configuration
         )
 
-        # Initialize agent team for this user session
-        await OrchestrationManager.get_current_or_new_orchestration(
-            user_id=user_id,
-            team_config=team_configuration,
-            team_switched=team_switched,
-            team_service=team_service,
-        )
+        return {"team_id": init_team_id}
 
-        return {
-            "status": "Request started successfully",
-            "team_id": init_team_id,
-            "team": team_configuration,
-        }
-
+    except HTTPException:
+        raise
     except Exception as e:
         track_event_if_configured(
             "Error_Init_Team_Failed",
@@ -393,10 +403,11 @@ async def process_request(
     try:
         if memory_store is None:
             memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        user_current_team = await memory_store.get_current_team(user_id=user_id)
-        team_id = None
-        if user_current_team:
-            team_id = user_current_team.team_id
+        team_id = input_task.team_id
+        if not team_id:
+            user_current_team = await memory_store.get_current_team(user_id=user_id)
+            if user_current_team:
+                team_id = user_current_team.team_id
         team = await memory_store.get_team_by_id(team_id=team_id)
         if not team:
             raise HTTPException(
@@ -521,10 +532,8 @@ async def process_request(
                 exc_info=True,
             )
 
-    # The cache-invalidation predicate's lane term (ADR-013). /init_team eagerly
-    # builds a workflow before any task is submitted, so without this the first
-    # request after a page load reuses that workflow and silently ignores the
-    # lane this request was routed into.
+    # The cache-invalidation predicate's lane term (ADR-013). A Workflow from
+    # an earlier request cannot silently cross into the Lane this request took.
     cached_plan_review = getattr(current_workflow, "_plan_review", None)
     plan_review_mismatch = (
         current_workflow is not None

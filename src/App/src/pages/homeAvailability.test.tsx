@@ -121,6 +121,23 @@ beforeEach(() => {
 });
 
 describe('the rail states who is available, before a question is typed', () => {
+    it('accepts typing while the team initialization request is still in flight', async () => {
+        let finishInitialization: () => void = () => undefined;
+        vi.mocked(TeamService.initializeTeam).mockReturnValue(
+            new Promise((resolve) => {
+                finishInitialization = () => resolve({ success: true } as any);
+            }),
+        );
+        renderHome();
+
+        const textbox = await screen.findByRole('textbox');
+        await userEvent.type(textbox, 'How do I close the store?');
+
+        expect(textbox).toHaveValue('How do I close the store?');
+        expect(TeamService.initializeTeam).toHaveBeenCalledWith(TEAM.team_id);
+        finishInitialization();
+    });
+
     it('counts the specialists from the roster with nothing yet sent', async () => {
         renderHome();
 

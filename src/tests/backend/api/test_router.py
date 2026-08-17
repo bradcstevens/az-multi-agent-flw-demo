@@ -314,6 +314,25 @@ def _no_user(rt):
 # /init_team
 # ---------------------------------------------------------------------------
 class TestInitTeam:
+    def test_returns_team_attachment_without_building_a_workflow(self, rt):
+        """The question box needs a team, not a precommitted Lane.
+
+        The first question is the first place a Lane is declared.  Building a
+        Workflow here would therefore choose a Plan review value the request
+        never made, and make a Fast-lane first question rebuild it.
+        """
+        team = MagicMock()
+        team.team_id = "team-current"
+        rt.store.get_current_team.return_value = team
+        team_configuration = MagicMock()
+        rt.team_service.get_team_configuration.return_value = team_configuration
+
+        response = rt.client.get("/api/v4/init_team")
+
+        assert response.status_code == 200
+        assert response.json() == {"team_id": "team-current"}
+        rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
+
     def test_no_user(self, rt):
         _no_user(rt)
         resp = rt.client.get("/api/v4/init_team")
@@ -324,8 +343,7 @@ class TestInitTeam:
         rt.store.get_current_team.return_value = None
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["requires_team_upload"] is True
+        assert resp.json() == {"team_id": None, "requires_team_upload": True}
 
     def test_first_available_team_used(self, rt):
         rt.find_first_available_team.return_value = "team-abc"
@@ -337,7 +355,45 @@ class TestInitTeam:
         rt.team_service.get_team_configuration.return_value = team_conf
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
-        assert resp.json()["status"] == "Request started successfully"
+        assert resp.json() == {"team_id": "team-abc"}
+
+    def test_explicit_team_attachment_overrides_the_current_team(self, rt):
+        current = MagicMock()
+        current.team_id = "stock-team"
+        rt.store.get_current_team.return_value = current
+        selected = MagicMock()
+        selected.team_id = "team-current"
+        rt.team_service.handle_team_selection.return_value = selected
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+
+        resp = rt.client.get("/api/v4/init_team?team_id=team-current")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"team_id": "team-current"}
+        rt.find_first_available_team.assert_not_awaited()
+        rt.team_service.handle_team_selection.assert_awaited_once_with(
+            user_id="user-1", team_id="team-current"
+        )
+
+    def test_invalid_explicit_team_does_not_replace_the_current_team(self, rt):
+        current = MagicMock()
+        current.team_id = "team-current"
+        rt.store.get_current_team.return_value = current
+        rt.team_service.get_team_configuration.return_value = None
+
+        resp = rt.client.get("/api/v4/init_team?team_id=not-a-team")
+
+        assert resp.status_code == 404
+        rt.team_service.handle_team_selection.assert_not_awaited()
+        rt.store.delete_current_team.assert_not_awaited()
+
+    def test_failed_explicit_team_persistence_is_not_reported_as_success(self, rt):
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+        rt.team_service.handle_team_selection.return_value = None
+
+        resp = rt.client.get("/api/v4/init_team?team_id=team-current")
+
+        assert resp.status_code == 500
 
     def test_current_team_used(self, rt):
         current = MagicMock()
@@ -355,7 +411,7 @@ class TestInitTeam:
         rt.team_service.get_team_configuration.return_value = None
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
-        assert resp.json()["requires_team_upload"] is True
+        assert resp.json() == {"team_id": None, "requires_team_upload": True}
         rt.store.delete_current_team.assert_awaited()
 
     def test_exception_returns_400(self, rt):
@@ -370,6 +426,27 @@ class TestInitTeam:
 class TestProcessRequest:
     def _payload(self):
         return {"session_id": "sess-1", "description": "do the thing"}
+
+    def test_uses_the_attached_team_over_a_stale_current_team(self, rt):
+        """The question's resolved team remains authoritative during initialization."""
+        stale_team = MagicMock()
+        stale_team.team_id = "stock-team"
+        rt.store.get_current_team.return_value = stale_team
+        attached_team = MagicMock()
+        rt.store.get_team_by_id.return_value = attached_team
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-1",
+                "description": "how do I close the store?",
+                "team_id": "team-abc",
+                "lane": "fast",
+            },
+        )
+
+        assert response.status_code == 200
+        rt.store.get_team_by_id.assert_awaited_once_with(team_id="team-abc")
 
     def test_no_user(self, rt):
         _no_user(rt)
@@ -921,8 +998,8 @@ class TestPerRequestPlanReview:
             .call_args.kwargs["plan_review"]
         )
 
-    def _eagerly_built_workflow(self, rt, plan_review=True):
-        """What /init_team leaves in the Workflow cache before any task.
+    def _cached_workflow(self, rt, plan_review=True):
+        """A Workflow left in the cache by an earlier request.
 
         The manager is mocked, so it is wired here to do what the real one does
         on a rebuild — install the new Workflow in the cache — otherwise the
@@ -959,6 +1036,25 @@ class TestPerRequestPlanReview:
 
     def test_a_fast_lane_request_turns_the_approval_gate_off(self, rt):
         assert self._post(rt, lane="fast").status_code == 200
+        assert self._plan_review_passed(rt) is False
+
+    def test_a_fast_lane_first_request_builds_once_for_its_declared_lane(self, rt):
+        """Team attachment does not pre-build a Deliberate Workflow.
+
+        This crosses both HTTP routes through the real router: the initialization
+        response must not build anything, and the first Fast-lane question then
+        makes the one Workflow build with Plan review off.
+        """
+        current_team = MagicMock()
+        current_team.team_id = "team-abc"
+        rt.store.get_current_team.return_value = current_team
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+
+        assert rt.client.get("/api/v4/init_team").status_code == 200
+        rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
+
+        assert self._post(rt, lane="fast").status_code == 200
+        assert rt.orchestration_manager.get_current_or_new_orchestration.await_count == 1
         assert self._plan_review_passed(rt) is False
 
     def test_an_authored_ticket_status_inquiry_turns_the_approval_gate_off(self, rt):
@@ -1020,24 +1116,23 @@ class TestPerRequestPlanReview:
         assert self._post(rt).json()["lane"] == "fast"
         assert self._post(rt, lane="deliberate").json()["lane"] == "deliberate"
 
-    def test_the_first_request_after_a_page_load_is_not_served_the_eager_workflow(
+    def test_a_fast_lane_request_replaces_a_cached_deliberate_workflow(
         self, rt
     ):
         """The Workflow cache fix, at the endpoint.
 
-        /init_team eagerly builds a Workflow with Plan review on before any
-        task is submitted. Without the fix the very first Fast lane request
-        reuses it and silently runs in the Deliberate lane.
+        A Workflow from an earlier Deliberate request cannot be reused for a
+        Fast-lane request: its Plan review value is part of the cache predicate.
         """
-        cache = self._eagerly_built_workflow(rt, plan_review=True)
-        eager = cache["current"]
+        cache = self._cached_workflow(rt, plan_review=True)
+        cached = cache["current"]
 
         assert self._post(rt, lane="fast").status_code == 200
 
         rt.orchestration_manager.get_current_or_new_orchestration.assert_awaited()
         assert self._plan_review_passed(rt) is False
         # The stale Workflow is gone from the cache, replaced by a Fast lane one
-        assert cache["current"] is not eager
+        assert cache["current"] is not cached
         assert cache["current"]._plan_review is False
 
     def test_a_workflow_already_built_for_this_lane_is_reused(self, rt):
@@ -1046,7 +1141,7 @@ class TestPerRequestPlanReview:
         Together with the test above this isolates the Plan review term — the
         two differ in nothing but the lane the cached Workflow was built for.
         """
-        cache = self._eagerly_built_workflow(rt, plan_review=False)
+        cache = self._cached_workflow(rt, plan_review=False)
         cached = cache["current"]
 
         assert self._post(rt, lane="fast").status_code == 200

@@ -20,15 +20,13 @@ export class TeamService {
     }
 
     /**
-     * Initialize user's team with default HR team configuration
-     * This calls the backend /init_team endpoint which sets up the default team
+     * Attach the user's selected team to the backend session.
+     * This calls the backend /init_team endpoint after the roster resolves.
      */
-    static async initializeTeam(team_switched: boolean = false): Promise<{
+    static async initializeTeam(teamId?: string, team_switched: boolean = false): Promise<{
         success: boolean;
         data?: {
-            status: string;
             team_id?: string;
-            team?: any;
             requires_team_upload?: boolean;
         };
         error?: string;
@@ -36,6 +34,7 @@ export class TeamService {
         try {
             const response = await apiClient.get('/v4/init_team', {
                 params: {
+                    team_id: teamId,
                     team_switched
                 }
             });

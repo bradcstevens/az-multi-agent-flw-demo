@@ -290,10 +290,9 @@ class OrchestrationManager:
             current is not None and current_team_id != team_config.team_id
         )
 
-        # Detect a cached orchestration built for the other lane. The
-        # team-initialisation endpoint eagerly builds a workflow before any task
-        # is submitted, so without this the first request after a page load
-        # reuses that workflow and silently ignores the per-request value.
+        # Detect a cached orchestration built for the other lane. A Workflow
+        # created for an earlier request must not silently ignore this request's
+        # per-request value.
         current_plan_review = getattr(current, "_plan_review", None)
         plan_review_changed = (
             current is not None and current_plan_review != plan_review

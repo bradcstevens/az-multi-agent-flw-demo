@@ -384,6 +384,9 @@ class InputTask(BaseModel):
     """Message representing the initial input task from the user."""
     session_id: str
     description: str
+    # The team the surface has already resolved. It lets the first question
+    # attach to that team while `/init_team` is still recording the selection.
+    team_id: Optional[str] = None
     # The Lane the request declares (issue #16, ADR-013), carried through from
     # the Quick Task the presenter tapped. Absent for free-typed input, which
     # the lane router then routes by its keyword fallback. It is deliberately

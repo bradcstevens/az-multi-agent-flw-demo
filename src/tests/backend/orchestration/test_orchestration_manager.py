@@ -549,9 +549,8 @@ class TestGetCurrentOrNewOrchestration:
     async def test_given_lane_change_when_called_then_rebuilds(self):
         """A Workflow built for the other lane must not be reused.
 
-        The team-initialisation endpoint eagerly builds a Workflow before any
-        task is submitted, so without this the *first* request after a page
-        load silently runs in whichever lane that eager build chose.
+        A Workflow from an earlier request can have the other Lane's Plan
+        review value and must not be reused for this request.
         """
         # Arrange — cached Workflow built with Plan review on
         cached = await OrchestrationManager.init_orchestration(
