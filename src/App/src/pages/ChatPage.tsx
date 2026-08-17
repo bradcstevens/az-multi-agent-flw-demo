@@ -28,16 +28,12 @@ import {
     selectProcessingApproval,
     selectShowApprovalButtons,
     selectShowProcessingPlanSpinner,
-    selectShowCancellationDialog,
-    selectCancellingPlan,
     selectReloadLeftList,
     selectShowTimeoutDialog,
     selectTimeoutMessage,
     setReloadLeftList,
     setProcessingApproval,
     setShowProcessingPlanSpinner,
-    setShowCancellationDialog,
-    setCancellingPlan,
     setErrorLoading,
     planApprovalAccepted,
     planSentBack,
@@ -76,7 +72,6 @@ import { TaskService } from '../store/TaskService';
 import { usePlanWebSocket } from '../hooks/usePlanWebSocket';
 import { usePlanActions } from '../hooks/usePlanActions';
 import { useAutoScroll } from '../hooks/useAutoScroll';
-import { usePlanCancellationAlert } from '../hooks/usePlanCancellationAlert';
 import { useTransparencySignals } from '../hooks/useTransparencySignals';
 import {
     conversationStarted,
@@ -108,7 +103,6 @@ import {
 import { useInlineToaster } from '../components/toast/InlineToaster';
 import Octo from '../commonComponents/imports/Octopus.png';
 import LoadingMessage from '../commonComponents/components/LoadingMessage';
-import PlanCancellationDialog from '../components/common/PlanCancellationDialog';
 import TimeoutDialog from '../components/common/TimeoutDialog';
 import '../styles/ChatPage.css';
 
@@ -148,8 +142,6 @@ const ChatPage: React.FC = () => {
     const processingApproval = useAppSelector(selectProcessingApproval);
     const showApprovalButtons = useAppSelector(selectShowApprovalButtons);
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
-    const showCancellationDialog = useAppSelector(selectShowCancellationDialog);
-    const cancellingPlan = useAppSelector(selectCancellingPlan);
     const reloadLeftList = useAppSelector(selectReloadLeftList);
     /* What the surface says while this request is in flight (#64, ADR-023). */
     const narration = useAppSelector(selectProgressNarration);
@@ -165,8 +157,6 @@ const ChatPage: React.FC = () => {
     const showTimeoutDialog = useAppSelector(selectShowTimeoutDialog);
     const timeoutMessage = useAppSelector(selectTimeoutMessage);
 
-    /* ── Cancellation alert hook ────────────────────────────── */
-    const [pendingNavigation, setPendingNavigation] = React.useState<(() => void) | null>(null);
     const [processingElapsedSeconds, setProcessingElapsedSeconds] = React.useState<number>(0);
     /*
       **One** in-flight lock for both continuation paths (#77). The follow-on
@@ -275,8 +265,6 @@ const ChatPage: React.FC = () => {
 
     const laneTaken = laneFromRouterState ?? laneFromSessionState;
 
-    const { isPlanActive } = usePlanCancellationAlert({ planData });
-
     /* ── Memoized formatErrorMessage ────────────────────────── */
     const formatErrorMessage = useCallback((content: string): string => {
         const lines = content.split('\n');
@@ -299,38 +287,44 @@ const ChatPage: React.FC = () => {
     useTransparencySignals();
     usePresenterChord();
 
-    /* ── Navigation with cancellation check ─────────────────── */
-    const handleNavigationWithAlert = useCallback(
-        (navigationFn: () => void) => {
-            if (!isPlanActive()) {
+    /*
+      **Leaving a Chat** has one declaration (ADR-031): each explicit gesture
+      supplies where to go, while this seam names and ends the Chat it leaves.
+      A socket closure never reaches here, so a network drop remains only a
+      transport event rather than an associate's stated intent.
+    */
+    const leavingChatRef = React.useRef(false);
+    const handleLeavingChat = useCallback(
+        async (navigationFn: () => void) => {
+            if (leavingChatRef.current) return;
+            leavingChatRef.current = true;
+
+            let sessionId = planData?.plan?.session_id;
+            try {
+                /*
+                  On a direct link, an associate can leave before the initial
+                  Plan read returns. Resolve the same record here rather than
+                  navigating without a session and creating an Abandoned turn.
+                */
+                if (!sessionId && planId) {
+                    const currentPlan = await PlanDataService.fetchPlanData(planId, false);
+                    sessionId = currentPlan?.plan?.session_id;
+                }
+                if (!sessionId) {
+                    showToast('Unable to end this chat. Please try again.', 'error');
+                    return;
+                }
+                await apiService.endChatTurn(sessionId);
+                webSocketService.disconnect();
                 navigationFn();
-                return;
+            } catch {
+                showToast('Unable to end this chat. Please try again.', 'error');
+            } finally {
+                leavingChatRef.current = false;
             }
-            setPendingNavigation(() => navigationFn);
-            dispatch(setShowCancellationDialog(true));
         },
-        [isPlanActive, dispatch],
+        [planData?.plan?.session_id, planId, showToast],
     );
-
-    const handleConfirmCancellation = useCallback(async () => {
-        // Leaving a Chat is navigation, not a **Verdict** (ADR-031 decision 2):
-        // no `/v4/plan_approval` call is made from here. The run behind an
-        // abandoned turn is ended by the Chat's own cancellation, which is #121.
-        dispatch(setCancellingPlan(true));
-        try {
-            pendingNavigation?.();
-            webSocketService.disconnect();
-        } finally {
-            dispatch(setCancellingPlan(false));
-            dispatch(setShowCancellationDialog(false));
-            setPendingNavigation(null);
-        }
-    }, [pendingNavigation, dispatch]);
-
-    const handleCancelDialog = useCallback(() => {
-        dispatch(setShowCancellationDialog(false));
-        setPendingNavigation(null);
-    }, [dispatch]);
 
     const handleTimeoutGoHome = useCallback(() => {
         navigate('/');
@@ -732,8 +726,8 @@ const ChatPage: React.FC = () => {
 
     /* ── Left-panel handlers ────────────────────────────────── */
     const handleNewChatButton = useCallback(() => {
-        handleNavigationWithAlert(() => navigate('/', { state: { focusInput: true } }));
-    }, [navigate, handleNavigationWithAlert]);
+        void handleLeavingChat(() => navigate('/', { state: { focusInput: true } }));
+    }, [navigate, handleLeavingChat]);
 
     const resetReload = useCallback(() => {
         dispatch(setReloadLeftList(false));
@@ -793,7 +787,7 @@ const ChatPage: React.FC = () => {
                         reloadChats={reloadLeftList}
                         onNewChatButton={handleNewChatButton}
                         restReload={resetReload}
-                        onNavigationWithAlert={handleNavigationWithAlert}
+                        onLeavingChat={handleLeavingChat}
                     />
                     <Content>
                         <div className="plan-error-message">
@@ -813,7 +807,7 @@ const ChatPage: React.FC = () => {
                     reloadChats={reloadLeftList}
                     onNewChatButton={handleNewChatButton}
                     restReload={resetReload}
-                    onNavigationWithAlert={handleNavigationWithAlert}
+                    onLeavingChat={handleLeavingChat}
                 />
 
                 <Content>
@@ -890,13 +884,6 @@ const ChatPage: React.FC = () => {
                     planApprovalRequest={planApprovalRequest}
                 />
             </CoralShellRow>
-
-            <PlanCancellationDialog
-                isOpen={showCancellationDialog}
-                onConfirm={handleConfirmCancellation}
-                onCancel={handleCancelDialog}
-                loading={cancellingPlan}
-            />
 
             <TimeoutDialog
                 isOpen={showTimeoutDialog}
