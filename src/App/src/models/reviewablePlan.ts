@@ -36,11 +36,17 @@ export interface ReviewablePlanStep {
 }
 
 export interface PlanVerdictState {
+    /** Which revision of this Reviewable plan the associate is looking at. */
     revision: number;
+    /** What the associate asked to change, oldest first. */
     feedback: string[];
     verdict: 'pending' | 'approved';
 }
 
+/**
+ * The two things an associate may say about a Reviewable plan. There is no
+ * third: leaving the conversation is navigation, not a verdict (ADR-031).
+ */
 export type PlanVerdictAction =
     | { kind: 'approve' }
     | { kind: 'revise'; feedback: string };
@@ -134,16 +140,31 @@ export const reviewablePlanSteps = (steps: readonly PlanApprovalStep[]): Reviewa
         };
     });
 
-/** Authored feedback starters, selected deterministically from this Reviewable plan. */
+/**
+ * The starters offered beside the free-text box when a plan is sent back.
+ *
+ * **Derived**, never generated (ADR-033): pure code reading the plan in front
+ * of the associate — the peer it names, whether more than one person is
+ * involved, whether a specialist would act. A different plan offers a
+ * different set, and no model puts words in the associate's mouth on stage.
+ */
 export const revisionSuggestionsFor = (
     steps: readonly PlanApprovalStep[],
 ): string[] => {
     const reviewSteps = reviewablePlanSteps(steps);
-    const suggestions: string[] = [];
-    if (reviewSteps.some((step) => step.assignee.kind === 'person' && step.assignee.relation === 'peer')) {
-        suggestions.push('Ask a different associate.');
-    }
-    if (reviewSteps.filter((step) => step.assignee.kind === 'person').length > 1) {
+    const people = reviewSteps
+        .map((step) => step.assignee)
+        .filter((assignee): assignee is Extract<Assignee, { kind: 'person' }> =>
+            assignee.kind === 'person');
+
+    const namedPeers = [
+        ...new Set(
+            people.filter((person) => person.relation === 'peer').map((peer) => peer.name),
+        ),
+    ];
+
+    const suggestions = namedPeers.map((name) => `Ask somebody other than ${name}.`);
+    if (people.length > 1) {
         suggestions.push('Change the order people are asked.');
     }
     if (reviewSteps.some((step) => step.assignee.kind === 'agent')) {
@@ -152,7 +173,23 @@ export const revisionSuggestionsFor = (
     return suggestions;
 };
 
-/** The review verdict is binary: approval is terminal; feedback asks for a revision. */
+/** The lineage an arriving Reviewable plan carries, before any verdict on it. */
+export const pendingVerdictFor = (plan: {
+    revision?: number;
+    revision_feedback?: string[];
+}): PlanVerdictState => ({
+    revision: plan.revision ?? 1,
+    feedback: [...(plan.revision_feedback ?? [])],
+    verdict: 'pending',
+});
+
+/**
+ * The verdict reducer. Approval is terminal — a second verdict on an approved
+ * plan changes nothing — and a send-back keeps the feedback that produced the
+ * revision it asks for, so the associate can check they were understood.
+ * Returns the state it was given when nothing was said, which is what the
+ * caller reads to know there is nothing to send.
+ */
 export const applyPlanVerdict = (
     state: PlanVerdictState,
     action: PlanVerdictAction,
@@ -160,7 +197,10 @@ export const applyPlanVerdict = (
     if (state.verdict === 'approved') return state;
     if (action.kind === 'approve') return { ...state, verdict: 'approved' };
     const feedback = action.feedback.trim();
-    return feedback
-        ? { ...state, revision: state.revision + 1, feedback: [...state.feedback, feedback] }
-        : state;
+    if (!feedback) return state;
+    return {
+        ...state,
+        revision: state.revision + 1,
+        feedback: [...state.feedback, feedback],
+    };
 };

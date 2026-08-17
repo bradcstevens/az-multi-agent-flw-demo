@@ -1232,11 +1232,14 @@ class TestPlanApproval:
         rt.orchestration_config.approvals = {"m-1": True}
         rt.store.get_plan_by_plan_id.return_value = None
         resp = rt.client.post(
-            "/api/v4/plan_approval", json=self._payload(approved=False)
+            "/api/v4/plan_approval",
+            json=self._payload(approved=False, feedback="Ask Marcus instead."),
         )
         assert resp.status_code == 200
 
-    def test_send_back_records_feedback_for_the_waiting_review(self, rt):
+    def test_send_back_carries_the_feedback_to_the_waiting_review(self, rt):
+        # The verdict the orchestration is blocked on is "revise with this",
+        # not "reject" — so the feedback travels with it (#108).
         rt.orchestration_config.approvals = {"m-1": True}
 
         resp = rt.client.post(
@@ -1246,11 +1249,11 @@ class TestPlanApproval:
 
         assert resp.status_code == 200
         assert resp.json()["status"] == "revision requested"
-        rt.orchestration_config.set_approval_feedback.assert_called_once_with(
-            "m-1", "Ask Marcus instead.", "p-1"
+        rt.orchestration_config.set_approval_result.assert_called_once_with(
+            "m-1", False, feedback="Ask Marcus instead."
         )
 
-    def test_send_back_requires_associate_feedback(self, rt):
+    def test_send_back_requires_the_associate_to_say_what_they_would_change(self, rt):
         rt.orchestration_config.approvals = {"m-1": True}
 
         resp = rt.client.post(
@@ -1259,6 +1262,17 @@ class TestPlanApproval:
         )
 
         assert resp.status_code == 422
+        rt.orchestration_config.set_approval_result.assert_not_called()
+
+    def test_approval_needs_no_feedback(self, rt):
+        rt.orchestration_config.approvals = {"m-1": True}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval", json=self._payload(approved=True, feedback=None)
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "approval recorded"
 
     def test_no_active_plan(self, rt):
         # The 404 raised in the else-branch is caught by the surrounding

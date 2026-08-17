@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect} from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Spinner, Text } from '@fluentui/react-components';
 
@@ -12,6 +12,11 @@ import {
     AgentMessageData,
     AgentMessageType,
 } from '../models';
+import {
+    PlanVerdictState,
+    applyPlanVerdict,
+    pendingVerdictFor,
+} from '../models/reviewablePlan';
 
 /* ── Redux ───────────────────────────────────────────────────── */
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -35,7 +40,7 @@ import {
     setCancellingPlan,
     setErrorLoading,
     planApprovalAccepted,
-    planApprovalRejected,
+    planSentBack,
 } from '../store/slices/planSlice';
 import {
     selectInput,
@@ -270,11 +275,7 @@ const ChatPage: React.FC = () => {
 
     const laneTaken = laneFromRouterState ?? laneFromSessionState;
 
-    const { isPlanActive } = usePlanCancellationAlert({
-        planData,
-        planApprovalRequest,
-        onNavigate: pendingNavigation || (() => {}),
-    });
+    const { isPlanActive } = usePlanCancellationAlert({ planData });
 
     /* ── Memoized formatErrorMessage ────────────────────────── */
     const formatErrorMessage = useCallback((content: string): string => {
@@ -312,27 +313,19 @@ const ChatPage: React.FC = () => {
     );
 
     const handleConfirmCancellation = useCallback(async () => {
+        // Leaving a Chat is navigation, not a **Verdict** (ADR-031 decision 2):
+        // no `/v4/plan_approval` call is made from here. The run behind an
+        // abandoned turn is ended by the Chat's own cancellation, which is #121.
         dispatch(setCancellingPlan(true));
         try {
-            if (planApprovalRequest?.id) {
-                await apiService.approvePlan({
-                    m_plan_id: planApprovalRequest.id,
-                    plan_id: planData?.plan?.id ?? '',
-                    approved: false,
-                    feedback: 'Plan cancelled by user navigation',
-                });
-            }
             pendingNavigation?.();
             webSocketService.disconnect();
-        } catch {
-            showToast('Failed to cancel the plan properly, but navigation will continue.', 'error');
-            pendingNavigation?.();
         } finally {
             dispatch(setCancellingPlan(false));
             dispatch(setShowCancellationDialog(false));
             setPendingNavigation(null);
         }
-    }, [planApprovalRequest, planData, pendingNavigation, showToast, dispatch]);
+    }, [pendingNavigation, dispatch]);
 
     const handleCancelDialog = useCallback(() => {
         dispatch(setShowCancellationDialog(false));
@@ -343,9 +336,29 @@ const ChatPage: React.FC = () => {
         navigate('/');
     }, [navigate]);
 
-    /* ── Plan Approval / Rejection ──────────────────────────── */
+    /* ── The Verdict on a Reviewable plan ───────────────────── */
+    /**
+     * Approve, or send it back saying what to change. There is no third
+     * verdict (#108, ADR-028): leaving the conversation is navigation, and the
+     * path that destroyed the plan is gone.
+     *
+     * The reducer beside this is what makes approval terminal — it returns the
+     * state it was given when there is nothing to say, and that identity is
+     * what tells the surface not to send.
+     */
+    const [verdict, setVerdict] = useState<PlanVerdictState>(() =>
+        pendingVerdictFor(planApprovalRequest ?? {}),
+    );
+
+    useEffect(() => {
+        setVerdict(pendingVerdictFor(planApprovalRequest ?? {}));
+    }, [planApprovalRequest?.id, planApprovalRequest?.revision]);
+
     const handleApprovePlan = useCallback(async () => {
         if (!planApprovalRequest) return;
+        const next = applyPlanVerdict(verdict, { kind: 'approve' });
+        if (next === verdict) return;
+        setVerdict(next);
         dispatch(setProcessingApproval(true));
         const id = showToast('Submitting Approval', 'progress');
         try {
@@ -364,30 +377,34 @@ const ChatPage: React.FC = () => {
         } finally {
             dispatch(setProcessingApproval(false));
         }
-    }, [planApprovalRequest, planData, showToast, dismissToast, dispatch]);
+    }, [planApprovalRequest, planData, verdict, showToast, dismissToast, dispatch]);
 
-    const handleRejectPlan = useCallback(async () => {
-        if (!planApprovalRequest) return;
-        dispatch(setProcessingApproval(true));
-        const id = showToast('Submitting cancellation', 'progress');
-        try {
-            await apiService.approvePlan({
-                m_plan_id: planApprovalRequest.id,
-                plan_id: planData?.plan?.id ?? '',
-                approved: false,
-                feedback: 'Plan rejected by user',
-            });
-            dismissToast(id);
-            navigate('/');
-        } catch {
-            dismissToast(id);
-            showToast('Failed to submit cancellation', 'error');
-            navigate('/');
-        } finally {
-            /* P0: single compound action replaces multiple state resets */
-            dispatch(planApprovalRejected());
-        }
-    }, [planApprovalRequest, planData, navigate, showToast, dismissToast, dispatch]);
+    const handleRejectPlan = useCallback(
+        async (feedback: string) => {
+            if (!planApprovalRequest) return;
+            const next = applyPlanVerdict(verdict, { kind: 'revise', feedback });
+            if (next === verdict) return;
+            setVerdict(next);
+            dispatch(setProcessingApproval(true));
+            const id = showToast('Sending the plan back', 'progress');
+            try {
+                await apiService.approvePlan({
+                    m_plan_id: planApprovalRequest.id,
+                    plan_id: planData?.plan?.id ?? '',
+                    approved: false,
+                    feedback: feedback.trim(),
+                });
+                dismissToast(id);
+                /* The revised plan arrives in this same conversation. */
+                dispatch(planSentBack());
+            } catch {
+                dismissToast(id);
+                showToast('Failed to send the plan back', 'error');
+                dispatch(planSentBack());
+            }
+        },
+        [planApprovalRequest, planData, verdict, showToast, dismissToast, dispatch],
+    );
 
     /**
      * One new turn in **this Chat's Session** (ADR-027).

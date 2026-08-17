@@ -14,7 +14,8 @@ import React, { useState } from 'react';
 import { getAgentIcon, getAgentDisplayNameWithSuffix } from '@/utils/agentIconUtils';
 import { PLAN_ARRIVING } from '@/models/progressNarration';
 import { SECTION_HEADING } from '@/models/headingOutline';
-import { revisionSuggestionsFor, reviewablePlanSteps } from '@/models/reviewablePlan';
+import { pendingVerdictFor, reviewablePlanSteps } from '@/models/reviewablePlan';
+import { PlanVerdictControls } from './PlanVerdictControls';
 
 // Updated styles to match consistent spacing and remove brand colors from bot elements
 const useStyles = makeStyles({
@@ -177,6 +178,23 @@ const useStyles = makeStyles({
         gap: '12px',
         alignItems: 'center',
         marginTop: '20px'
+    },
+    revisionLine: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        marginBottom: '16px'
+    },
+    revisionNumber: {
+        fontSize: '12px',
+        fontWeight: '600',
+        color: 'var(--colorNeutralForeground2)',
+        lineHeight: '16px'
+    },
+    revisionFeedback: {
+        fontSize: '12px',
+        color: 'var(--colorNeutralForeground2)',
+        lineHeight: '16px'
     }
 });
 
@@ -245,10 +263,8 @@ const renderPlanResponse = (
     const agentName = getAgentDisplayNameFromPlan(planApprovalRequest);
     const { factsContent, planSteps } = extractDynamicContent(planApprovalRequest);
     const factsPreview = getFactsPreview(factsContent);
-    const [feedback, setFeedback] = useState('');
-    const revision = planApprovalRequest.revision ?? 1;
-    const feedbackHistory = planApprovalRequest.revision_feedback ?? [];
-    const suggestions = revisionSuggestionsFor(planApprovalRequest.steps);
+    const { revision, feedback } = pendingVerdictFor(planApprovalRequest);
+    const askedToChange = feedback[feedback.length - 1];
 
     // Check if this is a "creating plan" state
     const isCreatingPlan = !planSteps.length && !factsContent;
@@ -335,12 +351,15 @@ const renderPlanResponse = (
                     </div>
                 )}
                 {!isCreatingPlan && (
-                    <div className={styles.instructionText}>
-                        <strong>Revision {revision}</strong>
-                        {feedbackHistory.length > 0 && (
-                            <div>
-                                What you asked to change: {feedbackHistory.at(-1)}
-                            </div>
+                    <div className={styles.revisionLine} data-testid="plan-revision">
+                        <Text className={styles.revisionNumber}>{`Revision ${revision}`}</Text>
+                        {askedToChange && (
+                            <Text
+                                className={styles.revisionFeedback}
+                                data-testid="plan-revision-feedback"
+                            >
+                                {`You asked to change: ${askedToChange}`}
+                            </Text>
                         )}
                     </div>
                 )}
@@ -370,58 +389,20 @@ const renderPlanResponse = (
                 )}
 
                 {/* Instruction Text */}
-                {!isCreatingPlan && (
+                {!isCreatingPlan && !showApprovalButtons && (
                     <Body1 className={styles.instructionText}>
                         If the plan looks good we can move forward with the first step.
                     </Body1>
                 )}
 
-                {/* Action Buttons */}
+                {/* The verdict: approve, or send it back saying what to change */}
                 {showApprovalButtons && !isCreatingPlan && (
-                    <div className={styles.buttonContainer}>
-                        <Button
-                            appearance="primary"
-                            size="medium"
-                            onClick={handleApprovePlan}
-                            disabled={processingApproval}
-                        >
-                            {processingApproval ? 'Processing...' : 'Approve Task Plan'}
-                        </Button>
-                        <Button
-                            appearance="secondary"
-                            size="medium"
-                            onClick={() => handleRejectPlan(feedback)}
-                            disabled={processingApproval || !feedback.trim()}
-                        >
-                            Send back with feedback
-                        </Button>
-                    </div>
-                )}
-                {showApprovalButtons && !isCreatingPlan && (
-                    <div className={styles.buttonContainer}>
-                        {suggestions.map((suggestion) => (
-                            <Button
-                                key={suggestion}
-                                appearance="secondary"
-                                size="small"
-                                onClick={() => setFeedback(suggestion)}
-                                disabled={processingApproval}
-                            >
-                                {suggestion}
-                            </Button>
-                        ))}
-                    </div>
-                )}
-                {showApprovalButtons && !isCreatingPlan && (
-                    <label>
-                        What would you change?
-                        <textarea
-                            aria-label="What would you change?"
-                            value={feedback}
-                            onChange={(event) => setFeedback(event.target.value)}
-                            disabled={processingApproval}
-                        />
-                    </label>
+                    <PlanVerdictControls
+                        steps={planApprovalRequest.steps}
+                        onApprove={handleApprovePlan}
+                        onSendBack={handleRejectPlan}
+                        processing={processingApproval}
+                    />
                 )}
             </div>
         </div>

@@ -26,6 +26,10 @@ class OrchestrationConfig:
         self.orchestrations: Dict[str, Any] = {}       # user_id -> workflow instance
         self.plans: Dict[str, MPlan] = {}              # plan_id -> plan details
         self.approvals: Dict[str, bool] = {}           # plan_id -> approval status (None = pending)
+        # plan_id -> what the associate would change, set only when a plan is
+        # sent back (#108). Read by the waiting review, which folds it into the
+        # framework's revise path.
+        self.plan_feedback: Dict[str, str] = {}
         self.sockets: Dict[str, WebSocket] = {}        # user_id -> WebSocket
         self.clarifications: Dict[str, str] = {}       # plan_id -> clarification response
         self.max_rounds: int = 30
@@ -46,16 +50,33 @@ class OrchestrationConfig:
     def set_approval_pending(self, plan_id: str) -> None:
         """Mark approval pending and create/reset its event."""
         self.approvals[plan_id] = None
+        self.plan_feedback.pop(plan_id, None)
         if plan_id not in self._approval_events:
             self._approval_events[plan_id] = asyncio.Event()
         else:
             self._approval_events[plan_id].clear()
 
-    def set_approval_result(self, plan_id: str, approved: bool) -> None:
-        """Set approval decision and trigger its event."""
+    def set_approval_result(
+        self,
+        plan_id: str,
+        approved: bool,
+        feedback: Optional[str] = None,
+    ) -> None:
+        """Record the associate's verdict and trigger its event.
+
+        ``approved=False`` is a **send-back**, not a rejection: ``feedback``
+        carries what the associate would change, and the waiting review folds
+        it into the framework's revise path (#108).
+        """
         self.approvals[plan_id] = approved
+        if feedback:
+            self.plan_feedback[plan_id] = feedback
         if plan_id in self._approval_events:
             self._approval_events[plan_id].set()
+
+    def get_plan_feedback(self, plan_id: str) -> Optional[str]:
+        """What the associate asked to change when they sent this plan back."""
+        return self.plan_feedback.get(plan_id)
 
     async def wait_for_approval(self, plan_id: str, timeout: Optional[float] = None) -> bool:
         """
@@ -99,6 +120,7 @@ class OrchestrationConfig:
     def cleanup_approval(self, plan_id: str) -> None:
         """Remove approval tracking data and event."""
         self.approvals.pop(plan_id, None)
+        self.plan_feedback.pop(plan_id, None)
         self._approval_events.pop(plan_id, None)
 
     # ------------------------------------------------------------------ #

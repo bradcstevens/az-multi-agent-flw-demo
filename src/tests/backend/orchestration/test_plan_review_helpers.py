@@ -73,9 +73,10 @@ class MockWebsocketMessageType:
 
 
 class MockPlanApprovalResponse:
-    def __init__(self, approved=True, m_plan_id=None):
+    def __init__(self, approved=True, m_plan_id=None, feedback=None):
         self.approved = approved
         self.m_plan_id = m_plan_id
+        self.feedback = feedback
 
 
 class MockTimeoutNotification:
@@ -502,6 +503,8 @@ class TestWaitForPlanApproval:
         orchestration_config.wait_for_approval.reset_mock()
         orchestration_config.wait_for_approval.return_value = True
         orchestration_config.cleanup_approval.reset_mock()
+        orchestration_config.get_plan_feedback.reset_mock()
+        orchestration_config.get_plan_feedback.return_value = None
 
     @pytest.mark.asyncio
     async def test_given_approved_when_waiting_then_returns_approved_response(self):
@@ -529,6 +532,18 @@ class TestWaitForPlanApproval:
         # Assert
         assert result is not None
         assert result.approved is False
+
+    @pytest.mark.asyncio
+    async def test_a_plan_sent_back_carries_what_the_associate_would_change(self):
+        # The verdict and the feedback arrive together, because the waiting
+        # review needs both to call the framework's revise path (#108).
+        orchestration_config.wait_for_approval.return_value = False
+        orchestration_config.get_plan_feedback.return_value = "Ask Marcus instead."
+
+        result = await wait_for_plan_approval("plan-1", "user-1")
+
+        assert result.approved is False
+        assert result.feedback == "Ask Marcus instead."
 
     @pytest.mark.asyncio
     async def test_given_no_plan_id_when_waiting_then_returns_rejected_response(self):

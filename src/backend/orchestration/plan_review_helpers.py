@@ -587,14 +587,16 @@ async def wait_for_plan_approval(
     m_plan_id: str,
     user_id: str,
 ) -> Optional[messages.PlanApprovalResponse]:
-    """Wait for user approval via WebSocket with timeout handling.
+    """Wait for the associate's verdict via WebSocket, with timeout handling.
 
     Args:
         m_plan_id: The ``MPlan.id`` to wait on.
         user_id: The user to send timeout notifications to.
 
     Returns:
-        A ``PlanApprovalResponse`` or ``None`` on timeout/error.
+        A ``PlanApprovalResponse`` — approved, or sent back carrying what the
+        associate would change (#108) — or ``None`` on timeout/error, which is
+        no verdict at all.
     """
     logger.info("Waiting for user approval for plan: %s", m_plan_id)
 
@@ -607,7 +609,11 @@ async def wait_for_plan_approval(
     try:
         approved = await orchestration_config.wait_for_approval(m_plan_id)
         logger.info("Approval received for plan %s: %s", m_plan_id, approved)
-        return messages.PlanApprovalResponse(approved=approved, m_plan_id=m_plan_id)
+        return messages.PlanApprovalResponse(
+            approved=approved,
+            m_plan_id=m_plan_id,
+            feedback=orchestration_config.get_plan_feedback(m_plan_id),
+        )
 
     except asyncio.TimeoutError:
         logger.debug(

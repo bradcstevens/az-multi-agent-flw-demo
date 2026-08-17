@@ -642,7 +642,7 @@ async def plan_approval(
     human_feedback: messages.PlanApprovalResponse, request: Request
 ):
     """
-    Endpoint to receive plan approval or rejection from the user.
+    Endpoint to receive the associate's verdict on a Reviewable plan.
     ---
     tags:
       - Plans
@@ -653,7 +653,7 @@ async def plan_approval(
         required: true
         description: User ID extracted from the authentication header
     requestBody:
-      description: Plan approval payload
+      description: Plan verdict payload
       required: true
       content:
         application/json:
@@ -665,16 +665,21 @@ async def plan_approval(
                 description: The internal m_plan id for the plan (required)
               approved:
                 type: boolean
-                description: Whether the plan is approved (true) or rejected (false)
+                description: >-
+                  Whether the plan is approved (true) or sent back for revision
+                  (false). There is no third verdict: leaving the conversation
+                  is navigation, not a verdict.
               feedback:
                 type: string
-                description: Optional feedback or comment from the user
+                description: >-
+                  What the associate would change. Required when the plan is
+                  sent back.
               plan_id:
                 type: string
                 description: Optional user-facing plan_id
     responses:
       200:
-        description: Approval recorded successfully
+        description: Verdict recorded successfully
         content:
           application/json:
             schema:
@@ -686,6 +691,8 @@ async def plan_approval(
         description: Missing or invalid user information
       404:
         description: No active plan found for approval
+      422:
+        description: A plan sent back with nothing asked
       500:
         description: Internal server error
     """
@@ -694,6 +701,19 @@ async def plan_approval(
     if not user_id:
         raise HTTPException(
             status_code=401, detail="Missing or invalid user information"
+        )
+
+    # The verdict on a **Reviewable plan** is binary: approve it, or send it
+    # back saying what you would change (#108). There is no reject, so a
+    # send-back with nothing asked is refused here rather than replanned into
+    # an identical plan the associate has no way to read differently. Refused
+    # *before* the try block below, whose `except Exception` would otherwise
+    # turn this into an opaque 500.
+    feedback = (human_feedback.feedback or "").strip()
+    if not human_feedback.approved and not feedback:
+        raise HTTPException(
+            status_code=422,
+            detail="Sending a plan back requires saying what you would change",
         )
 
     # Attach session_id to span if plan_id is available and capture for events
@@ -718,7 +738,9 @@ async def plan_approval(
                 and human_feedback.m_plan_id in orchestration_config.approvals
             ):
                 orchestration_config.set_approval_result(
-                    human_feedback.m_plan_id, human_feedback.approved
+                    human_feedback.m_plan_id,
+                    human_feedback.approved,
+                    feedback=feedback or None,
                 )
                 logger.debug("Plan approval received: %s", human_feedback)
 
@@ -758,8 +780,10 @@ async def plan_approval(
                         message_type=WebsocketMessageType.ERROR_MESSAGE,
                     )
 
-                # Use dynamic event name based on approval status
-                approval_status = "Approved" if human_feedback.approved else "Rejected"
+                # Use dynamic event name based on the verdict given
+                approval_status = (
+                    "Approved" if human_feedback.approved else "SentBack"
+                )
                 event_name = f"Plan_{approval_status}"
                 event_props = {
                     "plan_id": human_feedback.plan_id,
@@ -772,7 +796,9 @@ async def plan_approval(
                     event_props["session_id"] = session_id
                 track_event_if_configured(event_name, event_props)
 
-                return {"status": "approval recorded"}
+                if human_feedback.approved:
+                    return {"status": "approval recorded"}
+                return {"status": "revision requested"}
             else:
                 logging.warning(
                     "No orchestration or plan found for plan_id: %s",

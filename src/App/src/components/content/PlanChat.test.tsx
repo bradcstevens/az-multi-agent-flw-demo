@@ -129,7 +129,7 @@ describe('the conversation offers the rehearsed replies', () => {
         expect(screen.queryByTestId('ticket-status-reply')).not.toBeInTheDocument();
     });
 
-    it('sends selected feedback back with the Reviewable plan', () => {
+    it('sends a derived starter back with the Reviewable plan', () => {
         const handleRejectPlan = vi.fn();
         renderChat(
             {
@@ -156,9 +156,54 @@ describe('the conversation offers the rehearsed replies', () => {
             { pending: false },
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Ask a different associate.' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Send back with feedback' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Ask somebody other than Marcus Bell.' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Send back with changes' }));
 
-        expect(handleRejectPlan).toHaveBeenCalledWith('Ask a different associate.');
+        expect(handleRejectPlan).toHaveBeenCalledWith('Ask somebody other than Marcus Bell.');
+    });
+
+    it('offers no verdict the associate has not written, and no third one', () => {
+        // The box is empty, so there is nothing to send back yet — and there is
+        // no control between approving and sending back (#108).
+        renderChat(
+            {
+                showApprovalButtons: true,
+                planApprovalRequest: {
+                    id: 'review-1',
+                    user_request: 'Swap Saturday',
+                    facts: '',
+                    steps: [{ id: 1, action: 'Check the rota', agent: 'Rota_Agent' }],
+                },
+            } as never,
+            { pending: false },
+        );
+
+        expect(screen.getByRole('button', { name: 'Send back with changes' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Approve Task Plan' })).toBeEnabled();
+        expect(screen.queryByRole('button', { name: /reject|cancel/i })).not.toBeInTheDocument();
+    });
+
+    it('says which revision this is and what was asked to change', () => {
+        renderChat(
+            {
+                showApprovalButtons: true,
+                planApprovalRequest: {
+                    id: 'review-1',
+                    user_request: 'Swap Saturday',
+                    facts: '',
+                    revision: 2,
+                    revision_feedback: ['Ask somebody other than Marcus Bell.'],
+                    steps: [{ id: 1, action: 'Check the rota', agent: 'Rota_Agent' }],
+                },
+            } as never,
+            { pending: false },
+        );
+
+        expect(screen.getByTestId('plan-revision')).toHaveTextContent('Revision 2');
+        expect(screen.getByTestId('plan-revision-feedback')).toHaveTextContent(
+            'You asked to change: Ask somebody other than Marcus Bell.',
+        );
     });
 });

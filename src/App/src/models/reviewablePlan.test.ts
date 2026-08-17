@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
     applyPlanVerdict,
     isPersonRelation,
+    pendingVerdictFor,
     revisionSuggestionsFor,
     reviewablePlanSteps,
     type ProposedStep,
 } from './reviewablePlan';
+
+const pendingVerdict = () => pendingVerdictFor({});
 
 const STEPS: ProposedStep[] = [
     {
@@ -95,30 +98,74 @@ describe('the Reviewable plan model', () => {
         ).toThrow('Unknown person relation: director');
     });
 
-    it('derives authored send-back suggestions from the plan in front of the associate', () => {
+    it('derives the send-back suggestions from the plan in front of the associate', () => {
         expect(revisionSuggestionsFor(STEPS)).toEqual([
-            'Ask a different associate.',
+            'Ask somebody other than Marcus Bell.',
             'Change the order people are asked.',
-            'Use a different specialist.',
-        ]);
-        expect(revisionSuggestionsFor([STEPS[0]])).toEqual([
             'Use a different specialist.',
         ]);
     });
 
-    it('keeps revision feedback and makes approval terminal', () => {
-        const revised = applyPlanVerdict(
-            { revision: 1, feedback: [], verdict: 'pending' },
-            { kind: 'revise', feedback: 'Ask Marcus instead.' },
+    it('offers a different set once the plan names a different peer', () => {
+        const rewritten = STEPS.map((step) =>
+            step.assignee?.kind === 'person' && step.assignee.relation === 'peer'
+                ? { ...step, assignee: { ...step.assignee, name: 'Dana Okafor' } }
+                : step,
         );
+
+        expect(revisionSuggestionsFor(rewritten)).toContain(
+            'Ask somebody other than Dana Okafor.',
+        );
+    });
+
+    it('offers nothing about people when the plan asks none of them', () => {
+        expect(revisionSuggestionsFor([STEPS[0]])).toEqual(['Use a different specialist.']);
+    });
+
+    it('folds each send-back into the revision lineage', () => {
+        const revised = applyPlanVerdict(pendingVerdict(), {
+            kind: 'revise',
+            feedback: 'Ask Marcus instead.',
+        });
+
         expect(revised).toEqual({
             revision: 2,
             feedback: ['Ask Marcus instead.'],
             verdict: 'pending',
         });
-        const approved = applyPlanVerdict(revised, { kind: 'approve' });
-        expect(applyPlanVerdict(approved, { kind: 'revise', feedback: 'Actually, Dana.' })).toEqual(
+        expect(
+            applyPlanVerdict(revised, { kind: 'revise', feedback: 'Actually, ask Dana.' }),
+        ).toEqual({
+            revision: 3,
+            feedback: ['Ask Marcus instead.', 'Actually, ask Dana.'],
+            verdict: 'pending',
+        });
+    });
+
+    it('sends nothing back on an empty box', () => {
+        const pending = pendingVerdict();
+
+        expect(applyPlanVerdict(pending, { kind: 'revise', feedback: '   ' })).toBe(pending);
+    });
+
+    it('makes approval terminal', () => {
+        const approved = applyPlanVerdict(pendingVerdict(), { kind: 'approve' });
+
+        expect(approved.verdict).toBe('approved');
+        expect(applyPlanVerdict(approved, { kind: 'revise', feedback: 'Ask Dana.' })).toBe(
             approved,
         );
+        expect(applyPlanVerdict(approved, { kind: 'approve' })).toBe(approved);
+    });
+
+    it('starts from the lineage the arriving plan carries', () => {
+        expect(
+            pendingVerdictFor({ revision: 3, revision_feedback: ['Ask Marcus instead.'] }),
+        ).toEqual({
+            revision: 3,
+            feedback: ['Ask Marcus instead.'],
+            verdict: 'pending',
+        });
+        expect(pendingVerdictFor({})).toEqual({ revision: 1, feedback: [], verdict: 'pending' });
     });
 });

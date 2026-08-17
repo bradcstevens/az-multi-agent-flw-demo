@@ -8,6 +8,7 @@ from common.models.messages import (AgentMessageData, AgentMessageType,
                                     AgentType, PlanStatus)
 from common.utils.event_utils import track_event_if_configured
 from orchestration.connection_config import orchestration_config
+from orchestration.plan_revision import PlanRevision
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,11 @@ class PlanService:
         """
         Process a PlanApprovalResponse coming from the client.
 
+        The verdict is binary (#108): ``approved`` settles the plan, and
+        anything else is a **send-back** carrying what the associate would
+        change. Neither branch removes the Plan record — the row is the
+        conversation, not the plan.
+
         Args:
             feedback: messages.PlanApprovalResponse (contains m_plan_id, plan_id, approved, feedback)
             user_id: authenticated user id
@@ -161,16 +167,32 @@ class PlanService:
                     else:
                         print("Plan not found in memory store.")
                         return False
-                else:  # reject plan
+                else:  # the associate sent the plan back
+                    # Not a rejection and not a deletion: the Plan record *is*
+                    # the conversation (ADR-028), so it survives and records
+                    # the revision the associate asked for and what they said
+                    # to ask for it (#108). The waiting review does the
+                    # replanning; this is only the lineage.
+                    plan = await memory_store.get_plan(human_feedback.plan_id)
+                    if not plan:
+                        print("Plan not found in memory store.")
+                        return False
+                    revision = PlanRevision.restored(
+                        getattr(plan, "revision", None),
+                        getattr(plan, "revision_feedback", None),
+                    ).sent_back(human_feedback.feedback or "")
+                    plan.revision = revision.number
+                    plan.revision_feedback = list(revision.feedback)
+                    await memory_store.update_plan(plan)
                     track_event_if_configured(
-                        "PlanRejected",
+                        "PlanSentBack",
                         {
                             "m_plan_id": human_feedback.m_plan_id,
                             "plan_id": human_feedback.plan_id,
                             "user_id": user_id,
+                            "revision": revision.number,
                         },
                     )
-                    await memory_store.delete_plan_by_plan_id(human_feedback.plan_id)
 
         except Exception as e:
             print(f"Error processing plan approval: {e}")

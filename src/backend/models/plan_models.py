@@ -39,6 +39,11 @@ class MPlan(BaseModel):
     team: List[str] = []
     facts: str = ""
     steps: List[MStep] = []
+    # Which revision of this Reviewable plan the associate is looking at, and
+    # what they asked to change to get it (#108). Carried on the approval frame
+    # so the surface can tell a fresh plan from one already sent back.
+    revision: int = 1
+    revision_feedback: List[str] = Field(default_factory=list)
 
 
 @dataclass(slots=True)

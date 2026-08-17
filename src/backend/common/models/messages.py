@@ -224,6 +224,11 @@ class Plan(BaseDataModel):
     streaming_message: Optional[str] = None
     human_clarification_request: Optional[str] = None
     human_clarification_response: Optional[str] = None
+    # The Reviewable plan's lineage (#108). A plan the associate sent back is
+    # revised, never destroyed, so the row records which revision is on screen
+    # and what was asked to get there.
+    revision: int = 1
+    revision_feedback: List[str] = Field(default_factory=list)
 
 
 class Step(BaseDataModel):

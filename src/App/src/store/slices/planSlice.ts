@@ -145,8 +145,14 @@ const planSlice = createSlice({
             state.showProcessingPlanSpinner = true;
             state.processingApproval = false;
         },
-        /** Single dispatch after user rejects a plan (replaces 3 separate dispatches) */
-        planApprovalRejected(state) {
+        /**
+         * Single dispatch after the associate sends a plan back (#108).
+         *
+         * The verdict has been given, so the controls come down — but nothing
+         * claims progress: a revised plan is not an approved one, and the
+         * spinner that narrates a running plan stays off until it is.
+         */
+        planSentBack(state) {
             state.planApproved = false;
             state.showApprovalButtons = false;
             state.showProcessingPlanSpinner = false;
@@ -239,7 +245,7 @@ export const {
     setTimeoutMessage,
     markPlanCompleted,
     planApprovalAccepted,
-    planApprovalRejected,
+    planSentBack,
     approvalRequestReceived,
     planCompletedFinal,
     planFailedFinal,
