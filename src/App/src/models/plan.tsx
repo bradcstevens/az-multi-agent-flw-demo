@@ -70,6 +70,13 @@ export interface StartingTaskBE {
     lane?: string;
     /** The Quick Task to offer inside this task's conversation (issue #61). */
     follow_on?: string;
+    /**
+     * The Rehearsed replies (issue #26) this task authored for the
+     * Clarification it provokes. Carried through `convertTeamConfiguration`
+     * because the chat surface resolves the chips from the *plan's* team, and
+     * a field dropped there is a control the conversation can never offer.
+     */
+    rehearsed_replies?: string[];
     /** Whether approval must persist this task's Simulated ticket (issue #62). */
     ticket_on_approval?: boolean;
     /** The authored Fast-lane inquiry offered after this task raises a ticket. */

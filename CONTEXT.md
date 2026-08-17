@@ -1059,13 +1059,22 @@ fail **closed**, mid-beat. It sits above the chat box and below the **Rehearsed 
 slot, not in the rail, which stacks *beneath* the conversation below the **Stacking breakpoint**.
 
 **A suggestion hides while a Clarification is pending**, and the chips take the slot — one control
-at a time, so the card yields, the tap answers, the chips go and the card returns. Today it does
-not: `FollowOnTask` reads no clarification state and `handleFollowOnTask` calls
-`submitTurnIntoSession` unconditionally, so a tap while the orchestration waits on an answer
-strands the turn that asked — the failure `turnModeFor` exists to prevent, one component over
+at a time, so the card yields, the tap answers, the chips go and the card returns (#131). The gate
+is `FollowOnTask`'s own, beside the chips' in `RehearsedReplies`, because a gate the caller owns is
+a gate the second caller forgets — and it is **one condition, not a second gating regime**: the card
+is otherwise ungated, as above. It used to read no clarification state at all, so a tap while the
+orchestration waited on an answer started a turn `process_request` cancelled the question with, and
+stranded the turn that asked — the failure `turnModeFor` exists to prevent, one component over
 (ADR-033). It follows that **a suggestion always submits a new turn and a Rehearsed reply always
 submits an answer**: neither is ever tappable at a moment when the other is what is wanted, so
-source, visibility and payload cannot disagree.
+source, visibility and payload cannot disagree. Asserted at the wire seam,
+`src/App/src/pages/oneControlAtATime.test.tsx` — a `user_clarification_request` frame driven through
+the socket service into the real conversation, over a plan payload driven through the real
+conversion, because whether the agent is waiting on an answer is a claim about what the backend
+asked and which controls a Chat was authored is a claim about the team it came back with. That
+second half is what found `convertTeamConfiguration` carrying `follow_on` and dropping
+`rehearsed_replies`: on the chat surface the chips had nothing to render, so the slot the card
+yielded would have been handed to nothing.
 
 The card is **unchanged** by **Resume** (#77, ADR-027) and is still the rehearsed path: it carries
 authored wording and a declared **Lane** and needs no keyboard. Both now go through one seam,
