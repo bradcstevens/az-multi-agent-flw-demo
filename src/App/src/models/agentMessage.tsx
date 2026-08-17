@@ -27,6 +27,10 @@ export interface AgentMessageData {
     next_steps: any[];
     content: string;
     raw_data: string;
+    /** The answer is still receiving deltas and is not yet transcript history. */
+    is_streaming?: boolean;
+    /** Announce the complete answer once when it replaces the stream preview. */
+    announce?: boolean;
 }
 
 /**
