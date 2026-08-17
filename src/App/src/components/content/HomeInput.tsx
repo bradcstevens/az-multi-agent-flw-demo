@@ -30,7 +30,7 @@ import LaneBadge from "../lane/LaneBadge";
 import { NewChatService } from "../../store/NewChatService";
 import webSocketService from "@/store/WebSocketService";
 import { useAppDispatch } from "@/store/hooks";
-import { refusalRecorded, requestStarted } from "@/store/slices/transparencySlice";
+import { refusalRecorded, requestStarted, startConversation } from "@/store/slices/transparencySlice";
 import { ASSISTANT_NAME } from "../../models/storeSurface";
 import { SECTION_HEADING } from "../../models/headingOutline";
 
@@ -215,6 +215,7 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
             planId: response.plan_id,
           }),
         );
+        dispatch(startConversation(response.session_id));
 
         // The socket opens here, on the response, and not on the chat page
         // (ADR-021). `process_request` schedules the orchestration *before* it

@@ -11,7 +11,7 @@
  * things the backend refused to send.
  */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { RootState } from '../store';
+import type { AppDispatch, RootState } from '../store';
 
 import { PolicyBlock } from '@/api/policyBlock';
 import {
@@ -51,6 +51,8 @@ export interface TransparencyState {
     railPinned: boolean;
     /** Whether this conversation has already received its first valid `source_used` signal. */
     railSourceUsed: boolean;
+    /** The Chat's Session that owns the conversation-scoped rail state. */
+    conversationId: string | null;
 }
 
 const initialState: TransparencyState = {
@@ -60,6 +62,7 @@ const initialState: TransparencyState = {
     railExpanded: true,
     railPinned: false,
     railSourceUsed: false,
+    conversationId: null,
 };
 
 const transparencySlice = createSlice({
@@ -125,11 +128,13 @@ const transparencySlice = createSlice({
          * surface, so a meter cleared at the conversation boundary would never
          * show the guardrail's zero beside a row that cost something.
          */
-        conversationStarted(state) {
+        conversationStarted(state, action: PayloadAction<string>) {
+            if (state.conversationId === action.payload) return;
             state.source = null;
             state.alerts = [];
             state.railPinned = false;
             state.railSourceUsed = false;
+            state.conversationId = action.payload;
         },
         /**
          * The associate opens or closes the **Transparency rail**.
@@ -154,6 +159,19 @@ export const {
     transparencyRailToggled,
 } = transparencySlice.actions;
 
+/**
+ * Start a Chat's conversation-scoped state exactly once per Session.
+ *
+ * A Chat can hold several Plans, so plan navigation must not clear the
+ * presenter's pinned panel between its turns.
+ */
+export const startConversation =
+    (conversationId: string) =>
+    (dispatch: AppDispatch, getState: () => RootState): void => {
+        if (selectTransparencyConversationId(getState()) === conversationId) return;
+        dispatch(conversationStarted(conversationId));
+    };
+
 export const selectGroundingSource = (state: RootState): SourceUsed | null =>
     state.transparency.source;
 export const selectMeter = (state: RootState): MeterState => state.transparency.meter;
@@ -163,5 +181,7 @@ export const selectTransparencyRailExpanded = (state: RootState): boolean =>
     state.transparency.railExpanded;
 export const selectTransparencyRailPinned = (state: RootState): boolean =>
     state.transparency.railPinned;
+export const selectTransparencyConversationId = (state: RootState): string | null =>
+    state.transparency.conversationId;
 
 export default transparencySlice.reducer;

@@ -78,7 +78,7 @@ import { usePlanActions } from '../hooks/usePlanActions';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useTransparencySignals } from '../hooks/useTransparencySignals';
 import {
-    conversationStarted,
+    startConversation,
     refusalRecorded,
     requestStarted,
 } from '../store/slices/transparencySlice';
@@ -520,6 +520,7 @@ const ChatPage: React.FC = () => {
                         planId: response.plan_id,
                     }),
                 );
+                dispatch(startConversation(response.session_id));
                 webSocketService.connect(response.plan_id).catch(() => {
                     // The chat page retries, and the surface degrades to polling.
                 });
@@ -794,14 +795,6 @@ const ChatPage: React.FC = () => {
         // `/chat/:id` reuses this page instance. A leave outcome belongs to
         // the previous Chat, while the generation keeps its late responses stale.
         leavingChatDecisionRef.current = null;
-        // A different plan is a different conversation, so the provenance and
-        // the alerts pushed into the previous one go (#24). Dispatched here
-        // rather than only inside `resetPlanVariables`, which runs on the
-        // no-planId error path alone and so would leave a stale Grounding
-        // panel and old alerts on screen for every ordinary navigation. It is
-        // safe at this point: any signal for *this* plan arrives later, over a
-        // socket that has not connected yet.
-        dispatch(conversationStarted());
         /*
           The narration follows the request that made this navigation and
           nothing else (#64, ADR-023). Opening an earlier task from the left

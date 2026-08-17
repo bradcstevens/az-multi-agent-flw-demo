@@ -173,7 +173,7 @@ describe('the chat surface with Plan review off', () => {
     it('opens the unpinned rail from a Source used frame on the real socket seam', async () => {
         const store = makeStore();
         store.dispatch(transparencyRailToggled());
-        store.dispatch(conversationStarted());
+        store.dispatch(conversationStarted('session-rail'));
         renderSocketDrivenPanel(store);
 
         expect(screen.getByTestId('transparency-rail')).toHaveClass(

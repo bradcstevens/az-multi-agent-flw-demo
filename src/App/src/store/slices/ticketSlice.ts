@@ -8,10 +8,8 @@
  *
  * But the **conversation boundary is shared**, and this slice listens for the
  * transparency slice's `conversationStarted` rather than declaring one of its
- * own. That boundary is already dispatched from more than one place — the
- * `planId` effect and `resetPlanVariables` — and a second action to dispatch
- * beside it is a second thing to forget at one of them, which would leave one
- * conversation's ticket on the next conversation's screen.
+ * own. `startConversation` dispatches that boundary only when the Session
+ * changes, so a follow-on Plan cannot clear its own Chat's ticket.
  *
  * `requestStarted` is deliberately **not** honoured. A raised ticket is not a
  * claim about the question in flight: asking another one does not unraise it,

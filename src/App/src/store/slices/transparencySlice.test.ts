@@ -139,7 +139,7 @@ describe('the transparency slice', () => {
         state = reducer(state, tokenUsageReceived(tokenUsage));
         state = reducer(state, presenterAlertReceived(alert));
 
-        state = reducer(state, conversationStarted());
+        state = reducer(state, conversationStarted('session-next'));
 
         expect(state.source).toBeNull();
         expect(state.alerts).toEqual([]);
@@ -172,7 +172,7 @@ describe('the transparency slice', () => {
 
     it('opens a closed, unpinned rail on the first Source used of a conversation', () => {
         const closed = reducer(initial(), transparencyRailToggled());
-        const nextConversation = reducer(closed, conversationStarted());
+        const nextConversation = reducer(closed, conversationStarted('session-next'));
 
         const state = reducer(nextConversation, sourceUsedReceived(sourceUsed));
 
@@ -207,11 +207,27 @@ describe('the transparency slice', () => {
     it('clears the pin only when the next conversation starts', () => {
         const pinned = reducer(initial(), transparencyRailToggled());
         const duringRequest = reducer(pinned, requestStarted());
-        const nextConversation = reducer(duringRequest, conversationStarted());
+        const nextConversation = reducer(duringRequest, conversationStarted('session-next'));
 
         expect(duringRequest.railPinned).toBe(true);
         expect(nextConversation.railPinned).toBe(false);
         expect(nextConversation.railExpanded).toBe(false);
         expect(nextConversation.railSourceUsed).toBe(false);
+    });
+
+    it('keeps the pin across another Plan in the same Chat', () => {
+        const pinned = reducer(initial(), transparencyRailToggled());
+        const state = {
+            ...pinned,
+            conversationId: 'session-223',
+        };
+
+        const nextPlan = reducer(state, {
+            type: conversationStarted.type,
+            payload: 'session-223',
+        });
+
+        expect(nextPlan.railPinned).toBe(true);
+        expect(nextPlan.railExpanded).toBe(false);
     });
 });

@@ -23,7 +23,7 @@ import {
     resetStreaming,
 } from '@/store/slices/streamingSlice';
 import { setWsConnected } from '@/store/slices/appSlice';
-import { conversationStarted } from '@/store/slices/transparencySlice';
+import { startConversation } from '@/store/slices/transparencySlice';
 
 /** Return type of dispatch(createAsyncThunk()) — has .abort() */
 type ThunkPromise = ReturnType<typeof fetchPlanData> extends (...args: any[]) => infer R ? R : never;
@@ -46,12 +46,6 @@ export function usePlanActions() {
         dispatch(resetChat());
         dispatch(resetStreaming());
         dispatch(setWsConnected(false));
-        // Provenance and alerts belong to the conversation that just ended
-        // (#24). The Token meter deliberately does not: it is the
-        // walkthrough's running total, and clearing it here would mean the
-        // guardrail's zero — recorded on the home surface — was never seen
-        // beside a row that cost something on the chat surface.
-        dispatch(conversationStarted());
     }, [dispatch]);
 
     /**
@@ -73,6 +67,8 @@ export function usePlanActions() {
 
             if (fetchPlanData.fulfilled.match(resultAction)) {
                 const planResult = resultAction.payload;
+                const conversationId = planResult?.plan?.session_id;
+                if (conversationId) dispatch(startConversation(conversationId));
 
                 // Hydrate cross-slice state that extraReducers can't reach
                 if (planResult?.messages) {
