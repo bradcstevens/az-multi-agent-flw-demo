@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PROTOTYPE — Reviewable plan revisions</title>
+  <style>
+    body { color: #1f2937; font: 16px system-ui, sans-serif; margin: 0 auto; max-width: 760px; padding: 32px; }
+    h1 { margin-bottom: 4px; } .note { color: #4b5563; } section, pre { background: #f3f4f6; border-radius: 8px; margin: 20px 0; padding: 20px; }
+    button { background: #075985; border: 0; border-radius: 5px; color: white; cursor: pointer; margin: 4px; padding: 9px 12px; }
+    button.secondary { background: #475569; } button:disabled { background: #94a3b8; cursor: not-allowed; }
+    textarea { box-sizing: border-box; min-height: 72px; padding: 8px; width: 100%; } .scenario { display: none; } .scenario.active { display: block; }
+  </style>
+</head>
+<body>
+  <h1>Reviewable plan: approve or send back</h1>
+  <p class="note"><strong>Question:</strong> Can a Reviewable plan preserve the associate's feedback and conversation while each send-back creates a new revision, yet approval stays terminal?</p>
+
+  <section>
+    <h2>Current Plan record</h2>
+    <div id="state"></div>
+  </section>
+
+  <section>
+    <h2>Free play</h2>
+    <textarea id="feedback" placeholder="What should change?">Ask the shift lead instead.</textarea>
+    <p>
+      <button id="send-back">Send back with feedback</button>
+      <button id="approve">Approve plan</button>
+      <button class="secondary" id="reset">Reset</button>
+    </p>
+  </section>
+
+  <section>
+    <h2>Guided walkthroughs</h2>
+    <p>
+      <button class="secondary" data-scenario="revision">Revision lineage</button>
+      <button class="secondary" data-scenario="terminal">Terminal approval</button>
+    </p>
+    <div id="revision" class="scenario">
+      <p>Send a plan back, then observe the next review carry both the new revision number and the feedback that requested it.</p>
+      <button data-step="reset">1. Start a fresh plan</button>
+      <button data-step="feedback">2. Write “Ask the shift lead instead”</button>
+      <button data-step="send">3. Send it back</button>
+    </div>
+    <div id="terminal" class="scenario">
+      <p>Approval is the only terminal verdict. A later verdict does not rewrite an approved plan.</p>
+      <button data-step="reset">1. Start a fresh plan</button>
+      <button data-step="approve">2. Approve it</button>
+      <button data-step="send">3. Attempt to send it back</button>
+    </div>
+  </section>
+
+  <script>
+    // Portable pure module: the production reducer can lift this shape.
+    const initial = () => ({
+      approval: "pending",
+      revision: 1,
+      feedback: [],
+      steps: ["Confirm the fault", "Raise a service ticket"],
+    });
+    function reduce(state, action) {
+      if (state.approval === "approved") return state;
+      if (action.type === "approve") return { ...state, approval: "approved" };
+      if (action.type === "revise" && action.feedback.trim()) {
+        return {
+          ...state,
+          revision: state.revision + 1,
+          feedback: [...state.feedback, action.feedback.trim()],
+          steps: action.steps || state.steps,
+        };
+      }
+      return state;
+    }
+
+    let state = initial();
+    const stateNode = document.querySelector("#state");
+    const feedbackNode = document.querySelector("#feedback");
+    function render() {
+      stateNode.innerHTML = `
+        <p><strong>Revision:</strong> ${state.revision}</p>
+        <p><strong>Verdict:</strong> ${state.approval === "approved" ? "Approved (terminal)" : "Awaiting associate verdict"}</p>
+        <p><strong>What was asked to change:</strong> ${state.feedback.length ? state.feedback.map((item, i) => `Revision ${i + 1}: ${item}`).join("<br>") : "Nothing yet"}</p>
+        <p><strong>Plan steps:</strong> ${state.steps.join(" → ")}</p>`;
+      document.querySelector("#approve").disabled = state.approval === "approved";
+      document.querySelector("#send-back").disabled = state.approval === "approved";
+    }
+    function sendBack() {
+      state = reduce(state, { type: "revise", feedback: feedbackNode.value });
+      render();
+    }
+    document.querySelector("#send-back").onclick = sendBack;
+    document.querySelector("#approve").onclick = () => { state = reduce(state, { type: "approve" }); render(); };
+    document.querySelector("#reset").onclick = () => { state = initial(); feedbackNode.value = "Ask the shift lead instead."; render(); };
+    document.querySelectorAll("[data-scenario]").forEach((button) => button.onclick = () => {
+      document.querySelectorAll(".scenario").forEach((scenario) => scenario.classList.remove("active"));
+      document.querySelector(`#${button.dataset.scenario}`).classList.add("active");
+    });
+    document.querySelectorAll("[data-step]").forEach((button) => button.onclick = () => {
+      if (button.dataset.step === "reset") { state = initial(); }
+      if (button.dataset.step === "feedback") { feedbackNode.value = "Ask the shift lead instead."; }
+      if (button.dataset.step === "approve") { state = reduce(state, { type: "approve" }); }
+      if (button.dataset.step === "send") { sendBack(); return; }
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>
