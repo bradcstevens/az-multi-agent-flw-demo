@@ -53,6 +53,16 @@ export interface QuickTask {
     lane?: string;
     followOn?: string;
     rehearsedReplies: string[];
+    planSteps: PlanStep[];
+}
+
+/** One authored Reviewable-plan step on a Quick Task. */
+export interface PlanStep {
+    id: number;
+    assignee?: {
+        kind?: string;
+        name?: string;
+    };
 }
 
 /** One member of the **Store assistant roster**, as the pack authors it. */
@@ -106,6 +116,14 @@ export function quickTasks(): QuickTask[] {
             ? task.rehearsed_replies.filter(
                   (reply): reply is string =>
                       typeof reply === 'string' && reply.trim() !== '',
+              )
+            : [],
+        planSteps: Array.isArray(task.plan_steps)
+            ? task.plan_steps.filter(
+                  (step): step is PlanStep =>
+                      typeof step === 'object' &&
+                      step !== null &&
+                      typeof (step as PlanStep).id === 'number',
               )
             : [],
     }));

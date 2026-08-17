@@ -1,0 +1,245 @@
+diff --git a/src/backend/api/router.py b/src/backend/api/router.py
+index b54eb00e..5462fa26 100644
+--- a/src/backend/api/router.py
++++ b/src/backend/api/router.py
+@@ -642,7 +642,7 @@ async def plan_approval(
+     human_feedback: messages.PlanApprovalResponse, request: Request
+ ):
+     """
+-    Endpoint to receive plan approval or rejection from the user.
++    Endpoint to receive the associate's verdict on a Reviewable plan.
+     ---
+     tags:
+       - Plans
+@@ -653,7 +653,7 @@ async def plan_approval(
+         required: true
+         description: User ID extracted from the authentication header
+     requestBody:
+-      description: Plan approval payload
++      description: Plan verdict payload
+       required: true
+       content:
+         application/json:
+@@ -665,16 +665,21 @@ async def plan_approval(
+                 description: The internal m_plan id for the plan (required)
+               approved:
+                 type: boolean
+-                description: Whether the plan is approved (true) or rejected (false)
++                description: >-
++                  Whether the plan is approved (true) or sent back for revision
++                  (false). There is no third verdict: leaving the conversation
++                  is navigation, not a verdict.
+               feedback:
+                 type: string
+-                description: Optional feedback or comment from the user
++                description: >-
++                  What the associate would change. Required when the plan is
++                  sent back.
+               plan_id:
+                 type: string
+                 description: Optional user-facing plan_id
+     responses:
+       200:
+-        description: Approval recorded successfully
++        description: Verdict recorded successfully
+         content:
+           application/json:
+             schema:
+@@ -686,6 +691,8 @@ async def plan_approval(
+         description: Missing or invalid user information
+       404:
+         description: No active plan found for approval
++      422:
++        description: A plan sent back with nothing asked
+       500:
+         description: Internal server error
+     """
+@@ -696,6 +703,19 @@ async def plan_approval(
+             status_code=401, detail="Missing or invalid user information"
+         )
+ 
++    # The verdict on a **Reviewable plan** is binary: approve it, or send it
++    # back saying what you would change (#108). There is no reject, so a
++    # send-back with nothing asked is refused here rather than replanned into
++    # an identical plan the associate has no way to read differently. Refused
++    # *before* the try block below, whose `except Exception` would otherwise
++    # turn this into an opaque 500.
++    feedback = (human_feedback.feedback or "").strip()
++    if not human_feedback.approved and not feedback:
++        raise HTTPException(
++            status_code=422,
++            detail="Sending a plan back requires saying what you would change",
++        )
++
+     # Attach session_id to span if plan_id is available and capture for events
+     session_id = None
+     if human_feedback.plan_id:
+@@ -717,8 +737,23 @@ async def plan_approval(
+                 orchestration_config
+                 and human_feedback.m_plan_id in orchestration_config.approvals
+             ):
++                if (
++                    orchestration_config.approvals[human_feedback.m_plan_id]
++                    is not None
++                ):
++                    # A verdict resumes the waiting review exactly once. A
++                    # duplicate HTTP request must not turn an approved plan
++                    # into a revision request (or vice versa).
++                    logger.info(
++                        "Ignoring duplicate verdict for plan %s",
++                        human_feedback.m_plan_id,
++                    )
++                    return {"status": "verdict already recorded"}
++
+                 orchestration_config.set_approval_result(
+-                    human_feedback.m_plan_id, human_feedback.approved
++                    human_feedback.m_plan_id,
++                    human_feedback.approved,
++                    feedback=feedback or None,
+                 )
+                 logger.debug("Plan approval received: %s", human_feedback)
+ 
+@@ -758,8 +793,10 @@ async def plan_approval(
+                         message_type=WebsocketMessageType.ERROR_MESSAGE,
+                     )
+ 
+-                # Use dynamic event name based on approval status
+-                approval_status = "Approved" if human_feedback.approved else "Rejected"
++                # Use dynamic event name based on the verdict given
++                approval_status = (
++                    "Approved" if human_feedback.approved else "SentBack"
++                )
+                 event_name = f"Plan_{approval_status}"
+                 event_props = {
+                     "plan_id": human_feedback.plan_id,
+@@ -772,7 +809,9 @@ async def plan_approval(
+                     event_props["session_id"] = session_id
+                 track_event_if_configured(event_name, event_props)
+ 
+-                return {"status": "approval recorded"}
++                if human_feedback.approved:
++                    return {"status": "approval recorded"}
++                return {"status": "revision requested"}
+             else:
+                 logging.warning(
+                     "No orchestration or plan found for plan_id: %s",
+diff --git a/src/backend/orchestration/connection_config.py b/src/backend/orchestration/connection_config.py
+index ee0a8ec2..20b87817 100644
+--- a/src/backend/orchestration/connection_config.py
++++ b/src/backend/orchestration/connection_config.py
+@@ -26,6 +26,10 @@ class OrchestrationConfig:
+         self.orchestrations: Dict[str, Any] = {}       # user_id -> workflow instance
+         self.plans: Dict[str, MPlan] = {}              # plan_id -> plan details
+         self.approvals: Dict[str, bool] = {}           # plan_id -> approval status (None = pending)
++        # plan_id -> what the associate would change, set only when a plan is
++        # sent back (#108). Read by the waiting review, which folds it into the
++        # framework's revise path.
++        self.plan_feedback: Dict[str, str] = {}
+         self.sockets: Dict[str, WebSocket] = {}        # user_id -> WebSocket
+         self.clarifications: Dict[str, str] = {}       # plan_id -> clarification response
+         self.max_rounds: int = 30
+@@ -46,17 +50,34 @@ class OrchestrationConfig:
+     def set_approval_pending(self, plan_id: str) -> None:
+         """Mark approval pending and create/reset its event."""
+         self.approvals[plan_id] = None
++        self.plan_feedback.pop(plan_id, None)
+         if plan_id not in self._approval_events:
+             self._approval_events[plan_id] = asyncio.Event()
+         else:
+             self._approval_events[plan_id].clear()
+ 
+-    def set_approval_result(self, plan_id: str, approved: bool) -> None:
+-        """Set approval decision and trigger its event."""
++    def set_approval_result(
++        self,
++        plan_id: str,
++        approved: bool,
++        feedback: Optional[str] = None,
++    ) -> None:
++        """Record the associate's verdict and trigger its event.
++
++        ``approved=False`` is a **send-back**, not a rejection: ``feedback``
++        carries what the associate would change, and the waiting review folds
++        it into the framework's revise path (#108).
++        """
+         self.approvals[plan_id] = approved
++        if feedback:
++            self.plan_feedback[plan_id] = feedback
+         if plan_id in self._approval_events:
+             self._approval_events[plan_id].set()
+ 
++    def get_plan_feedback(self, plan_id: str) -> Optional[str]:
++        """What the associate asked to change when they sent this plan back."""
++        return self.plan_feedback.get(plan_id)
++
+     async def wait_for_approval(self, plan_id: str, timeout: Optional[float] = None) -> bool:
+         """
+         Wait for an approval decision with timeout.
+@@ -99,6 +120,7 @@ class OrchestrationConfig:
+     def cleanup_approval(self, plan_id: str) -> None:
+         """Remove approval tracking data and event."""
+         self.approvals.pop(plan_id, None)
++        self.plan_feedback.pop(plan_id, None)
+         self._approval_events.pop(plan_id, None)
+ 
+     # ------------------------------------------------------------------ #
+diff --git a/src/backend/services/plan_service.py b/src/backend/services/plan_service.py
+index df71f5d5..9c7b0011 100644
+--- a/src/backend/services/plan_service.py
++++ b/src/backend/services/plan_service.py
+@@ -8,6 +8,7 @@ from common.models.messages import (AgentMessageData, AgentMessageType,
+                                     AgentType, PlanStatus)
+ from common.utils.event_utils import track_event_if_configured
+ from orchestration.connection_config import orchestration_config
++from orchestration.plan_revision import PlanRevision
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -121,6 +122,11 @@ class PlanService:
+         """
+         Process a PlanApprovalResponse coming from the client.
+ 
++        The verdict is binary (#108): ``approved`` settles the plan, and
++        anything else is a **send-back** carrying what the associate would
++        change. Neither branch removes the Plan record — the row is the
++        conversation, not the plan.
++
+         Args:
+             feedback: messages.PlanApprovalResponse (contains m_plan_id, plan_id, approved, feedback)
+             user_id: authenticated user id
+@@ -161,16 +167,32 @@ class PlanService:
+                     else:
+                         print("Plan not found in memory store.")
+                         return False
+-                else:  # reject plan
++                else:  # the associate sent the plan back
++                    # Not a rejection and not a deletion: the Plan record *is*
++                    # the conversation (ADR-028), so it survives and records
++                    # the revision the associate asked for and what they said
++                    # to ask for it (#108). The waiting review does the
++                    # replanning; this is only the lineage.
++                    plan = await memory_store.get_plan(human_feedback.plan_id)
++                    if not plan:
++                        print("Plan not found in memory store.")
++                        return False
++                    revision = PlanRevision.restored(
++                        getattr(plan, "revision", None),
++                        getattr(plan, "revision_feedback", None),
++                    ).sent_back(human_feedback.feedback or "")
++                    plan.revision = revision.number
++                    plan.revision_feedback = list(revision.feedback)
++                    await memory_store.update_plan(plan)
+                     track_event_if_configured(
+-                        "PlanRejected",
++                        "PlanSentBack",
+                         {
+                             "m_plan_id": human_feedback.m_plan_id,
+                             "plan_id": human_feedback.plan_id,
+                             "user_id": user_id,
++                            "revision": revision.number,
+                         },
+                     )
+-                    await memory_store.delete_plan_by_plan_id(human_feedback.plan_id)
+ 
+         except Exception as e:
+             print(f"Error processing plan approval: {e}")

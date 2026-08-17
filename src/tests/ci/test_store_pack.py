@@ -1093,34 +1093,76 @@ def test_given_the_shift_swap_task_when_read_then_the_library_answers_it(
     assert procedure is workforce_library.SHIFT_SWAP
 
 
-def test_given_the_shift_swap_task_when_routed_then_it_takes_the_fast_lane(
+def test_given_the_shift_swap_transaction_when_routed_then_it_takes_the_deliberate_lane(
     store_pack, lane_mod
 ):
-    # Declared and typed, the way the other six are asserted. An HR process
-    # question that grows an approval step is a beat that got slower for no
-    # reason the audience can see, and the Deliberate lane is where the
-    # keyword fallback sends anything it does not recognise.
+    # The declaration, not the model, earns this Reviewable plan. The typed
+    # transaction is also deliberate: the one-way keyword fallback must never
+    # silently turn a confirmed swap into an unreviewed request.
     task = _shift_swap_task(store_pack)
 
-    assert lane_mod.select_lane(task["lane"], task["prompt"]) is lane_mod.Lane.FAST
-    assert lane_mod.select_lane(None, task["prompt"]) is lane_mod.Lane.FAST
+    assert lane_mod.select_lane(task["lane"], task["prompt"]) is lane_mod.Lane.DELIBERATE
+    assert lane_mod.select_lane(None, task["prompt"]) is lane_mod.Lane.DELIBERATE
 
 
-def test_given_the_shift_swap_task_when_read_then_it_is_the_measured_control(
+def test_given_the_shift_swap_transaction_when_read_then_its_people_and_order_are_authored(
+    store_pack,
+):
+    task = _shift_swap_task(store_pack)
+    steps = task["plan_steps"]
+
+    assert [(step["id"], step.get("waitsOn")) for step in steps] == [
+        (1, None),
+        (2, 1),
+        (3, 2),
+        (4, 3),
+        (5, 4),
+    ]
+    assert [
+        step["assignee"] for step in steps if step["assignee"]["kind"] == "person"
+    ] == [
+        {
+            "kind": "person",
+            "name": "You",
+            "relation": "associate",
+            "simulated": False,
+        },
+        {
+            "kind": "person",
+            "name": "Marcus Bell",
+            "relation": "peer",
+            "simulated": True,
+        },
+        {
+            "kind": "person",
+            "name": "Dana Reyes",
+            "relation": "manager",
+            "simulated": True,
+        },
+    ]
+
+
+def test_given_the_shift_swap_transaction_when_read_then_it_trips_no_personal_scope_keyword(
+    store_pack, gate_keywords
+):
+    task = _shift_swap_task(store_pack)
+
+    assert not gate_keywords.matches_personal_keyword(task["prompt"])
+
+
+def test_given_the_shift_swap_process_question_when_read_then_it_stays_a_measured_control(
     store_pack, guardrail_corpus, gate_keywords
 ):
-    # ADR-017's second negative consequence, closed. The gate's similarity tier
-    # is a live model call, and a process question phrased near the personal
-    # probes can be refused **on stage**. The Guardrail corpus is the only
-    # thing in this build that has ever run against the real embedding
-    # deployment, so the beat's question has to be one of the things it scores
-    # — otherwise its safety is an assumption.
+    # ADR-017's hardest negative control stays measured even though the live
+    # beat now starts a transaction with a named peer.
     task = _shift_swap_task(store_pack)
     measured = {
         gate_keywords.normalise(text) for text in guardrail_corpus.NEGATIVE_CONTROLS
     }
 
-    assert gate_keywords.normalise(task["prompt"]) in measured
+    retired_process_question = "How do I swap a shift with another associate?"
+    assert gate_keywords.normalise(retired_process_question) in measured
+    assert gate_keywords.normalise(task["prompt"]) not in measured
 
 
 
@@ -1201,7 +1243,7 @@ def test_given_each_quick_task_when_read_then_its_declared_lane_parses(
         assert lane_mod.parse_lane(task.get("lane")) is not None, task["id"]
 
 
-def test_given_the_quick_tasks_when_read_then_exactly_one_declares_deliberate(
+def test_given_the_quick_tasks_when_read_then_only_the_two_transactions_deliberate(
     store_pack, lane_mod
 ):
     deliberate = [
@@ -1210,7 +1252,7 @@ def test_given_the_quick_tasks_when_read_then_exactly_one_declares_deliberate(
         if lane_mod.parse_lane(task.get("lane")) is lane_mod.Lane.DELIBERATE
     ]
 
-    assert len(deliberate) == 1, deliberate
+    assert deliberate == ["task-223-escalation", "task-223-shift-swap"]
 
 
 def test_given_the_deliberate_quick_task_when_routed_then_it_takes_that_lane(

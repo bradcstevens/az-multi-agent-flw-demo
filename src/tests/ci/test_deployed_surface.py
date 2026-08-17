@@ -37,7 +37,7 @@ EXPECTED = Expected(
         ("task-223-escalation", "deliberate"),
         ("task-223-identity", "fast"),
         ("task-223-shift-tasks", "fast"),
-        ("task-223-shift-swap", "fast"),
+        ("task-223-shift-swap", "deliberate"),
     ),
     documents=(
         "SOP-101 Store Opening Procedure.docx",

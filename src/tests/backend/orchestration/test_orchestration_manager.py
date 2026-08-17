@@ -2033,6 +2033,33 @@ class TestTheApprovalIsTheTicketConfirmation:
             is False
         )
 
+    def test_an_authored_transaction_not_the_browser_names_the_plan_people(self):
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
+        workflow = Mock()
+        workflow._team_config = Mock(
+            starting_tasks=[Mock(id="task-223-shift-swap", plan_steps=steps)]
+        )
+
+        actual = OrchestrationManager()._task_plan_steps(
+            workflow, Mock(starting_task_id="task-223-shift-swap")
+        )
+
+        assert [step.model_dump(mode="json") for step in actual] == [
+            {**steps[0], "agent": ""}
+        ]
+
     async def _review(
         self,
         store,
@@ -2043,6 +2070,7 @@ class TestTheApprovalIsTheTicketConfirmation:
         ticket_on_approval=False,
         record=None,
         revision=None,
+        plan_steps=None,
     ):
         mock_wait_approval.return_value = MockPlanApprovalResponse(
             approved=approved, m_plan_id="test-plan-id", feedback=feedback
@@ -2063,9 +2091,32 @@ class TestTheApprovalIsTheTicketConfirmation:
                 task_text="I can't fix it, raise a ticket",
                 user_id="user-1",
                 ticket_on_approval=ticket_on_approval,
+                plan_steps=plan_steps,
                 **({} if revision is None else {"revision": revision}),
             )
         return review, outcome
+
+    @pytest.mark.asyncio
+    async def test_authored_transaction_steps_replace_the_generated_review_plan(self):
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
+
+        await self._review(None, plan_steps=steps)
+
+        assert [
+            step.model_dump(mode="json") for step in mock_convert.return_value.steps
+        ] == [{**steps[0], "agent": ""}]
 
     @pytest.mark.asyncio
     async def test_approving_an_escalation_drafts_from_the_carried_record(self):

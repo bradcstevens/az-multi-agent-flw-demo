@@ -164,6 +164,25 @@ def test_every_prompt_is_quoted_from_the_pack():
     assert not missing, f"the runbook misquotes the prompts: {missing}"
 
 
+def test_the_shift_swap_beat_quotes_its_authored_people_and_order():
+    """The Reviewable plan names its people in the pack, not in presenter prose."""
+    task = next(
+        task for task in _quick_tasks() if task["id"] == "task-223-shift-swap"
+    )
+    rendered = _rendered()
+    beat = rendered[rendered.index(task["prompt"]) :][:1800]
+
+    assert "Deliberate" in beat
+    person_steps = [
+        step["assignee"]
+        for step in task["plan_steps"]
+        if step["assignee"]["kind"] == "person"
+    ]
+    for assignee in person_steps:
+        assert assignee["name"] in beat
+    assert "waitsOn" in beat
+
+
 def test_every_rehearsed_reply_chip_is_quoted_from_the_pack():
     """The other affordance nothing on screen reveals until it is too late.
 

@@ -116,9 +116,24 @@ sys.modules['orchestration.connection_config'] = Mock(
 
 # ---- Mock models.plan_models ----
 class MockMStep:
-    def __init__(self, agent="", action=""):
+    def __init__(self, agent="", action="", **kwargs):
         self.agent = agent
         self.action = action
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @classmethod
+    def model_validate(cls, value):
+        return cls(**value)
+
+    def model_dump(self, **_kwargs):
+        return {
+            "id": getattr(self, "id", None),
+            "agent": self.agent,
+            "action": self.action,
+            "assignee": getattr(self, "assignee", None),
+            "waitsOn": getattr(self, "waitsOn", None),
+        }
 
 
 class MockMPlan:

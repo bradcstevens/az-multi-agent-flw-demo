@@ -7,17 +7,15 @@ import { StoreSurface } from '../pages/StoreSurface';
 /**
  * Beat 8 — the fourth specialist.
  *
- * An **HR process question** — how an employment task is performed — answered
- * by `WorkforceAgent`, so the audience watches four specialists being chosen
- * between rather than three. [ADR-017](../../docs/ADR/017-workforce-agent-answers-process-never-record.md)
- * is why it exists and where its boundary is drawn: this agent answers *how a
- * thing is done* and never *an individual's record*, which stays the
- * **Identity boundary gate**'s business and is still answered with no agent at
- * all.
+ * An agreed shift-swap transaction, answered by `WorkforceAgent`, so the
+ * audience watches four specialists being chosen between rather than three.
+ * [ADR-017](../../docs/ADR/017-workforce-agent-answers-process-never-record.md)
+ * still draws the boundary: this agent follows a process and never reads an
+ * individual's record, which stays the **Identity boundary gate**'s business.
  *
  * Two things are graded, and neither is prose:
  *
- * - the question was **admitted**. The gate's similarity tier is a live model
+ * - the transaction was **admitted**. The gate's similarity tier is a live model
  *   call, and ADR-017 records the risk out loud: a process question phrased
  *   near the personal probes can be refused on stage, on the run that matters.
  *   The **Guardrail corpus** measures that offline; this watches it live.
@@ -56,7 +54,7 @@ const SHIFT_SWAP_TASK = 'task-223-shift-swap';
 const WORKFORCE_TOOLBOX = 'workforce';
 
 test.describe('the fourth specialist', () => {
-    test('answers the HR process question, and the meter says it was the one that did', async ({
+    test('reviews the agreed shift swap, and the meter says the fourth specialist answered it', async ({
         page,
     }) => {
         const specialist = agentHoldingToolbox(WORKFORCE_TOOLBOX);
@@ -68,11 +66,9 @@ test.describe('the fourth specialist', () => {
                 'beat has no card to tap',
         ).toBeTruthy();
 
-        // The lane is metadata on the card, and it is asserted here because
-        // the walkthrough's claim about this beat is that it is *fast* — an
-        // approval step in front of a procedure lookup is the demonstration
-        // getting slower for a reason the audience cannot see.
-        expect(task!.lane).toBe('fast');
+        // The declaration earns the Reviewable plan. It is read from the pack,
+        // not repeated here, so a transaction that loses approval goes red.
+        expect(task!.lane).toBe('deliberate');
 
         const store = new StoreSurface(page);
         await store.open();
@@ -108,6 +104,21 @@ test.describe('the fourth specialist', () => {
 
         const plan = new ChatSurface(page);
         await plan.waitForArrival(120_000);
+        await expect(plan.laneBadge).toContainText('Deliberate');
+        await expect(plan.approveButton).toBeVisible({ timeout: 240_000 });
+
+        const people = task!.planSteps
+            .map((step) => step.assignee)
+            .filter(
+                (assignee): assignee is { kind?: string; name: string } =>
+                    assignee?.kind === 'person' && typeof assignee.name === 'string',
+            );
+        expect(people.map((person) => person.name)).toHaveLength(3);
+        for (const person of people) {
+            await expect(plan.conversation.getByText(person.name, { exact: false })).toBeVisible();
+        }
+
+        await plan.approveButton.click();
 
         const turn = plan.latestAgentTurn;
         await expect(turn).toBeVisible({ timeout: 180_000 });

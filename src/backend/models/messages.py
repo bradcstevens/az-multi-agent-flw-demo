@@ -74,6 +74,14 @@ class PlanApprovalRequest:
     status: PlanStatus
     context: dict | None = None
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the Reviewable plan as structured data for the browser."""
+        return {
+            "plan": self.plan.model_dump(mode="json"),
+            "status": getattr(self.status, "value", self.status),
+            "context": self.context,
+        }
+
 
 @dataclass(slots=True)
 class PlanApprovalResponse:

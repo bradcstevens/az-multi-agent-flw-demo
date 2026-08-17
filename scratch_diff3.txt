@@ -1,0 +1,618 @@
+diff --git a/src/App/src/components/content/streaming/PlanVerdictControls.tsx b/src/App/src/components/content/streaming/PlanVerdictControls.tsx
+new file mode 100644
+index 00000000..36012c86
+--- /dev/null
++++ b/src/App/src/components/content/streaming/PlanVerdictControls.tsx
+@@ -0,0 +1,114 @@
++import { Body1, Button, Field, Textarea, makeStyles } from '@fluentui/react-components';
++import React, { useState } from 'react';
++
++import { PlanApprovalStep, revisionSuggestionsFor } from '@/models/reviewablePlan';
++
++const useStyles = makeStyles({
++    container: {
++        display: 'flex',
++        flexDirection: 'column',
++        gap: '12px',
++        marginTop: '20px',
++    },
++    suggestions: {
++        display: 'flex',
++        flexWrap: 'wrap',
++        gap: '8px',
++    },
++    verdicts: {
++        display: 'flex',
++        gap: '12px',
++        alignItems: 'center',
++    },
++    prompt: {
++        color: 'var(--colorNeutralForeground2)',
++        fontSize: '14px',
++        lineHeight: '1.5',
++    },
++});
++
++export const SEND_BACK_PROMPT = 'What would you change?';
++export const SEND_BACK_LABEL = 'Send back with changes';
++export const APPROVE_LABEL = 'Approve Task Plan';
++
++interface PlanVerdictControlsProps {
++    steps: PlanApprovalStep[];
++    onApprove: () => void;
++    onSendBack: (feedback: string) => void;
++    processing: boolean;
++}
++
++/**
++ * The two things an associate may say about a Reviewable plan (#108).
++ *
++ * There is no third control: leaving the conversation is navigation, not a
++ * verdict, and lives on the rail rather than here. The starters beside the box
++ * are **derived** from the plan on screen (ADR-033) — a different plan offers a
++ * different set — and the box is there for when none of them fit, so nobody is
++ * limited to what somebody anticipated.
++ */
++export const PlanVerdictControls: React.FC<PlanVerdictControlsProps> = ({
++    steps,
++    onApprove,
++    onSendBack,
++    processing,
++}) => {
++    const styles = useStyles();
++    const [feedback, setFeedback] = useState('');
++    const suggestions = revisionSuggestionsFor(steps);
++
++    return (
++        <div className={styles.container} data-testid="plan-verdict-controls">
++            <Body1 className={styles.prompt}>
++                If the plan looks good we can move forward with the first step. If it
++                does not, say what you would change and it comes back revised.
++            </Body1>
++
++            {suggestions.length > 0 && (
++                <div className={styles.suggestions} data-testid="send-back-suggestions">
++                    {suggestions.map((suggestion) => (
++                        <Button
++                            key={suggestion}
++                            appearance="outline"
++                            size="small"
++                            disabled={processing}
++                            onClick={() => setFeedback(suggestion)}
++                        >
++                            {suggestion}
++                        </Button>
++                    ))}
++                </div>
++            )}
++
++            <Field label={SEND_BACK_PROMPT}>
++                <Textarea
++                    aria-label={SEND_BACK_PROMPT}
++                    value={feedback}
++                    disabled={processing}
++                    onChange={(_event, data) => setFeedback(data.value)}
++                />
++            </Field>
++
++            <div className={styles.verdicts}>
++                <Button
++                    appearance="primary"
++                    size="medium"
++                    onClick={onApprove}
++                    disabled={processing}
++                >
++                    {processing ? 'Processing...' : APPROVE_LABEL}
++                </Button>
++                <Button
++                    appearance="secondary"
++                    size="medium"
++                    onClick={() => onSendBack(feedback)}
++                    disabled={processing || !feedback.trim()}
++                >
++                    {SEND_BACK_LABEL}
++                </Button>
++            </div>
++        </div>
++    );
++};
++
++export default PlanVerdictControls;
+diff --git a/src/App/src/components/content/streaming/StreamingPlanResponse.tsx b/src/App/src/components/content/streaming/StreamingPlanResponse.tsx
+index 4529364c..a0d1cece 100644
+--- a/src/App/src/components/content/streaming/StreamingPlanResponse.tsx
++++ b/src/App/src/components/content/streaming/StreamingPlanResponse.tsx
+@@ -14,7 +14,8 @@ import React, { useState } from 'react';
+ import { getAgentIcon, getAgentDisplayNameWithSuffix } from '@/utils/agentIconUtils';
+ import { PLAN_ARRIVING } from '@/models/progressNarration';
+ import { SECTION_HEADING } from '@/models/headingOutline';
+-import { reviewablePlanSteps } from '@/models/reviewablePlan';
++import { pendingVerdictFor, reviewablePlanSteps } from '@/models/reviewablePlan';
++import { PlanVerdictControls } from './PlanVerdictControls';
+ 
+ // Updated styles to match consistent spacing and remove brand colors from bot elements
+ const useStyles = makeStyles({
+@@ -177,6 +178,23 @@ const useStyles = makeStyles({
+         gap: '12px',
+         alignItems: 'center',
+         marginTop: '20px'
++    },
++    revisionLine: {
++        display: 'flex',
++        flexDirection: 'column',
++        gap: '4px',
++        marginBottom: '16px'
++    },
++    revisionNumber: {
++        fontSize: '12px',
++        fontWeight: '600',
++        color: 'var(--colorNeutralForeground2)',
++        lineHeight: '16px'
++    },
++    revisionFeedback: {
++        fontSize: '12px',
++        color: 'var(--colorNeutralForeground2)',
++        lineHeight: '16px'
+     }
+ });
+ 
+@@ -233,7 +251,7 @@ const getFactsPreview = (content: string): string => {
+ const renderPlanResponse = (
+     planApprovalRequest: MPlanData | null, 
+     handleApprovePlan: () => void, 
+-    handleRejectPlan: () => void, 
++    handleRejectPlan: (feedback: string) => void, 
+     processingApproval: boolean, 
+     showApprovalButtons: boolean
+ ) => {
+@@ -245,6 +263,8 @@ const renderPlanResponse = (
+     const agentName = getAgentDisplayNameFromPlan(planApprovalRequest);
+     const { factsContent, planSteps } = extractDynamicContent(planApprovalRequest);
+     const factsPreview = getFactsPreview(factsContent);
++    const { revision, feedback } = pendingVerdictFor(planApprovalRequest);
++    const askedToChange = feedback[feedback.length - 1];
+ 
+     // Check if this is a "creating plan" state
+     const isCreatingPlan = !planSteps.length && !factsContent;
+@@ -330,6 +350,19 @@ const renderPlanResponse = (
+                         {`Proposed Plan for ${planApprovalRequest.user_request || 'Task'}`}
+                     </div>
+                 )}
++                {!isCreatingPlan && (
++                    <div className={styles.revisionLine} data-testid="plan-revision">
++                        <Text className={styles.revisionNumber}>{`Revision ${revision}`}</Text>
++                        {askedToChange && (
++                            <Text
++                                className={styles.revisionFeedback}
++                                data-testid="plan-revision-feedback"
++                            >
++                                {`You asked to change: ${askedToChange}`}
++                            </Text>
++                        )}
++                    </div>
++                )}
+ 
+                 {/* Plan Steps */}
+                 {planSteps.length > 0 && (
+@@ -356,32 +389,20 @@ const renderPlanResponse = (
+                 )}
+ 
+                 {/* Instruction Text */}
+-                {!isCreatingPlan && (
++                {!isCreatingPlan && !showApprovalButtons && (
+                     <Body1 className={styles.instructionText}>
+                         If the plan looks good we can move forward with the first step.
+                     </Body1>
+                 )}
+ 
+-                {/* Action Buttons */}
++                {/* The verdict: approve, or send it back saying what to change */}
+                 {showApprovalButtons && !isCreatingPlan && (
+-                    <div className={styles.buttonContainer}>
+-                        <Button
+-                            appearance="primary"
+-                            size="medium"
+-                            onClick={handleApprovePlan}
+-                            disabled={processingApproval}
+-                        >
+-                            {processingApproval ? 'Processing...' : 'Approve Task Plan'}
+-                        </Button>
+-                        <Button
+-                            appearance="secondary"
+-                            size="medium"
+-                            onClick={handleRejectPlan}
+-                            disabled={processingApproval}
+-                        >
+-                            Cancel
+-                        </Button>
+-                    </div>
++                    <PlanVerdictControls
++                        steps={planApprovalRequest.steps}
++                        onApprove={handleApprovePlan}
++                        onSendBack={handleRejectPlan}
++                        processing={processingApproval}
++                    />
+                 )}
+             </div>
+         </div>
+diff --git a/src/App/src/hooks/usePlanCancellationAlert.tsx b/src/App/src/hooks/usePlanCancellationAlert.tsx
+index 67defa8c..73010f8c 100644
+--- a/src/App/src/hooks/usePlanCancellationAlert.tsx
++++ b/src/App/src/hooks/usePlanCancellationAlert.tsx
+@@ -1,74 +1,27 @@
+ import { useCallback } from 'react';
+ import { PlanStatus } from '../models';
+-import { APIService } from '../api/apiService';
+ 
+ interface UsePlanCancellationAlertProps {
+   planData: any;
+-  planApprovalRequest: any;
+-  onNavigate: () => void;
+ }
+ 
+ /**
+- * Custom hook to handle plan cancellation alerts when navigating during active plans
++ * Whether this Chat has a turn still running.
++ *
++ * It answers one question and nothing else. **Leaving a Chat is navigation,
++ * not a Verdict** (ADR-031 decision 2, #108): nothing here calls
++ * `/v4/plan_approval`, because walking away is not a thing the associate said
++ * about the plan. What ends the run behind an abandoned turn is the Chat's own
++ * cancellation, which is #121.
+  */
+ export const usePlanCancellationAlert = ({
+   planData,
+-  planApprovalRequest,
+-  onNavigate
+ }: UsePlanCancellationAlertProps) => {
+-  const apiService = new APIService();
+-
+-  /**
+-   * Check if a plan is currently active/running
+-   */
+   const isPlanActive = useCallback(() => {
+     return planData?.plan?.overall_status === PlanStatus.IN_PROGRESS;
+   }, [planData]);
+ 
+-  /**
+-   * Handle the confirmation dialog and plan cancellation
+-   */
+-  const handleNavigationWithConfirmation = useCallback(async () => {
+-    if (!isPlanActive()) {
+-      // Plan is not active, proceed with navigation
+-      onNavigate();
+-      return;
+-    }
+-
+-    // Show confirmation dialog
+-    const userConfirmed = window.confirm(
+-      "If you continue, the plan process will be stopped and the plan will be cancelled."
+-    );
+-
+-    if (!userConfirmed) {
+-      // User cancelled, do nothing
+-      return;
+-    }
+-
+-    try {
+-      // User confirmed, cancel the plan
+-      if (planApprovalRequest?.id) {
+-        await apiService.approvePlan({
+-          m_plan_id: planApprovalRequest.id,
+-          plan_id: planData?.plan?.id,
+-          approved: false,
+-          feedback: 'Plan cancelled by user navigation'
+-        });
+-      }
+-
+-      // Navigate after successful cancellation
+-      onNavigate();
+-    } catch {
+-      // Show error but still allow navigation
+-      alert('Failed to cancel the plan properly, but navigation will continue.');
+-      onNavigate();
+-    }
+-  }, [isPlanActive, onNavigate, planApprovalRequest, planData, apiService]);
+-
+-  return {
+-    isPlanActive,
+-    handleNavigationWithConfirmation
+-  };
++  return { isPlanActive };
+ };
+ 
+-export default usePlanCancellationAlert;
+\ No newline at end of file
++export default usePlanCancellationAlert;
+diff --git a/src/App/src/models/reviewablePlan.ts b/src/App/src/models/reviewablePlan.ts
+index 2c3ab163..344357e5 100644
+--- a/src/App/src/models/reviewablePlan.ts
++++ b/src/App/src/models/reviewablePlan.ts
+@@ -35,6 +35,22 @@ export interface ReviewablePlanStep {
+     waitingDescription: string | null;
+ }
+ 
++export interface PlanVerdictState {
++    /** Which revision of this Reviewable plan the associate is looking at. */
++    revision: number;
++    /** What the associate asked to change, oldest first. */
++    feedback: string[];
++    verdict: 'pending' | 'approved';
++}
++
++/**
++ * The two things an associate may say about a Reviewable plan. There is no
++ * third: leaving the conversation is navigation, not a verdict (ADR-031).
++ */
++export type PlanVerdictAction =
++    | { kind: 'approve' }
++    | { kind: 'revise'; feedback: string };
++
+ export const isPersonRelation = (value: unknown): value is PersonRelation =>
+     value === 'associate' || value === 'peer' || value === 'manager';
+ 
+@@ -123,3 +139,68 @@ export const reviewablePlanSteps = (steps: readonly PlanApprovalStep[]): Reviewa
+             waitingDescription: describeWaiting(assignee),
+         };
+     });
++
++/**
++ * The starters offered beside the free-text box when a plan is sent back.
++ *
++ * **Derived**, never generated (ADR-033): pure code reading the plan in front
++ * of the associate — the peer it names, whether more than one person is
++ * involved, whether a specialist would act. A different plan offers a
++ * different set, and no model puts words in the associate's mouth on stage.
++ */
++export const revisionSuggestionsFor = (
++    steps: readonly PlanApprovalStep[],
++): string[] => {
++    const reviewSteps = reviewablePlanSteps(steps);
++    const people = reviewSteps
++        .map((step) => step.assignee)
++        .filter((assignee): assignee is Extract<Assignee, { kind: 'person' }> =>
++            assignee.kind === 'person');
++
++    const namedPeers = [
++        ...new Set(
++            people.filter((person) => person.relation === 'peer').map((peer) => peer.name),
++        ),
++    ];
++
++    const suggestions = namedPeers.map((name) => `Ask somebody other than ${name}.`);
++    if (people.length > 1) {
++        suggestions.push('Change the order people are asked.');
++    }
++    if (reviewSteps.some((step) => step.assignee.kind === 'agent')) {
++        suggestions.push('Use a different specialist.');
++    }
++    return suggestions;
++};
++
++/** The lineage an arriving Reviewable plan carries, before any verdict on it. */
++export const pendingVerdictFor = (plan: {
++    revision?: number;
++    revision_feedback?: string[];
++}): PlanVerdictState => ({
++    revision: plan.revision ?? 1,
++    feedback: [...(plan.revision_feedback ?? [])],
++    verdict: 'pending',
++});
++
++/**
++ * The verdict reducer. Approval is terminal — a second verdict on an approved
++ * plan changes nothing — and a send-back keeps the feedback that produced the
++ * revision it asks for, so the associate can check they were understood.
++ * Returns the state it was given when nothing was said, which is what the
++ * caller reads to know there is nothing to send.
++ */
++export const applyPlanVerdict = (
++    state: PlanVerdictState,
++    action: PlanVerdictAction,
++): PlanVerdictState => {
++    if (state.verdict === 'approved') return state;
++    if (action.kind === 'approve') return { ...state, verdict: 'approved' };
++    const feedback = action.feedback.trim();
++    if (!feedback) return state;
++    return {
++        ...state,
++        revision: state.revision + 1,
++        feedback: [...state.feedback, feedback],
++    };
++};
+diff --git a/src/App/src/pages/ChatPage.tsx b/src/App/src/pages/ChatPage.tsx
+index 2a33e221..e3d008da 100644
+--- a/src/App/src/pages/ChatPage.tsx
++++ b/src/App/src/pages/ChatPage.tsx
+@@ -1,4 +1,4 @@
+-import React, { useCallback, useEffect} from 'react';
++import React, { useCallback, useEffect, useState } from 'react';
+ import { useParams, useNavigate, useLocation } from 'react-router-dom';
+ import { Spinner, Text } from '@fluentui/react-components';
+ 
+@@ -12,6 +12,11 @@ import {
+     AgentMessageData,
+     AgentMessageType,
+ } from '../models';
++import {
++    PlanVerdictState,
++    applyPlanVerdict,
++    pendingVerdictFor,
++} from '../models/reviewablePlan';
+ 
+ /* ── Redux ───────────────────────────────────────────────────── */
+ import { useAppDispatch, useAppSelector } from '../store/hooks';
+@@ -35,7 +40,7 @@ import {
+     setCancellingPlan,
+     setErrorLoading,
+     planApprovalAccepted,
+-    planApprovalRejected,
++    planSentBack,
+ } from '../store/slices/planSlice';
+ import {
+     selectInput,
+@@ -270,11 +275,7 @@ const ChatPage: React.FC = () => {
+ 
+     const laneTaken = laneFromRouterState ?? laneFromSessionState;
+ 
+-    const { isPlanActive } = usePlanCancellationAlert({
+-        planData,
+-        planApprovalRequest,
+-        onNavigate: pendingNavigation || (() => {}),
+-    });
++    const { isPlanActive } = usePlanCancellationAlert({ planData });
+ 
+     /* ── Memoized formatErrorMessage ────────────────────────── */
+     const formatErrorMessage = useCallback((content: string): string => {
+@@ -312,27 +313,19 @@ const ChatPage: React.FC = () => {
+     );
+ 
+     const handleConfirmCancellation = useCallback(async () => {
++        // Leaving a Chat is navigation, not a **Verdict** (ADR-031 decision 2):
++        // no `/v4/plan_approval` call is made from here. The run behind an
++        // abandoned turn is ended by the Chat's own cancellation, which is #121.
+         dispatch(setCancellingPlan(true));
+         try {
+-            if (planApprovalRequest?.id) {
+-                await apiService.approvePlan({
+-                    m_plan_id: planApprovalRequest.id,
+-                    plan_id: planData?.plan?.id ?? '',
+-                    approved: false,
+-                    feedback: 'Plan cancelled by user navigation',
+-                });
+-            }
+             pendingNavigation?.();
+             webSocketService.disconnect();
+-        } catch {
+-            showToast('Failed to cancel the plan properly, but navigation will continue.', 'error');
+-            pendingNavigation?.();
+         } finally {
+             dispatch(setCancellingPlan(false));
+             dispatch(setShowCancellationDialog(false));
+             setPendingNavigation(null);
+         }
+-    }, [planApprovalRequest, planData, pendingNavigation, showToast, dispatch]);
++    }, [pendingNavigation, dispatch]);
+ 
+     const handleCancelDialog = useCallback(() => {
+         dispatch(setShowCancellationDialog(false));
+@@ -343,9 +336,29 @@ const ChatPage: React.FC = () => {
+         navigate('/');
+     }, [navigate]);
+ 
+-    /* ── Plan Approval / Rejection ──────────────────────────── */
++    /* ── The Verdict on a Reviewable plan ───────────────────── */
++    /**
++     * Approve, or send it back saying what to change. There is no third
++     * verdict (#108, ADR-028): leaving the conversation is navigation, and the
++     * path that destroyed the plan is gone.
++     *
++     * The reducer beside this is what makes approval terminal — it returns the
++     * state it was given when there is nothing to say, and that identity is
++     * what tells the surface not to send.
++     */
++    const [verdict, setVerdict] = useState<PlanVerdictState>(() =>
++        pendingVerdictFor(planApprovalRequest ?? {}),
++    );
++
++    useEffect(() => {
++        setVerdict(pendingVerdictFor(planApprovalRequest ?? {}));
++    }, [planApprovalRequest?.id, planApprovalRequest?.revision]);
++
+     const handleApprovePlan = useCallback(async () => {
+         if (!planApprovalRequest) return;
++        const next = applyPlanVerdict(verdict, { kind: 'approve' });
++        if (next === verdict) return;
++        setVerdict(next);
+         dispatch(setProcessingApproval(true));
+         const id = showToast('Submitting Approval', 'progress');
+         try {
+@@ -364,30 +377,34 @@ const ChatPage: React.FC = () => {
+         } finally {
+             dispatch(setProcessingApproval(false));
+         }
+-    }, [planApprovalRequest, planData, showToast, dismissToast, dispatch]);
+-
+-    const handleRejectPlan = useCallback(async () => {
+-        if (!planApprovalRequest) return;
+-        dispatch(setProcessingApproval(true));
+-        const id = showToast('Submitting cancellation', 'progress');
+-        try {
+-            await apiService.approvePlan({
+-                m_plan_id: planApprovalRequest.id,
+-                plan_id: planData?.plan?.id ?? '',
+-                approved: false,
+-                feedback: 'Plan rejected by user',
+-            });
+-            dismissToast(id);
+-            navigate('/');
+-        } catch {
+-            dismissToast(id);
+-            showToast('Failed to submit cancellation', 'error');
+-            navigate('/');
+-        } finally {
+-            /* P0: single compound action replaces multiple state resets */
+-            dispatch(planApprovalRejected());
+-        }
+-    }, [planApprovalRequest, planData, navigate, showToast, dismissToast, dispatch]);
++    }, [planApprovalRequest, planData, verdict, showToast, dismissToast, dispatch]);
++
++    const handleRejectPlan = useCallback(
++        async (feedback: string) => {
++            if (!planApprovalRequest) return;
++            const next = applyPlanVerdict(verdict, { kind: 'revise', feedback });
++            if (next === verdict) return;
++            setVerdict(next);
++            dispatch(setProcessingApproval(true));
++            const id = showToast('Sending the plan back', 'progress');
++            try {
++                await apiService.approvePlan({
++                    m_plan_id: planApprovalRequest.id,
++                    plan_id: planData?.plan?.id ?? '',
++                    approved: false,
++                    feedback: feedback.trim(),
++                });
++                dismissToast(id);
++                /* The revised plan arrives in this same conversation. */
++                dispatch(planSentBack());
++            } catch {
++                dismissToast(id);
++                showToast('Failed to send the plan back', 'error');
++                dispatch(planSentBack());
++            }
++        },
++        [planApprovalRequest, planData, verdict, showToast, dismissToast, dispatch],
++    );
+ 
+     /**
+      * One new turn in **this Chat's Session** (ADR-027).
+diff --git a/src/App/src/store/slices/planSlice.ts b/src/App/src/store/slices/planSlice.ts
+index efa8bfbb..ca7ce2a7 100644
+--- a/src/App/src/store/slices/planSlice.ts
++++ b/src/App/src/store/slices/planSlice.ts
+@@ -145,8 +145,14 @@ const planSlice = createSlice({
+             state.showProcessingPlanSpinner = true;
+             state.processingApproval = false;
+         },
+-        /** Single dispatch after user rejects a plan (replaces 3 separate dispatches) */
+-        planApprovalRejected(state) {
++        /**
++         * Single dispatch after the associate sends a plan back (#108).
++         *
++         * The verdict has been given, so the controls come down — but nothing
++         * claims progress: a revised plan is not an approved one, and the
++         * spinner that narrates a running plan stays off until it is.
++         */
++        planSentBack(state) {
+             state.planApproved = false;
+             state.showApprovalButtons = false;
+             state.showProcessingPlanSpinner = false;
+@@ -239,7 +245,7 @@ export const {
+     setTimeoutMessage,
+     markPlanCompleted,
+     planApprovalAccepted,
+-    planApprovalRejected,
++    planSentBack,
+     approvalRequestReceived,
+     planCompletedFinal,
+     planFailedFinal,

@@ -310,6 +310,11 @@ class StartingTask(BaseModel):
     # edit cannot silently stop the approval seam from storing its ticket.
     ticket_on_approval: bool = False
 
+    # An authored Reviewable plan. A person step names who the system will ask
+    # and the step it waits for, so a rehearsal never invents a colleague or an
+    # approval order.
+    plan_steps: List[Dict[str, Any]] = Field(default_factory=list)
+
 
 class TeamConfiguration(BaseDataModel):
     """Represents a team configuration stored in the database."""

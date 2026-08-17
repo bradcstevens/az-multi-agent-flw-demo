@@ -208,23 +208,26 @@ that was going to explain it.
 
 ### 8. Swap a shift — the fourth specialist
 
-**Tap:** `Swap a shift` — *"How do I swap a shift with another associate?"*
+**Tap:** `Swap a shift` — *"Marcus Bell and I have agreed to swap our Saturday shifts. Start the
+swap."*
 
-**Say:** *"This one is not about the store at all. It is about employment — the thing an associate
-would otherwise take to a manager, or to a portal they have to be at a desk to use."*
+**Say:** *"This is not a procedure recital. Marcus and I already agreed the swap, and this request
+starts the approval chain."*
 
-**What lands:** an answer about offering the swap, the other associate accepting it and the shift
-lead approving it, quoting `WF-401`, and saying out loud that the procedure library is simulated.
-On the right, the **Agent Team** panel shows **four** specialists and the cost table bills the
+**What lands:** a **Reviewable plan**, with the **Deliberate** lane badge and its approval control.
+It starts with the **Workforce Agent** checking the procedure, then reaches **You**, **Marcus Bell**
+and **Dana Reyes** in that declared `waitsOn` order. The two named people receive a message and can
+say no; they are not discovered from a roster. Approve the plan to let the fourth specialist answer.
+On the right, the **Agent Team** panel still shows **four** specialists and the cost table bills the
 **Workforce Agent** for the turn — a different specialist from the one that answered beat 1.
 
-**Say:** *"Four specialists, and the orchestrator picked the right one. Nobody wrote a rule that
-said 'shift swap goes here' — it chose from what each one says it does."*
+**Say:** *"Four specialists, and the orchestrator picked the right one. The plan does not invent a
+roster: it names the colleague the associate already agreed this with, then makes the approvals
+visible."*
 
-**The claim:** the routing story, made legible. And the boundary: this specialist answers **how a
-thing is done**, never **what somebody is owed**. Beat 5 is the other half of that sentence, and
-this beat is what makes it a boundary rather than a limitation — *"it will tell you how to swap a
-shift; it will not tell you Tanya's leave balance on a shared device."*
+**The claim:** the routing story, made legible, now acting on a real decision. And the boundary:
+this specialist follows the shift-swap process but never reads **what somebody is owed**. Beat 5 is
+the other half of that sentence, and this beat is what makes it a boundary rather than a limitation.
 
 **Do not claim an HR integration.** There is no employment system behind this. The procedure
 library is mocked and says so on every answer. If somebody asks, *"this is where Workday or UKG

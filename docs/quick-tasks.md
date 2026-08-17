@@ -19,7 +19,7 @@ They render in this order, which is the order the demonstration runs in.
 | 4 | I can't fix it (follow-on) | *I have tried everything and I can't fix it. I need someone to come out.* | **deliberate** | R4 — the approval *is* the **Simulated ticket** being raised |
 | 5 | How much PTO do I have? | *My name is Tanya, how much PTO do I have?* | fast | R5 — the **Identity boundary gate** refusing, and #27's sign-in |
 | 6 | What is due this shift? | *What tasks are due on this shift?* | fast | R8 — where the **Presenter alert** leads |
-| 7 | Swap a shift | *How do I swap a shift with another associate?* | fast | ADR-017 — the **Workforce agent**, an **HR process question**, and the gate admitting it |
+| 7 | Swap a shift | *Marcus Bell and I have agreed to swap our Saturday shifts. Start the swap.* | **deliberate** | ADR-028 — the **Workforce agent** follows an agreed transaction into a **Reviewable plan** |
 
 The opening tap is the cross-platform hop **deliberately**: it is the claim the
 whole demonstration exists to make, and the honest miss that follows it only
@@ -27,7 +27,7 @@ reads as honesty once the audience has watched the same surface answer.
 
 ## Nothing here is a list this repository keeps twice
 
-Four of the seven prompts are read out of the corpus they were written against
+Three of the seven prompts are read out of the corpus they were written against
 rather than restated, because the Quick Tasks are authored in `content_packs/`
 and the SOP corpus in `content/sop/`, by different tools, and a prompt that
 drifted a word away from the corpus would go unnoticed on both sides.
@@ -37,7 +37,7 @@ drifted a word away from the corpus would go unnoticed on both sides.
 | Close the store | `corpus.toml` `[rehearsed_hit]` | `test_given_the_opening_task_when_read_then_it_is_the_cross_platform_hop` |
 | Restart the car wash | `corpus.toml` `[honest_miss]` | `test_given_the_honest_miss_task_when_read_then_it_is_the_corpus_own_question` |
 | How much PTO do I have? | `guardrail.corpus.POSITIVE_PROBES` | `test_given_the_boundary_probe_when_read_then_it_is_a_measured_probe` |
-| Swap a shift | `guardrail.corpus.NEGATIVE_CONTROLS` | `test_given_the_shift_swap_task_when_read_then_it_is_the_measured_control` |
+| Shift-swap process question | `guardrail.corpus.NEGATIVE_CONTROLS` | `test_given_the_shift_swap_process_question_when_read_then_it_stays_a_measured_control` |
 
 `[rehearsed_hit]` is new, and it is the mirror image of `[honest_miss]`. The
 honest miss has always been guarded — the corpus keeps its `absent_terms` out
@@ -63,9 +63,9 @@ an approval step. So every declared lane goes through the real `parse_lane`.
 authored prompt with its declared Lane, so there is no filled box between the
 tap and the request. A presenter who needs to adapt a prompt types it as a
 free-text question; that request declares no Lane and belongs to the **Lane
-keyword fallback**. The escalation prompt is therefore asserted to route
-Deliberate through the fallback *as well as* by declaration, and every other
-prompt that reaches the router is asserted to route Fast.
+keyword fallback**. The escalation and agreed shift-swap prompts are therefore
+asserted to route Deliberate through the fallback *as well as* by declaration,
+and every other prompt that reaches the router is asserted to route Fast.
 
 The keyword fallback defaults to **Deliberate**, so a prompt carrying no fast
 vocabulary at all is the trap here, and it is not hypothetical: *"Walk me

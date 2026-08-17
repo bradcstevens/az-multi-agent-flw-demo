@@ -100,6 +100,7 @@ class MockStartingTask:
     ticket_status_reply: Optional[dict] = None
     follow_on: str = None
     ticket_on_approval: bool = False
+    plan_steps: List[dict] = field(default_factory=list)
 
 @dataclass
 class MockTeamConfiguration:
@@ -393,6 +394,26 @@ class TestTeamConfigurationValidation:
             ).ticket_on_approval
             is True
         )
+
+    def test_authored_plan_steps_survive_the_upload(self):
+        service = TeamService()
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
+
+        assert service._validate_and_parse_task(
+            _valid_task_data(plan_steps=steps)
+        ).plan_steps == [{**steps[0], "agent": ""}]
 
     def test_a_ticket_status_reply_survives_the_upload(self):
         """The ticketing task owns the Fast-lane reply it offers after approval."""
@@ -999,8 +1020,8 @@ class TestStoreAssistantPackUploads:
         # the upload is most likely to drop silently: ``StartingTask.lane`` is
         # an optional, unvalidated ``str``, so a lane that never arrives parses
         # as no declaration at all and the lane router falls back to the
-        # keywords. The escalation task is the one that matters — its approval
-        # step is the associate confirming the ticket (#22, #26).
+        # keywords. The two transaction tasks are the ones that matter — each
+        # must carry its approval gate through the upload.
         service = TeamService()
         team = await service.validate_and_parse_team_config(self._pack(), "user-1")
 
@@ -1008,7 +1029,7 @@ class TestStoreAssistantPackUploads:
         assert all(lane in ("fast", "deliberate") for lane in lanes.values()), lanes
         assert [
             task_id for task_id, lane in lanes.items() if lane == "deliberate"
-        ] == ["task-223-escalation"]
+        ] == ["task-223-escalation", "task-223-shift-swap"]
 
     @pytest.mark.asyncio
     async def test_authored_pack_keeps_its_rehearsed_replies(self):
