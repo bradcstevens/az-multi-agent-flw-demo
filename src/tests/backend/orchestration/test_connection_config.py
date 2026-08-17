@@ -201,12 +201,27 @@ class TestTheTurnInFlight:
     async def test_a_registered_turn_names_the_chat_it_belongs_to(self):
         cfg = OrchestrationConfig()
         task = await self._pending()
-        cfg.register_active_turn("user-1", "sess-1", task)
+        cfg.register_active_turn("user-1", "sess-1", "plan-1", task)
 
         turn = cfg.active_turn("user-1")
         assert turn is not None
         assert turn.session_id == "sess-1"
         assert turn.task is task
+
+        task.cancel()
+
+    @pytest.mark.asyncio
+    async def test_a_registered_turn_names_the_plan_it_is_answering(self):
+        # A Chat holds more than one Plan (#71) and a second turn in the same
+        # session mints another, so the session alone does not identify the
+        # record this turn's end should settle. `process_request` writes the new
+        # Plan *before* it replaces this entry, so "the session's latest" is,
+        # for that window, a turn that has not started yet.
+        cfg = OrchestrationConfig()
+        task = await self._pending()
+        cfg.register_active_turn("user-1", "sess-1", "plan-1", task)
+
+        assert cfg.active_turn("user-1").plan_id == "plan-1"
 
         task.cancel()
 
@@ -218,7 +233,7 @@ class TestTheTurnInFlight:
         # it reads.
         cfg = OrchestrationConfig()
         task = await self._pending()
-        cfg.register_active_turn("user-1", "sess-1", task)
+        cfg.register_active_turn("user-1", "sess-1", "plan-1", task)
 
         assert cfg.active_turn("user-1").session_id == "sess-1"
 
@@ -233,7 +248,7 @@ class TestTheTurnInFlight:
 
         task = asyncio.create_task(_done())
         await task
-        cfg.register_active_turn("user-1", "sess-1", task)
+        cfg.register_active_turn("user-1", "sess-1", "plan-1", task)
 
         assert cfg.active_turn("user-1") is None
 
@@ -246,8 +261,8 @@ class TestTheTurnInFlight:
         cfg = OrchestrationConfig()
         first = await self._pending()
         second = await self._pending()
-        cfg.register_active_turn("user-1", "sess-1", first)
-        cfg.register_active_turn("user-1", "sess-2", second)
+        cfg.register_active_turn("user-1", "sess-1", "plan-1", first)
+        cfg.register_active_turn("user-1", "sess-2", "plan-2", second)
 
         cfg.release_active_turn("user-1", first)
 
@@ -261,7 +276,7 @@ class TestTheTurnInFlight:
     async def test_releasing_the_registered_turn_empties_the_slot(self):
         cfg = OrchestrationConfig()
         task = await self._pending()
-        cfg.register_active_turn("user-1", "sess-1", task)
+        cfg.register_active_turn("user-1", "sess-1", "plan-1", task)
 
         cfg.release_active_turn("user-1", task)
 

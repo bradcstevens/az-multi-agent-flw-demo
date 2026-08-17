@@ -235,35 +235,58 @@ class CosmosDBClient(DatabaseBase):
         ]
         return await self.query_items(query, parameters, Plan)
 
-    async def get_plan_by_session(self, session_id: str) -> Optional[Plan]:
-        """A Chat's **latest** Plan record — the one **Ending a turn** settles.
+    async def get_plan_by_session(
+        self, session_id: str, plan_id: Optional[str] = None
+    ) -> Optional[Plan]:
+        """The Plan record **Ending a turn** settles (#120, ADR-031).
 
-        A Chat's state is its latest Plan's (#71) and every turn mints a new
-        one, so the newest is the only one a turn's end may write. ``TOP 1`` is
-        what makes that true rather than nearly true: ``query_items`` drops a
-        document it cannot validate into the model, so a query that fetched the
-        session's plans and took the first would quietly promote an *older*
-        settled plan whenever the newest failed to parse — and write `canceled`
-        onto a turn that had already finished, while the one actually running
-        went on running. Asked for one, an unreadable newest plan comes back as
-        no chat at all, and nothing is written.
+        Without ``plan_id``, the Chat's **latest** Plan: a Chat's state is its
+        latest Plan's (#71) and every turn mints a new one, so the newest is the
+        only one an end-of-turn may write. With one — the turn registry knows
+        exactly which Plan the turn it just cancelled was answering — that plan
+        within that session, because "the session's latest" stops being the
+        cancelled turn's record the moment a newer turn starts.
+
+        Read **raw**, and that is the whole reason this method exists rather
+        than another ``query_items`` caller. That helper maps *every* failure to
+        an empty list, so a Cosmos outage arrives indistinguishable from a
+        session holding no plan — and this caller ends an orchestration on the
+        strength of the answer. Reported as no chat, an outage would kill the
+        turn and then write nothing, leaving the **Abandoned turn** this
+        primitive exists to end. It also drops a document it cannot validate,
+        which would promote an *older* settled plan to "the chat's state" and
+        write `canceled` onto a turn that finished long ago. Both are refused
+        the same way `delete_chat` refuses them: raw, and ``TOP 1`` so there is
+        no older row to fall back to.
 
         Scoped by ``user_id``, which is the whole of the authorization for the
         reason :meth:`delete_chat` records: a session id is not a secret, and
         ``process_request`` takes one from the caller.
         """
-        query = (
-            "SELECT TOP 1 * FROM c WHERE c.session_id=@session_id "
-            "AND c.data_type=@data_type AND c.user_id=@user_id "
-            "ORDER BY c._ts DESC"
-        )
+        await self._ensure_initialized()
+
+        named = " AND c.id=@plan_id" if plan_id is not None else ""
         parameters = [
             {"name": "@session_id", "value": session_id},
             {"name": "@data_type", "value": DataType.plan},
             {"name": "@user_id", "value": self.user_id},
         ]
-        results = await self.query_items(query, parameters, Plan)
-        return results[0] if results else None
+        if plan_id is not None:
+            parameters.append({"name": "@plan_id", "value": plan_id})
+
+        rows = self.container.query_items(
+            query=(
+                "SELECT TOP 1 * FROM c "
+                "WHERE c.session_id=@session_id AND c.data_type=@data_type "
+                f"AND c.user_id=@user_id{named} ORDER BY c._ts DESC"
+            ),
+            parameters=parameters,
+        )
+
+        async for row in rows:
+            return Plan.model_validate(row)
+
+        return None
 
     async def get_all_plans_by_team_id_status(
         self, user_id: str, team_id: str, status: str

@@ -626,7 +626,7 @@ async def process_request(
             )
         )
         orchestration_config.register_active_turn(
-            user_id, input_task.session_id, new_task
+            user_id, input_task.session_id, plan_id, new_task
         )
 
         return {
@@ -2288,7 +2288,10 @@ async def end_chat_turn(session_id: str, request: Request):
     A Chat that has already reached a **Settled status** answers 200 saying so
     and is left exactly as it is, and a session this user has no Plan record in
     is 404 — the same reading ``delete_chat`` takes of a session id, which is
-    not a secret.
+    not a secret. A store that could not answer at all is 500 and neither: an
+    outage reported as "no chat" would end the turn, write nothing and tell the
+    associate the conversation is gone while its record sits at `in_progress`,
+    which is the **Abandoned turn** this route exists to clear.
     """
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -2299,12 +2302,22 @@ async def end_chat_turn(session_id: str, request: Request):
         raise HTTPException(status_code=400, detail="no user")
 
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
-    result = await end_turn(
-        user_id=user_id,
-        session_id=session_id,
-        memory_store=memory_store,
-        orchestration=orchestration_config,
-    )
+    try:
+        result = await end_turn(
+            user_id=user_id,
+            session_id=session_id,
+            memory_store=memory_store,
+            orchestration=orchestration_config,
+        )
+    except Exception as e:
+        logger.exception("Failed to end the turn for session '%s'", session_id)
+        track_event_if_configured(
+            "Error_Turn_End_Failed",
+            {"session_id": session_id, "user_id": user_id, "error": str(e)},
+        )
+        raise HTTPException(
+            status_code=500, detail="Could not read this chat, so its turn was not ended"
+        ) from e
 
     if result.outcome is TurnOutcome.no_such_chat:
         raise HTTPException(status_code=404, detail="Chat not found")

@@ -538,6 +538,12 @@ class TestProcessRequest:
         conversation the task it held was answering. **Ending a turn** reads
         that to scope itself; a turn registered without its session would make
         the primitive either cancel nothing or cancel whatever was running.
+
+        The Plan is recorded for the same reason one step down. This route
+        writes the new Plan *before* it reaches this line, so a turn that named
+        only its session would leave **Ending a turn** to find its record by
+        asking for the session's latest — and in that window the latest belongs
+        to the turn about to start, not the one being cancelled.
         """
         rt.store.get_team_by_id.return_value = MagicMock()
         rt.rai_success.return_value = True
@@ -550,6 +556,7 @@ class TestProcessRequest:
         registered = rt.orchestration_config.register_active_turn.call_args.args
         assert registered[0] == "user-1"
         assert registered[1] == "sess-1"
+        assert registered[2] == response.json()["plan_id"]
 
     def test_a_prior_turn_is_replaced_rather_than_run_beside(self, rt):
         """Not session-scoped, and deliberately so.
@@ -2218,7 +2225,28 @@ class TestEndingATurn:
 
         self._end(rt, session_id="sess-9")
 
-        rt.store.get_plan_by_session.assert_awaited_once_with("sess-9")
+        rt.store.get_plan_by_session.assert_awaited_once_with("sess-9", plan_id=None)
+
+    def test_a_store_that_cannot_answer_is_not_a_chat_that_is_not_there(self, rt):
+        # An outage arriving as 404 would be a lie with a cost: the surface
+        # would tell the associate the Chat is gone while its record sits at
+        # `in_progress`, unclearable — the **Abandoned turn** this route exists
+        # to end. 500 says what happened, and the turn is left exactly as it
+        # was found for the caller to try again.
+        rt.store.get_plan_by_session = AsyncMock(
+            side_effect=RuntimeError("Cosmos is unavailable")
+        )
+        task = MagicMock()
+        task.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="sess-1", plan_id="plan-1", task=task
+        )
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 500
+        task.cancel.assert_not_called()
+        rt.store.update_plan.assert_not_awaited()
 
     @pytest.mark.parametrize("settled", ["completed", "failed", "canceled"])
     def test_a_chat_that_already_settled_keeps_the_status_it_reached(

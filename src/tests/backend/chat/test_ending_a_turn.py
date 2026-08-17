@@ -144,8 +144,109 @@ class TestOneChatsTurnIsNotAnothers:
             orchestration=orchestration,
         )
 
-        store.get_plan_by_session.assert_awaited_once_with("sess-1")
+        store.get_plan_by_session.assert_awaited_once_with("sess-1", plan_id=None)
         assert store.update_plan.await_args.args[0].session_id == "sess-1"
+        task.cancel()
+
+
+class TestTheRecordSettledIsTheCancelledTurnsOwn:
+    """Which Plan, when the session holds more than one.
+
+    A Chat holds more than one Plan (#71) and a new turn in the same session
+    mints another, so "the session's latest" is the cancelled turn's record
+    only while no newer turn has started. ``process_request`` writes the new
+    Plan *before* it replaces the registry entry, so there is a window in which
+    the registry still names the old turn and the latest plan is already the
+    new one — and settling "the latest" there would cancel one turn and label a
+    different one, leaving a turn about to run against a record that says it
+    was canceled.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_turn_names_the_plan_it_was_answering(self):
+        task = await _in_flight()
+        store = _store(_plan())
+        orchestration = _registry(
+            SimpleNamespace(session_id="sess-1", task=task, plan_id="plan-old")
+        )
+
+        await end_turn(
+            user_id="user-1",
+            session_id="sess-1",
+            memory_store=store,
+            orchestration=orchestration,
+        )
+
+        store.get_plan_by_session.assert_awaited_once_with("sess-1", plan_id="plan-old")
+
+    @pytest.mark.asyncio
+    async def test_an_abandoned_turn_still_settles_the_sessions_latest(self):
+        # The fallback, and why the plan id cannot simply be required: a turn
+        # whose task is gone leaves no registry entry to read one from, and
+        # that stuck row is exactly what #122 has to be able to clear.
+        store = _store(_plan())
+
+        await end_turn(
+            user_id="user-1",
+            session_id="sess-1",
+            memory_store=store,
+            orchestration=_registry(),
+        )
+
+        store.get_plan_by_session.assert_awaited_once_with("sess-1", plan_id=None)
+
+
+class TestAStoreThatCannotBeRead:
+    """An outage may not become a destroyed turn (ADR-031, ADR-026).
+
+    The record is read **before** anything is cancelled, and that order is the
+    whole of this class. Cancel-then-read means a Cosmos failure kills the
+    orchestration and then fails to write the status that would let anyone
+    clear the row — an **Abandoned turn** manufactured by the primitive whose
+    entire purpose is to end them. Read first, and a store that cannot answer
+    leaves the turn exactly as it found it.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_turn_is_not_cancelled_on_a_record_nobody_could_read(self):
+        task = await _in_flight()
+        store = _store()
+        store.get_plan_by_session = AsyncMock(
+            side_effect=RuntimeError("Cosmos is unavailable")
+        )
+        orchestration = _registry(SimpleNamespace(session_id="sess-1", task=task))
+
+        with pytest.raises(RuntimeError):
+            await end_turn(
+                user_id="user-1",
+                session_id="sess-1",
+                memory_store=store,
+                orchestration=orchestration,
+            )
+
+        assert not task.cancelled() and not task.cancelling()
+        orchestration.release_active_turn.assert_not_called()
+        task.cancel()
+
+    @pytest.mark.asyncio
+    async def test_a_chat_that_is_not_there_cancels_nothing(self):
+        # No Plan record for this session and this user means there is no Chat
+        # here to end a turn of. Reaching into the registry anyway would let a
+        # session id somebody guessed reach a task — and the registry answers by
+        # `user_id`, so the only turn it could reach is the caller's own,
+        # running for a Chat they did not name.
+        task = await _in_flight()
+        orchestration = _registry(SimpleNamespace(session_id="sess-1", task=task))
+
+        result = await end_turn(
+            user_id="user-1",
+            session_id="sess-1",
+            memory_store=_store(None),
+            orchestration=orchestration,
+        )
+
+        assert result == EndedTurn(outcome=TurnOutcome.no_such_chat, cancelled=False)
+        assert not task.cancelled() and not task.cancelling()
         task.cancel()
 
 
@@ -171,6 +272,30 @@ class TestASettledChatKeepsItsStatus:
 
         store.update_plan.assert_not_awaited()
         assert result.outcome is TurnOutcome.already_settled
+
+    @pytest.mark.asyncio
+    async def test_a_settled_record_still_ends_the_turn_it_finds_computing(self):
+        # Keeping the status and ending the turn are separate answers. The
+        # record already tells the truth, so nothing is written — but a task
+        # still computing for this Chat is a turn the associate asked to end,
+        # and leaving it running against a socket they have left is the
+        # **Abandoned turn** by another name.
+        task = await _in_flight()
+        store = _store(_plan(status=PlanStatus.completed))
+        orchestration = _registry(SimpleNamespace(session_id="sess-1", task=task))
+
+        result = await end_turn(
+            user_id="user-1",
+            session_id="sess-1",
+            memory_store=store,
+            orchestration=orchestration,
+        )
+
+        assert task.cancelled() or task.cancelling()
+        store.update_plan.assert_not_awaited()
+        assert result == EndedTurn(
+            outcome=TurnOutcome.already_settled, cancelled=True
+        )
 
     @pytest.mark.asyncio
     async def test_a_status_nobody_recognises_is_a_turn_to_end(self):

@@ -89,8 +89,11 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
-    async def get_plan_by_session(self, session_id: str) -> Optional[Plan]:
-        """Retrieve a Chat's latest plan — the one **Ending a turn** settles."""
+    async def get_plan_by_session(
+        self, session_id: str, plan_id: Optional[str] = None
+    ) -> Optional[Plan]:
+        """The Plan record **Ending a turn** settles — the session's latest, or
+        the named one within that session."""
         pass
 
     @abstractmethod

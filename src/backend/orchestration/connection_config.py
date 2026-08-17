@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ActiveTurn:
-    """A user's turn in flight, and the **Chat** it is answering.
+    """A user's turn in flight: the **Chat** it is answering, and the Plan.
 
     The session is half of the record rather than an afterthought (#120,
     ADR-031 §6). Keyed by ``user_id`` alone, this registry could say *that* a
@@ -31,9 +31,18 @@ class ActiveTurn:
     whatever the associate had running and mislabel a second conversation. One
     associate, one tab, one live turn is true in rehearsal, which is precisely
     why that would surface once, in front of an audience.
+
+    The plan is the other half, for the same reason one step down. A Chat holds
+    more than one Plan (#71) and a second turn in the same session mints
+    another, so ending a turn cannot find its record by asking for the
+    session's latest — ``process_request`` writes the new Plan *before* it
+    replaces this entry, and in that window the latest belongs to a turn that
+    has not started. Cancelling one turn and settling another's record is how a
+    Chat ends up saying `canceled` while it answers.
     """
 
     session_id: str
+    plan_id: str
     task: asyncio.Task
 
 
@@ -69,10 +78,12 @@ class OrchestrationConfig:
     # ------------------------------------------------------------------ #
 
     def register_active_turn(
-        self, user_id: str, session_id: str, task: asyncio.Task
+        self, user_id: str, session_id: str, plan_id: str, task: asyncio.Task
     ) -> None:
-        """Record the turn ``user_id`` has in flight, and the Chat it answers."""
-        self.active_turns[user_id] = ActiveTurn(session_id=session_id, task=task)
+        """Record the turn ``user_id`` has in flight, its Chat and its Plan."""
+        self.active_turns[user_id] = ActiveTurn(
+            session_id=session_id, plan_id=plan_id, task=task
+        )
 
     def active_turn(self, user_id: str) -> Optional[ActiveTurn]:
         """The turn this user has in flight, if there is one still running.

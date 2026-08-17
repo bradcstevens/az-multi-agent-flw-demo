@@ -261,6 +261,15 @@ reported vs measured** holds everywhere else: the turn was already destroyed, si
 ends *itself* — an expired **Clarification**, inside the orchestration task — is not cancelled, only
 recorded; cancelling there would raise before the write and leave the Chat at `in_progress`, which
 is the state the primitive exists to leave.
+
+The record is read **before** anything is cancelled, and it is *this turn's* record. Both are
+failures rather than preferences. Cancel first and a store outage — which the shared read reports as
+an empty result, identical to a session with no plan — destroys the orchestration, writes nothing,
+and manufactures the **Abandoned turn** the primitive exists to end; so this read goes to Cosmos raw
+and a store that cannot answer is a 500, not a 404. And a Chat holds more than one **Plan record**,
+so the turn registry records which one its task is answering: `process_request` writes a new Plan
+*before* it replaces the registry entry, and settling "the session's latest" in that window would
+cancel one turn and label another.
 _Avoid_: cancel the plan, plan cancellation, abort the request
 
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
