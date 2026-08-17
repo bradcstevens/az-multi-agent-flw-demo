@@ -7,6 +7,8 @@ import SimulatedTicketCard from "../escalation/SimulatedTicketCard";
 import { useAppSelector } from "../../store/hooks";
 import { selectRaisedTicket } from "../../store/slices/ticketSlice";
 import { selectSelectedTeam, selectTeamAgentCount } from "../../store/slices/teamSlice";
+import { selectTransparencyRailExpanded } from "../../store/slices/transparencySlice";
+import useDesktopDrawer from '@/hooks/useDesktopDrawer';
 import "../../styles/planpanelright.css";
 import "../../styles/simulatedTicket.css";
 
@@ -37,6 +39,8 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   // second count is a second thing to disagree with the first.
   const availableTeam = useAppSelector(selectSelectedTeam);
   const availableCount = useAppSelector(selectTeamAgentCount);
+  const isDesktopDrawer = useDesktopDrawer();
+  const railExpanded = useAppSelector(selectTransparencyRailExpanded);
 
   if (!planData && !loading) {
     return <ContentNotFound subtitle="The requested page could not be found." />;
@@ -66,7 +70,10 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
 
   // Main render
   return (
-    <div className="plan-panel-right" data-testid="plan-panel-right">
+    <div
+      className={`plan-panel-right${isDesktopDrawer && !railExpanded ? ' plan-panel-right--collapsed' : ''}`}
+      data-testid="plan-panel-right"
+    >
       {/*
         The ticket the approval raised, above the plan it was raised from.
         This panel rather than the reply stream, and deliberately: it is the

@@ -39,6 +39,15 @@
     background-color: var(--colorNeutralBackground2);
 }
 
+.transparency-rail--collapsed {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    border-left: none;
+}
+
 /*
  * A panel is a card.
  *

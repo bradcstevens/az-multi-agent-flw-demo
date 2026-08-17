@@ -1,9 +1,14 @@
 import React from 'react';
 
 import { useAppSelector } from '@/store/hooks';
-import { selectGroundingSource, selectMeter } from '@/store/slices/transparencySlice';
+import {
+    selectGroundingSource,
+    selectMeter,
+    selectTransparencyRailExpanded,
+} from '@/store/slices/transparencySlice';
 import { modelsByExecutor } from '@/models/roster';
 import { TeamConfig } from '@/models/Team';
+import useDesktopDrawer from '@/hooks/useDesktopDrawer';
 import '@/styles/transparency.css';
 
 import GroundingPanel from './GroundingPanel';
@@ -29,12 +34,23 @@ export interface TransparencyRailProps {
 const TransparencyRail: React.FC<TransparencyRailProps> = ({ team, children }) => {
     const source = useAppSelector(selectGroundingSource);
     const meter = useAppSelector(selectMeter);
+    const isDesktopDrawer = useDesktopDrawer();
+    const expanded = useAppSelector(selectTransparencyRailExpanded);
+    const visible = !isDesktopDrawer || expanded;
 
     return (
-        <aside className="transparency-rail" data-testid="transparency-rail">
-            {children}
-            <GroundingPanel source={source} />
-            <TokenMeterPanel meter={meter} models={modelsByExecutor(team)} />
+        <aside
+            id="transparency-rail"
+            className={`transparency-rail${visible ? '' : ' transparency-rail--collapsed'}`}
+            data-testid="transparency-rail"
+        >
+            {visible && (
+                <>
+                    {children}
+                    <GroundingPanel source={source} />
+                    <TokenMeterPanel meter={meter} models={modelsByExecutor(team)} />
+                </>
+            )}
         </aside>
     );
 };

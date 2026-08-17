@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -27,6 +27,7 @@ vi.mock('../store/PlanDataService', () => ({
 import HomePage from './HomePage';
 import ChatPage from './ChatPage';
 import TransparencyRail from '@/components/transparency/TransparencyRail';
+import AgentTeamPanel from '@/components/transparency/AgentTeamPanel';
 import { TeamService } from '../store/TeamService';
 import { PlanDataService } from '../store/PlanDataService';
 import { ASSISTANT_NAME, STORE_ASSISTANT_TEAM_ID } from '../models/storeSurface';
@@ -43,6 +44,7 @@ import streamingReducer from '@/store/slices/streamingSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import progressReducer from '@/store/slices/progressSlice';
+import { transparencyRailToggled } from '@/store/slices/transparencySlice';
 
 /**
  * The surface's heading outline (issue #57).
@@ -186,6 +188,16 @@ beforeEach(() => {
 });
 
 describe('the home surface has a heading outline', () => {
+    it('offers the transparency-panel disclosure from the content toolbar', async () => {
+        renderHomeSurface();
+
+        await waitFor(() => expect(screen.getByText('Quick tasks')).toBeInTheDocument());
+
+        const toggle = screen.getByRole('button', { name: 'Transparency panels' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(toggle).toHaveAttribute('aria-controls', 'transparency-rail');
+    });
+
     it('exposes exactly one top-level heading, and it names the assistant', async () => {
         renderHomeSurface();
 
@@ -257,6 +269,16 @@ describe('the chat surface has a heading outline', () => {
 
         const top = outline().filter((heading) => heading.level === levelOf(SURFACE_HEADING));
         expect(top.map((heading) => heading.text)).toEqual([ASSISTANT_NAME]);
+    });
+
+    it('offers the transparency-panel disclosure from the content toolbar', async () => {
+        renderChatSurface();
+
+        await waitFor(() => expect(screen.getByTestId('transparency-rail')).toBeInTheDocument());
+
+        const toggle = screen.getByRole('button', { name: 'Transparency panels' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(toggle).toHaveAttribute('aria-controls', 'transparency-rail');
     });
 
     it('makes every transparency panel reachable by heading navigation', async () => {
@@ -352,6 +374,30 @@ describe('the rail heads its panels without heading the surface', () => {
         expect(
             outline().filter((heading) => heading.level === levelOf(SURFACE_HEADING)),
         ).toEqual([]);
+    });
+
+    it('has an expanded outline and a collapsed outline', () => {
+        const store = makeStore();
+        render(
+            <Provider store={store}>
+                <TransparencyRail team={TEAM}>
+                    <AgentTeamPanel available={TEAM} availableCount={1} />
+                </TransparencyRail>
+            </Provider>,
+        );
+
+        const sections = () =>
+            outline()
+                .filter((heading) => heading.level === levelOf(SECTION_HEADING))
+                .map((heading) => heading.text);
+
+        expect(sections()).toEqual(['Agent Team', 'Grounding', 'What this cost']);
+
+        act(() => {
+            store.dispatch(transparencyRailToggled());
+        });
+
+        expect(sections()).toEqual([]);
     });
 
     it('cannot ship a panel title as a span', () => {

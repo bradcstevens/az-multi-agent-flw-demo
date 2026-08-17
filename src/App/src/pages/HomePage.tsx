@@ -6,6 +6,7 @@ import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import HomeInput from '@/components/content/HomeInput';
 import TransparencyRail from '@/components/transparency/TransparencyRail';
+import TransparencyRailToggle from '@/components/transparency/TransparencyRailToggle';
 import AgentTeamPanel from '@/components/transparency/AgentTeamPanel';
 import { NewChatService } from '../store/NewChatService';
 import ChatPanelLeft from '@/components/content/ChatPanelLeft';
@@ -125,6 +126,7 @@ const HomePage: React.FC = () => {
                     />
                     <Content>
                         <ContentToolbar panelTitle={ASSISTANT_NAME}>
+                            <TransparencyRailToggle />
                             <StoreIdentity />
                         </ContentToolbar>
                         {!isLoadingTeam ? (

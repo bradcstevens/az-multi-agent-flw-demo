@@ -36,12 +36,18 @@ export interface TransparencyState {
     meter: MeterState;
     /** Proactive alerts, which are never replies. */
     alerts: PresenterAlert[];
+    /** Whether the transparency rail is open on a desktop surface. */
+    railExpanded: boolean;
+    /** A presenter's choice wins over automatic expansion for this conversation. */
+    railPinned: boolean;
 }
 
 const initialState: TransparencyState = {
     source: null,
     meter: emptyMeter(),
     alerts: [],
+    railExpanded: true,
+    railPinned: false,
 };
 
 const transparencySlice = createSlice({
@@ -54,6 +60,7 @@ const transparencySlice = createSlice({
             if (!source) return;
             state.source = source;
             state.meter = recordSourceUsed(state.meter, source);
+            if (!state.railPinned) state.railExpanded = true;
         },
         /** `WebsocketMessageType.TOKEN_USAGE` — one executor's reported cost. */
         tokenUsageReceived(state, action: PayloadAction<unknown>) {
@@ -106,10 +113,23 @@ const transparencySlice = createSlice({
         conversationStarted(state) {
             state.source = null;
             state.alerts = [];
+            state.railExpanded = true;
+            state.railPinned = false;
+        },
+        /** The presenter opens or closes the rail for this conversation. */
+        transparencyRailToggled(state) {
+            state.railExpanded = !state.railExpanded;
+            state.railPinned = true;
         },
         /** A new conversation, and every panel back to claiming nothing. */
         transparencyReset() {
-            return { source: null, meter: emptyMeter(), alerts: [] };
+            return {
+                source: null,
+                meter: emptyMeter(),
+                alerts: [],
+                railExpanded: true,
+                railPinned: false,
+            };
         },
     },
 });
@@ -121,6 +141,7 @@ export const {
     refusalRecorded,
     requestStarted,
     conversationStarted,
+    transparencyRailToggled,
     transparencyReset,
 } = transparencySlice.actions;
 
@@ -129,5 +150,7 @@ export const selectGroundingSource = (state: RootState): SourceUsed | null =>
 export const selectMeter = (state: RootState): MeterState => state.transparency.meter;
 export const selectPresenterAlerts = (state: RootState): PresenterAlert[] =>
     state.transparency.alerts;
+export const selectTransparencyRailExpanded = (state: RootState): boolean =>
+    state.transparency.railExpanded;
 
 export default transparencySlice.reducer;

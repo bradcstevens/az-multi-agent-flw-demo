@@ -6,6 +6,7 @@ import reducer, {
     refusalRecorded,
     requestStarted,
     sourceUsedReceived,
+    transparencyRailToggled,
     tokenUsageReceived,
     transparencyReset,
 } from './transparencySlice';
@@ -167,5 +168,14 @@ describe('the transparency slice', () => {
         state = reducer(state, tokenUsageReceived(tokenUsage));
 
         expect(state.meter.rows).toHaveLength(2);
+    });
+
+    it('keeps the transparency rail closed after the presenter closes it', () => {
+        let state = reducer(initial(), transparencyRailToggled());
+
+        state = reducer(state, sourceUsedReceived(sourceUsed));
+
+        expect(state.railExpanded).toBe(false);
+        expect(state.railPinned).toBe(true);
     });
 });

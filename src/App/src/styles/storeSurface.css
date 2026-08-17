@@ -180,6 +180,26 @@
         border-top: 1px solid var(--colorNeutralStroke2);
     }
 
+    .coral-shell-row .transparency-rail--collapsed {
+        width: 100%;
+        min-width: 0;
+        padding: 16px;
+        gap: 12px;
+        overflow: visible;
+        border-left: none;
+    }
+
+    .coral-shell-row .plan-panel-right--collapsed {
+        width: 100%;
+        min-width: 0;
+        overflow: visible;
+        border-left: none;
+    }
+
+    .transparency-rail-toggle {
+        display: none;
+    }
+
     /*
      * The stacked shell scrolls as one, so the plan panel is as tall as what it
      * holds. Pinned to `100vh` it would put a viewport of furniture between the

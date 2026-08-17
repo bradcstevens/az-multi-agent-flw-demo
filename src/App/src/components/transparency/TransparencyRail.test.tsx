@@ -50,6 +50,16 @@ const railColumnClasses = (): string[] => {
     );
 };
 
+const collapsedRailContainers = (): string[] =>
+    Array.from(
+        new Set(
+            allRulesIncludingMediaQueries()
+                .flatMap((rule) => classesIn(rule.selector))
+                .filter((className) => className.endsWith('--collapsed'))
+                .filter(isRendered),
+        ),
+    );
+
 describe('the transparency rail fits its own box', () => {
     it('renders the width it declares, padding included', () => {
         // A content-box column is its declared width *plus* its padding, so
@@ -76,12 +86,14 @@ describe('the transparency rail fits its own box', () => {
         // wrong and the outer one clipped the difference away. Whichever number
         // is right, there can only be one of it, or the two drift again the way
         // the two stacking breakpoints did in #58.
-        const rivals = railColumnClasses().filter((className) =>
+        const rivals = railColumnClasses()
+            .filter((className) => !className.endsWith('--collapsed'))
+            .filter((className) =>
             allRulesIncludingMediaQueries().some(
                 (rule) =>
                     classesIn(rule.selector).includes(className) && DECLARED_LENGTH.test(rule.body),
             ),
-        );
+            );
 
         expect(
             rivals,
@@ -156,5 +168,38 @@ describe('the transparency rail fits its own box', () => {
             nested,
             'still a scroll region of its own inside the stacked, already-scrolling page',
         ).toEqual([]);
+    });
+
+    it('collapses every rendered rail container on desktop and releases it when the shell stacks', () => {
+        const containers = collapsedRailContainers();
+        expect(containers, 'no rendered rail container has a collapsed state').not.toEqual([]);
+
+        for (const className of containers) {
+            const closesOnDesktop = allRulesIncludingMediaQueries().some(
+                (rule) =>
+                    classesIn(rule.selector).includes(className) &&
+                    /(?:^|[;\s])width:\s*0/.test(rule.body) &&
+                    /min-width:\s*0/.test(rule.body),
+            );
+            expect(closesOnDesktop, `.${className} does not give its width back on desktop`).toBe(true);
+
+            const stacked = stackedBody(className);
+            expect(
+                stacked,
+                `.${className} keeps its collapsed desktop width below the stacking breakpoint`,
+            ).toMatch(/(?:^|[;\s])width:\s*100%/);
+
+            const compactsGap = allRulesIncludingMediaQueries().some(
+                (rule) =>
+                    classesIn(rule.selector).includes(className) &&
+                    /(?:^|[;\s])gap:\s*0/.test(rule.body),
+            );
+            if (compactsGap) {
+                expect(
+                    stacked,
+                    `.${className} keeps its collapsed spacing below the stacking breakpoint`,
+                ).toMatch(/(?:^|[;\s])gap:\s*12px/);
+            }
+        }
     });
 });

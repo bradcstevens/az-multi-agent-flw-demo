@@ -93,6 +93,7 @@ import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import ContentToolbar from '../commonComponents/components/Content/ContentToolbar';
 import StoreIdentity from '../components/branding/StoreIdentity';
+import TransparencyRailToggle from '../components/transparency/TransparencyRailToggle';
 import { ASSISTANT_NAME } from '../models/storeSurface';
 import LaneBadge from '../components/lane/LaneBadge';
 import { isLane, LANE_LABELS } from '../models/lane';
@@ -766,8 +767,11 @@ const ChatPage: React.FC = () => {
 
     /* ── Left-panel handlers ────────────────────────────────── */
     const handleNewChatButton = useCallback(() => {
-        void handleLeavingChat(() => navigate('/', { state: { focusInput: true } }));
-    }, [navigate, handleLeavingChat]);
+        void handleLeavingChat(() => {
+            dispatch(conversationStarted());
+            navigate('/', { state: { focusInput: true } });
+        });
+    }, [dispatch, navigate, handleLeavingChat]);
 
     const resetReload = useCallback(() => {
         dispatch(setReloadLeftList(false));
@@ -872,6 +876,7 @@ const ChatPage: React.FC = () => {
                     ) : (
                         <>
                             <ContentToolbar panelTitle={ASSISTANT_NAME}>
+                                <TransparencyRailToggle />
                                 <StoreIdentity />
                                 {/*
                                   The Lane this plan was routed into (ADR-013).
