@@ -4,6 +4,7 @@ import { Spinner, Text } from '@fluentui/react-components';
 
 /* ── Services / API ──────────────────────────────────────────── */
 import { APIService } from '../api/apiService';
+import { HttpError } from '../api/httpClient';
 import { PlanDataService } from '../store/PlanDataService';
 import webSocketService from '../store/WebSocketService';
 
@@ -307,8 +308,22 @@ const ChatPage: React.FC = () => {
                   navigating without a session and creating an Abandoned turn.
                 */
                 if (!sessionId && planId) {
-                    const currentPlan = await PlanDataService.fetchPlanData(planId, false);
-                    sessionId = currentPlan?.plan?.session_id;
+                    try {
+                        const currentPlan = await PlanDataService.fetchPlanData(planId, false);
+                        sessionId = currentPlan?.plan?.session_id;
+                    } catch (error: unknown) {
+                        /*
+                          A missing Plan record names no Chat and therefore no
+                          turn to end. Let the associate leave the broken route;
+                          every other failed read remains visible rather than
+                          risking an Abandoned turn.
+                        */
+                        if (error instanceof HttpError && error.status === 404) {
+                            navigationFn();
+                            return;
+                        }
+                        throw error;
+                    }
                 }
                 if (!sessionId) {
                     showToast('Unable to end this chat. Please try again.', 'error');

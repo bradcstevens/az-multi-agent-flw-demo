@@ -39,6 +39,7 @@ import progressReducer from '../store/slices/progressSlice';
 import webSocketService from '../store/WebSocketService';
 import { FakeSocket, frame } from '../testing/fakeSocket';
 import { PlanStatus, ProcessedPlanData } from '../models';
+import { HttpError } from '../api/httpClient';
 
 const PLAN_DATA = {
     plan: {
@@ -65,7 +66,7 @@ const OTHER_PLAN = {
     initial_goal: 'The freezer needs a new filter.',
 };
 
-const renderLeavingChat = () =>
+const renderLeavingChat = (initialPath = '/chat/plan-troubleshooting') =>
     render(
         <Provider
             store={configureStore({
@@ -83,7 +84,7 @@ const renderLeavingChat = () =>
                     getDefaultMiddleware({ serializableCheck: false }),
             })}
         >
-            <MemoryRouter initialEntries={['/chat/plan-troubleshooting']}>
+            <MemoryRouter initialEntries={[initialPath]}>
                 <Routes>
                     <Route path="/" element={<div>New chat</div>} />
                     <Route path="/chat/:id" element={<ChatPage />} />
@@ -209,5 +210,17 @@ describe('leaving a chat', () => {
             expect(apiService.endChatTurn).toHaveBeenCalledWith('session-223'),
         );
         settleInitialRead!(PLAN_DATA);
+    });
+
+    it('leaves a Chat route whose Plan record no longer exists', async () => {
+        vi.mocked(PlanDataService.fetchPlanData).mockRejectedValue(
+            new HttpError('Plan not found', 404),
+        );
+
+        renderLeavingChat();
+        fireEvent.click(await screen.findByRole('button', { name: 'New chat' }));
+
+        expect(await screen.findByText('New chat')).toBeInTheDocument();
+        expect(apiService.endChatTurn).not.toHaveBeenCalled();
     });
 });

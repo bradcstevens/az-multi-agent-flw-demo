@@ -14,6 +14,13 @@ type RequestConfig = RequestInit & { url: string };
 type RequestInterceptor = (config: RequestConfig) => RequestConfig;
 type ResponseInterceptor = (response: Response) => Response | Promise<Response>;
 
+export class HttpError extends Error {
+    constructor(message: string, readonly status: number) {
+        super(message);
+        this.name = 'HttpError';
+    }
+}
+
 class HttpClient {
     private baseUrl: string;
     private requestInterceptors: RequestInterceptor[] = [];
@@ -112,7 +119,7 @@ class HttpClient {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(errorText || 'Request failed');
+            throw new HttpError(errorText || 'Request failed', response.status);
         }
 
         const isJson = response.headers.get('content-type')?.includes('application/json');
