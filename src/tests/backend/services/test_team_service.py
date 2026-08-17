@@ -66,7 +66,7 @@ sys.modules['common.database.database_base'] = mock_database_base_module
 
 # Mock common.models.messages with real dataclasses
 from dataclasses import dataclass, field
-from typing import Any, List
+from typing import Any, List, Optional
 
 
 @dataclass
@@ -97,6 +97,7 @@ class MockStartingTask:
     logo: str = ""
     lane: str = None
     rehearsed_replies: List[str] = field(default_factory=list)
+    ticket_status_reply: Optional[dict] = None
     follow_on: str = None
     ticket_on_approval: bool = False
 
@@ -391,6 +392,18 @@ class TestTeamConfigurationValidation:
                 _valid_task_data(ticket_on_approval=True)
             ).ticket_on_approval
             is True
+        )
+
+    def test_a_ticket_status_reply_survives_the_upload(self):
+        """The ticketing task owns the Fast-lane reply it offers after approval."""
+        service = TeamService()
+        reply = {"prompt": "What's happening with my ticket?", "lane": "fast"}
+
+        assert (
+            service._validate_and_parse_task(
+                _valid_task_data(ticket_status_reply=reply)
+            ).ticket_status_reply
+            == reply
         )
 
     def test_rehearsed_replies_survive_the_upload(self):

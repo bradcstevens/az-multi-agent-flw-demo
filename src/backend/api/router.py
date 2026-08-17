@@ -42,7 +42,8 @@ from transparency.source import source_used
 from troubleshooting.steps import parse_attempted_steps
 from troubleshooting.store import TroubleshootingStore
 from troubleshooting.turn import note_turn, sole_turn
-from escalation.store import TicketStore, render_ticket
+from escalation.payloads import TicketRaised
+from escalation.store import TicketStatus, TicketStore, render_ticket
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -2046,6 +2047,30 @@ async def get_service_ticket():
     except Exception as e:
         logger.warning("Could not read the service ticket: %s", e)
         return _no_ticket()
+
+
+@app_router.get("/chats/{session_id}/ticket")
+async def get_chat_ticket(session_id: str, request: Request):
+    """The submitted Simulated ticket for one of this user's Chats, if any.
+
+    This is a Chat read, not a ticket-number lookup: the route accepts the
+    Session the browser already opened and the store enforces its owner. Drafts
+    remain invisible because the associate has not raised them yet.
+    """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        raise HTTPException(status_code=400, detail="no user")
+
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    ticket = await TicketStore(memory_store, user_id=user_id).read(session_id)
+    if (
+        ticket is None
+        or ticket.user_id != user_id
+        or ticket.fields.get("status") != TicketStatus.submitted
+    ):
+        return None
+    return TicketRaised.from_fields(ticket.fields).to_dict()
 
 
 @app_router.post("/escalation/ticket")

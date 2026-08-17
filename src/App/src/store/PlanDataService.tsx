@@ -118,6 +118,7 @@ export class PlanDataService {
         creator: taskBE.creator,
         logo: taskBE.logo,
         lane: taskBE.lane,
+        ticket_status_reply: taskBE.ticket_status_reply,
         follow_on: taskBE.follow_on,
         ticket_on_approval: taskBE.ticket_on_approval,
       }))

@@ -19,6 +19,7 @@ vi.mock('@/api/apiService', () => {
         getPlans: vi.fn(async () => []),
         approvePlan: vi.fn(),
         getSessionState: vi.fn(async () => ({})),
+        getChatTicket: vi.fn(async () => null),
     };
     return { apiService, APIService: vi.fn(() => apiService) };
 });

@@ -66,8 +66,8 @@ DOMAIN_ALLOWED_TOOLS: dict[str, list[str]] = {
         "list_attempted_steps",
         "record_attempted_steps",
     ],
-    # The Simulated ticket (#22). One tool, and it drafts — the associate
-    # approving the plan is what raises the ticket
+    # The Simulated ticket (#22, #105). The toolset drafts or reads its
+    # conversation-scoped status — the associate approving the plan raises it.
     # (``orchestration_manager._raise_confirmed_ticket``), and TKT-001 says
     # there is no step after that one.
     #
@@ -76,9 +76,11 @@ DOMAIN_ALLOWED_TOOLS: dict[str, list[str]] = {
     # contract needs a ``SESSION_USER_ID`` nothing injects any more, and which
     # is itself a *second question to the associate* at exactly the moment the
     # requirement says there is none. And an entry naming anything beyond the
-    # draft would put a second confirmation step back within a model's reach.
+    # submission tool would put a second confirmation step back within a
+    # model's reach.
     "escalation": [
         "draft_service_ticket",
+        "get_ticket_status",
     ],
     # The Workforce agent's HR procedure library (#52, ADR-017). Load-bearing
     # for the third time: a domain with no entry gets **no filter**, and every

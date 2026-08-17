@@ -4,6 +4,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 
+const { getChatTicket } = vi.hoisted(() => ({
+    getChatTicket: vi.fn(),
+}));
+
 vi.mock('../store/TeamService', () => ({
     TeamService: {
         getUserTeams: vi.fn(),
@@ -19,6 +23,7 @@ vi.mock('@/api/apiService', () => {
         getPlans: vi.fn(async () => []),
         approvePlan: vi.fn(),
         getSessionState: vi.fn(async () => ({})),
+        getChatTicket,
     };
     return { apiService, APIService: vi.fn(() => apiService) };
 });
@@ -51,7 +56,7 @@ import appReducer from '../store/slices/appSlice';
 import teamReducer from '../store/slices/teamSlice';
 import streamingReducer from '../store/slices/streamingSlice';
 import transparencyReducer from '../store/slices/transparencySlice';
-import ticketReducer from '../store/slices/ticketSlice';
+import ticketReducer, { ticketRaised } from '../store/slices/ticketSlice';
 import progressReducer from '@/store/slices/progressSlice';
 import { FakeSocket } from '@/testing/fakeSocket';
 import {
@@ -92,6 +97,10 @@ const TEAM = {
             logo: 'Document',
             lane: 'deliberate',
             ticket_on_approval: true,
+            ticket_status_reply: {
+                prompt: "What's happening with my ticket?",
+                lane: 'fast',
+            },
         },
     ],
 } satisfies TeamConfig;
@@ -121,6 +130,26 @@ const ESCALATION_RESPONSE = {
     lane: 'deliberate',
 } satisfies InputTaskResponse;
 
+const TICKET_STATUS_PLAN_DATA = {
+    ...PLAN_DATA,
+    plan: {
+        ...PLAN_DATA.plan,
+        id: 'plan-escalation',
+        plan_id: 'plan-escalation',
+        initial_goal: ESCALATION_RESPONSE.description,
+    },
+} satisfies ProcessedPlanData;
+
+const REOPENED_TICKET_STATUS_PLAN_DATA = {
+    ...TICKET_STATUS_PLAN_DATA,
+    plan: {
+        ...TICKET_STATUS_PLAN_DATA.plan,
+        id: 'plan-ticket-status',
+        plan_id: 'plan-ticket-status',
+        initial_goal: TICKET_STATUS_PLAN_DATA.team.starting_tasks[1].ticket_status_reply!.prompt,
+    },
+} satisfies ProcessedPlanData;
+
 const makeStore = () => {
     const store = configureStore({
         reducer: {
@@ -139,9 +168,11 @@ const makeStore = () => {
     return store;
 };
 
-const renderPlan = () =>
-    render(
-        <Provider store={makeStore()}>
+const renderPlan = (planData = PLAN_DATA) => {
+    const store = makeStore();
+    vi.mocked(PlanDataService.fetchPlanData).mockResolvedValue(planData);
+    const result = render(
+        <Provider store={store}>
             <MemoryRouter initialEntries={['/chat/plan-troubleshooting']}>
                 <Routes>
                     <Route path="/chat/:id" element={<ChatPage />} />
@@ -149,6 +180,8 @@ const renderPlan = () =>
             </MemoryRouter>
         </Provider>,
     );
+    return { store, ...result };
+};
 
 describe('the troubleshooting follow-on task', () => {
     beforeEach(() => {
@@ -157,6 +190,7 @@ describe('the troubleshooting follow-on task', () => {
         window.appConfig = { API_URL: 'https://backend.example/api' } as never;
         vi.mocked(PlanDataService.fetchPlanData).mockResolvedValue(PLAN_DATA);
         vi.mocked(TaskService.createPlan).mockReset().mockResolvedValue(ESCALATION_RESPONSE);
+        getChatTicket.mockReset().mockResolvedValue(null);
     });
 
     it('continues the viewed troubleshooting session with the authored escalation', async () => {
@@ -216,5 +250,44 @@ describe('the troubleshooting follow-on task', () => {
 
         expect(TaskService.createPlan).toHaveBeenCalledTimes(1);
         resolveCreatePlan!();
+    });
+
+    it('continues the ticket Chat on the declared Fast lane when its status reply is tapped', async () => {
+        const { store } = renderPlan(TICKET_STATUS_PLAN_DATA);
+        await screen.findByRole('textbox');
+        store.dispatch(
+            ticketRaised({
+                ticket_id: 'SIM-223-0001',
+                status: 'submitted',
+                fields: [{ name: 'status', value: 'submitted' }],
+            }),
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: "What's happening with my ticket?" }),
+        );
+
+        await waitFor(() =>
+            expect(TaskService.createPlan).toHaveBeenCalledWith(
+                "What's happening with my ticket?",
+                'team-223',
+                'fast',
+                'session-223-troubleshooting',
+                undefined,
+            ),
+        );
+    });
+
+    it('restores the ticket-status reply when the raised-ticket Chat is reopened', async () => {
+        getChatTicket.mockResolvedValue({
+            ticket_id: 'SIM-223-0001',
+            status: 'submitted',
+            fields: [{ name: 'status', value: 'submitted' }],
+        });
+        renderPlan(REOPENED_TICKET_STATUS_PLAN_DATA);
+
+        expect(
+            await screen.findByRole('button', { name: "What's happening with my ticket?" }),
+        ).toBeInTheDocument();
     });
 });

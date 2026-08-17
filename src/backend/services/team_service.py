@@ -174,6 +174,7 @@ class TeamService:
             # asks what has been tried, and the only symptom is a presenter
             # typing the answer on stage.
             rehearsed_replies=list(task_data.get("rehearsed_replies") or []),
+            ticket_status_reply=task_data.get("ticket_status_reply"),
             # The follow-on is optional because most tasks begin and end their
             # own conversation. It is nevertheless explicit: omitted here,
             # it is silently lost during upload and the escalation returns to

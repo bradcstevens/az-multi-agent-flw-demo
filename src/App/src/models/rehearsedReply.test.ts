@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { followOnTaskFor, rehearsedRepliesFor } from './rehearsedReply';
+import {
+    followOnTaskFor,
+    rehearsedRepliesFor,
+    ticketStatusReplyFor,
+} from './rehearsedReply';
 import { TeamConfig } from './Team';
 
 const task = (overrides: Partial<TeamConfig['starting_tasks'][number]> = {}) => ({
@@ -47,6 +51,70 @@ describe('resolving the rehearsed replies for a plan', () => {
             expect(followOnTaskFor(team(), task().prompt)).toBeUndefined();
             expect(followOnTaskFor(team([task({ follow_on: 'missing-task' })]), task().prompt)).toBeUndefined();
         });
+    });
+
+    it('gives the escalation task authored ticket-status reply to its own Chat', () => {
+        const escalation = {
+            ...task({
+                id: 'task-223-escalation',
+                name: "I can't fix it",
+                prompt: 'I have tried everything and I need someone to come out.',
+            }),
+            ticket_status_reply: {
+                prompt: "What's happening with my ticket?",
+                lane: 'fast',
+            },
+        };
+
+        expect(ticketStatusReplyFor(team([escalation]), escalation.prompt)).toEqual(
+            escalation.ticket_status_reply,
+        );
+    });
+
+    it('finds the ticketing reply after its status turn became the latest plan', () => {
+        const escalation = {
+            ...task({
+                id: 'task-223-escalation',
+                name: "I can't fix it",
+                prompt: 'I have tried everything and I need someone to come out.',
+                ticket_on_approval: true,
+            }),
+            ticket_status_reply: {
+                prompt: "What's happening with my ticket?",
+                lane: 'fast',
+            },
+        };
+
+        expect(ticketStatusReplyFor(team([escalation]), escalation.ticket_status_reply.prompt)).toEqual(
+            escalation.ticket_status_reply,
+        );
+    });
+
+    it('keeps ticketing continuations separate when a team has more than one', () => {
+        const coffeeTicket = {
+            ...task({
+                id: 'task-223-coffee',
+                ticket_on_approval: true,
+            }),
+            ticket_status_reply: {
+                prompt: 'What is happening with the coffee ticket?',
+                lane: 'fast',
+            },
+        };
+        const coolerTicket = {
+            ...task({
+                id: 'task-223-cooler',
+                ticket_on_approval: true,
+            }),
+            ticket_status_reply: {
+                prompt: 'What is happening with the cooler ticket?',
+                lane: 'fast',
+            },
+        };
+
+        expect(
+            ticketStatusReplyFor(team([coffeeTicket, coolerTicket]), coolerTicket.ticket_status_reply.prompt),
+        ).toEqual(coolerTicket.ticket_status_reply);
     });
 
     it('gives nothing for a goal no Quick Task declares', () => {

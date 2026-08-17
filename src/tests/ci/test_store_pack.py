@@ -780,11 +780,37 @@ def test_given_the_escalation_task_when_approved_then_it_requires_a_ticket_witho
     assert "do not ask the associate any questions" in message
 
 
+def test_given_the_ticketing_task_when_read_then_its_status_reply_is_authored_fast(
+    store_pack,
+):
+    task = next(
+        task
+        for task in store_pack.team["starting_tasks"]
+        if task["id"] == "task-223-escalation"
+    )
+    reply = task["ticket_status_reply"]
+
+    assert reply["lane"] == "fast"
+    assert reply["prompt"].strip()
+
+
 def test_given_the_escalation_prompt_when_read_then_it_does_not_call_the_drafting_tool(
     store_pack,
 ):
     message = store_pack.agent("EscalationAgent")["system_message"].lower()
     assert "do not call draft_service_ticket" in message
+
+
+def test_given_the_escalation_prompt_when_read_then_it_names_the_status_tool(
+    store_pack,
+):
+    service = (
+        REPO_ROOT / "src" / "mcp_server" / "services" / "escalation_service.py"
+    ).read_text(encoding="utf-8")
+    message = store_pack.agent("EscalationAgent")["system_message"]
+
+    assert "async def get_ticket_status(" in service
+    assert "get_ticket_status" in message
 
 
 def test_given_the_escalation_prompt_when_read_then_it_never_asks_for_the_steps(

@@ -7,6 +7,7 @@ interpreter state for other test files that import the same real modules.
 """
 
 import contextlib
+import json
 import logging
 import os
 import sys
@@ -110,6 +111,24 @@ from guardrail.refusal import IDENTITY_BOUNDARY_REFUSAL  # noqa: E402
 from models.messages import WebsocketMessageType  # noqa: E402
 from sop.citation import Citation  # noqa: E402
 from sop.direct_line import SopAnswer  # noqa: E402
+
+_STORE_PACK = (
+    Path(__file__).resolve().parents[4]
+    / "content_packs"
+    / "store_assistant"
+    / "agent_teams"
+    / "store_assistant.json"
+)
+
+
+def _ticket_status_prompt():
+    pack = json.loads(_STORE_PACK.read_text(encoding="utf-8"))
+    ticketing_task = next(
+        task
+        for task in pack["starting_tasks"]
+        if task.get("ticket_on_approval") is True
+    )
+    return ticketing_task["ticket_status_reply"]["prompt"]
 
 
 class StubEmbedder:
@@ -940,6 +959,18 @@ class TestPerRequestPlanReview:
 
     def test_a_fast_lane_request_turns_the_approval_gate_off(self, rt):
         assert self._post(rt, lane="fast").status_code == 200
+        assert self._plan_review_passed(rt) is False
+
+    def test_an_authored_ticket_status_inquiry_turns_the_approval_gate_off(self, rt):
+        """The word ``ticket`` cannot override the reply's declared Fast lane."""
+        response = self._post(
+            rt,
+            description=_ticket_status_prompt(),
+            lane="fast",
+        )
+
+        assert response.status_code == 200
+        assert response.json()["lane"] == "fast"
         assert self._plan_review_passed(rt) is False
 
     def test_free_typed_input_falls_back_to_the_keyword_selection(self, rt):
@@ -2695,6 +2726,44 @@ class TestServiceTicket:
         self._in_flight()
 
         assert self._read(rt).json()["drafted"] is False
+
+    def test_a_reopened_chat_reads_its_submitted_ticket_without_a_number_lookup(self, rt):
+        """A Chat rehydrates its own raised ticket; a draft does not count."""
+        self._in_flight()
+        self._draft(rt, symptom="cold coffee")
+        document = next(
+            d for d in rt.session_documents.values()
+            if d["data_type"] == "service_ticket"
+        )
+        document["fields"]["ticket_id"] = "SIM-223-0001"
+        document["fields"]["status"] = "submitted"
+
+        response = rt.client.get("/api/v4/chats/sess-1/ticket")
+
+        assert response.status_code == 200
+        assert response.json()["ticket_id"] == "SIM-223-0001"
+        assert response.json()["status"] == "submitted"
+
+    def test_a_chat_read_refuses_a_legacy_ticket_without_an_owner(self, rt):
+        """The browser route needs exact ownership, unlike migration-tolerant reads."""
+        self._in_flight()
+        self._draft(rt, symptom="cold coffee")
+        document = next(
+            d for d in rt.session_documents.values()
+            if d["data_type"] == "service_ticket"
+        )
+        document["fields"]["ticket_id"] = "SIM-223-0001"
+        document["fields"]["status"] = "submitted"
+        document["user_id"] = None
+
+        assert rt.client.get("/api/v4/chats/sess-1/ticket").json() is None
+
+    def test_a_fresh_chat_has_no_ticket_to_rehydrate(self, rt):
+        """The path takes a Chat session, never a ticket identifier."""
+        response = rt.client.get("/api/v4/chats/fresh-chat/ticket")
+
+        assert response.status_code == 200
+        assert response.json() is None
 
     def test_no_session_in_flight_drafts_nothing_and_says_so(self, rt):
         """A tool call that cannot be attributed must not fail the agent's turn

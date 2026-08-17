@@ -20,7 +20,8 @@ pytest.importorskip("fastmcp", reason="fastmcp not installed in backend venv; ru
 from core.factory import Domain  # noqa: E402
 from services.backend_client import BackendClient  # noqa: E402
 from services.escalation_service import (  # noqa: E402
-    DRAFT_FAILED, TICKET_PATH, EscalationService, format_draft)
+    DRAFT_FAILED, TICKET_PATH, TICKET_STATUS_UNAVAILABLE, EscalationService,
+    format_draft, format_status)
 
 
 def client_with(payload=None, status=200, error=None):
@@ -65,18 +66,19 @@ class TestThereIsNoWayToRaiseATicket:
     is not a gate, and this one guards the one artefact that leaves the room.
     """
 
-    def test_the_service_offers_exactly_one_tool(self, mock_mcp_server):
+    def test_the_service_offers_a_draft_and_a_read_only_status_tool(self, mock_mcp_server):
         service = EscalationService()
         service.register_tools(mock_mcp_server)
 
-        assert service.tool_count == len(mock_mcp_server.tools) == 1
+        assert service.tool_count == len(mock_mcp_server.tools) == 2
 
-    def test_and_that_tool_drafts(self, mock_mcp_server):
+    def test_the_tools_draft_or_read_but_never_submit(self, mock_mcp_server):
         service = EscalationService()
         service.register_tools(mock_mcp_server)
 
         assert [tool["func"].__name__ for tool in mock_mcp_server.tools] == [
-            "draft_service_ticket"
+            "draft_service_ticket",
+            "get_ticket_status",
         ]
 
     def test_no_tool_here_submits_confirms_or_raises_anything(
@@ -227,3 +229,23 @@ class TestDraftServiceTicket:
         be asked to approve with nothing in it."""
         assert format_draft({}) == DRAFT_FAILED
         assert format_draft(None) == DRAFT_FAILED
+
+
+class TestTicketStatus:
+    @pytest.mark.asyncio
+    async def test_it_reads_only_the_ticket_for_the_turn_in_flight(self, mock_mcp_server):
+        service = EscalationService(
+            client_with({"drafted": True, "fields": {"status": "submitted"}})
+        )
+        tool = tool_named(service, mock_mcp_server, "get_ticket_status")
+
+        assert "submitted" in (await tool()).lower()
+        method, path = service.backend._request.await_args.args
+        assert (method, path) == ("GET", TICKET_PATH)
+        assert "json" not in service.backend._request.await_args.kwargs
+
+    def test_no_ticket_is_an_honest_answer_not_a_status_guess(self):
+        assert format_status({}) == TICKET_STATUS_UNAVAILABLE
+
+    def test_a_draft_is_not_presented_as_a_raised_ticket(self):
+        assert format_status(drafted()) == TICKET_STATUS_UNAVAILABLE

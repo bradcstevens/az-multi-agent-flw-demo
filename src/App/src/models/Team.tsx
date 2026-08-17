@@ -39,6 +39,11 @@ export interface StartingTask {
      */
     rehearsed_replies?: string[];
     /**
+     * The authored Fast-lane inquiry that is available after this task raises a
+     * Simulated ticket in the same Chat.
+     */
+    ticket_status_reply?: TicketStatusReply;
+    /**
      * The Quick Task to offer inside this task's conversation (issue #61,
      * ADR-024). A follow-on is not offered from the home grid.
      */
@@ -48,6 +53,12 @@ export interface StartingTask {
      * record, regardless of whether the model drafted a preview.
      */
     ticket_on_approval?: boolean;
+}
+
+/** An authored continuation prompt whose Lane is declared on the request. */
+export interface TicketStatusReply {
+    prompt: string;
+    lane: string;
 }
 
 export interface Team {

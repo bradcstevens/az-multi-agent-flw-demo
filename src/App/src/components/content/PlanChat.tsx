@@ -12,10 +12,11 @@ import StreamingBufferMessage from "./streaming/StreamingBufferMessage";
 import PresenterAlertCard from "../transparency/PresenterAlertCard";
 import RehearsedReplies from "./RehearsedReplies";
 import FollowOnTask from "./FollowOnTask";
+import TicketStatusReply from "./TicketStatusReply";
 import { useAppSelector } from "@/store/hooks";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
 import { selectProgressNarration } from "@/store/slices/progressSlice";
-import { StartingTask } from "@/models/Team";
+import { StartingTask, TicketStatusReply as TicketStatusReplyModel } from "@/models/Team";
 import { PersonalAnswer } from "@/models/personalAnswer";
 import { PolicyBlock } from "@/api/policyBlock";
 import PersonalAnswerCard from "../identity/PersonalAnswerCard";
@@ -47,6 +48,10 @@ interface SimplifiedPlanChatProps extends PlanChatProps {
   /** The task this conversation can lead to (issue #61, ADR-024). */
   followOnTask?: StartingTask;
   onFollowOnTask?: (task: StartingTask) => void;
+  /** The authored inquiry this Chat offers after it raises its Simulated ticket. */
+  ticketStatusReply?: TicketStatusReplyModel;
+  onTicketStatusReply?: (reply: TicketStatusReplyModel) => void;
+  hasRaisedTicket?: boolean;
   /**
    * Whether a continuation turn is in flight — one lock for both paths, since
    * two turns into one session is one turn cancelled (#77).
@@ -88,6 +93,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
   rehearsedReplies,
   followOnTask,
   onFollowOnTask,
+  ticketStatusReply,
+  onTicketStatusReply,
+  hasRaisedTicket = false,
   continuationSubmitting = false,
   turnInFlight = false,
   personalAnswer = null,
@@ -173,6 +181,13 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
         onReply={OnChatSubmit}
         disabled={submittingChatDisableInput}
       />
+      {hasRaisedTicket && ticketStatusReply && onTicketStatusReply && (
+        <TicketStatusReply
+          reply={ticketStatusReply}
+          onReply={onTicketStatusReply}
+          disabled={continuationSubmitting || turnInFlight}
+        />
+      )}
 
       {/*
         A continuation turn that produced no plan, said where the box that

@@ -54,12 +54,17 @@ import {
 } from '../store/slices/streamingSlice';
 import { selectWsConnected } from '../store/slices/appSlice';
 import { selectSelectedTeam } from '../store/slices/teamSlice';
-import { followOnTaskFor, rehearsedRepliesFor } from '../models/rehearsedReply';
+import {
+    followOnTaskFor,
+    rehearsedRepliesFor,
+    ticketStatusReplyFor,
+} from '../models/rehearsedReply';
 import { CANNOT_CONTINUE, turnModeFor } from '../models/resume';
 import { PersonalAnswer, parsePersonalAnswer } from '../models/personalAnswer';
 import { PolicyBlock, parsePolicyBlock } from '../api/policyBlock';
 import { forgetSignedInDevice } from '../models/signedInDevice';
-import { StartingTask } from '../models/Team';
+import { StartingTask, TicketStatusReply } from '../models/Team';
+import { selectRaisedTicket, ticketRaised } from '../store/slices/ticketSlice';
 import { TaskService } from '../store/TaskService';
 
 /* ── Custom Hooks ────────────────────────────────────────────── */
@@ -131,6 +136,7 @@ const ChatPage: React.FC = () => {
 
     /* ── Redux Selectors (granular — Point 10) ──────────────── */
     const planData = useAppSelector(selectPlanData);
+    const raisedTicket = useAppSelector(selectRaisedTicket);
     const loading = useAppSelector(selectPlanLoading);
     const errorLoading = useAppSelector(selectErrorLoading);
     const planApprovalRequest = useAppSelector(selectPlanApprovalRequest);
@@ -210,6 +216,10 @@ const ChatPage: React.FC = () => {
         () => followOnTaskFor(planTeam, planData?.plan?.initial_goal),
         [planTeam, planData?.plan?.initial_goal],
     );
+    const ticketStatusReply = React.useMemo(
+        () => ticketStatusReplyFor(planTeam, planData?.plan?.initial_goal),
+        [planTeam, planData?.plan?.initial_goal],
+    );
 
     /* ── The lane taken, recovered after a reload (issue #20) ─── */
     const [laneFromSessionState, setLaneFromSessionState] = React.useState<string | undefined>(undefined);
@@ -237,6 +247,26 @@ const ChatPage: React.FC = () => {
             cancelled = true;
         };
     }, [laneFromRouterState, planSessionId]);
+
+    useEffect(() => {
+        /*
+          A ticket is a persisted property of this **Chat**, not of the browser
+          that watched its approval. Restore only a submitted ticket, through
+          the session-scoped read, so reopening its Chat retains the authored
+          Fast inquiry while a fresh Chat still has none.
+        */
+        if (!planSessionId) return;
+        let cancelled = false;
+        apiService
+            .getChatTicket(planSessionId)
+            .then((ticket) => {
+                if (!cancelled) dispatch(ticketRaised(ticket));
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [dispatch, planSessionId]);
 
     const laneTaken = laneFromRouterState ?? laneFromSessionState;
 
@@ -501,6 +531,12 @@ const ChatPage: React.FC = () => {
                 lane: task.lane,
                 startingTaskId: task.id,
             }),
+        [submitTurnIntoSession],
+    );
+
+    const handleTicketStatusReply = useCallback(
+        (reply: TicketStatusReply) =>
+            submitTurnIntoSession(reply.prompt, { lane: reply.lane }),
         [submitTurnIntoSession],
     );
 
@@ -784,6 +820,9 @@ const ChatPage: React.FC = () => {
                                 rehearsedReplies={rehearsedReplies}
                                 followOnTask={followOnTask}
                                 onFollowOnTask={handleFollowOnTask}
+                                ticketStatusReply={ticketStatusReply}
+                                onTicketStatusReply={handleTicketStatusReply}
+                                hasRaisedTicket={raisedTicket !== null}
                                 continuationSubmitting={continuationSubmitting}
                                 turnInFlight={turnInFlight}
                                 personalAnswer={continuationAnswer}

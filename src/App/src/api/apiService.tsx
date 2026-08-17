@@ -245,6 +245,13 @@ export class APIService {
         );
     }
 
+    /** Read the submitted Simulated ticket for an already-open Chat, if it has one. */
+    async getChatTicket(sessionId: string): Promise<unknown> {
+        return apiClient.get(
+            `${API_ENDPOINTS.CHATS}/${encodeURIComponent(sessionId)}/ticket`
+        );
+    }
+
     /**
      * The Mocked sign-in (issue #27) — the whole of the identity provider.
      *

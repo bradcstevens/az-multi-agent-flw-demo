@@ -71,6 +71,8 @@ export interface StartingTaskBE {
     follow_on?: string;
     /** Whether approval must persist this task's Simulated ticket (issue #62). */
     ticket_on_approval?: boolean;
+    /** The authored Fast-lane inquiry offered after this task raises a ticket. */
+    ticket_status_reply?: { prompt: string; lane: string };
 }
 
 /**

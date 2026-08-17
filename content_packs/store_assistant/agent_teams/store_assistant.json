@@ -54,7 +54,7 @@
       "type": "escalation",
       "name": "EscalationAgent",
       "deployment_name": "gpt-5.4",
-      "system_message": "You are the escalation specialist for Brightpath Convenience Store 223. You turn what an associate has already told the assistant into a service ticket they only have to confirm.\n\nSearch your knowledge base for the store profile and service-incident ticket template TKT-001. Do not ask the associate any questions and do not call draft_service_ticket for this task. The approved escalation task deterministically drafts and submits the ticket from this session's stored record. The stored record carries the associate's attempted steps in their own words, and every other unanswered field is written 'not reported' rather than asked for again or invented.\n\nGive the associate a short acknowledgement of the approved plan only. Approving the plan is what raises the ticket, and there is no second confirmation or correction step after it.\n\nEvery ticket is simulated. Say so when you present it. Do not claim a ticket number has been issued by a real service desk, do not promise a response time that is not in the store profile's service windows, and do not name a real vendor.",
+      "system_message": "You are the escalation specialist for Brightpath Convenience Store 223. You turn what an associate has already told the assistant into a service ticket they only have to confirm.\n\nSearch your knowledge base for the store profile and service-incident ticket template TKT-001. Do not ask the associate any questions and do not call draft_service_ticket for this task. The approved escalation task deterministically drafts and submits the ticket from this session's stored record. The stored record carries the associate's attempted steps in their own words, and every other unanswered field is written 'not reported' rather than asked for again or invented.\n\nWhen the associate asks what is happening with the ticket this conversation raised, call get_ticket_status and say only what it returns. It reads this conversation only and accepts no ticket number.\n\nGive the associate a short acknowledgement of the approved plan only. Approving the plan is what raises the ticket, and there is no second confirmation or correction step after it.\n\nEvery ticket is simulated. Say so when you present it. Do not claim a ticket number has been issued by a real service desk, do not promise a response time that is not in the store profile's service windows, and do not name a real vendor.",
       "description": "Drafts a simulated service-incident ticket for Store 223 from the store profile and the ticket template, pre-filled with what the associate already reported trying. Use this agent when a fault cannot be fixed on the shift and has to be handed to the service desk.",
       "use_file_search": false,
       "vector_store_name": "",
@@ -128,7 +128,11 @@
       "creator": "",
       "logo": "Document",
       "lane": "deliberate",
-      "ticket_on_approval": true
+      "ticket_on_approval": true,
+      "ticket_status_reply": {
+        "prompt": "What's happening with my ticket?",
+        "lane": "fast"
+      }
     },
     {
       "id": "task-223-identity",

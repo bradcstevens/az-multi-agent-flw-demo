@@ -5,12 +5,10 @@ and no dependency — so the draft goes to the backend over HTTP through the sam
 ``BackendClient`` seam the attempted-steps tools use, against the backend URL
 already configured for it.
 
-**There is one tool and it drafts.** That is the requirement "the plan approval
-*is* the ticket confirmation — there is no second confirmation step" expressed
-as a toolbox rather than as an instruction. Submission happens deterministically
-at the plan-approval seam in the backend's orchestration manager; nothing here
-can reach it, so no turn the model improvises can raise a ticket the associate
-did not approve, and no turn the model forgets can leave one unraised.
+**The tools draft or read; neither submits.** The plan approval *is* the ticket
+confirmation. Submission happens deterministically at the plan-approval seam in
+the backend's orchestration manager, so no turn the model improvises can raise a
+ticket the associate did not approve.
 
 The tool has no ``steps_attempted`` parameter either, for the same class of
 reason. A model given somewhere to put the attempted steps will put its
@@ -41,6 +39,9 @@ DRAFT_FAILED = (
     "approve. Tell them the ticket was not raised and do not quote a ticket "
     "number. Do not claim it is waiting for approval."
 )
+TICKET_STATUS_UNAVAILABLE = (
+    "There is no simulated ticket in this conversation to check."
+)
 
 # What the agent must not say yet. The number is issued by the confirmation,
 # and the confirmation is the approval step the associate has not reached.
@@ -69,8 +70,22 @@ def format_draft(payload: Optional[Dict[str, Any]]) -> str:
     return f"{rendered}\n\n{NOT_RAISED_YET}"
 
 
+def format_status(payload: Optional[Dict[str, Any]]) -> str:
+    """Render this conversation's stored ticket status, or say none exists."""
+    fields = (payload or {}).get("fields")
+    if not (payload or {}).get("drafted") or not isinstance(fields, dict):
+        return TICKET_STATUS_UNAVAILABLE
+    status = str(fields.get("status") or "").strip()
+    if status != "submitted":
+        return TICKET_STATUS_UNAVAILABLE
+    return (
+        f"The simulated ticket is {status}. No service desk receives it and no "
+        "engineer is dispatched."
+    )
+
+
 class EscalationService(MCPToolBase):
-    """The ticket draft, on its own domain."""
+    """The Simulated ticket's draft and conversation-scoped status."""
 
     def __init__(self, backend: Optional[BackendClient] = None):
         super().__init__(Domain.ESCALATION)
@@ -156,6 +171,24 @@ class EscalationService(MCPToolBase):
                 return DRAFT_FAILED
             return format_draft(payload)
 
+        @mcp.tool(tags=[self.domain.value])
+        async def get_ticket_status() -> str:
+            """Read this conversation's Simulated ticket status.
+
+            Call this only when the associate asks what is happening with the
+            ticket the conversation already raised. It accepts no ticket number
+            and reads only the session of the turn in flight.
+            """
+            try:
+                payload = await self.backend.get_json(
+                    TICKET_PATH,
+                    timeout=ESCALATION_TIMEOUT_SECONDS,
+                )
+            except Exception as exc:
+                logger.error("get_ticket_status: backend unreachable: %s", exc)
+                return TICKET_STATUS_UNAVAILABLE
+            return format_status(payload)
+
     @property
     def tool_count(self) -> int:
-        return 1
+        return 2

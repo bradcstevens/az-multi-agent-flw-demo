@@ -24,7 +24,7 @@
  * another are a tap that answers something nobody asked.
  */
 
-import { StartingTask, TeamConfig } from './Team';
+import { StartingTask, TeamConfig, TicketStatusReply } from './Team';
 
 /** How a prompt is compared after its round trip through a text box. */
 const comparable = (text: string): string => text.trim().toLowerCase();
@@ -67,4 +67,40 @@ export const followOnTaskFor = (
     if (!followOnId) return undefined;
 
     return (team?.starting_tasks ?? []).find((candidate) => candidate.id === followOnId);
+};
+
+/** The ticket-status inquiry authored for this Chat's ticketing task, or none. */
+export const ticketStatusReplyFor = (
+    team: TeamConfig | null | undefined,
+    goal: string | null | undefined,
+): TicketStatusReply | undefined => {
+    const replyFor = (task: StartingTask | undefined): TicketStatusReply | undefined => {
+        const reply = task?.ticket_status_reply;
+        if (
+            !reply
+            || typeof reply.prompt !== 'string'
+            || !reply.prompt.trim()
+            || typeof reply.lane !== 'string'
+        ) {
+            return undefined;
+        }
+        return reply;
+    };
+    const taskReply = replyFor(taskForGoal(team, goal));
+    if (taskReply) return taskReply;
+
+    /*
+     * A Chat row opens its latest Plan. Once the inquiry itself creates that
+     * Plan, its goal is the status prompt rather than the ticketing task. Match
+     * that authored prompt among ticketing tasks, so different ticket flows in
+     * the same team do not borrow each other's continuation.
+     */
+    const statusGoalReplies = (team?.starting_tasks ?? [])
+        .filter((task) => task.ticket_on_approval === true)
+        .map(replyFor)
+        .filter(
+            (reply): reply is TicketStatusReply =>
+                reply !== undefined && comparable(reply.prompt) === comparable(goal ?? ''),
+        );
+    return statusGoalReplies.length === 1 ? statusGoalReplies[0] : undefined;
 };

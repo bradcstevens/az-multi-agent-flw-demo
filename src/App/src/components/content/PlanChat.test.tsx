@@ -113,4 +113,19 @@ describe('the conversation offers the rehearsed replies', () => {
 
         expect(screen.queryByTestId('rehearsed-replies')).not.toBeInTheDocument();
     });
+
+    it('does not offer a ticket-status reply before this Chat raises a ticket', () => {
+        renderChat(
+            {
+                ticketStatusReply: {
+                    prompt: 'Ticket status',
+                    lane: 'fast',
+                },
+                onTicketStatusReply: vi.fn(),
+            },
+            { pending: false },
+        );
+
+        expect(screen.queryByTestId('ticket-status-reply')).not.toBeInTheDocument();
+    });
 });

@@ -290,6 +290,11 @@ class StartingTask(BaseModel):
     # it has any.
     rehearsed_replies: List[str] = Field(default_factory=list)
 
+    # The post-approval ticket-status inquiry (issue #105). It is authored on
+    # the ticketing task because only that task can raise the ticket whose
+    # conversation may offer the reply.
+    ticket_status_reply: Optional[Dict[str, str]] = None
+
     # The next Quick Task in this conversation (issue #61, ADR-024). Like
     # ``lane``, the pointer is authored configuration: a missing or unknown
     # task simply produces no follow-on affordance in the surface.
