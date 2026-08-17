@@ -306,10 +306,12 @@ export class PlanDataService {
               .replace(/\s+/g, ' ')
               .trim();
             return {
-              id: i + 1,
+              id: step.id ?? i + 1,
               action,
               cleanAction,
-              agent: step.agent || step._agent || 'System'
+              agent: step.agent || step._agent || 'System',
+              ...(step.assignee ? { assignee: step.assignee } : {}),
+              ...(step.waitsOn === undefined ? {} : { waitsOn: step.waitsOn }),
             };
           }).filter((s: any) => s.cleanAction.length > 3 && !/^(?:involvement|certainly|given|here is)/i.test(s.cleanAction));
 

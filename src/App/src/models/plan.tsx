@@ -1,6 +1,7 @@
 import { AgentMessageData } from './agentMessage';
 import { PlanStatus, AgentMessageType } from './enums';
 import { StreamingPlanUpdate } from './messages';
+import { PlanApprovalStep } from './reviewablePlan';
 import { TeamConfig } from './Team';
 
 /**
@@ -260,12 +261,7 @@ export interface MPlanData {
     user_request: string;
     team: string[];
     facts: string;
-    steps: Array<{
-        id: number;
-        action: string;
-        cleanAction: string;
-        agent?: string;
-    }>;
+    steps: PlanApprovalStep[];
     context: {
         task: string;
         participant_descriptions: Record<string, string>;
