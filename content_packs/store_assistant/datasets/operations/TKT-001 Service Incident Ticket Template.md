@@ -1,7 +1,7 @@
 # TKT-001 Service Incident Ticket Template
 
 Document ID: TKT-001
-Site: Brightpath Convenience Store 223
+Site: Circle K Store 223
 Owner: Store Operations
 Version: 1.0
 
@@ -18,7 +18,7 @@ ticket_id: SIM-223-<sequence>, issued when the associate confirms
 opened_at: the local time the associate confirmed, ISO 8601
 status: draft until confirmed, then submitted
 priority: 1 to 4, chosen against the service windows in STORE-223 Store Profile
-site: Brightpath Convenience Store 223
+site: Circle K Store 223
 site_number: 223
 site_contact: the shift lead on duty, or the duty manager out of hours
 asset: the equipment in plain words, as the associate would name it
@@ -55,7 +55,7 @@ ticket_id: SIM-223-0041
 opened_at: 2026-08-13T14:12:00
 status: submitted
 priority: 2
-site: Brightpath Convenience Store 223
+site: Circle K Store 223
 site_number: 223
 site_contact: shift lead on duty
 asset: front counter coffee brewer, left head

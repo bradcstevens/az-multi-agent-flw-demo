@@ -1,7 +1,7 @@
 # STORE-223 Store Profile
 
 Document ID: STORE-223
-Site: Brightpath Convenience Store 223
+Site: Circle K Store 223
 Owner: Store Operations
 Version: 1.0
 
@@ -11,7 +11,7 @@ filled in from a record rather than from the associate's memory.
 
 ## Site
 
-- Site name: Brightpath Convenience Store 223
+- Site name: Circle K Store 223
 - Site number: 223
 - Format: Forecourt and shop. Eight fuel positions, no vehicle services on site.
 - Address: 4180 Halden Road, Marchfield

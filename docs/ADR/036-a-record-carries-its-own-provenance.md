@@ -100,7 +100,7 @@ Eight findings from the inventory, each of which moved the decision.
 8. **A worse honesty problem is already on screen and this change promotes it.**
    `ticket.py:21` still holds `SITE = "Brightpath Convenience Store 223"`, and the card renders
    every field in `ticket.fields` without filtering, so a **different company's name** is a row on
-   the ticket. It is also in all four agent `system_message`s and seven content-pack documents,
+   the ticket. It is also in all four agent `system_message`s and seven content-pack documents,[^pack-count]
    surviving [ADR-019](./019-rebrand-the-sop-corpus-to-circle-k.md). *Simulated* was at least a
    deliberate marker; *Brightpath* reads as *"they built this for someone else and swapped the
    logo"*, and once the badge is gone it is the loudest thing on the card telling the audience this
@@ -204,7 +204,7 @@ the deleted device walking back in under its old name.
 
 **The Brightpath leak is decided here and shipped separately.** Removing the badges is what promotes
 it from cosmetic to load-bearing, so the reasoning belongs to this ADR; the work — `SITE`, four
-system messages, seven content-pack documents — is its own issue under spec 2, ordered **before**
+system messages, seven content-pack documents[^pack-count] — is its own issue under spec 2, ordered **before**
 the badge removal ships, so the surface is never in a state where the most conspicuous fake thing on
 it is another company's name.
 
@@ -329,3 +329,5 @@ it is another company's name.
   rule 1 required this ADR rather than a quiet deletion
 - [#85](https://github.com/bradcstevens/az-multi-agent-flw-demo/issues/85) — `Assignee.simulated`,
   whose consumer is redefined by decision 10
+
+[^pack-count]: Corrected by #136: the shipped store pack contains six reference documents carrying nine old-site occurrences. The distinct seventh file is the agent-team definition, which this ADR counts separately as four `system_message`s.
