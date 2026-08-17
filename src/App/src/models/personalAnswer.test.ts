@@ -4,7 +4,7 @@ import { PERSONAL_ANSWER_KIND, parsePersonalAnswer } from './personalAnswer';
 
 const payload = {
     kind: PERSONAL_ANSWER_KIND,
-    display_name: 'Tanya Alvarez',
+    display_name: 'Clara Workman',
     role: 'Store associate, Store 223',
     facts: [
         { label: 'PTO balance', value: '34.5 hours' },
@@ -16,7 +16,7 @@ const payload = {
 describe('the personal answer', () => {
     it('reads the associate the record answers for', () => {
         expect(parsePersonalAnswer({ personal_answer: payload })?.displayName).toBe(
-            'Tanya Alvarez',
+            'Clara Workman',
         );
     });
 
@@ -77,11 +77,11 @@ describe('the personal answer', () => {
         // nothing, which is true. Failing here would look on stage exactly like
         // the refusal the sign-in was supposed to lift.
         const answer = parsePersonalAnswer({
-            personal_answer: { kind: PERSONAL_ANSWER_KIND, display_name: 'Tanya Alvarez' },
+            personal_answer: { kind: PERSONAL_ANSWER_KIND, display_name: 'Clara Workman' },
         });
 
         expect(answer).toEqual({
-            displayName: 'Tanya Alvarez',
+            displayName: 'Clara Workman',
             role: '',
             facts: [],
             note: '',

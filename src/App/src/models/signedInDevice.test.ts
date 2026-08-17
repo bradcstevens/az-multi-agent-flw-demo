@@ -19,20 +19,20 @@ describe('the signed-in device', () => {
     });
 
     it('remembers the name the backend returned', () => {
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
-        expect(signedInName()).toBe('Tanya Alvarez');
+        expect(signedInName()).toBe('Clara Workman');
     });
 
     it('survives a reload, because the demo is one tap from a reload', () => {
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
         // What a fresh module instance after a reload would read.
-        expect(window.sessionStorage.getItem(SIGNED_IN_NAME_KEY)).toBe('Tanya Alvarez');
+        expect(window.sessionStorage.getItem(SIGNED_IN_NAME_KEY)).toBe('Clara Workman');
     });
 
     it('is forgotten by signing out', () => {
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
         forgetSignedInDevice();
 
@@ -45,7 +45,7 @@ describe('the signed-in device', () => {
         // an anonymous shared store device, which is where the demo has to
         // start — and a laptop closed after one rehearsal must open on the
         // refusing state for the next, with nothing to reset by hand.
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
         expect(window.localStorage.getItem(SIGNED_IN_NAME_KEY)).toBeNull();
         expect(window.localStorage.length).toBe(0);
@@ -63,10 +63,10 @@ describe('the signed-in device', () => {
         const listener = vi.fn();
         const unsubscribe = subscribeToSignedInDevice(listener);
 
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
         forgetSignedInDevice();
         unsubscribe();
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
         expect(listener).toHaveBeenCalledTimes(2);
     });
@@ -81,8 +81,8 @@ describe('the signed-in device', () => {
                 throw new Error('nope');
             });
 
-        expect(() => rememberSignedInName('Tanya Alvarez')).not.toThrow();
-        expect(signedInName()).toBe('Tanya Alvarez');
+        expect(() => rememberSignedInName('Clara Workman')).not.toThrow();
+        expect(signedInName()).toBe('Clara Workman');
 
         setItem.mockRestore();
     });

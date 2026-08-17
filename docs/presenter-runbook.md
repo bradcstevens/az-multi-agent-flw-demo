@@ -155,7 +155,10 @@ the service desk.
 
 ### 5. How much PTO do I have? — the boundary
 
-**Tap:** `How much PTO do I have?` — *"My name is Tanya, how much PTO do I have?"*
+**Tap:** `How much PTO do I have?` — *"My name is Clara, how much PTO do I have?"*
+
+**Context:** this is Clara Workman's personal question, but the shared device has not identified
+the person asking it.
 
 **What lands:** it is refused, immediately, under the heading **Store-scoped assistant**. The
 refusal explains that the assistant is set up for the store rather than for individuals, that on a
@@ -180,8 +183,8 @@ separate login screen.
 loud, unprompted. A stakeholder who works this out for themselves afterwards stops believing
 everything else you showed them.
 
-**What happens:** the header gains a name, and the *same question, unedited* is asked again — and
-answered, out of an authored associate record, marked *Simulated*.
+**What happens:** the header gains **Clara Workman**, and the *same question, unedited* is asked
+again — and answered, out of Clara Workman's authored associate record, marked *Simulated*.
 
 **They should be looking at:** the header changing, and the same words getting a different
 outcome.
@@ -218,14 +221,15 @@ that was going to explain it.
 **Tap:** `Swap a shift` — *"Marcus Bell and I have agreed to swap our Saturday shifts. Start the
 swap."*
 
-**Say:** *"This is not a procedure recital. Marcus and I already agreed the swap, and this request
-starts the approval chain."*
+**Say:** *"This is not a procedure recital. Clara Workman and Marcus already agreed the swap, and
+this request starts the approval chain."*
 
 **What lands:** a **Reviewable plan**, with the **Deliberate** lane badge and its approval control.
-It starts with the **Workforce Agent** checking the procedure, then reaches **You**, **Marcus Bell**
-and **Dana Reyes** in that declared `waitsOn` order. Each person's step says, in the plan's own
-words, that they get a message and can say no — the plan is where the approval chain is declared,
-and nobody in it was discovered from a roster. Approve it to let the fourth specialist answer.
+It starts with the **Workforce Agent** checking the procedure, then reaches **Clara Workman**
+(**You**), **Marcus Bell** and **Dana Reyes** in that declared `waitsOn` order. Each person's step
+says, in the plan's own words, that they get a message and can say no — the plan is where the
+approval chain is declared, and nobody in it was discovered from a roster. Approve it to let the
+fourth specialist answer.
 On the right, the **Agent Team** panel still shows **four** specialists and the cost table bills the
 **Workforce Agent** for the turn — a different specialist from the one that answered beat 1.
 

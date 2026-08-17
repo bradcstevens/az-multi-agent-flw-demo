@@ -193,7 +193,7 @@ const PERSONAL_REPLY = {
     plan_id: null,
     personal_answer: {
         kind: PERSONAL_ANSWER_KIND,
-        display_name: 'Tanya Alvarez',
+        display_name: 'Clara Workman',
         role: 'Store associate, Store 223',
         facts: [{ label: 'PTO balance', value: '34.5 hours' }],
         note: 'Simulated associate record, authored for this walkthrough.',
@@ -502,7 +502,7 @@ describe('a resumed turn that made no plan', () => {
         // A refusal *is* the gate stating that nobody is signed in. The header
         // reads the device's own record, so a refusal that left it standing
         // would have the surface naming somebody the gate will not serve.
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
         vi.mocked(TaskService.createPlan).mockRejectedValue(REFUSAL);
         renderPlan();
         await screen.findByRole('textbox');
@@ -521,7 +521,7 @@ describe('a resumed turn that made no plan', () => {
         answer(PERSONAL);
 
         const card = await screen.findByTestId('personal-answer');
-        expect(card).toHaveTextContent('Tanya Alvarez');
+        expect(card).toHaveTextContent('Clara Workman');
         expect(card).toHaveTextContent('34.5 hours');
         expect(
             screen.queryByText(/Unable to create plan/i),
@@ -640,7 +640,7 @@ describe('a refused clarification answer', () => {
     it('stops naming an associate the gate has just declined to answer for', async () => {
         // The same two side effects the home screen's refusal has, because
         // they are claims about the conversation rather than about a surface.
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
         await askAndAnswer(PERSONAL);
 

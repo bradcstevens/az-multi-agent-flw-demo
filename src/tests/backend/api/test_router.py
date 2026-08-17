@@ -752,7 +752,7 @@ class TestTheIdentityBoundaryGate:
     Two-class margin and the fail-closed rule are all the production code.
     """
 
-    PERSONAL = "my name is Tanya, how much PTO do I have?"
+    PERSONAL = "my name is Clara, how much PTO do I have?"
     STORE = "How do I close the store?"
 
     def _post(self, rt, description):
@@ -835,7 +835,7 @@ class TestTheIdentityBoundaryGate:
         """
         rt.client.patch(
             "/api/v4/session_state/sess-1",
-            json={"identity": {"display_name": "Tanya Reyes"}},
+            json={"identity": {"display_name": "Clara Reyes"}},
         )
 
         resp = self._post(rt, self.PERSONAL)
@@ -865,7 +865,7 @@ class TestTheMockedUnlock:
     anybody is signed in, which is the whole of the closing beat.
     """
 
-    PERSONAL = "my name is Tanya, how much PTO do I have?"
+    PERSONAL = "my name is Clara, how much PTO do I have?"
     STORE = "How do I close the store?"
 
     def _sign_in(self, rt, display_name=None):
@@ -1264,9 +1264,9 @@ class TestSessionState:
         assert body["lane"] is None
 
     def test_a_written_identity_survives_the_reload(self, rt):
-        assert self._patch(rt, {"identity": {"display_name": "Tanya"}}).status_code == 200
+        assert self._patch(rt, {"identity": {"display_name": "Clara"}}).status_code == 200
 
-        assert self._get(rt).json()["identity"]["display_name"] == "Tanya"
+        assert self._get(rt).json()["identity"]["display_name"] == "Clara"
 
     def test_a_written_lane_survives_the_reload(self, rt):
         self._patch(rt, {"lane": "fast"})
@@ -1275,23 +1275,23 @@ class TestSessionState:
 
     def test_writing_one_field_leaves_the_other_alone(self, rt):
         """Two surfaces write this record and neither may erase the other."""
-        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": {"display_name": "Clara"}})
         self._patch(rt, {"lane": "fast"})
 
         body = self._get(rt).json()
-        assert body["identity"]["display_name"] == "Tanya"
+        assert body["identity"]["display_name"] == "Clara"
         assert body["lane"] == "fast"
 
     def test_signing_out_returns_to_the_anonymous_state(self, rt):
         """An explicit null clears; it is a write, not the absence of one."""
-        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": {"display_name": "Clara"}})
         self._patch(rt, {"identity": None})
 
         assert self._get(rt).json()["identity"]["display_name"] is None
 
     def test_one_session_cannot_read_another_sessions_state(self, rt):
         """The record is partitioned by session, observed through the route."""
-        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": {"display_name": "Clara"}})
 
         other = self._get(rt, session_id="sess-2").json()
         assert other["identity"]["display_name"] is None
@@ -1300,7 +1300,7 @@ class TestSessionState:
         """Records in this container carry their owner and reads are scoped by
         it, so a session identifier alone does not unlock somebody else's
         session — the gate would otherwise admit on a borrowed record."""
-        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": {"display_name": "Clara"}})
         rt.get_user.return_value = {"user_principal_id": "user-2"}
 
         assert self._get(rt).json()["identity"]["display_name"] is None
@@ -1323,7 +1323,7 @@ class TestSessionState:
 # /process_request — reading and writing session state (issue #20)
 # ---------------------------------------------------------------------------
 class TestProcessRequestUsesSessionState:
-    PERSONAL = "my name is Tanya, how much PTO do I have?"
+    PERSONAL = "my name is Clara, how much PTO do I have?"
 
     def _post(self, rt, description="how do I close the store?", **body):
         rt.store.get_team_by_id.return_value = MagicMock()
@@ -1349,7 +1349,7 @@ class TestProcessRequestUsesSessionState:
         """Signing in on one device is not signing in on the shared one."""
         rt.client.patch(
             "/api/v4/session_state/sess-other",
-            json={"identity": {"display_name": "Tanya Reyes"}},
+            json={"identity": {"display_name": "Clara Reyes"}},
         )
 
         assert self._post(rt, description=self.PERSONAL).status_code == 403
@@ -1363,7 +1363,7 @@ class TestProcessRequestUsesSessionState:
         """
         rt.client.patch(
             "/api/v4/session_state/sess-1",
-            json={"identity": {"display_name": "Tanya Reyes"}},
+            json={"identity": {"display_name": "Clara Reyes"}},
         )
         rt.store.get_item_by_id = AsyncMock(side_effect=Exception("cosmos is down"))
 

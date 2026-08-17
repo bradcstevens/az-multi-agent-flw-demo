@@ -55,11 +55,11 @@ class AssociateRecord:
 
 
 # The one associate the mocked sign-in signs in as. The boundary probe Quick
-# Task says "My name is Tanya", so signing in as anybody else makes the beat a
+# Task says "My name is Clara", so signing in as anybody else makes the beat a
 # non sequitur — the audience is watching one question be refused and then
 # answered, and the name has to be the same one both times.
 DEMO_ASSOCIATE = AssociateRecord(
-    display_name="Tanya Alvarez",
+    display_name="Clara Workman",
     role=f"Store associate, Store {STORE_NUMBER}",
     facts=(
         AssociateFact("PTO balance", "34.5 hours"),
@@ -91,7 +91,7 @@ def lookup_associate(display_name: object) -> Optional[AssociateRecord]:
     either way: fall through to the ordinary request path.
 
     Matching is on the **whole** display name or the **whole** first name.
-    Deliberately not on a substring: "Tan" is not Tanya, and a record shown to
+    Deliberately not on a substring: "Clar" is not Clara, and a record shown to
     the wrong associate is the claim the Identity boundary gate exists to
     refuse, made by the code that was supposed to be the reward for passing it.
     """

@@ -51,7 +51,7 @@ const ANSWER = {
     plan_id: null,
     personal_answer: {
         kind: PERSONAL_ANSWER_KIND,
-        display_name: 'Tanya Alvarez',
+        display_name: 'Clara Workman',
         role: 'Store associate, Store 223',
         facts: [{ label: 'PTO balance', value: '34.5 hours' }],
         note: 'Simulated associate record, authored for this walkthrough.',
@@ -89,8 +89,8 @@ beforeEach(() => {
     window.appConfig = { API_URL: 'https://backend.example/api' } as never;
     createPlan.mockReset().mockResolvedValue({ plan_id: 'plan-1' } as any);
     signInDevice.mockReset().mockImplementation(async () => {
-        rememberSignedInName('Tanya Alvarez');
-        return 'Tanya Alvarez';
+        rememberSignedInName('Clara Workman');
+        return 'Clara Workman';
     });
 });
 
@@ -102,7 +102,7 @@ describe('the door beside the refusal', () => {
         createPlan.mockRejectedValue(REFUSAL);
         renderInput();
 
-        await ask('my name is Tanya, how much PTO do I have?');
+        await ask('my name is Clara, how much PTO do I have?');
 
         expect(await screen.findByTestId('policy-block')).toBeInTheDocument();
         expect(screen.getByTestId('sign-in-to-continue')).toBeInTheDocument();
@@ -118,11 +118,11 @@ describe('the door beside the refusal', () => {
         // A refusal *is* the gate stating that nobody is signed in. A header
         // that went on naming an associate the gate has just declined to answer
         // for is the one thing no surface here may do.
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
         createPlan.mockRejectedValue(REFUSAL);
         renderInput();
 
-        await ask('my name is Tanya, how much PTO do I have?');
+        await ask('my name is Clara, how much PTO do I have?');
 
         await waitFor(() => expect(signedInName()).toBeNull());
     });
@@ -134,14 +134,14 @@ describe('the door beside the refusal', () => {
         createPlan.mockRejectedValueOnce(REFUSAL).mockResolvedValueOnce(ANSWER);
         renderInput();
 
-        await ask('my name is Tanya, how much PTO do I have?');
+        await ask('my name is Clara, how much PTO do I have?');
         await userEvent.click(await screen.findByTestId('sign-in-to-continue'));
 
         expect(await screen.findByTestId('personal-answer')).toHaveTextContent(
             '34.5 hours',
         );
         expect(createPlan.mock.calls[1][0]).toBe(
-            'my name is Tanya, how much PTO do I have?',
+            'my name is Clara, how much PTO do I have?',
         );
     });
 
@@ -149,8 +149,8 @@ describe('the door beside the refusal', () => {
         const order: string[] = [];
         signInDevice.mockImplementation(async () => {
             order.push('sign_in');
-            rememberSignedInName('Tanya Alvarez');
-            return 'Tanya Alvarez';
+            rememberSignedInName('Clara Workman');
+            return 'Clara Workman';
         });
         createPlan.mockImplementation(async () => {
             order.push('ask');
@@ -158,7 +158,7 @@ describe('the door beside the refusal', () => {
         });
         renderInput();
 
-        await ask('my name is Tanya, how much PTO do I have?');
+        await ask('my name is Clara, how much PTO do I have?');
         await userEvent.click(await screen.findByTestId('sign-in-to-continue'));
 
         await waitFor(() => expect(order).toEqual(['ask', 'sign_in', 'ask']));
@@ -171,7 +171,7 @@ describe('the door beside the refusal', () => {
         createPlan.mockRejectedValue(REFUSAL);
         renderInput();
 
-        await ask('my name is Tanya, how much PTO do I have?');
+        await ask('my name is Clara, how much PTO do I have?');
         await userEvent.click(await screen.findByTestId('sign-in-to-continue'));
 
         await waitFor(() => expect(createPlan).toHaveBeenCalledTimes(1));
@@ -181,7 +181,7 @@ describe('the door beside the refusal', () => {
         createPlan.mockRejectedValueOnce(REFUSAL).mockResolvedValueOnce(ANSWER);
         renderInput();
 
-        await ask('my name is Tanya, how much PTO do I have?');
+        await ask('my name is Clara, how much PTO do I have?');
         await userEvent.click(await screen.findByTestId('sign-in-to-continue'));
 
         await waitFor(() =>
@@ -199,7 +199,7 @@ describe('the answered personal question', () => {
         await ask('how much PTO do I have?');
 
         expect(await screen.findByTestId('personal-answer')).toHaveTextContent(
-            'Tanya Alvarez',
+            'Clara Workman',
         );
     });
 
@@ -328,7 +328,7 @@ describe('the socket the answer arrives on', () => {
         createPlan.mockRejectedValue(REFUSAL);
         renderInput();
 
-        await ask('my name is Tanya, how much PTO do I have?');
+        await ask('my name is Clara, how much PTO do I have?');
 
         await screen.findByTestId('policy-block');
         expect(FakeSocket.instances).toHaveLength(0);
@@ -486,7 +486,7 @@ describe('what the home surface says about a question it has just sent', () => {
         createPlan.mockRejectedValue(REFUSAL);
         const { narration } = renderInput();
 
-        await ask('my name is Tanya, how much PTO do I have?');
+        await ask('my name is Clara, how much PTO do I have?');
 
         await screen.findByTestId('policy-block');
         expect(narration()).toBeNull();

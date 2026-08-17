@@ -164,6 +164,22 @@ def test_every_prompt_is_quoted_from_the_pack():
     assert not missing, f"the runbook misquotes the prompts: {missing}"
 
 
+def test_the_boundary_unlock_and_shift_swap_beats_name_the_same_associate():
+    """The personal-record boundary and the workforce process are one contrast."""
+    runbook = _rendered()
+
+    for heading in (
+        "### 5. How much PTO do I have? — the boundary",
+        "### 6. Sign in to continue — the door in the wall",
+        "### 8. Swap a shift — the fourth specialist",
+    ):
+        start = runbook.index(heading)
+        following = runbook[start + len(heading) :]
+        next_heading = re.search(r" ### \d+\.", following)
+        beat = following[: next_heading.start()] if next_heading else following
+        assert "Clara Workman" in beat
+
+
 def test_every_follow_on_edge_is_quoted_in_the_presenter_runbook():
     """A Follow-on task is an authored transition the presenter has to rehearse.
 

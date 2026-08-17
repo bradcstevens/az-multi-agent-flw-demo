@@ -227,7 +227,7 @@ async def test_a_signed_in_associate_is_admitted_by_the_same_gate(
         gate = IdentityBoundaryGate(embed=client.embed)
         anonymous = await gate.evaluate(POSITIVE_PROBES[0])
         signed_in = await gate.evaluate(
-            POSITIVE_PROBES[0], SessionIdentity(display_name="Tanya Reyes")
+            POSITIVE_PROBES[0], SessionIdentity(display_name="Clara Reyes")
         )
 
     assert anonymous.refused

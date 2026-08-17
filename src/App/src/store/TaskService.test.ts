@@ -23,7 +23,7 @@ beforeEach(() => {
     createPlan.mockReset().mockResolvedValue({ plan_id: 'plan-1' } as any);
     signIn.mockReset().mockResolvedValue({
         session_id: 'sid',
-        identity: { display_name: 'Tanya Alvarez' },
+        identity: { display_name: 'Clara Workman' },
     } as any);
 });
 
@@ -33,8 +33,8 @@ describe('the mocked sign-in', () => {
         // by would otherwise be two strings in two languages, free to drift.
         const name = await TaskService.signInDevice();
 
-        expect(name).toBe('Tanya Alvarez');
-        expect(signedInName()).toBe('Tanya Alvarez');
+        expect(name).toBe('Clara Workman');
+        expect(signedInName()).toBe('Clara Workman');
     });
 
     it('writes the identity into server-side session state', async () => {
@@ -67,7 +67,7 @@ describe('creating a plan on a signed-in device', () => {
         // conversation — one **Simulated ticket**, one **Lane** taken. So the
         // identity is materialised into each new session as it is created,
         // rather than by re-using one session for the whole tab.
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
         await TaskService.createPlan('how much PTO do I have?');
 
@@ -76,7 +76,7 @@ describe('creating a plan on a signed-in device', () => {
     });
 
     it('signs the session in before the request that the gate reads it for', async () => {
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
         const order: string[] = [];
         signIn.mockImplementation(async () => {
             order.push('sign_in');
@@ -103,7 +103,7 @@ describe('creating a plan on a signed-in device', () => {
     it('falls back to anonymous when the session cannot be signed in', async () => {
         // Fails closed, like the gate: the request goes anonymous and is
         // refused, and the header returns to matching it.
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
         signIn.mockRejectedValue(new Error('unreachable'));
 
         await TaskService.createPlan('how much PTO do I have?');

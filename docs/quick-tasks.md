@@ -29,7 +29,7 @@ They render in this order, which is the order the demonstration runs in.
 | 2 | Restart the car wash | *How do I restart the car wash after a vehicle stalls in the bay?* | fast | R2 — the rehearsed honest miss |
 | 3 | The coffee brewer is down | *The coffee brewer is down. It is not brewing on the left head.* | fast | R3 — multi-turn troubleshooting with **Attempted steps** |
 | 4 | I can't fix it (follow-on) | *I have tried everything and I can't fix it. I need someone to come out.* | **deliberate** | R4 — the approval *is* the **Simulated ticket** being raised |
-| 5 | How much PTO do I have? | *My name is Tanya, how much PTO do I have?* | fast | R5 — the **Identity boundary gate** refusing, and #27's sign-in |
+| 5 | How much PTO do I have? | *My name is Clara, how much PTO do I have?* | fast | R5 — the **Identity boundary gate** refusing, and #27's sign-in |
 | 6 | What is due this shift? | *What tasks are due on this shift?* | fast | R8 — where the **Presenter alert** leads |
 | 7 | Swap a shift | *Marcus Bell and I have agreed to swap our Saturday shifts. Start the swap.* | **deliberate** | ADR-028 — the **Workforce agent** follows an agreed transaction into a **Reviewable plan** |
 

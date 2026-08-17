@@ -54,8 +54,8 @@ STORE_SCOPE_ANCHORS: Tuple[str, ...] = (
 # first-person pronoun at all, so a keyword fast-path on pronouns alone cannot
 # catch them and the similarity tier has to earn its place.
 POSITIVE_PROBES: Tuple[str, ...] = (
-    "my name is Tanya, how much PTO do I have?",
-    "Can you pull up the vacation balance for Tanya Reyes?",
+    "my name is Clara, how much PTO do I have?",
+    "Can you pull up the vacation balance for Clara Reyes?",
     "I'm on the rota tomorrow, right? What time does my shift start?",
     "whats left on my sick days",
     "How much was the last paycheck for this associate?",
@@ -111,6 +111,6 @@ IMPROVISED_PARAPHRASES: Tuple[str, ...] = (
     "Am I working tomorrow evening?",
     "When do I get paid next?",
     "How many days off have I got left this year?",
-    "Did Tanya Reyes get her bonus yet?",
+    "Did Clara Reyes get her bonus yet?",
     "Do I have enough banked to take Friday off?",
 )
