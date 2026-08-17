@@ -13,6 +13,11 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+# This module imports the helper with lightweight collaborators. Restore the
+# import table afterwards so collection cannot replace the real models or Azure
+# namespace used by the following backend modules.
+_MODULES_BEFORE_HELPER_IMPORT = dict(sys.modules)
+
 # Set up required environment variables before any imports
 os.environ.update({
     'APPLICATIONINSIGHTS_CONNECTION_STRING': 'InstrumentationKey=test-key',
@@ -143,9 +148,19 @@ from backend.orchestration.plan_review_helpers import (
     convert_plan_review_to_mplan, get_magentic_prompt_kwargs,
     mandatory_participants, plans_minimally, wait_for_plan_approval)
 
-# Re-bind mocked singletons for convenient assertions
-connection_config = sys.modules['orchestration.connection_config'].connection_config
-orchestration_config = sys.modules['orchestration.connection_config'].orchestration_config
+_helper_module = sys.modules["backend.orchestration.plan_review_helpers"]
+for _module_name in set(sys.modules) | set(_MODULES_BEFORE_HELPER_IMPORT):
+    if _module_name == "backend.orchestration.plan_review_helpers":
+        continue
+    if _module_name in _MODULES_BEFORE_HELPER_IMPORT:
+        sys.modules[_module_name] = _MODULES_BEFORE_HELPER_IMPORT[_module_name]
+    else:
+        sys.modules.pop(_module_name, None)
+sys.modules["backend.orchestration.plan_review_helpers"] = _helper_module
+
+# Re-bind mocked singletons for convenient assertions.
+connection_config = _helper_module.connection_config
+orchestration_config = _helper_module.orchestration_config
 
 
 # =========================================================================
