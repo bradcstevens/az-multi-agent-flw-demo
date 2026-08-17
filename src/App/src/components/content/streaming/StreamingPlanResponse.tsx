@@ -366,7 +366,11 @@ const renderPlanResponse = (
 
                 {/* Plan Steps */}
                 {planSteps.length > 0 && (
-                    <ol className={styles.stepsList} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                    <ol
+                        className={styles.stepsList}
+                        data-testid="reviewable-plan-steps"
+                        style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                    >
                         {planSteps.map((step, index) => {
                             stepCounter++;
                             return (

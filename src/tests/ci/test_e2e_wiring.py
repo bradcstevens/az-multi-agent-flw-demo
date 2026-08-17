@@ -898,3 +898,92 @@ def _roster() -> list:
     agents = pack.get("agents", [])
     assert agents, "the store pack authors no roster"
     return agents
+
+
+def _shift_swap_task() -> dict:
+    """The Quick Task the fourth specialist's beat taps, out of the pack."""
+    pack = json.loads(
+        (
+            REPO_ROOT / "content_packs" / "store_assistant" / "agent_teams" / "store_assistant.json"
+        ).read_text(encoding="utf-8")
+    )
+    return next(
+        task
+        for task in pack.get("starting_tasks", [])
+        if task.get("id") == "task-223-shift-swap"
+    )
+
+
+def test_the_beat_asserts_the_lane_the_transaction_declares():
+    """#109: the beat stopped reciting the procedure and started following it.
+
+    The lane is what earns the **Reviewable plan**, and a beat that stopped
+    checking it would go green against a surface that had quietly lost the
+    approval the whole transaction exists to show. Read out of the pack here so
+    the assertion and the declaration cannot disagree.
+    """
+    spec = _flat(WORKFORCE_SPEC)
+    lane = _shift_swap_task()["lane"]
+
+    assert lane == "deliberate", (
+        "the shift-swap Quick Task no longer declares the Deliberate lane, so "
+        "the transaction earns no Reviewable plan (ADR-028)"
+    )
+    assert f"toBe('{lane}')" in spec, (
+        "the beat does not assert the lane the store pack declares, so a "
+        "transaction that lost its approval step would still pass"
+    )
+    assert "approveButton" in spec, (
+        "the beat never reaches the approval control, so the Reviewable plan "
+        "it now earns goes unwatched"
+    )
+
+
+def test_the_beat_names_the_invented_colleagues_inside_the_plan_itself():
+    """The two stand-ins are named where the plan names them, or not at all.
+
+    The **Reviewable plan**'s own step list is the one region where a person's
+    name means *the plan reaches this person*. Looking for them anywhere in the
+    conversation column matches the request line, the prose and every ancestor
+    of each — Playwright resolves that to several elements and fails the beat in
+    strict mode, which is a red run that says nothing about the surface.
+    """
+    spec = _flat(WORKFORCE_SPEC)
+
+    assert "reviewablePlanSteps" in spec, (
+        "the beat looks for the plan's people outside the plan's own step list"
+    )
+    assert "plan.conversation.getByText" not in spec, (
+        "the beat searches the whole conversation column for a person's name"
+    )
+    assert "simulated" in spec, (
+        "the beat does not distinguish the invented colleagues from the "
+        "associate, so it grades no claim ADR-037 makes"
+    )
+
+
+def test_the_beat_pins_no_invented_colleague_of_its_own():
+    """The people are the content pack's, exactly as the roster names are.
+
+    A spec carrying its own copy of the peer's name passes a rename it never
+    saw, and the walkthrough would then show one name while the beat graded
+    another. Scoped to the people the pack marks `simulated`, because those are
+    the invented ones — the associate's own step is the word *You*, which is not
+    a name anybody can rename and is three characters no assertion message can
+    be asked to avoid.
+    """
+    spec = _code(WORKFORCE_SPEC)
+
+    invented = [
+        (step.get("assignee") or {})
+        for step in _shift_swap_task().get("plan_steps", [])
+        if (step.get("assignee") or {}).get("kind") == "person"
+        and (step.get("assignee") or {}).get("simulated")
+    ]
+    assert invented, "the shift-swap plan authors no simulated colleague"
+
+    for assignee in invented:
+        assert assignee["name"] not in spec, (
+            f"the beat pins the authored person {assignee['name']!r} in its "
+            "code. The people are the store pack's to change"
+        )

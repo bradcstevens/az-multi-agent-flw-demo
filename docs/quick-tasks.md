@@ -37,7 +37,18 @@ drifted a word away from the corpus would go unnoticed on both sides.
 | Close the store | `corpus.toml` `[rehearsed_hit]` | `test_given_the_opening_task_when_read_then_it_is_the_cross_platform_hop` |
 | Restart the car wash | `corpus.toml` `[honest_miss]` | `test_given_the_honest_miss_task_when_read_then_it_is_the_corpus_own_question` |
 | How much PTO do I have? | `guardrail.corpus.POSITIVE_PROBES` | `test_given_the_boundary_probe_when_read_then_it_is_a_measured_probe` |
-| Shift-swap process question | `guardrail.corpus.NEGATIVE_CONTROLS` | `test_given_the_shift_swap_process_question_when_read_then_it_stays_a_measured_control` |
+
+The fourth row used to be **Swap a shift**, and its disappearance is the point.
+That tap was *"How do I swap a shift with another associate?"* — the **HR
+process question** ADR-017 chose as the hardest negative control in the
+**Guardrail corpus**, because it is about a shift, between two people, on a
+device where *"when is my next shift?"* is refused. ADR-028 repurposed the tap
+into the shift-swap **transaction**, so the two strings parted company: the
+control is still measured, and it is no longer anything a live beat says.
+Asserted in both directions by
+`test_given_the_shift_swap_process_question_when_read_then_it_stays_a_measured_control`
+— the retired wording is still in `NEGATIVE_CONTROLS`, and the tap's own prompt
+is not.
 
 `[rehearsed_hit]` is new, and it is the mirror image of `[honest_miss]`. The
 honest miss has always been guarded — the corpus keeps its `absent_terms` out
@@ -90,6 +101,17 @@ way only — it may miss a personal question, but it may never trip on a
 store-level one — and a false positive here does not slow the demonstration
 down. It refuses the beat outright, with copy explaining that the assistant is
 store-scoped, which is the most convincing possible way to look broken.
+
+The shift-swap transaction has that check of its own, on top of the sweep, and
+it is the one prompt in the pack that needed writing against the list rather
+than merely surviving it. `PERSONAL_SCOPE_TERMS` holds `my shift`, `my shifts`
+and `my schedule`, and the natural way to ask for a swap uses all three — so the
+tap in the table above says *our* Saturday shifts, and names the colleague, and
+both of those are choices made for the gate as much as for the stage. The gate
+**fails closed** before any agent runs, so a tap out of walkthrough order is a
+beat refused in front of the audience. The check is a pure list call with no
+embedding round trip, which is what lets it run unattended in the CI-tooling
+loop and stay outside the integration marker.
 
 The probe is also where the walkthrough ends, so the name it gives is not
 decoration. The **Mocked unlock** (#27) rides this same tap — refused, signed

@@ -59,10 +59,32 @@ export interface QuickTask {
 /** One authored Reviewable-plan step on a Quick Task. */
 export interface PlanStep {
     id: number;
-    assignee?: {
-        kind?: string;
-        name?: string;
-    };
+    assignee?: PlanAssignee;
+}
+
+/**
+ * Who an authored step reaches.
+ *
+ * `simulated` is the field ADR-037 hangs the disclosure on, and it is the one
+ * that separates the two invented colleagues from the associate holding the
+ * device — so a beat that grades *the plan shows its stand-ins by name* reads
+ * it rather than deciding for itself which of the three names is which.
+ */
+export interface PlanAssignee {
+    kind?: string;
+    name?: string;
+    relation?: string;
+    simulated?: boolean;
+}
+
+/** The people an authored Quick Task's plan reaches, in its declared order. */
+export function planPeople(task: QuickTask): PlanAssignee[] {
+    return task.planSteps
+        .map((step) => step.assignee)
+        .filter(
+            (assignee): assignee is PlanAssignee =>
+                assignee?.kind === 'person' && typeof assignee.name === 'string',
+        );
 }
 
 /** One member of the **Store assistant roster**, as the pack authors it. */

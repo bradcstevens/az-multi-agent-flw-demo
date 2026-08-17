@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { agentHoldingToolbox, agentKey, quickTasks } from '../authored';
+import { agentHoldingToolbox, agentKey, planPeople, quickTasks } from '../authored';
 import { ChatSurface } from '../pages/ChatSurface';
 import { StoreSurface } from '../pages/StoreSurface';
 
@@ -107,15 +107,35 @@ test.describe('the fourth specialist', () => {
         await expect(plan.laneBadge).toContainText('Deliberate');
         await expect(plan.approveButton).toBeVisible({ timeout: 240_000 });
 
-        const people = task!.planSteps
-            .map((step) => step.assignee)
-            .filter(
-                (assignee): assignee is { kind?: string; name: string } =>
-                    assignee?.kind === 'person' && typeof assignee.name === 'string',
-            );
-        expect(people.map((person) => person.name)).toHaveLength(3);
-        for (const person of people) {
-            await expect(plan.conversation.getByText(person.name, { exact: false })).toBeVisible();
+        // Who the plan reaches, read off the pack. Three people — the
+        // associate, the peer they named and the shift lead — and the two the
+        // pack marks `simulated` are the ones ADR-037 makes this beat about.
+        // They are looked up inside the plan's **own step list**, because a
+        // name found anywhere in the conversation column is also the request
+        // line the associate typed.
+        const people = planPeople(task!);
+        expect(
+            people.length,
+            'the plan reaches fewer than three people, so the multi-party ' +
+                'approval this beat exists to show is not in it',
+        ).toBe(3);
+
+        const standIns = people.filter((person) => person.simulated);
+        expect(
+            standIns.length,
+            'the plan authors no simulated colleague, so there is nobody for ' +
+                'the approval chain to reach',
+        ).toBe(2);
+
+        for (const person of standIns) {
+            await expect(
+                plan.reviewablePlanSteps.getByText(person.name!, { exact: false }).first(),
+                `the Reviewable plan never names ${person.name}. The people are ` +
+                    'authored on the Quick Task and attached to the plan by the ' +
+                    'backend — a plan that lost them is one the orchestrator ' +
+                    'wrote for itself, and the beat is showing an approval ' +
+                    'chain with nobody in it.',
+            ).toBeVisible();
         }
 
         await plan.approveButton.click();

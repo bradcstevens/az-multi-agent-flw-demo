@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import React, { StrictMode } from 'react';
-import { render, waitFor, act, screen } from '@testing-library/react';
+import { render, waitFor, act, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 
@@ -486,5 +486,77 @@ describe('a plan approval arriving on the wire', () => {
             'Dana Reyes, your shift lead, is asked next.',
         ]);
         expect(inFlightIndicators()).toHaveLength(0);
+    });
+
+    it('names every person the plan reaches inside the plan step list itself', async () => {
+        // The **Demo validator** grades this beat by looking for the invented
+        // colleagues by name, and the only honest place to look is the plan's
+        // own steps. Searching the conversation column instead matches the
+        // request line, the prose and every ancestor of each — a beat that goes
+        // red for a reason that is not the beat.
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('plan_approval_request', {
+                    plan: {
+                        user_request:
+                            'Marcus Bell and I have agreed to swap our Saturday shifts. Start the swap.',
+                        steps: [
+                            {
+                                id: 1,
+                                action: 'Check the swap procedure for this store',
+                                assignee: { kind: 'agent', name: 'Workforce Agent' },
+                                waitsOn: null,
+                            },
+                            {
+                                id: 2,
+                                action: 'Confirm you want the agreed Saturday swap to proceed',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'You',
+                                    relation: 'associate',
+                                    simulated: false,
+                                },
+                                waitsOn: 1,
+                            },
+                            {
+                                id: 3,
+                                action: 'Ask Marcus Bell to confirm the agreed swap',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Marcus Bell',
+                                    relation: 'peer',
+                                    simulated: true,
+                                },
+                                waitsOn: 2,
+                            },
+                            {
+                                id: 4,
+                                action: 'Ask Dana Reyes to approve the swap',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Dana Reyes',
+                                    relation: 'manager',
+                                    simulated: true,
+                                },
+                                waitsOn: 3,
+                            },
+                        ],
+                    },
+                }),
+            );
+        });
+
+        const steps = await screen.findByTestId('reviewable-plan-steps');
+
+        for (const person of ['You', 'Marcus Bell', 'Dana Reyes']) {
+            expect(
+                within(steps).getAllByText(new RegExp(person)),
+                `the plan step list never names ${person}`,
+            ).not.toHaveLength(0);
+        }
     });
 });

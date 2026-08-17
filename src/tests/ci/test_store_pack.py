@@ -1165,9 +1165,6 @@ def test_given_the_shift_swap_process_question_when_read_then_it_stays_a_measure
     assert gate_keywords.normalise(task["prompt"]) not in measured
 
 
-
-
-
 def test_given_the_roster_when_read_then_there_are_seven_quick_tasks(store_pack):
     assert len(store_pack.starting_tasks) == 7
 

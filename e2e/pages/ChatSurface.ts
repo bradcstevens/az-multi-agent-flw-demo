@@ -131,6 +131,19 @@ export class ChatSurface {
         return this.page.getByRole('button', { name: 'Approve Task Plan' });
     }
 
+    /**
+     * The **Reviewable plan**'s own step list.
+     *
+     * The one region where a person's name means *the plan reaches this
+     * person*. The conversation column is not: it holds the request line and
+     * the prose too, so a name looked up there resolves to several elements and
+     * fails the beat in strict mode — a red run that says nothing about the
+     * surface.
+     */
+    get reviewablePlanSteps(): Locator {
+        return this.page.getByTestId('reviewable-plan-steps');
+    }
+
     /** The other half of the approval gate. */
     get rejectButton(): Locator {
         return this.page.getByRole('button', { name: 'Cancel', exact: true });
