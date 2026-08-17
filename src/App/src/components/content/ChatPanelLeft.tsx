@@ -28,6 +28,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Chat, ChatPanelLeftProps, Plan } from "@/models";
 import { apiService } from "@/api";
+import {
+  isRuntimeBootstrapPending,
+  waitForRuntimeBootstrap,
+} from "../../api/config";
 import { TaskService } from "@/store";
 import "../../styles/ChatPanelLeft.css";
 import { ASSISTANT_NAME } from "../../models/storeSurface";
@@ -85,6 +89,9 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
     try {
       setPlansLoading(true);
       setPlansError(null);
+      if (isRuntimeBootstrapPending()) {
+        await waitForRuntimeBootstrap();
+      }
       const plansData = await apiService.getPlans(undefined, !forceRefresh); // Invert forceRefresh for useCache
       setPlans(plansData);
       

@@ -11,6 +11,7 @@ import { NewChatService } from '../store/NewChatService';
 import ChatPanelLeft from '@/components/content/ChatPanelLeft';
 import ContentToolbar from '@/commonComponents/components/Content/ContentToolbar';
 import { TeamService } from '../store/TeamService';
+import { waitForRuntimeBootstrap } from '../api/config';
 import StoreIdentity from '../components/branding/StoreIdentity';
 import { ASSISTANT_NAME, selectStoreAssistant } from '../models/storeSurface';
 import InlineToaster, { useInlineToaster } from '../components/toast/InlineToaster';
@@ -59,8 +60,14 @@ const HomePage: React.FC = () => {
      */
     useEffect(() => {
         const initTeam = async () => {
+            if (selectedTeam) {
+                dispatch(setIsLoadingTeam(false));
+                return;
+            }
+
             dispatch(setIsLoadingTeam(true));
             try {
+                await waitForRuntimeBootstrap();
                 const teams = await TeamService.getUserTeams();
                 const storeAssistant = selectStoreAssistant(teams);
 
@@ -100,7 +107,7 @@ const HomePage: React.FC = () => {
         };
 
         initTeam();
-    }, [dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [dispatch, selectedTeam]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleNewChatButton = useCallback(() => {
         NewChatService.handleNewChatFromHome();

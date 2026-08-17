@@ -6,6 +6,10 @@ import { createSlice, createAsyncThunk, createSelector, PayloadAction } from '@r
 import type { RootState } from '../store';
 import { ProcessedPlanData, MPlanData, PlanStatus } from '@/models';
 import { PlanDataService } from '@/store/PlanDataService';
+import {
+    isRuntimeBootstrapPending,
+    waitForRuntimeBootstrap,
+} from '@/api/config';
 
 /* ── Async Thunks (Point 9 — createAsyncThunk for API‑driven state) ── */
 
@@ -22,6 +26,9 @@ export const fetchPlanData = createAsyncThunk<
     'plan/fetchPlanData',
     async ({ planId, useCache = true }, { rejectWithValue }) => {
         try {
+            if (isRuntimeBootstrapPending()) {
+                await waitForRuntimeBootstrap();
+            }
             return await PlanDataService.fetchPlanData(planId, useCache);
         } catch {
             return rejectWithValue('Failed to load plan data');
