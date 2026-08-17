@@ -553,6 +553,9 @@ class OrchestrationManager:
                         # (#62): read once, carried, never derived twice.
                         asks_the_associate_nothing=ticket_on_approval,
                     )
+                    if approval_responses is None:
+                        await self._end_turn_after_expired_clarification(user_id)
+                        return
                     responses.update(approval_responses)
 
                 self.logger.info(
@@ -1120,7 +1123,7 @@ class OrchestrationManager:
         *,
         user_id: str,
         asks_the_associate_nothing: bool = False,
-    ) -> dict:
+    ) -> dict | None:
         """Handle pending tool approval requests (HITL clarification).
 
         For each approval request:
@@ -1147,7 +1150,8 @@ class OrchestrationManager:
                 it, and on stage it is an interview nobody can rehearse.
 
         Returns:
-            A ``{request_id: approval_response}`` dict.
+            A ``{request_id: approval_response}`` dict, or ``None`` when a
+            **Clarification** expired and the turn must end rather than resume.
         """
         import threading
 
@@ -1240,7 +1244,7 @@ class OrchestrationManager:
                     "[TOOL_APPROVAL] Timeout waiting for user answer (request_id=%s)",
                     request_id,
                 )
-                answer = "No response received from user (timeout)."
+                return None
             except Exception as e:
                 self.logger.error(
                     "[TOOL_APPROVAL] Error waiting for answer (request_id=%s): %s",
@@ -1271,6 +1275,29 @@ class OrchestrationManager:
             responses[request_id] = approval
 
         return responses
+
+    async def _end_turn_after_expired_clarification(self, user_id: str) -> None:
+        """End the active turn when its **Clarification** expires.
+
+        The expiry occurs inside the orchestration task, so ``end_turn`` keeps
+        that task running long enough to write `canceled` onto its Plan record.
+        """
+        from chat.turn import end_turn
+        from common.database.database_factory import DatabaseFactory
+
+        turn = orchestration_config.active_turn(user_id)
+        if turn is None:
+            raise RuntimeError(
+                "An expired clarification requires an active turn to settle."
+            )
+
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        await end_turn(
+            user_id=user_id,
+            session_id=turn.session_id,
+            memory_store=memory_store,
+            orchestration=orchestration_config,
+        )
 
     async def _ticket_store(self, user_id: str):
         """The ticket store for the session this user has in flight.

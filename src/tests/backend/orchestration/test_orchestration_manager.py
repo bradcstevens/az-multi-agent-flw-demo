@@ -7,6 +7,7 @@ Tests OrchestrationManager:
 - _process_event_stream() — event dispatch
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -1922,6 +1923,70 @@ class TestTheBoundReachesTheTurnItIsAbout:
         await self._run(authored_ticket_on_approval=False)
 
         assert self._questions_put_to_the_associate() == ["What is failing?"]
+
+
+class TestAnExpiredClarification:
+    """An expired **Clarification** ends the current turn, rather than replying
+    for the associate and re-entering the Workflow."""
+
+    def setup_method(self):
+        orchestration_config.plans.clear()
+        orchestration_config.set_approval_pending.reset_mock()
+        connection_config.send_status_update_async.reset_mock()
+        connection_config.send_status_update_async.side_effect = None
+        orchestration_config.wait_for_clarification = AsyncMock(
+            side_effect=asyncio.TimeoutError
+        )
+
+    @pytest.mark.asyncio
+    async def test_an_expired_clarification_ends_the_turn_without_resuming_the_workflow(
+        self,
+    ):
+        approval = MockToolApproval("What have you already tried?")
+        workflow = Mock()
+        workflow.run = Mock(
+            return_value=_async_iter(
+                [
+                    _make_event(
+                        "request_info",
+                        data=approval,
+                        request_id="clarification-1",
+                    ),
+                ]
+            )
+        )
+        workflow._executors = {}
+        workflow.executors = {}
+        workflow.get_executors_list.return_value = []
+        workflow._team_config = Mock(starting_tasks=[])
+        orchestration_config.get_current_orchestration.return_value = workflow
+        record = FakeTroubleshootingStore()
+        manager = OrchestrationManager()
+
+        with patch.object(
+            OrchestrationManager,
+            "_troubleshooting_store",
+            AsyncMock(return_value=(record, "session-1")),
+        ), patch.object(
+            manager,
+            "_end_turn_after_expired_clarification",
+            AsyncMock(),
+        ) as end_turn:
+            await manager.run_orchestration(
+                user_id="user-1",
+                input_task=Mock(
+                    description="The brewer is showing FILL.",
+                    starting_task_id="troubleshoot-brewer",
+                ),
+            )
+
+        orchestration_config.wait_for_clarification.assert_awaited_once_with(
+            "clarification-1", timeout=300.0
+        )
+        end_turn.assert_awaited_once_with("user-1")
+        assert workflow.run.call_count == 1
+        assert approval.approved is None
+        assert record.recorded == []
 
 
 # ---------------------------------------------------------------------------

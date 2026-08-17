@@ -1250,7 +1250,7 @@ async def user_clarification(
     # steps** — is below this, so the Clarification stays *pending* with its
     # box *open* and the associate answers again. That is what keeps a refusal
     # out of the 300-second timeout (#87): nothing was consumed, so nothing
-    # resumes on *"No response received from user (timeout)."*.
+    # ends the turn.
     #
     # A blank answer is not put to the gate, exactly as it is not put to the
     # content-safety check below: there are no words in it to refuse, and

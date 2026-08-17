@@ -63,11 +63,8 @@ class TestParseAttemptedSteps:
         for denial in ("nothing", "Nothing yet", "no", "I haven't tried anything"):
             assert parse_attempted_steps(denial) == []
 
-    def test_a_timeout_answer_records_nothing(self):
-        """The clarification path substitutes its own words on a timeout
-        (300 s, issue #21's second named constraint). Those words are the
-        backend's, not the associate's, and they are not a step."""
-        assert parse_attempted_steps("No response received from user (timeout).") == []
+    def test_an_internal_error_text_records_nothing(self):
+        """An internal error is not an associate-reported step."""
         assert parse_attempted_steps("Error receiving response: boom") == []
 
 

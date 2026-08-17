@@ -1611,8 +1611,7 @@ class TestTheIdentityBoundaryGateOnTheClarificationSeam:
 
         Everything that consumes the **Clarification** is below the gate, so
         the orchestration is still waiting — which is what keeps a refusal out
-        of the 300-second timeout (#87) instead of turning it into a resume on
-        *"No response received from user (timeout)."*
+        of the 300-second timeout (#87) instead of ending the turn.
         """
         self._pending(rt)
 
