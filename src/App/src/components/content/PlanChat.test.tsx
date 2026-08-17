@@ -94,6 +94,16 @@ describe('the conversation offers the rehearsed replies', () => {
 
             expect(onFollowOnTask).toHaveBeenCalledWith(FOLLOW_ON);
         });
+
+        it('yields the slot to the chips while a clarification is pending', () => {
+            // One control at a time (#131, ADR-033). Wired here as well as in
+            // the card, because a gate the conversation forgets to honour is a
+            // tap that strands the turn the agent is waiting on.
+            renderChat({ followOnTask: FOLLOW_ON, onFollowOnTask: vi.fn() });
+
+            expect(screen.queryByTestId('follow-on-task')).not.toBeInTheDocument();
+            expect(screen.getByTestId('rehearsed-replies')).toBeInTheDocument();
+        });
     });
 
     it('submits one through the same path a typed answer takes', () => {

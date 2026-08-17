@@ -120,6 +120,7 @@ export class PlanDataService {
         lane: taskBE.lane,
         ticket_status_reply: taskBE.ticket_status_reply,
         follow_on: taskBE.follow_on,
+        rehearsed_replies: taskBE.rehearsed_replies,
         ticket_on_approval: taskBE.ticket_on_approval,
       }))
     };
