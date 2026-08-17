@@ -737,6 +737,19 @@ async def plan_approval(
                 orchestration_config
                 and human_feedback.m_plan_id in orchestration_config.approvals
             ):
+                if (
+                    orchestration_config.approvals[human_feedback.m_plan_id]
+                    is not None
+                ):
+                    # A verdict resumes the waiting review exactly once. A
+                    # duplicate HTTP request must not turn an approved plan
+                    # into a revision request (or vice versa).
+                    logger.info(
+                        "Ignoring duplicate verdict for plan %s",
+                        human_feedback.m_plan_id,
+                    )
+                    return {"status": "verdict already recorded"}
+
                 orchestration_config.set_approval_result(
                     human_feedback.m_plan_id,
                     human_feedback.approved,

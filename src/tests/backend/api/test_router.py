@@ -1219,7 +1219,7 @@ class TestPlanApproval:
         assert resp.status_code == 401
 
     def test_approved_recorded(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
         plan = MagicMock()
         plan.session_id = "sess-1"
         rt.store.get_plan_by_plan_id.return_value = plan
@@ -1229,7 +1229,7 @@ class TestPlanApproval:
         rt.orchestration_config.set_approval_result.assert_called_once()
 
     def test_rejected_recorded(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
         rt.store.get_plan_by_plan_id.return_value = None
         resp = rt.client.post(
             "/api/v4/plan_approval",
@@ -1240,7 +1240,7 @@ class TestPlanApproval:
     def test_send_back_carries_the_feedback_to_the_waiting_review(self, rt):
         # The verdict the orchestration is blocked on is "revise with this",
         # not "reject" — so the feedback travels with it (#108).
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
 
         resp = rt.client.post(
             "/api/v4/plan_approval",
@@ -1254,7 +1254,7 @@ class TestPlanApproval:
         )
 
     def test_send_back_requires_the_associate_to_say_what_they_would_change(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
 
         resp = rt.client.post(
             "/api/v4/plan_approval",
@@ -1265,7 +1265,7 @@ class TestPlanApproval:
         rt.orchestration_config.set_approval_result.assert_not_called()
 
     def test_approval_needs_no_feedback(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
 
         resp = rt.client.post(
             "/api/v4/plan_approval", json=self._payload(approved=True, feedback=None)
@@ -1273,6 +1273,19 @@ class TestPlanApproval:
 
         assert resp.status_code == 200
         assert resp.json()["status"] == "approval recorded"
+
+    def test_a_second_verdict_on_an_approved_plan_changes_nothing(self, rt):
+        rt.orchestration_config.approvals = {"m-1": True}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval",
+            json=self._payload(approved=False, feedback="Ask Marcus instead."),
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "verdict already recorded"
+        rt.orchestration_config.set_approval_result.assert_not_called()
+        rt.plan_service.handle_plan_approval.assert_not_called()
 
     def test_no_active_plan(self, rt):
         # The 404 raised in the else-branch is caught by the surrounding
@@ -1282,13 +1295,13 @@ class TestPlanApproval:
         assert resp.status_code == 500
 
     def test_plan_service_value_error(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
         rt.plan_service.handle_plan_approval = AsyncMock(side_effect=ValueError("bad"))
         resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
         assert resp.status_code == 200
 
     def test_plan_service_generic_error(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
         rt.plan_service.handle_plan_approval = AsyncMock(side_effect=Exception("boom"))
         resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
         assert resp.status_code == 200
