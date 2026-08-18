@@ -15,11 +15,9 @@ const VerdictCard: React.FC<VerdictCardProps> = ({ verdict }) => (
             </Body1Strong>
         </div>
         <div><Body1>{verdict.words}</Body1></div>
-        {verdict.outcome === 'declined' ? (
+        {verdict.stoppedLine ? (
             <div>
-                <Body1 data-testid="verdict-plan-stopped">
-                    The rest of this plan did not proceed.
-                </Body1>
+                <Body1 data-testid="verdict-plan-stopped">{verdict.stoppedLine}</Body1>
             </div>
         ) : null}
         {verdict.provenanceLine ? (

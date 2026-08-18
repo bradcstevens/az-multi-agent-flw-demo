@@ -13,6 +13,8 @@ export interface Verdict {
     };
     outcome: VerdictOutcome;
     words: string;
+    /** What a decline stopped, in the record's own words. Never composed here. */
+    stoppedLine?: string;
     provenanceLine?: string;
 }
 
@@ -53,6 +55,7 @@ export const parseVerdict = (value: unknown): Verdict | null => {
     const words = asText(record.words);
     if ((outcome !== 'approved' && outcome !== 'declined') || !words) return null;
 
+    const stoppedLine = asText(record.stopped_line);
     const provenanceLine = asText(record.provenance_line);
     return {
         planId,
@@ -65,6 +68,7 @@ export const parseVerdict = (value: unknown): Verdict | null => {
         },
         outcome,
         words,
+        ...(stoppedLine ? { stoppedLine } : {}),
         ...(provenanceLine ? { provenanceLine } : {}),
     };
 };

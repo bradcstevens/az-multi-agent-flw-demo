@@ -2653,6 +2653,121 @@ class TestTheApprovalIsTheTicketConfirmation:
         )
 
     @pytest.mark.asyncio
+    async def test_the_declined_verdict_says_what_it_stopped(self):
+        """The record says what did not happen, transitively (ADR-042 dec. 6).
+
+        The peer's words are generated, so they cannot be trusted to report the
+        consequence — *"I'm away that weekend"* does not tell the associate that
+        the shift lead was never asked. The steps named are the plan's own
+        authored actions, and step 6 reaches the list through step 5 rather than
+        by naming the declined step itself.
+        """
+        steps = [
+            {
+                "id": 1,
+                "action": "Check the swap procedure",
+                "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+            },
+            {
+                "id": 2,
+                "action": "Confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "You",
+                    "relation": "associate",
+                    "simulated": False,
+                },
+                "waitsOn": 1,
+            },
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+                "outcome": "declined",
+            },
+            {
+                "id": 4,
+                "action": "Ask Dana Reyes to approve the swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Dana Reyes",
+                    "relation": "manager",
+                    "simulated": True,
+                },
+                "waitsOn": 3,
+                "outcome": "approved",
+            },
+            {
+                "id": 5,
+                "action": "Put the swap on the schedule",
+                "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+                "waitsOn": 4,
+            },
+            {
+                "id": 6,
+                "action": "Ask Priya Nair to cover the handover",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Priya Nair",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 5,
+                "outcome": "approved",
+            },
+        ]
+        chat_client = FakeManagerChatClient(["I'm away that weekend after all."])
+
+        _review, outcome = await self._review(
+            None, plan_steps=steps, manager_chat_client=chat_client
+        )
+
+        assert [verdict.stopped_steps for verdict in outcome.verdicts] == [
+            [
+                "Ask Dana Reyes to approve the swap",
+                "Put the swap on the schedule",
+                "Ask Priya Nair to cover the handover",
+            ]
+        ]
+        assert len(chat_client.requests) == 1
+
+    @pytest.mark.asyncio
+    async def test_an_approved_verdict_says_it_stopped_nothing(self):
+        steps = [
+            {
+                "id": 1,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "outcome": "approved",
+            },
+            {
+                "id": 2,
+                "action": "Put the swap on the schedule",
+                "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+                "waitsOn": 1,
+            },
+        ]
+        chat_client = FakeManagerChatClient(["That works for me."])
+
+        _review, outcome = await self._review(
+            None, plan_steps=steps, manager_chat_client=chat_client
+        )
+
+        assert [verdict.stopped_steps for verdict in outcome.verdicts] == [[]]
+        assert outcome.stopped is False
+
+    @pytest.mark.asyncio
     async def test_associate_only_person_steps_never_invoke_the_postapproval_executor(self):
         steps = [
             {

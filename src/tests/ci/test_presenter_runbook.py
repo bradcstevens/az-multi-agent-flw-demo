@@ -275,6 +275,37 @@ def test_the_shift_swap_beat_quotes_its_authored_people_and_order():
     assert "waitsOn" in beat
 
 
+def test_the_walkthrough_never_walks_a_decline():
+    """A colleague can say no, and the demonstration never asks one to.
+
+    ADR-042 decision 6: the decline path is expressible and specified, and
+    deliberately not rehearsed. A named peer who might refuse on the customer
+    run is unpresentable, and a beat whose outcome the presenter cannot predict
+    is one this runbook cannot script — so every person the walked plan asks is
+    authored to approve, and the beat offers no decline to attempt.
+    """
+    task = next(
+        task for task in _quick_tasks() if task["id"] == "task-223-shift-swap"
+    )
+    asked = {
+        step["assignee"]["name"]: step.get("outcome")
+        for step in task["plan_steps"]
+        if step["assignee"]["kind"] == "person"
+        and step["assignee"].get("relation") != "associate"
+    }
+
+    assert asked, "the shift-swap plan asks nobody for a verdict"
+    assert set(asked.values()) == {"approved"}, (
+        f"the walkthrough authors a decline it cannot rehearse: {asked}"
+    )
+
+    rendered = _rendered()
+    beat = rendered[rendered.index(task["prompt"]) :][:1800]
+    assert "declin" not in beat.lower(), (
+        "the runbook scripts a decline the walkthrough does not walk"
+    )
+
+
 def test_the_runbook_says_approval_completes_a_ticket_and_starts_a_swap():
     """The two workflows share an approval shape but have opposite next steps."""
     assert (

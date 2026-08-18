@@ -429,6 +429,40 @@ class TestTeamConfigurationValidation:
 
         assert task.plan_steps == [{**steps[0], "agent": ""}]
 
+    def test_an_authored_decline_uploads_exactly_as_an_approval_does(self):
+        """A colleague can say no, and saying so is authored the same way.
+
+        ADR-042 decision 6. If a decline needed a second field or a second
+        rule, the path the walkthrough never walks would be the path nobody
+        ever authors — and #100's promise that the people in a plan can say no
+        would be prose no `grep` will ever find.
+        """
+        service = TeamService()
+
+        def uploaded(outcome):
+            step = {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+                "outcome": outcome,
+            }
+            return service._validate_and_parse_task(
+                _valid_task_data(plan_steps=[step])
+            ).plan_steps
+
+        declined = uploaded("declined")
+
+        assert declined[0]["outcome"] == "declined"
+        assert declined == [
+            {**step, "outcome": "declined"} for step in uploaded("approved")
+        ]
+
     def test_omitted_plan_steps_preserve_the_generated_review_plan(self):
         """A task that never mentions a plan is not a task with an empty one:
         the orchestrator keeps the plan it generated."""

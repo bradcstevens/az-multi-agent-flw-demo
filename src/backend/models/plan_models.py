@@ -8,9 +8,16 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from provenance import PLAN_PROVENANCE, VERDICT_PROVENANCE
+
+# What a declined Verdict says it cost, authored beside the record that carries
+# it rather than in the component that renders it (ADR-036 decision 4). The
+# person's own words are generated, so they cannot be relied on to report the
+# consequence: a colleague who says only that they are away that weekend has
+# not told the associate that the shift lead was never asked.
+DECLINE_STOPS_THE_PLAN = "Nothing waiting on this went ahead:"
 
 
 class PlanStatus(str, Enum):
@@ -69,7 +76,28 @@ class Verdict(BaseModel):
     assignee: PersonAssignee
     outcome: VerdictOutcome
     words: str
+    # The authored actions this decline stopped, in the plan's declared order.
+    # Empty when nothing waited on the step — and refused outright on an
+    # approval, which stops nothing by definition.
+    stopped_steps: List[str] = Field(default_factory=list)
     provenance_line: str = VERDICT_PROVENANCE
+
+    @model_validator(mode="after")
+    def _only_a_decline_stops_anything(self) -> "Verdict":
+        if self.stopped_steps and self.outcome is not VerdictOutcome.DECLINED:
+            raise ValueError("An approved Verdict cannot have stopped a step")
+        return self
+
+    @computed_field(return_type=Optional[str])
+    @property
+    def stopped_line(self) -> Optional[str]:
+        """What did not happen, said on the record that stopped it."""
+        if not self.stopped_steps:
+            return None
+        actions = "; ".join(
+            action.strip().rstrip(".") for action in self.stopped_steps
+        )
+        return f"{DECLINE_STOPS_THE_PLAN} {actions}."
 
 
 class MPlan(BaseModel):

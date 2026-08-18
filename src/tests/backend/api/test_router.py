@@ -8,10 +8,12 @@ interpreter state for other test files that import the same real modules.
 
 import asyncio
 import contextlib
+import importlib.machinery
 import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -93,6 +95,108 @@ def _import_router():
 
 
 router_mod, _app = _import_router()
+
+
+# The flat namespaces the backend imports itself by. Earlier-collected tests
+# replace some of them with bare ``Mock()`` objects, which are not packages, so
+# a later real import of anything underneath them fails.
+_FLAT_BACKEND_NAMESPACES = (
+    "agents", "associate", "auth", "callbacks", "chat", "config", "common",
+    "escalation", "guardrail", "lane", "middleware", "models", "orchestration",
+    "patches", "provenance", "services", "session", "sop", "tools",
+    "transparency", "troubleshooting",
+)
+
+
+def _azure_stub(name):
+    """An SDK module whose every name is a real, instantiable class.
+
+    The seam never calls the SDK — nothing in a decline reaches Azure — but it
+    is imported through modules that annotate against SDK classes, and `X |
+    None` is only legal when `X` is a type.
+    """
+    module = ModuleType(name)
+    fabricated = {}
+
+    def __getattr__(attribute):  # noqa: N807 (PEP 562 module hook)
+        if attribute.startswith("__") and attribute.endswith("__"):
+            raise AttributeError(attribute)
+        if attribute not in fabricated:
+            fabricated[attribute] = type(
+                attribute,
+                (),
+                {"__init__": lambda self, *args, **kwargs: None},
+            )
+        return fabricated[attribute]
+
+    module.__getattr__ = __getattr__
+    module.__path__ = []
+    return module
+
+
+class _AzureStubLoader:
+    def create_module(self, spec):
+        return _azure_stub(spec.name)
+
+    def exec_module(self, module):
+        pass
+
+
+class _AzureStubFinder:
+    """Fabricates any ``azure.*`` module the seam's imports walk through."""
+
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split(".")[0] != "azure":
+            return None
+        return importlib.machinery.ModuleSpec(
+            fullname, _AzureStubLoader(), is_package=True
+        )
+
+
+def _import_real_orchestration():
+    """The real post-approval seam, imported the way the router imports it.
+
+    Same shape as ``_import_router`` and for the same reason: the mock
+    pollution this file already works around would make the seam's own flat
+    imports fail. Every mocked flat entry is removed for the walk and
+    ``sys.modules`` is restored to its exact prior state afterwards, so no other
+    test file is affected — this file keeps the modules by reference.
+
+    Only the decline path (#154) uses them. It is the one beat the walkthrough
+    deliberately never walks, so it is the one that must be driven through the
+    real seam here or nowhere.
+    """
+    snapshot = dict(sys.modules)
+    finder = _AzureStubFinder()
+    sys.meta_path.insert(0, finder)
+    try:
+        for name in list(sys.modules):
+            root = name.split(".")[0]
+            if root == "azure":
+                # A `Mock` module hands back a `Mock` for any name, which is
+                # not a type — and the seam's own imports annotate against SDK
+                # classes (`AIProjectClient | None`). Stubs with real classes,
+                # not the SDK itself: reimporting it half-mocked fails inside
+                # the SDK, and nothing here calls it.
+                sys.modules[name] = _azure_stub(name)
+            elif root in _FLAT_BACKEND_NAMESPACES and not isinstance(
+                sys.modules[name], ModuleType
+            ):
+                del sys.modules[name]
+        import provenance as provenance_module
+        import orchestration.connection_config as connection_module
+        import orchestration.orchestration_manager as manager_module
+
+        return manager_module, connection_module, provenance_module
+    finally:
+        sys.meta_path.remove(finder)
+        for key in list(sys.modules):
+            if key not in snapshot:
+                del sys.modules[key]
+        sys.modules.update(snapshot)
+
+
+_real_manager, _real_config, _real_provenance = _import_real_orchestration()
 from fastapi.testclient import TestClient  # noqa: E402
 
 from associate.answer import PERSONAL_ANSWER_KIND  # noqa: E402
@@ -327,6 +431,23 @@ def rt(monkeypatch):
 
 def _no_user(rt):
     rt.get_user.return_value = {"user_principal_id": None}
+
+
+def _await(read, timeout=5.0):
+    """Block until a turn running on the client's own loop produces something.
+
+    ``TestClient`` drives the event loop from a portal thread, so a turn keeps
+    running between requests. This is how a test observes the moment that turn
+    reaches — the plan it is paused on, or the record it settled — without
+    reaching into the loop.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        value = read()
+        if value is not None:
+            return value
+        time.sleep(0.01)
+    raise AssertionError("the turn never got there")
 
 
 # ---------------------------------------------------------------------------
@@ -790,6 +911,23 @@ class TestTheServerSettlesTheTurnItEnded:
     def _orchestration(self, rt, **kwargs):
         rt.orchestration_manager.return_value.run_orchestration = AsyncMock(**kwargs)
 
+    @staticmethod
+    def _router_errors(caplog):
+        """The router's own error records, and nothing else's.
+
+        A turn runs in a background task nobody awaits, so an orchestration
+        stood in for with a raise leaves an exception that is never retrieved —
+        and asyncio logs that at ERROR when the task is finally collected, from
+        inside whichever test happens to be running then. That record is
+        evidence about garbage collection, not about the route under test.
+        """
+        return [
+            record
+            for record in caplog.records
+            if record.levelno >= logging.ERROR
+            and record.name == router_mod.logger.name
+        ]
+
     def test_a_turn_that_completes_settles_completed(self, rt):
         response = self._ask(rt)
 
@@ -945,9 +1083,7 @@ class TestTheServerSettlesTheTurnItEnded:
             response = self._ask(rt)
 
         assert response.status_code == 200
-        assert not [
-            record for record in caplog.records if record.levelno >= logging.ERROR
-        ]
+        assert not self._router_errors(caplog)
 
     def test_a_rejected_plans_deleted_record_is_not_a_failed_write(self, rt, caplog):
         # Rejecting a plan deletes the Plan document outright (#108's path,
@@ -964,9 +1100,7 @@ class TestTheServerSettlesTheTurnItEnded:
             response = self._ask(rt)
 
         assert response.status_code == 200
-        assert not [
-            record for record in caplog.records if record.levelno >= logging.ERROR
-        ]
+        assert not self._router_errors(caplog)
         assert any(
             record.levelno == logging.WARNING and "sess-1" in record.getMessage()
             for record in caplog.records
@@ -1823,6 +1957,243 @@ class TestPlanApproval:
 
         assert resp.status_code == 500
         rt.orchestration_config.set_approval_result.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# A colleague says no (#154)
+# ---------------------------------------------------------------------------
+class FakeManagerChatClient:
+    """The manager, stood in for at the one seam a Verdict's words come from."""
+
+    def __init__(self, replies):
+        self._replies = list(replies)
+        self.requests = []
+
+    async def get_response(self, request, **kwargs):
+        self.requests.append(request)
+        return SimpleNamespace(text=self._replies.pop(0))
+
+
+class TestAColleagueSaysNo:
+    """The decline path, driven through this in-process client (#154).
+
+    ADR-042 decision 6 specifies a beat the walkthrough deliberately never
+    walks — the authored pack has both people approve, because a peer who might
+    refuse on the customer run is unpresentable — so nothing but a test will
+    ever notice it rotting. It is held here, at the surface the associate meets
+    it through: an approval arriving over HTTP, and the records this client is
+    pushed afterwards.
+
+    The **real** post-approval seam runs, on the real approval registry the
+    endpoint writes into. Only the framework's event stream and the ticket
+    store are stood in for, because neither is what a decline is about — and
+    the event stream being stood in for is what makes *the workflow was never
+    resumed* observable, which is how an agent step waiting on the declined
+    step is shown never to have run.
+    """
+
+    STEPS = [
+        {
+            "id": 1,
+            "action": "Check the swap procedure for this store",
+            "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+        },
+        {
+            "id": 2,
+            "action": "Confirm you want the agreed Saturday swap to proceed",
+            "assignee": {
+                "kind": "person",
+                "name": "You",
+                "relation": "associate",
+                "simulated": False,
+            },
+            "waitsOn": 1,
+        },
+        {
+            "id": 3,
+            "action": "Ask Marcus Bell to confirm the agreed swap",
+            "assignee": {
+                "kind": "person",
+                "name": "Marcus Bell",
+                "relation": "peer",
+                "simulated": True,
+            },
+            "waitsOn": 2,
+            "outcome": "declined",
+        },
+        {
+            "id": 4,
+            "action": "Ask Dana Reyes to approve the swap",
+            "assignee": {
+                "kind": "person",
+                "name": "Dana Reyes",
+                "relation": "manager",
+                "simulated": True,
+            },
+            "waitsOn": 3,
+            "outcome": "approved",
+        },
+        {
+            "id": 5,
+            "action": "Put the swap on the schedule",
+            "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+            "waitsOn": 4,
+        },
+    ]
+
+    @pytest.fixture
+    def swap(self, rt, monkeypatch):
+        """A Deliberate-lane swap paused on its plan, with the real seam behind it."""
+        manager_module = _real_manager
+        config_module = _real_config
+
+        pushed = []
+
+        async def record(message=None, user_id=None, message_type=None, **kwargs):
+            pushed.append((message_type, message))
+            return True
+
+        monkeypatch.setattr(
+            manager_module.connection_config, "send_status_update_async", record
+        )
+        monkeypatch.setattr(
+            manager_module.OrchestrationManager,
+            "_ticket_store",
+            AsyncMock(return_value=(None, None)),
+        )
+        monkeypatch.setattr(
+            manager_module.OrchestrationManager,
+            "_evaluate_team_scope",
+            AsyncMock(return_value=None),
+        )
+        stream = AsyncMock(
+            side_effect=[
+                {"plan_reviews": {"req-1": SimpleNamespace(
+                    plan=SimpleNamespace(text="1. Ask Marcus Bell."),
+                    approve=lambda: "approved",
+                )}},
+                {},
+            ]
+        )
+        monkeypatch.setattr(
+            manager_module.OrchestrationManager, "_process_event_stream", stream
+        )
+
+        chat_client = FakeManagerChatClient(["I'm away that weekend after all."])
+        workflow = MagicMock()
+        workflow._terminated = False
+        workflow._is_running = False
+        workflow._team_id = "team-abc"
+        workflow._plan_review = True
+        workflow._manager_chat_client = chat_client
+        workflow._team_config = SimpleNamespace(
+            starting_tasks=[
+                SimpleNamespace(
+                    id="task-223-shift-swap",
+                    ticket_on_approval=False,
+                    plan_steps=self.STEPS,
+                )
+            ]
+        )
+        workflow.get_executors_list.return_value = []
+        config_module.orchestration_config.orchestrations["user-1"] = workflow
+
+        monkeypatch.setattr(
+            router_mod, "orchestration_config", config_module.orchestration_config
+        )
+        monkeypatch.setattr(
+            router_mod, "OrchestrationManager", manager_module.OrchestrationManager
+        )
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+
+        # Entered, so one event loop stays up across both requests: the turn
+        # this test drives waits between them, and a client that tears its
+        # portal down per request would leave it suspended for ever.
+        with TestClient(_app) as client:
+            yield SimpleNamespace(
+                pushed=pushed,
+                stream=stream,
+                chat_client=chat_client,
+                rt=rt,
+                client=client,
+                config=config_module.orchestration_config,
+            )
+
+        config_module.orchestration_config.orchestrations.pop("user-1", None)
+
+    def _settled(self, swap):
+        """Approve the plan this turn is paused on, then let the turn finish."""
+        started = swap.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-swap",
+                "description": "Swap my Saturday shift with Marcus Bell",
+                "team_id": "team-abc",
+                "lane": "deliberate",
+                "starting_task_id": "task-223-shift-swap",
+            },
+        )
+        assert started.status_code == 200
+
+        plan = _await(
+            lambda: next(
+                (
+                    message.plan
+                    for message_type, message in swap.pushed
+                    if message_type == WebsocketMessageType.PLAN_APPROVAL_REQUEST
+                ),
+                None,
+            )
+        )
+        # The plan reaches the surface a moment before the turn starts waiting
+        # on it, so an approval sent on the push alone races the gate it is the
+        # verdict for.
+        _await(lambda: plan.id in swap.config.approvals or None)
+        approved = swap.client.post(
+            "/api/v4/plan_approval",
+            json={"m_plan_id": plan.id, "approved": True},
+        )
+        assert approved.status_code == 200
+
+        _await(lambda: swap.rt.store.settle_turn.await_count or None)
+        return [
+            message
+            for message_type, message in swap.pushed
+            if message_type == WebsocketMessageType.VERDICT_LANDED
+        ]
+
+    def test_the_colleague_who_declined_is_the_last_person_asked(self, swap):
+        landed = self._settled(swap)
+
+        assert [
+            (verdict["assignee"]["name"], verdict["outcome"]) for verdict in landed
+        ] == [("Marcus Bell", "declined")]
+        assert len(swap.chat_client.requests) == 1
+
+    def test_no_step_waiting_on_the_declined_step_ever_runs(self, swap):
+        """Transitively: step 5 waits on step 4, which waits on the decline.
+
+        The shift lead is never asked, and the workflow is never resumed — so
+        the agent step that would have put the swap on the schedule does not
+        run either.
+        """
+        self._settled(swap)
+
+        assert swap.stream.await_count == 1
+
+    def test_the_conversation_is_told_what_did_not_happen(self, swap):
+        landed = self._settled(swap)
+
+        assert landed[0]["stopped_line"] == (
+            "Nothing waiting on this went ahead: Ask Dana Reyes to approve the "
+            "swap; Put the swap on the schedule."
+        )
+
+    def test_the_declined_record_carries_its_own_provenance_line(self, swap):
+        landed = self._settled(swap)
+
+        assert landed[0]["provenance_line"] == _real_provenance.VERDICT_PROVENANCE
 
 
 # ---------------------------------------------------------------------------

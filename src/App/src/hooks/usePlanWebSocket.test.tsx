@@ -709,6 +709,9 @@ describe('a declined Verdict arriving on the wire', () => {
                     },
                     outcome: 'declined',
                     words: 'I cannot make the Saturday swap.',
+                    stopped_line:
+                        'Nothing waiting on this went ahead: Ask Dana Reyes to '
+                        + 'approve the swap.',
                     provenance_line: 'No workforce management system was consulted.',
                 }),
             );
@@ -717,7 +720,7 @@ describe('a declined Verdict arriving on the wire', () => {
         await waitFor(() => {
             expect(screen.getByText('Marcus Bell declined')).toBeInTheDocument();
             expect(screen.getByTestId('verdict-plan-stopped')).toHaveTextContent(
-                'The rest of this plan did not proceed.',
+                'Nothing waiting on this went ahead: Ask Dana Reyes to approve the swap.',
             );
             expect(inFlightIndicators()).toHaveLength(0);
             expect(selectShowProcessingPlanSpinner(store.getState())).toBe(false);

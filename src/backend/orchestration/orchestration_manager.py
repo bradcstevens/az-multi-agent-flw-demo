@@ -26,7 +26,7 @@ from common.models.messages import TeamConfiguration
 from common.utils.markdown_utils import \
     normalize_markdown_tables as _normalize_markdown_tables
 from models.messages import AgentMessageStreaming, WebsocketMessageType
-from models.plan_models import MStep, Verdict
+from models.plan_models import MStep, Verdict, VerdictOutcome
 from orchestration.connection_config import (connection_config,
                                              orchestration_config)
 from orchestration.plan_review_helpers import (convert_plan_review_to_mplan,
@@ -1083,7 +1083,7 @@ class OrchestrationManager:
                     )
                     verdicts.extend(resolved_verdicts)
                     if any(
-                        getattr(verdict.outcome, "value", verdict.outcome) == "declined"
+                        verdict.outcome == VerdictOutcome.DECLINED
                         for verdict in resolved_verdicts
                     ):
                         return PlanReviewOutcome(
@@ -1133,21 +1133,14 @@ class OrchestrationManager:
         )
 
     @staticmethod
-    def _post_approval_person_steps(plan) -> list:
-        """Return non-associate Person steps in their declared dependency order.
+    def _ordered_plan_steps(plan) -> list:
+        """Every step of a Reviewable plan in its declared dependency order.
 
-        The plan's own steps choose the post-approval mechanism (#151,
-        ADR-042). A Person step assigned to somebody other than the associate
-        is the only thing that creates waiting; the associate's own
-        confirmation step is satisfied by the approval that got here. Nothing
-        below reads the workflow's name, the task id or the lane, so the
-        Simulated ticket — whose plan has no such step — reaches no executor at
-        all rather than declining to use one, which is what keeps *there is no
-        submit tool* (#21) closed by construction.
-
-        The whole plan is ordered before it is filtered: `waitsOn` may name an
-        agent step, so the peer's turn comes after the associate's confirmation
-        even though only the peer records a Verdict.
+        `waitsOn` names one earlier step, so the plan is a dependency graph and
+        the order it runs in is the graph's, not the list's. Ordering the
+        *whole* plan is what lets a peer's turn come after the associate's
+        confirmation, and what lets a decline name the steps it stopped even
+        when they reach it through an agent step rather than by naming it.
         """
         steps = getattr(plan, "steps", None)
         if not isinstance(steps, list):
@@ -1178,12 +1171,54 @@ class OrchestrationManager:
                 if isinstance(getattr(step, "id", None), int):
                     resolved_ids.add(step.id)
 
+        return ordered_steps
+
+    @classmethod
+    def _post_approval_person_steps(cls, plan) -> list:
+        """Return non-associate Person steps in their declared dependency order.
+
+        The plan's own steps choose the post-approval mechanism (#151,
+        ADR-042). A Person step assigned to somebody other than the associate
+        is the only thing that creates waiting; the associate's own
+        confirmation step is satisfied by the approval that got here. Nothing
+        below reads the workflow's name, the task id or the lane, so the
+        Simulated ticket — whose plan has no such step — reaches no executor at
+        all rather than declining to use one, which is what keeps *there is no
+        submit tool* (#21) closed by construction.
+
+        The whole plan is ordered before it is filtered: `waitsOn` may name an
+        agent step, so the peer's turn comes after the associate's confirmation
+        even though only the peer records a Verdict.
+        """
         return [
-            step for step in ordered_steps
+            step for step in cls._ordered_plan_steps(plan)
             if (
                 getattr(getattr(step, "assignee", None), "kind", None) == "person"
                 and getattr(step.assignee, "relation", None) != "associate"
             )
+        ]
+
+    @classmethod
+    def _steps_a_decline_stops(cls, plan, declined_step) -> list:
+        """The authored actions a declined step stops, in declared order.
+
+        Transitive by construction rather than by a second traversal: a step
+        that waits on a declined step can only be ordered after it, and so can
+        anything that waits on *that*. The associate is told what did not
+        happen because the peer's own words are generated and cannot be relied
+        on to report it (ADR-042 decision 6).
+        """
+        ordered = cls._ordered_plan_steps(plan)
+        position = next(
+            (index for index, step in enumerate(ordered) if step is declined_step),
+            None,
+        )
+        if position is None:
+            return []
+        return [
+            action
+            for step in ordered[position + 1:]
+            if (action := (getattr(step, "action", "") or "").strip())
         ]
 
     async def _resolve_person_steps(
@@ -1268,6 +1303,11 @@ class OrchestrationManager:
                 assignee=assignee,
                 outcome=outcome,
                 words=words,
+                stopped_steps=(
+                    self._steps_a_decline_stops(plan, step)
+                    if outcome == VerdictOutcome.DECLINED
+                    else []
+                ),
             )
             verdicts.append(verdict)
             # The plan owns the record before the conversation sees it. The
@@ -1281,7 +1321,10 @@ class OrchestrationManager:
                 user_id=user_id,
                 message_type=WebsocketMessageType.VERDICT_LANDED,
             )
-            if verdict.outcome == "declined":
+            if verdict.outcome == VerdictOutcome.DECLINED:
+                # A decline stops the plan at this step, so nothing ordered
+                # after it is asked — the shift lead never hears about a swap
+                # the peer already refused.
                 return verdicts
         return verdicts
 

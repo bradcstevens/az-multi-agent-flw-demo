@@ -4,7 +4,11 @@ PlannerResponseStep, PlannerResponsePlan."""
 
 import uuid
 
-from backend.models.plan_models import (AgentDefinition, MPlan, MStep,
+import pytest
+from pydantic import ValidationError
+
+from backend.models.plan_models import (DECLINE_STOPS_THE_PLAN,
+                                        AgentDefinition, MPlan, MStep,
                                         PlannerResponsePlan,
                                         PlannerResponseStep, PlanStatus,
                                         Verdict)
@@ -132,6 +136,75 @@ class TestTheVerdictCarriesItsProvenance:
 
         assert "No workforce management system was consulted" in line
         assert "authored for this walkthrough" in line
+
+
+class TestADeclinedVerdictSaysWhatDidNotHappen:
+    """A decline stops the plan at that step, and the record says what that
+    cost (ADR-042 decision 6).
+
+    The words the person says are generated, so they cannot be relied on to
+    report the consequence — a colleague who says *"sorry, I'm away that
+    weekend"* has not told the associate that the shift lead was never asked.
+    The steps named here are the plan's own authored actions, and the sentence
+    that frames them is authored beside them, because ADR-036 decision 4 puts
+    a string where the content is authored rather than in the component that
+    renders it.
+    """
+
+    def _verdict(self, **overrides):
+        fields = {
+            "step_id": 3,
+            "assignee": {
+                "kind": "person",
+                "name": "Marcus Bell",
+                "relation": "peer",
+                "simulated": True,
+            },
+            "outcome": "declined",
+            "words": "Sorry — I'm away that weekend after all.",
+        }
+        fields.update(overrides)
+        return Verdict.model_validate(fields)
+
+    def test_the_record_names_the_steps_the_decline_stopped(self):
+        line = self._verdict(
+            stopped_steps=[
+                "Ask Dana Reyes to approve the swap",
+                "Put the swap on the schedule",
+            ]
+        ).model_dump(mode="json")["stopped_line"]
+
+        assert "Ask Dana Reyes to approve the swap" in line
+        assert "Put the swap on the schedule" in line
+
+    def test_the_line_says_the_rest_of_the_plan_did_not_go_ahead(self):
+        """The associate must not read a landed record as a plan that continued."""
+        line = self._verdict(
+            stopped_steps=["Ask Dana Reyes to approve the swap"]
+        ).stopped_line
+
+        assert line.startswith(DECLINE_STOPS_THE_PLAN)
+
+    def test_an_approved_verdict_carries_no_such_line(self):
+        assert (
+            self._verdict(
+                outcome="approved", words="That works for me."
+            ).stopped_line
+            is None
+        )
+
+    def test_an_approved_verdict_cannot_claim_to_have_stopped_anything(self):
+        """Two fields, three states, and one combination that cannot happen —
+        refused here rather than rendered on stage."""
+        with pytest.raises(ValidationError):
+            self._verdict(
+                outcome="approved",
+                words="That works for me.",
+                stopped_steps=["Ask Dana Reyes to approve the swap"],
+            )
+
+    def test_a_decline_at_the_last_step_stops_nothing_and_says_nothing(self):
+        assert self._verdict().stopped_line is None
 
 
 class TestReviewablePlanProvenance:
