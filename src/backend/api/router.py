@@ -2558,7 +2558,11 @@ async def delete_all_chats(request: Request):
 
 
 @app_router.delete("/chats/{session_id}")
-async def delete_chat(session_id: str, request: Request):
+async def delete_chat(
+    session_id: str,
+    request: Request,
+    end_turn_first: bool = Query(False, alias="end_turn"),
+):
     """
     Delete one Chat — every document in its session partition.
 
@@ -2578,6 +2582,27 @@ async def delete_chat(session_id: str, request: Request):
     refused with the reason the surface shows, a chat that is not this user's
     is simply not found, and a sweep that left documents behind is a failure
     rather than a success with a smaller number in it.
+
+    **``end_turn=true`` is the door out of that refusal (#122, ADR-031 §5.)**
+    The guard does not move — ``SETTLED_STATUSES`` keeps its three members and
+    anything else, including nothing at all, still means running. What moves is
+    the record: the turn is ended first, through the same primitive **Leaving a
+    Chat** uses, and the sweep then runs on the guard's unchanged terms. That
+    is what a **Chat** whose turn was destroyed by a walk-away needs, and it is
+    the only route to it — a rehearsal that ran the walkthrough twenty times
+    otherwise leaves twenty rows nobody can clear.
+
+    It is **opt-in on the request**, and that is the whole of the trigger. No
+    heuristic about abandonment is introduced and none is wanted: the associate
+    named this Chat and asked for it to go, which is the same explicit gesture
+    ADR-031 decision 3 requires and the reason a dropped socket still ends
+    nothing.
+
+    A turn that could not be ended is a **500 and no deletion**. The store
+    answers "no such chat" and "I could not tell you" in the same breath, so
+    sweeping a Chat whose turn this route failed to settle would destroy the
+    conversation while its orchestration went on computing into the partition
+    it just emptied.
     """
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user["user_principal_id"]
@@ -2590,6 +2615,42 @@ async def delete_chat(session_id: str, request: Request):
     # The store is built for this user, and its `user_id` predicate is the whole
     # of the authorization — a session id is not a secret.
     memory_store = await DatabaseFactory.get_database(user_id=user_id)
+
+    if end_turn_first:
+        try:
+            ended = await end_turn(
+                user_id=user_id,
+                session_id=session_id,
+                memory_store=memory_store,
+                orchestration=orchestration_config,
+            )
+        except Exception as e:
+            logger.exception(
+                "Failed to end the turn for session '%s'; nothing deleted",
+                session_id,
+            )
+            track_event_if_configured(
+                "Error_Turn_End_Failed",
+                {"session_id": session_id, "user_id": user_id, "error": str(e)},
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Could not end this chat's turn, so nothing was deleted."
+                ),
+            ) from e
+
+        track_event_if_configured(
+            "Turn_Ended",
+            {
+                "status": ended.outcome.value,
+                "cancelled": ended.cancelled,
+                "session_id": session_id,
+                "user_id": user_id,
+                "before": "delete",
+            },
+        )
+
     result = await memory_store.delete_chat(session_id=session_id)
 
     if result.outcome in (DeletionOutcome.no_such_chat, DeletionOutcome.not_yours):

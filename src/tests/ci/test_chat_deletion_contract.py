@@ -68,9 +68,10 @@ def test_both_ends_call_the_same_three_states_settled():
     assert browser == set(SETTLED_STATUSES)
 
 
-def test_a_running_chat_is_refused_in_the_same_words_at_both_ends():
-    # The row says this while it refuses to offer the delete; the route says it
-    # in the 409 when something asks anyway. Two sentences here would have the
+def test_a_running_chat_is_answered_in_the_same_words_at_both_ends():
+    # The row says this beside the delete it offers, and in the confirmation
+    # that delete opens; the route says it in the 409 when something deletes
+    # without asking for the turn to end. Two sentences here would have the
     # surface explaining itself twice and differently.
     source = _code_only(DELETION)
     reason = re.search(
@@ -109,6 +110,25 @@ def test_the_browser_deletes_a_chat_by_its_session():
 
     assert "sessionId: string" in call.group(1)
     assert "planId" not in call.group(1)
+
+
+def test_the_browser_asks_for_the_door_at_the_name_the_route_serves():
+    # The way out of `in_progress` is to end the turn, never to loosen the
+    # guard (#122, ADR-031 §5), and the ask travels on the request. A third
+    # place for that name to come from is a door the surface opens and the
+    # route does not, which reads to the associate as the refusal it replaced.
+    served = re.search(
+        r'end_turn_first:\s*bool\s*=\s*Query\(\s*False,\s*alias="(\w+)"\s*\)',
+        ROUTER.read_text(encoding="utf-8"),
+    )
+    assert served, "the delete route no longer offers an end-the-turn door"
+
+    called = re.search(
+        r"async deleteChat\((.*?)\n    \}", _code_only(API_SERVICE), re.S
+    )
+    assert called, "apiService no longer offers deleteChat"
+
+    assert f"{served.group(1)}=true" in called.group(1)
 
 
 def test_the_single_plan_primitive_has_no_caller_left():

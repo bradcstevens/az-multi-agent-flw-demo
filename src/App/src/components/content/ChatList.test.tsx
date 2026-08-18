@@ -12,6 +12,7 @@ import {
     DELETE_CHAT_LABEL,
     DELETE_CHAT_WARNING,
     DELETE_FAILED_TITLE,
+    END_AND_DELETE_LABEL,
     STILL_RUNNING_REASON,
     chatMenuLabel,
 } from '../../models/chatDeletion';
@@ -274,20 +275,22 @@ describe('deleting one chat', () => {
     });
 });
 
-describe('a running chat is kept', () => {
+describe('a running chat is a door rather than a wall', () => {
     const RUNNING = chat('chat-running', 'The register is frozen', PlanStatus.IN_PROGRESS);
 
-    it('offers the delete but will not take it', () => {
+    it('offers the delete rather than refusing it', () => {
+        // #122, ADR-031 §5. The turn a walk-away destroyed leaves a row at
+        // `in_progress` for ever, and a refusal is the only thing the surface
+        // ever said about it. The way out is to end the turn, never to loosen
+        // the guard — so the control is offered and says what it will do.
         renderList([RUNNING]);
 
         openMenuFor('The register is frozen');
 
-        expect(deleteItem()).toHaveAttribute('aria-disabled', 'true');
+        expect(deleteItem()).not.toHaveAttribute('aria-disabled', 'true');
     });
 
-    it('says why, rather than reading as a control that did not work', () => {
-        // ADR-026's own noted cost: a running Chat cannot be deleted, so the
-        // surface has to explain when it keeps one.
+    it('says the turn ends first, in the words the route answers with', () => {
         renderList([RUNNING]);
 
         openMenuFor('The register is frozen');
@@ -295,37 +298,71 @@ describe('a running chat is kept', () => {
         expect(screen.getByText(STILL_RUNNING_REASON)).toBeInTheDocument();
     });
 
-    it('keeps its place in the tab order while it refuses', () => {
-        // A natively-disabled control leaves the tab order, so a keyboard user
-        // would find the reason missing rather than read it (#56's finding).
+    it('names the act on the button that performs it', async () => {
+        // ADR-033's discipline at the confirmation: the associate is about to
+        // end an answer in progress, so the button says so rather than
+        // repeating the label of a delete that takes nothing else with it.
         renderList([RUNNING]);
-
-        openMenuFor('The register is frozen');
-
-        expect(deleteItem()).not.toHaveAttribute('disabled');
-    });
-
-    it('asks nothing and deletes nothing when the item is activated anyway', async () => {
-        const onChatDelete = vi.fn();
-        renderList([RUNNING], { onChatDelete });
 
         openMenuFor('The register is frozen');
         fireEvent.click(deleteItem());
 
-        await waitFor(() =>
-            expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
-        );
-        expect(onChatDelete).not.toHaveBeenCalled();
+        expect(
+            await screen.findByRole('button', { name: END_AND_DELETE_LABEL }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: CONFIRM_DELETE_LABEL }),
+        ).not.toBeInTheDocument();
     });
 
-    it('is not offered a delete no state can be read from', () => {
-        // Fail-closed: a status this build does not know is a chat something
-        // may still be happening to.
+    it('states what is ended as well as what is destroyed', async () => {
+        renderList([RUNNING]);
+
+        openMenuFor('The register is frozen');
+        fireEvent.click(deleteItem());
+
+        const confirmation = await screen.findByRole('dialog');
+        expect(confirmation).toHaveTextContent(STILL_RUNNING_REASON);
+        expect(confirmation).toHaveTextContent(DELETE_CHAT_WARNING);
+    });
+
+    it('deletes the chat the confirmation named', async () => {
+        const onChatDelete = vi.fn().mockResolvedValue(undefined);
+        renderList([RUNNING], { onChatDelete });
+
+        openMenuFor('The register is frozen');
+        fireEvent.click(deleteItem());
+        fireEvent.click(
+            await screen.findByRole('button', { name: END_AND_DELETE_LABEL }),
+        );
+
+        await waitFor(() => expect(onChatDelete).toHaveBeenCalledWith(RUNNING));
+    });
+
+    it('is the same door for a state no label can be read from', () => {
+        // Fail-closed, still: a status this build does not know is a chat
+        // something may still be happening to, so the way through it is the
+        // one that ends a turn first rather than the one that assumes none.
         renderList([{ ...RUNNING, status: 'archived' as PlanStatus }]);
 
         openMenuFor('The register is frozen');
 
-        expect(deleteItem()).toHaveAttribute('aria-disabled', 'true');
+        expect(deleteItem()).not.toHaveAttribute('aria-disabled', 'true');
+    });
+
+    it('says nothing about ending a turn for a chat that already settled', async () => {
+        // The offer is about the turn in flight. Made over a finished chat it
+        // would be the surface describing an act it is not performing.
+        renderList(MORNING);
+
+        openMenuFor('How do I close the store?');
+        fireEvent.click(deleteItem());
+
+        const confirmation = await screen.findByRole('dialog');
+        expect(confirmation).not.toHaveTextContent(STILL_RUNNING_REASON);
+        expect(
+            screen.getByRole('button', { name: CONFIRM_DELETE_LABEL }),
+        ).toBeInTheDocument();
     });
 });
 

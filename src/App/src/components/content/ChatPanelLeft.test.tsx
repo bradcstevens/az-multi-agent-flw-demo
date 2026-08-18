@@ -39,6 +39,7 @@ import {
     DELETE_ALL_CHATS_LABEL,
     DELETE_ALL_CHATS_TITLE,
     DELETE_CHAT_LABEL,
+    END_AND_DELETE_LABEL,
     chatMenuLabel,
 } from '../../models/chatDeletion';
 import type { Plan } from '../../models';
@@ -342,6 +343,19 @@ describe('deleting a chat from the panel', () => {
         overall_status: PlanStatus.COMPLETED,
     } as unknown as Plan;
 
+    /*
+      The row #122 exists for: a turn destroyed by a walk-away leaves the Plan
+      record at `in_progress` for ever, and until the door there was no exposed
+      route that could clear it.
+    */
+    const STILL_RUNNING = {
+        id: 'plan-running',
+        session_id: 'session-running',
+        timestamp: '2026-08-14T10:00:00Z',
+        initial_goal: 'How do I close the store?',
+        overall_status: PlanStatus.IN_PROGRESS,
+    } as unknown as Plan;
+
     const deleteChat = async (name: string) => {
         fireEvent.click(
             await screen.findByRole('button', { name: chatMenuLabel(name) }),
@@ -375,7 +389,50 @@ describe('deleting a chat from the panel', () => {
         await deleteChat('The coffee machine is showing an error');
 
         await waitFor(() =>
-            expect(apiService.deleteChat).toHaveBeenCalledWith('session-shared'),
+            expect(apiService.deleteChat).toHaveBeenCalledWith('session-shared', false),
+        );
+    });
+
+    it('asks nothing of a turn a settled row never claimed to be running', async () => {
+        // The ask is what the confirmation promised, and a settled chat's
+        // confirmation promised nothing about a turn. Sent anyway it would end
+        // a turn that started after this list was read.
+        renderPanelAt('/chat/plan-troubleshooting');
+
+        await deleteChat('How do I swap a shift?');
+
+        await waitFor(() =>
+            expect(apiService.deleteChat).toHaveBeenCalledWith('session-other', false),
+        );
+    });
+
+    it('asks for the turn to be ended when the row it offered was running', async () => {
+        /*
+          #122, ADR-031 §5. The associate confirmed a dialog that said the turn
+          ends first, and the request carries that ask — which is the whole of
+          the trigger. No heuristic about abandonment lives at either end of
+          it, and the route's fail-closed guard is untouched: what changes is
+          that the record reaches a **Settled status** before the sweep reads
+          it.
+        */
+        vi.mocked(apiService.getPlans).mockResolvedValue([
+            TROUBLESHOOTING,
+            STILL_RUNNING,
+        ] as never);
+        renderPanelAt('/chat/plan-troubleshooting');
+
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: chatMenuLabel('How do I close the store?'),
+            }),
+        );
+        fireEvent.click(screen.getByRole('menuitem', { name: DELETE_CHAT_LABEL }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: END_AND_DELETE_LABEL }),
+        );
+
+        await waitFor(() =>
+            expect(apiService.deleteChat).toHaveBeenCalledWith('session-running', true),
         );
     });
 

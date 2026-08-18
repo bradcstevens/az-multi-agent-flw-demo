@@ -6,6 +6,7 @@ import {
     DELETE_CHAT_LABEL,
     DELETE_CHAT_TITLE,
     DELETE_CHAT_WARNING,
+    END_AND_DELETE_LABEL,
     STILL_RUNNING_REASON,
     canDeleteChat,
     chatMenuLabel,
@@ -73,8 +74,18 @@ describe('the words the control says', () => {
         expect(CONFIRM_DELETE_LABEL.toLowerCase()).toContain('delete');
     });
 
-    it('says why a running chat is kept', () => {
+    it('says what deleting a running chat does, rather than why it is refused', () => {
+        // #122, ADR-031 §5: the way out of `in_progress` is to end the turn,
+        // so the sentence names the act instead of the wall.
         expect(STILL_RUNNING_REASON.toLowerCase()).toContain('running');
+        expect(STILL_RUNNING_REASON.toLowerCase()).toContain('ends its turn');
+    });
+
+    it('names both acts on the button that performs them', () => {
+        // An answer in progress is stopped here, and a button reading only
+        // "Delete chat" would take that consent without asking for it.
+        expect(END_AND_DELETE_LABEL.toLowerCase()).toContain('end');
+        expect(END_AND_DELETE_LABEL.toLowerCase()).toContain('delete');
     });
 });
 
