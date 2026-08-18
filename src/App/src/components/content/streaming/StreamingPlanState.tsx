@@ -15,7 +15,6 @@ const renderThinkingState = (narration: string | null) => {
 
     return (
         <div style={{
-            maxWidth: '800px',
             margin: '0 auto 32px auto',
             padding: '0 24px'
         }}>

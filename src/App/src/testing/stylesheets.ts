@@ -28,6 +28,7 @@ export interface Rule {
 export const SRC = join(__dirname, '..');
 export const STYLES = join(SRC, 'styles');
 export const SHELL_STYLESHEET = join(STYLES, 'storeSurface.css');
+export const indexStylesheet = join(SRC, 'index.css');
 export const RAIL_STYLESHEET = join(STYLES, 'transparency.css');
 export const PLAN_PANEL_STYLESHEET = join(STYLES, 'planpanelright.css');
 /**
@@ -146,23 +147,22 @@ export const allRules = (): Rule[] =>
 
 /** Every rule the stylesheets declare, inside media queries as well as out. */
 export const allRulesIncludingMediaQueries = (): Rule[] =>
-    readdirSync(STYLES)
-        .filter((entry) => entry.endsWith('.css'))
-        .flatMap((entry) => {
-            const css = withoutComments(readFileSync(join(STYLES, entry), 'utf8'));
-            // Media-query bodies are parsed as their own stylesheets, so a rule
-            // inside one is read exactly like a rule outside one.
-            const inner = Array.from(css.matchAll(/@media[^{]*\{/g)).flatMap((match) => {
-                const open = (match.index ?? 0) + match[0].length - 1;
-                let depth = 0;
-                for (let i = open; i < css.length; i += 1) {
-                    if (css[i] === '{') depth += 1;
-                    if (css[i] === '}') {
-                        depth -= 1;
-                        if (depth === 0) return rulesIn(css.slice(open + 1, i), entry);
-                    }
+    ['index.css', ...readdirSync(STYLES).filter((entry) => entry.endsWith('.css'))].flatMap((entry) => {
+        const path = entry === 'index.css' ? indexStylesheet : join(STYLES, entry);
+        const css = withoutComments(readFileSync(path, 'utf8'));
+        // Media-query bodies are parsed as their own stylesheets, so a rule
+        // inside one is read exactly like a rule outside one.
+        const inner = Array.from(css.matchAll(/@media[^{]*\{/g)).flatMap((match) => {
+            const open = (match.index ?? 0) + match[0].length - 1;
+            let depth = 0;
+            for (let i = open; i < css.length; i += 1) {
+                if (css[i] === '{') depth += 1;
+                if (css[i] === '}') {
+                    depth -= 1;
+                    if (depth === 0) return rulesIn(css.slice(open + 1, i), entry);
                 }
-                return [];
-            });
-            return [...rulesIn(css, entry), ...inner];
+            }
+            return [];
         });
+        return [...rulesIn(css, entry), ...inner];
+    });
