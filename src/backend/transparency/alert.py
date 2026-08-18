@@ -22,6 +22,7 @@ names a rehearsed line; it never composes one.
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
+from provenance import PRESENTER_ALERT_PROVENANCE
 from transparency.payloads import PresenterAlert
 
 # The rehearsed roster. The words are the **server's**, never the caller's: the
@@ -45,6 +46,7 @@ REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
             "you have not done it before."
         ),
         timestamp="",
+        provenance_line=PRESENTER_ALERT_PROVENANCE,
     ),
     "delivery": PresenterAlert(
         title="Delivery arriving",
@@ -54,6 +56,7 @@ REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
             "Receiving and put-away are in SOP-109."
         ),
         timestamp="",
+        provenance_line=PRESENTER_ALERT_PROVENANCE,
     ),
     "temperature-log": PresenterAlert(
         title="Temperature check due",
@@ -64,6 +67,7 @@ REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
             "reads low."
         ),
         timestamp="",
+        provenance_line=PRESENTER_ALERT_PROVENANCE,
     ),
     "safe-drop": PresenterAlert(
         title="Safe drop due",
@@ -73,6 +77,7 @@ REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
             "counting and witness rules."
         ),
         timestamp="",
+        provenance_line=PRESENTER_ALERT_PROVENANCE,
     ),
     "restroom-check": PresenterAlert(
         title="Restroom check due",
@@ -82,6 +87,7 @@ REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
             "list and what to do if something needs closing off."
         ),
         timestamp="",
+        provenance_line=PRESENTER_ALERT_PROVENANCE,
     ),
     "age-check": PresenterAlert(
         title="Age-restricted sales reminder",
@@ -91,6 +97,7 @@ REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
             "the accepted forms of identification and the refusal wording."
         ),
         timestamp="",
+        provenance_line=PRESENTER_ALERT_PROVENANCE,
     ),
     "handover": PresenterAlert(
         title="Handover in fifteen minutes",
@@ -100,6 +107,7 @@ REHEARSED_ALERTS: Dict[str, PresenterAlert] = {
             "the handover sheet. SOP-110 has the order to work through."
         ),
         timestamp="",
+        provenance_line=PRESENTER_ALERT_PROVENANCE,
     ),
 }
 
@@ -122,4 +130,5 @@ def presenter_alert(name: Optional[str] = None) -> PresenterAlert:
         title=alert.title,
         content=alert.content,
         timestamp=datetime.now(timezone.utc).isoformat(),
+        provenance_line=alert.provenance_line,
     )

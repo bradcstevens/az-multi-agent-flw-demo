@@ -9,6 +9,7 @@ the sentence that was going to explain it.
 import transparency.alert as alert_module
 from transparency.alert import (REHEARSED_ALERT, REHEARSED_ALERTS,
                                 presenter_alert)
+from provenance import PRESENTER_ALERT_PROVENANCE
 
 
 class TestPresenterAlert:
@@ -41,6 +42,9 @@ class TestPresenterAlert:
         """A timestamp records that the chord was pressed. It does not decide
         when — that is the distinction between a stamp and a timer."""
         assert presenter_alert().timestamp
+
+    def test_the_alert_names_the_shift_task_system_that_did_not_push_it(self):
+        assert presenter_alert().provenance_line == PRESENTER_ALERT_PROVENANCE
 
     def test_every_rehearsed_alert_reads_as_a_shift_task_not_as_an_answer(self):
         """They answer nothing, so they must not look like replies. Each names

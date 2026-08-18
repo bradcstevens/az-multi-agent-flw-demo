@@ -174,7 +174,8 @@ loud, unprompted. A stakeholder who works this out for themselves afterwards sto
 everything else you showed them.
 
 **What happens:** the header gains a name, and the *same question, unedited* is asked again — and
-answered, out of an authored associate record, marked *Simulated*.
+answered out of an authored associate record. Alongside its *Simulated* badge, the record carries a
+Provenance line that no payroll system was queried.
 
 **They should be looking at:** the header changing, and the same words getting a different
 outcome.
@@ -193,8 +194,9 @@ need to be in a chat for the next part to work.
 while you do it.
 
 **What lands:** an alert card arrives on its own, with the conversation already finished — visibly
-not an answer, with its own heading and a *Simulated* badge — about the coffee station deep clean
-due before the 15:00 handover, naming SOP-104.
+not an answer, with its own heading, a *Simulated* badge, and a Provenance line naming the
+shift-task system that did not push it — about the coffee station deep clean due before the 15:00
+handover, naming SOP-104.
 
 **Say:** *"Nobody asked it anything just then. It can act on a shift event and put the procedure
 one tap away."*
@@ -276,6 +278,29 @@ proof that a refused request costs nothing at all.
 
 ---
 
+## Simulation register
+
+These are the invented things in the walkthrough. The record rows include their exact **Provenance
+line**, which names the system that did not produce the content. That is ADR-037's floor: an
+invented person's action is disclosed in the record that carries it, never only here.
+
+| Invented thing | What the presenter can say |
+| --- | --- |
+| Store 223 setting | The store number and its setting were authored for this walkthrough; no connected store system supplied them. |
+| Procedure library | The procedures are invented demonstration content; no customer procedure library supplied them. |
+| Simulated service ticket | No service desk receives this ticket and no engineer is dispatched. |
+| Simulated sign-in | No identity provider signed the associate in; the name is authored session state for this walkthrough. |
+| Associate record | No payroll system was queried — these figures were authored for this walkthrough. |
+| Presenter alert | No shift-task system pushed this alert — it was authored for this walkthrough. |
+| Workforce procedure library | No employment system supplied the procedure; the Workforce agent describes authored process content. |
+
+When a later walkthrough record is invented, add its **Provenance line** constant in
+`src/backend/provenance.py`, carry it on the record's payload, and add the exact line to this
+register. The CI guard enumerates that module's constants, so the register cannot silently fall
+behind the records it explains.
+
+---
+
 ## Questions you will be asked
 
 **"Are these our procedures?"** No. Every procedure in the library is **invented** for this
@@ -347,6 +372,11 @@ question from `content/sop/corpus.toml`, the header's words from
 `src/App/src/models/storeSurface.ts`. That is ADR-019's lesson applied to prose: a runbook
 carrying its own copy of the surface passes a rebrand it never saw, and the presenter finds out in
 the room.
+
+The **Simulation register** and `src/backend/provenance.py` are the extension points for invented
+records. Keep the disclosure with the record that carries the invented action, then register the
+same source-owned line here; a runbook-only disclosure does not survive a screenshot or the
+Recorded fallback.
 
 **What is not asserted, and what nobody has watched.** Only beat 1 has been driven through a real
 browser against the deployment ([demo-validator.md](demo-validator.md)); beats 2 through 7 are

@@ -62,6 +62,7 @@ class PresenterAlert:
     title: str
     content: str
     timestamp: str
+    provenance_line: str
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

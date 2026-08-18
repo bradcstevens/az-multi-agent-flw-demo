@@ -62,8 +62,8 @@ const PersonalAnswerCard: React.FC<PersonalAnswerCardProps> = ({ answer }) => (
             </dl>
         )}
 
-        {answer.note && (
-            <Caption1 className="personal-answer__note">{answer.note}</Caption1>
+        {answer.provenanceLine && (
+            <Caption1 className="personal-answer__note">{answer.provenanceLine}</Caption1>
         )}
     </div>
 );

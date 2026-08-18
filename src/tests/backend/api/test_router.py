@@ -102,6 +102,7 @@ from chat.deletion import (  # noqa: E402
     ChatsDeletion,
     DeletionOutcome,
 )
+from provenance import ASSOCIATE_RECORD_PROVENANCE  # noqa: E402
 from guardrail.corpus import (  # noqa: E402
     PERSONAL_INTENT_ANCHORS,
     STORE_SCOPE_ANCHORS,
@@ -744,13 +745,13 @@ class TestTheMockedUnlock:
             f.label for f in DEMO_ASSOCIATE.facts
         ]
 
-    def test_the_answer_says_it_is_simulated(self, rt):
+    def test_the_answer_carries_the_payroll_provenance_line(self, rt):
         """A claim about somebody's pay, made in their name, on a stage."""
         self._sign_in(rt)
 
         answer = self._post(rt, self.PERSONAL).json()["personal_answer"]
 
-        assert "simulated" in answer["note"].lower()
+        assert answer["provenance_line"] == ASSOCIATE_RECORD_PROVENANCE
 
     def test_the_answer_costs_no_agent_and_no_plan(self, rt):
         """The unlock costs exactly what the refusal costs: nothing.

@@ -10,7 +10,8 @@ const payload = {
         { label: 'PTO balance', value: '34.5 hours' },
         { label: 'Next scheduled shift', value: 'Thursday, 06:00 - 14:00' },
     ],
-    note: 'Simulated associate record, authored for this walkthrough.',
+    provenance_line:
+        'No payroll system was queried — these figures were authored for this walkthrough.',
 };
 
 describe('the personal answer', () => {
@@ -29,9 +30,9 @@ describe('the personal answer', () => {
         ]);
     });
 
-    it('carries the note that says the record is simulated', () => {
-        expect(parsePersonalAnswer({ personal_answer: payload })?.note).toContain(
-            'Simulated',
+    it('carries the provenance line the associate record authored', () => {
+        expect(parsePersonalAnswer({ personal_answer: payload })?.provenanceLine).toContain(
+            'No payroll system was queried',
         );
     });
 
@@ -84,7 +85,7 @@ describe('the personal answer', () => {
             displayName: 'Tanya Alvarez',
             role: '',
             facts: [],
-            note: '',
+            provenanceLine: '',
         });
     });
 

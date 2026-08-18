@@ -8,6 +8,8 @@ const alert = parsePresenterAlert({
     title: 'Shift task due',
     content: 'The coffee station deep clean is due before the 15:00 handover at Store 223.',
     timestamp: '2026-08-13T09:00:00+00:00',
+    provenance_line:
+        'No shift-task system pushed this alert — it was authored for this walkthrough.',
 })!;
 
 describe('the Presenter alert', () => {
@@ -43,5 +45,25 @@ describe('the Presenter alert', () => {
         render(<PresenterAlertCard alert={alert} />);
 
         expect(screen.getByTestId('presenter-alert')).toHaveTextContent(/simulated/i);
+    });
+
+    it('renders the provenance line the server delivered', () => {
+        render(<PresenterAlertCard alert={alert} />);
+
+        expect(screen.getByTestId('presenter-alert-provenance')).toHaveTextContent(
+            /No shift-task system pushed this alert/i,
+        );
+    });
+
+    it('renders no provenance line when the payload carries none', () => {
+        const alertWithoutProvenance = parsePresenterAlert({
+            title: 'Shift task due',
+            content: 'The coffee station deep clean is due before the 15:00 handover at Store 223.',
+            timestamp: '2026-08-13T09:00:00+00:00',
+        })!;
+
+        render(<PresenterAlertCard alert={alertWithoutProvenance} />);
+
+        expect(screen.queryByTestId('presenter-alert-provenance')).not.toBeInTheDocument();
     });
 });

@@ -12,6 +12,7 @@ from associate.answer import (
     personal_answer_detail,
 )
 from associate.records import DEMO_ASSOCIATE, AssociateFact, AssociateRecord
+from provenance import ASSOCIATE_RECORD_PROVENANCE
 
 
 class TestBuildingTheAnswer:
@@ -42,24 +43,24 @@ class TestBuildingTheAnswer:
         assert answer.facts == []
 
 
-class TestTheAnswerSaysWhatItIs:
+class TestTheAnswerCarriesItsProvenance:
     """A claim about a person's pay may not read as a system of record's."""
 
-    def test_the_answer_says_the_data_is_simulated(self):
+    def test_the_answer_names_the_payroll_system_that_was_not_queried(self):
         answer = PersonalAnswer.from_record(DEMO_ASSOCIATE)
-        assert "simulated" in answer.note.lower()
+        assert answer.provenance_line == ASSOCIATE_RECORD_PROVENANCE
 
-    def test_there_is_no_simulated_flag_to_omit(self):
+    def test_there_is_no_provenance_flag_to_omit(self):
         """Every answer this system produces is from authored content — there
         is no other kind — so the framing is a property of the answer, not a
         field a caller could leave off."""
         payload = personal_answer_detail(DEMO_ASSOCIATE)
-        assert "simulated" not in payload
+        assert "provenance_line" in payload
 
-    def test_the_note_is_the_same_for_every_record(self):
+    def test_the_provenance_line_is_the_same_for_every_record(self):
         a = PersonalAnswer.from_record(DEMO_ASSOCIATE)
         b = PersonalAnswer.from_record(AssociateRecord(display_name="Nobody"))
-        assert a.note == b.note
+        assert a.provenance_line == b.provenance_line
 
 
 class TestTheWireShape:

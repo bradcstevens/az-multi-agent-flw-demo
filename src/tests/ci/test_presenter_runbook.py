@@ -18,6 +18,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import provenance
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RUNBOOK = REPO_ROOT / "docs" / "presenter-runbook.md"
 
@@ -30,7 +32,6 @@ STORE_PACK = (
 )
 CHORD_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "presenterChord.ts"
 SURFACE_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "storeSurface.ts"
-HOME_INPUT = REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
 RESUME_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "resume.ts"
 AGENT_AVAILABILITY = (
     REPO_ROOT / "src" / "App" / "src" / "models" / "agentAvailability.ts"
@@ -249,20 +250,27 @@ def test_the_anonymous_opening_is_explained_rather_than_merely_stated():
     )
 
 
-def test_the_simulated_sign_in_is_said_out_loud():
-    """What the button says beside itself, said in the runbook too.
+def test_every_provenance_line_is_in_the_simulation_register():
+    """Every source-owned Provenance line has a presenter-owned register row.
 
-    A stakeholder who discovers afterwards that an identity provider was implied
-    has stopped believing the rest of the demonstration, so the presenter must
-    say it before they are asked.
+    The source module is deliberately enumerated rather than sampled. Adding a
+    record's line without documenting it here leaves the record honest in a
+    screenshot but strands the presenter who must explain it conversationally.
     """
-    note = re.search(
-        r"(Simulated sign-in — no identity provider is involved\.)",
-        HOME_INPUT.read_text(encoding="utf-8"),
-    )
-    assert note, "HomeInput no longer says the sign-in is simulated"
-    assert note.group(1) in _rendered(), (
-        "the runbook does not say out loud that the sign-in is mocked end to end"
+    runbook = _runbook()
+    start = runbook.index("## Simulation register")
+    register = runbook[start : runbook.find("\n## ", start + 1)]
+    lines = {
+        name: value
+        for name, value in vars(provenance).items()
+        if name.isupper() and isinstance(value, str)
+    }
+
+    assert lines, "provenance.py no longer exposes any Provenance line constants"
+    missing = {name: value for name, value in lines.items() if value not in register}
+    assert not missing, (
+        "the Simulation register is missing Provenance line constants: "
+        f"{missing}"
     )
 
 

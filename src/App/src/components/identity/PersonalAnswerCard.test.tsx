@@ -14,7 +14,8 @@ const answer = parsePersonalAnswer({
             { label: 'PTO balance', value: '34.5 hours' },
             { label: 'Hours scheduled this week', value: '32' },
         ],
-        note: 'Simulated associate record, authored for this walkthrough.',
+        provenance_line:
+            'No payroll system was queried — these figures were authored for this walkthrough.',
     },
 })!;
 
@@ -50,11 +51,11 @@ describe('the personal answer card', () => {
         );
     });
 
-    it('says plainly that no identity provider signed anybody in', () => {
+    it('renders the provenance line the associate record carried', () => {
         render(<PersonalAnswerCard answer={answer} />);
 
         expect(screen.getByTestId('personal-answer')).toHaveTextContent(
-            /Simulated associate record/i,
+            /No payroll system was queried/i,
         );
     });
 
@@ -63,7 +64,7 @@ describe('the personal answer card', () => {
         // nothing, which is true. An empty card is better than a claim.
         render(
             <PersonalAnswerCard
-                answer={{ displayName: 'Tanya Alvarez', role: '', facts: [], note: '' }}
+                answer={{ displayName: 'Tanya Alvarez', role: '', facts: [], provenanceLine: '' }}
             />,
         );
 

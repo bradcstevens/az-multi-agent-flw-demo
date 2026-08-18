@@ -35,7 +35,7 @@ export interface PersonalAnswer {
     displayName: string;
     role: string;
     facts: PersonalFact[];
-    note: string;
+    provenanceLine: string;
 }
 
 const text = (value: unknown): string =>
@@ -64,7 +64,7 @@ export function parsePersonalAnswer(response: unknown): PersonalAnswer | null {
         return null;
     }
 
-    const { kind, display_name, role, facts, note } = payload as Record<string, unknown>;
+    const { kind, display_name, role, facts, provenance_line } = payload as Record<string, unknown>;
     if (kind !== PERSONAL_ANSWER_KIND) return null;
 
     const displayName = text(display_name);
@@ -75,7 +75,7 @@ export function parsePersonalAnswer(response: unknown): PersonalAnswer | null {
     return {
         displayName,
         role: text(role),
-        note: text(note),
+        provenanceLine: text(provenance_line),
         facts: rows
             .map((fact) => ({
                 label: text((fact as { label?: unknown })?.label),
