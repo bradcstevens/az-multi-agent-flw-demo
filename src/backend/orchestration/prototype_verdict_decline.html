@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PROTOTYPE — Verdict decline stops a Reviewable plan</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; line-height: 1.45; margin: 3rem auto; max-width: 48rem; color: #16233a; }
+    h1 { color: #0b5cab; } button { margin: .25rem; padding: .55rem .8rem; } section { margin: 1.5rem 0; }
+    dl { background: #f4f7fb; padding: 1rem; } dt { font-weight: 700; margin-top: .5rem; } dd { margin-left: 0; }
+    .blocked { color: #8b1a1a; } .resolved { color: #116329; } .waiting { color: #705000; }
+  </style>
+</head>
+<body>
+  <h1>Verdict decline stops a Reviewable plan</h1>
+  <p><strong>Question:</strong> When a Person step declines, does emitting that
+  Verdict and blocking every later step that directly or transitively waits on it
+  make the rest of the swap visibly not happen?</p>
+
+  <section>
+    <h2>Free play</h2>
+    <button onclick="dispatch({type: 'resolve', id: 2, outcome: 'approved'})">Peer approves</button>
+    <button onclick="dispatch({type: 'resolve', id: 2, outcome: 'declined'})">Peer declines</button>
+    <button onclick="dispatch({type: 'resolve', id: 3, outcome: 'approved'})">Shift lead approves</button>
+    <button onclick="reset()">Reset</button>
+  </section>
+
+  <section>
+    <h2>Guided walkthroughs</h2>
+    <p><button onclick="happyPath()">Both people approve</button> Watch both
+    Verdicts land in dependency order.</p>
+    <p><button onclick="declinePath()">Peer declines</button> Watch the peer's
+    declined Verdict land while the shift lead is blocked and never asked.</p>
+  </section>
+
+  <section>
+    <h2>Current plan state</h2>
+    <dl id="state"></dl>
+  </section>
+
+  <script>
+    // Pure state module: decline blocks every descendant of the declined step.
+    const initial = () => ({
+      steps: [
+        { id: 1, name: "Associate confirms the swap", waitsOn: null, state: "resolved" },
+        { id: 2, name: "Peer responds", waitsOn: 1, state: "waiting" },
+        { id: 3, name: "Shift lead responds", waitsOn: 2, state: "waiting" },
+      ],
+      verdicts: [],
+    });
+
+    const descendantsOf = (steps, declinedId) => {
+      const blocked = new Set([declinedId]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const step of steps) {
+          if (blocked.has(step.waitsOn) && !blocked.has(step.id)) {
+            blocked.add(step.id);
+            changed = true;
+          }
+        }
+      }
+      return blocked;
+    };
+
+    const reduce = (state, action) => {
+      if (action.type !== "resolve") return state;
+      const step = state.steps.find(({ id }) => id === action.id);
+      if (!step || step.state !== "waiting") return state;
+      const verdicts = [...state.verdicts, { id: step.id, outcome: action.outcome }];
+      const steps = state.steps.map((candidate) =>
+        candidate.id === step.id ? { ...candidate, state: "resolved" } : candidate
+      );
+      if (action.outcome !== "declined") return { steps, verdicts };
+      const blocked = descendantsOf(steps, step.id);
+      return {
+        verdicts,
+        steps: steps.map((candidate) =>
+          candidate.id !== step.id && blocked.has(candidate.id)
+            ? { ...candidate, state: "blocked" }
+            : candidate
+        ),
+      };
+    };
+
+    let state = initial();
+    const dispatch = (action) => { state = reduce(state, action); render(); };
+    const reset = () => { state = initial(); render(); };
+    const happyPath = () => { reset(); dispatch({ type: "resolve", id: 2, outcome: "approved" }); dispatch({ type: "resolve", id: 3, outcome: "approved" }); };
+    const declinePath = () => { reset(); dispatch({ type: "resolve", id: 2, outcome: "declined" }); };
+    const render = () => {
+      document.querySelector("#state").innerHTML = state.steps.map((step) =>
+        `<dt class="${step.state}">${step.name}</dt><dd>${step.state}${step.waitsOn ? ` (waits on step ${step.waitsOn})` : ""}</dd>`
+      ).join("") + `<dt>Verdicts</dt><dd>${state.verdicts.map((v) => `step ${v.id}: ${v.outcome}`).join(", ") || "none"}</dd>`;
+    };
+    render();
+  </script>
+</body>
+</html>
