@@ -1240,6 +1240,92 @@ class TestRunOrchestrationResumeLoop:
         assert call_count[0] == 2
 
     @pytest.mark.asyncio
+    async def test_a_declined_person_verdict_never_resumes_a_step_that_waits_on_it(self):
+        review_event = _make_event(
+            "request_info",
+            data=MockMagenticPlanReviewRequest(),
+            request_id="req-1",
+        )
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "outcome": "declined",
+            },
+            {
+                "id": 4,
+                "action": "Ask Dana Reyes to approve the swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Dana Reyes",
+                    "relation": "manager",
+                    "simulated": True,
+                },
+                "waitsOn": 3,
+                "outcome": "approved",
+            },
+            {
+                "id": 5,
+                "action": "Put the swap on the schedule",
+                "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+                "waitsOn": 4,
+            },
+        ]
+        mock_wait_approval.return_value = MockPlanApprovalResponse(
+            approved=True, m_plan_id="test-plan-id"
+        )
+        workflow = Mock()
+        workflow.run = Mock(return_value=_async_iter([review_event]))
+        workflow._executors = {}
+        workflow.executors = {}
+        workflow.get_executors_list.return_value = []
+        workflow._manager_chat_client = FakeManagerChatClient(
+            [
+                "not a scope classifier response",
+                "I cannot make the Saturday swap.",
+                "I approve the Saturday swap.",
+            ]
+        )
+        workflow._team_config = SimpleNamespace(
+            starting_tasks=[
+                SimpleNamespace(
+                    id="swap",
+                    ticket_on_approval=False,
+                    plan_steps=steps,
+                )
+            ]
+        )
+        orchestration_config.get_current_orchestration.return_value = workflow
+
+        await OrchestrationManager().run_orchestration(
+            user_id="user-1",
+            input_task=SimpleNamespace(
+                description="Swap my Saturday shift with Marcus Bell",
+                starting_task_id="swap",
+            ),
+        )
+
+        assert workflow.run.call_count == 1
+        assert "Their authored decision is declined." in (
+            workflow._manager_chat_client.requests[1][1].contents[0]
+        )
+        assert len(workflow._manager_chat_client.requests) == 2
+        landed = [
+            call.kwargs["message"]
+            for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "verdict_landed"
+        ]
+        assert [(message["step_id"], message["outcome"]) for message in landed] == [
+            (3, "declined")
+        ]
+
+    @pytest.mark.asyncio
     async def test_a_plan_sent_back_is_asked_again_in_the_same_conversation(self):
         """Disagreeing with a plan is not the end of the conversation (#108).
 
@@ -2496,6 +2582,75 @@ class TestTheApprovalIsTheTicketConfirmation:
                 "authored for this walkthrough.",
             ),
         ]
+
+    @pytest.mark.asyncio
+    async def test_a_declined_person_verdict_stops_the_swap_before_a_waiting_person_runs(self):
+        """A declined peer is the last Person step this approved swap reaches."""
+        steps = [
+            {
+                "id": 1,
+                "action": "Check the swap procedure",
+                "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+            },
+            {
+                "id": 2,
+                "action": "Confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "You",
+                    "relation": "associate",
+                    "simulated": False,
+                },
+                "waitsOn": 1,
+            },
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+                "outcome": "declined",
+            },
+            {
+                "id": 4,
+                "action": "Ask Dana Reyes to approve the swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Dana Reyes",
+                    "relation": "manager",
+                    "simulated": True,
+                },
+                "waitsOn": 3,
+                "outcome": "approved",
+            },
+            {
+                "id": 5,
+                "action": "Put the swap on the schedule",
+                "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+                "waitsOn": 4,
+            },
+        ]
+        chat_client = FakeManagerChatClient(["I cannot make the Saturday swap."])
+
+        _review, outcome = await self._review(
+            None, plan_steps=steps, manager_chat_client=chat_client
+        )
+
+        assert [
+            (verdict.step_id, verdict.assignee.name, verdict.outcome)
+            for verdict in outcome.verdicts
+        ] == [(3, "Marcus Bell", "declined")]
+        assert chat_client.requests
+        assert len(chat_client.requests) == 1
+        assert outcome.stopped is True
+        assert outcome.verdicts[0].provenance_line == (
+            "No workforce management system was consulted — this verdict was "
+            "authored for this walkthrough."
+        )
 
     @pytest.mark.asyncio
     async def test_associate_only_person_steps_never_invoke_the_postapproval_executor(self):

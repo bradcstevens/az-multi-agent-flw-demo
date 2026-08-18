@@ -653,3 +653,74 @@ describe('a plan approval arriving on the wire', () => {
         }
     });
 });
+
+describe('a declined Verdict arriving on the wire', () => {
+    it('ends the approved plan and says the remaining steps did not proceed', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('plan_approval_request', {
+                    plan: {
+                        id: 'mplan-1',
+                        user_request: 'Swap my Saturday shift with Marcus Bell',
+                        steps: [
+                            {
+                                id: 3,
+                                action: 'Ask Marcus Bell to take the shift',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Marcus Bell',
+                                    relation: 'peer',
+                                    simulated: true,
+                                },
+                            },
+                            {
+                                id: 4,
+                                action: 'Ask Dana Reyes to approve the swap',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Dana Reyes',
+                                    relation: 'manager',
+                                    simulated: true,
+                                },
+                                waitsOn: 3,
+                            },
+                        ],
+                    },
+                }),
+            );
+        });
+        await screen.findByRole('heading', { name: 'Plan Overview' });
+
+        act(() => {
+            store.dispatch(planApprovalAccepted());
+            socket.deliver(
+                frame('verdict_landed', {
+                    m_plan_id: 'mplan-1',
+                    step_id: 3,
+                    assignee: {
+                        kind: 'person',
+                        name: 'Marcus Bell',
+                        relation: 'peer',
+                        simulated: true,
+                    },
+                    outcome: 'declined',
+                    words: 'I cannot make the Saturday swap.',
+                    provenance_line: 'No workforce management system was consulted.',
+                }),
+            );
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('Marcus Bell declined')).toBeInTheDocument();
+            expect(screen.getByTestId('verdict-plan-stopped')).toHaveTextContent(
+                'The rest of this plan did not proceed.',
+            );
+            expect(inFlightIndicators()).toHaveLength(0);
+            expect(selectShowProcessingPlanSpinner(store.getState())).toBe(false);
+        });
+    });
+});

@@ -26,6 +26,7 @@ from common.models.messages import TeamConfiguration
 from common.utils.markdown_utils import \
     normalize_markdown_tables as _normalize_markdown_tables
 from models.messages import AgentMessageStreaming, WebsocketMessageType
+from models.plan_models import MStep, Verdict
 from orchestration.connection_config import (connection_config,
                                              orchestration_config)
 from orchestration.plan_review_helpers import (convert_plan_review_to_mplan,
@@ -79,12 +80,15 @@ class PlanReviewOutcome:
     the only way a plan review ends the run now that there is no reject (#108).
     ``approved`` is true only when every review was approved, so a run that has
     been sent back once does not auto-approve the plan that comes back.
+    ``stopped`` records an authored declined Person Verdict: the associate
+    approved the plan, but the swap did not proceed past that colleague.
     """
 
     responses: Optional[dict]
     revision: PlanRevision
     approved: bool
     verdicts: list = field(default_factory=list)
+    stopped: bool = False
 
 
 class OrchestrationManager:
@@ -548,6 +552,12 @@ class OrchestrationManager:
                             revision=revision,
                         )
                         revision = outcome.revision
+                        if outcome.stopped:
+                            self.logger.info(
+                                "A Person declined the approved plan — ending the run "
+                                "(job='%s')", job_id,
+                            )
+                            return
                         if outcome.responses is None:
                             # No verdict arrived — a timeout or a socket that
                             # went away. The associate has already been told,
@@ -1013,8 +1023,6 @@ class OrchestrationManager:
             mplan.revision = revision.number
             mplan.revision_feedback = list(revision.feedback)
             if plan_steps is not None:
-                from models.plan_models import MStep
-
                 mplan.steps = [
                     step if isinstance(step, MStep) else MStep.model_validate(step)
                     for step in plan_steps
@@ -1074,6 +1082,17 @@ class OrchestrationManager:
                         manager_chat_client=manager_chat_client,
                     )
                     verdicts.extend(resolved_verdicts)
+                    if any(
+                        getattr(verdict.outcome, "value", verdict.outcome) == "declined"
+                        for verdict in resolved_verdicts
+                    ):
+                        return PlanReviewOutcome(
+                            responses=responses,
+                            revision=revision,
+                            approved=True,
+                            verdicts=verdicts,
+                            stopped=True,
+                        )
                 continue
 
             feedback = getattr(approval_response, "feedback", None) or ""
@@ -1200,8 +1219,6 @@ class OrchestrationManager:
         if manager_chat_client is None:
             raise RuntimeError("Manager chat client is required to resolve Person steps")
 
-        from models.plan_models import Verdict
-
         verdicts = []
         for step in person_steps:
             outcome = getattr(step, "outcome", None)
@@ -1264,6 +1281,8 @@ class OrchestrationManager:
                 user_id=user_id,
                 message_type=WebsocketMessageType.VERDICT_LANDED,
             )
+            if verdict.outcome == "declined":
+                return verdicts
         return verdicts
 
     def _task_requires_ticket_on_approval(self, workflow, input_task) -> bool:
@@ -1309,8 +1328,6 @@ class OrchestrationManager:
                 plan_steps = getattr(task, "plan_steps", None)
                 if not isinstance(plan_steps, list):
                     return None
-                from models.plan_models import MStep
-
                 return [MStep.model_validate(step) for step in plan_steps]
 
         return None

@@ -247,6 +247,14 @@ export function usePlanWebSocket({
                     scrollToBottom();
                     return;
                 }
+                if (verdict.outcome === 'declined') {
+                    // A declined Person Verdict stops this Reviewable plan, so
+                    // it must not narrate another colleague as still waiting.
+                    dispatch(requestSettled());
+                    dispatch(setShowProcessingPlanSpinner(false));
+                    scrollToBottom();
+                    return;
+                }
                 const next = nextUnresolvedPerson(
                     planApprovalRequest?.steps ?? [],
                     [
