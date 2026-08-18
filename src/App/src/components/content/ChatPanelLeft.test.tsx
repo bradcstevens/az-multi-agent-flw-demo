@@ -508,6 +508,27 @@ describe('deleting every chat from the panel (#76)', () => {
         );
     };
 
+    /*
+      The confirmation is still open — asked without consulting the
+      accessibility tree, which is not the fact under test and does not answer
+      the same way twice.
+
+      #130's chat-history drawer is an `OverlayDrawer`, and tabster makes it a
+      *trapped* modalizer: `isOthersAccessible: false`. The confirmation renders
+      into a portal that is a sibling of the drawer's, so once tabster has swept
+      it is `aria-hidden`, and a role query — which reads the accessibility tree
+      — cannot see it. When tabster has not yet swept, the same query can. That
+      timing is the whole difference between this file passing on a developer's
+      machine and failing on the runner, and it says nothing about the panel:
+      the `findByText` assertions beside these two, reading the very words
+      inside that same dialog, pass on both.
+
+      `hidden: true` asks the DOM instead. Fluent unmounts a closed `Dialog`'s
+      surface, so the element being there is the confirmation being open.
+    */
+    const findDeleteAllDialog = () =>
+        screen.findByRole('dialog', { name: DELETE_ALL_CHATS_TITLE, hidden: true });
+
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(apiService.getPlans).mockResolvedValue([
@@ -615,12 +636,7 @@ describe('deleting every chat from the panel (#76)', () => {
         expect(
             await screen.findByText(/1 chat could not be deleted/i),
         ).toBeInTheDocument();
-        // Found rather than read: the chat-history drawer is a modalizer, so
-        // between the message landing and the sweep's render settling the
-        // delete dialog can still be outside what a role query can reach.
-        expect(
-            await screen.findByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
-        ).toBeInTheDocument();
+        expect(await findDeleteAllDialog()).toBeInTheDocument();
     });
 
     it('still names a chat it kept running when the same sweep also failed', async () => {
@@ -657,7 +673,7 @@ describe('deleting every chat from the panel (#76)', () => {
         await confirmDeleteAll();
 
         await waitFor(() => expect(apiService.deleteAllChats).toHaveBeenCalled());
-        expect(screen.getByRole('dialog', { name: DELETE_ALL_CHATS_TITLE })).toBeInTheDocument();
+        expect(await findDeleteAllDialog()).toBeInTheDocument();
         expect(screen.getByText('offline')).toBeInTheDocument();
         expect(
             screen.getByRole('button', { name: /^The coffee machine/ }),
