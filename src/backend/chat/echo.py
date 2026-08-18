@@ -5,8 +5,10 @@
 browser echoing `is_final` back through `POST /v4/agent_message` is a second
 opinion on a question already answered, and two writers of one fact is how they
 come to disagree. So the echo was narrowed rather than removed: it still carries
-the transcript and the streaming message, which nothing else persists, and it no
-longer says whether the conversation is over.
+what an agent said and the streamed reply, neither of which anything else
+persists — the associate's own answers reach the transcript through
+`handle_human_clarification`, not here — and it no longer says whether the
+conversation is over.
 
 This module is the half of that with no Cosmos in it — what the echo can have
 done, and, crucially, **what the route is allowed to call success**. That second

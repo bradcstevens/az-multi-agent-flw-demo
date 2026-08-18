@@ -206,9 +206,10 @@ class PlanService:
     ) -> MessageEchoed:
         """Record what an agent said — and nothing about whether the turn ended.
 
-        The browser's echo carries the transcript and the streaming message,
-        which nothing else persists, so this is a narrowing rather than a
-        removal (#158, ADR-043 decision 7). What it no longer carries is a
+        The browser's echo carries what an agent said and the streamed reply,
+        neither of which anything else persists — the associate's own answers
+        arrive through :meth:`handle_human_clarification` below — so this is a
+        narrowing rather than a removal (#158, ADR-043 decision 7). What it no longer carries is a
         verdict: the terminal status of a turn is written by the server that
         ended it, and this handler writing `overall_status` as well made two
         writers of one fact.

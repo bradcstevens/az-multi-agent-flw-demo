@@ -1941,7 +1941,7 @@ class TestDeleteAllChats:
         # A Chat is a Session and holds more than one Plan (#71) — the
         # walkthrough's centrepiece pair is one chat with two. Deduped here
         # rather than left to the store's `DISTINCT`, because the second sweep
-        # of an already-deleted partition reports `no_such_plan_record` and the
+        # of an already-deleted partition reports `no_such_chat` and the
         # outcome would count a phantom failure.
         self._sessions(
             client,

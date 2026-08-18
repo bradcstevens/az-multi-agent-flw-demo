@@ -780,6 +780,13 @@ class CosmosDBClient(DatabaseBase):
                 # Deleted between the read and the write. The same ordinary
                 # event as an empty read, and reported the same way: a store
                 # that had nothing to write to did not fail.
+                #
+                # A 404 does not say *which* resource was missing, so this
+                # leans on what already happened rather than on the code alone:
+                # the transcript write landed in this container moments ago,
+                # and the read above found this very document in it. A missing
+                # container or database would have failed both. What is left
+                # for a 404 to mean here is the record itself.
                 self.logger.info(
                     "Plan record %s went between the read and the write, so it "
                     "did not take the streaming message",
@@ -1030,7 +1037,7 @@ class CosmosDBClient(DatabaseBase):
         Deduped in Python rather than by ``DISTINCT``: a Chat holds more than
         one Plan (#71) — the walkthrough's centrepiece pair is one chat with
         two — and sweeping the same partition twice reports the second pass as
-        ``no_such_plan_record``, which would put a phantom failure in front of the
+        ``no_such_chat``, which would put a phantom failure in front of the
         presenter.
 
         A store failure while enumerating is raised rather than read as an

@@ -1445,8 +1445,9 @@ the store is touched, so no fourth member is coined by accident.
 _Avoid_: terminal state, final status, deletable status
 
 **The echo** — `POST /v4/agent_message`, the browser telling the server what an agent said. It is
-the only writer of a **Chat**'s transcript and of the streamed reply, which is why it survives at
-all; since #158 it writes nothing else. It used to set `overall_status = completed` when the browser
+the only writer of the agent-authored half of a **Chat**'s transcript, and the only writer of the
+streamed reply, which is why it survives at all; since #158 it writes nothing else. (The associate's
+own answers reach the transcript through the clarification route, not this one.) It used to set `overall_status = completed` when the browser
 echoed `is_final` back, making two writers of one fact and putting a regex over a stringified Python
 repr — the flag arrives in three shapes — in the path that decided whether a Chat could ever be
 deleted. That verdict is the **settle-write**'s alone
