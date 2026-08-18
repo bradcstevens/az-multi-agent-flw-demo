@@ -19,6 +19,7 @@ import subprocess
 from pathlib import Path
 
 import provenance
+from sop.provenance import SOP_SOURCE
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RUNBOOK = REPO_ROOT / "docs" / "presenter-runbook.md"
@@ -133,9 +134,11 @@ def test_the_chord_is_the_chord_the_browser_listens_for():
 def test_the_runbook_quotes_the_grounding_route_the_panel_exports():
     """A presenter's route names every observed hop, not a parallel story.
 
-    The surface owns the known Copilot Studio transport segments. Dataverse stays
-    supplied by `source_used`, so the panel can still refuse to claim this route
-    for a platform it did not observe.
+    The surface owns the known Copilot Studio transport segments and the backend
+    owns the source the hop lands in, so every word of the quoted route is read
+    out of the repository rather than restated here. Dataverse stays supplied by
+    `source_used` at run time, which is why the panel can still refuse to claim
+    this route for a platform it did not observe.
     """
     names = (
         "ROUTE_ORIGIN",
@@ -144,10 +147,12 @@ def test_the_runbook_quotes_the_grounding_route_the_panel_exports():
         "DIRECT_LINE_ROUTE_SEGMENT",
         "COPILOT_STUDIO_PLATFORM",
     )
-    route = " → ".join(_exported_string(GROUNDING_PANEL, name) for name in names)
+    segments = [_exported_string(GROUNDING_PANEL, name) for name in names]
+    segments.append(SOP_SOURCE)
+    route = " → ".join(segments)
 
-    assert f"{route} → Dataverse" in _rendered(), (
-        "the runbook does not quote the Grounding panel's observed route"
+    assert route in _rendered(), (
+        f"the runbook does not quote the Grounding panel's observed route: {route}"
     )
 
 

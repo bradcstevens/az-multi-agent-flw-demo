@@ -33,7 +33,11 @@ export class TransparencyRail {
         return this.page.getByTestId('grounding-platform');
     }
 
-    /** `Foundry orchestrator → Copilot Studio → Dataverse`. */
+    /**
+     * `Foundry orchestrator → search_store_procedures (MCP tool, plain HTTP) →
+     * POST /sop/ask → Direct Line → Copilot Studio → Dataverse` — the observed
+     * hop with the tool call that made it named (ADR-040).
+     */
     get route(): Locator {
         return this.page.getByTestId('grounding-route');
     }

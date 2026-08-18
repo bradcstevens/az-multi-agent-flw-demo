@@ -65,9 +65,19 @@ alone: wiring the reset there and nowhere else would have left it firing almost 
 
 Leads with the **platform**, not the document. The claim R6 exists to make is that *this one answer
 left Foundry*, so the headline is `Copilot Studio` and the route reads
-`Foundry orchestrator → Copilot Studio → Dataverse`. **Dataverse**, never SharePoint: that is where
+`Foundry orchestrator → search_store_procedures (MCP tool, plain HTTP) → POST /sop/ask →
+Direct Line → Copilot Studio → Dataverse`. **Dataverse**, never SharePoint: that is where
 the SOP corpus actually lives (ADR-012), and naming SharePoint would describe an architecture this
 demo deliberately does not have.
+
+The route **names the MCP tool that made the hop** (ADR-040). The tool call is the step the route
+used to skip, in the one panel whose whole purpose is that the hop is checkable, and the literal
+`search_store_procedures` is what an engineer in the room can go and find afterwards — with the
+gloss beside it so the identifier is not jargon to everyone else. The transport segments are a
+claim about a *specific* transport, so a `source_used` naming any other platform gets only the route
+the panel can vouch for: origin, platform, source. There is **no Direct Line MCP server** and that
+phrase renders nowhere: the tool is a plain HTTP relay to `POST /sop/ask` and the only Direct Line
+client is `src/backend/sop/direct_line.py` (ADR-011).
 
 Three states, and the differences between them are the point:
 

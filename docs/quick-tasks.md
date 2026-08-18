@@ -13,7 +13,7 @@ They render in this order, which is the order the demonstration runs in.
 
 | # | Task | Prompt | Lane | The beat |
 | --- | --- | --- | --- | --- |
-| 1 | Close the store | *How do I close the store?* | fast | R2/R6 — the cross-platform hop, `Foundry orchestrator → Copilot Studio → Dataverse` |
+| 1 | Close the store | *How do I close the store?* | fast | R2/R6 — the cross-platform hop, over the route the **Grounding panel** names hop by hop (ADR-040) |
 | 2 | Restart the car wash | *How do I restart the car wash after a vehicle stalls in the bay?* | fast | R2 — the rehearsed honest miss |
 | 3 | The coffee brewer is down | *The coffee brewer is down. It is not brewing on the left head.* | fast | R3 — multi-turn troubleshooting with **Attempted steps** |
 | 4 | I can't fix it (follow-on) | *I have tried everything and I can't fix it. I need someone to come out.* | **deliberate** | R4 — the approval *is* the **Simulated ticket** being raised |

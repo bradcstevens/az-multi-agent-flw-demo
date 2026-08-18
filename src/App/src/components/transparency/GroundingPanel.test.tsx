@@ -91,10 +91,17 @@ describe('the Grounding panel', () => {
     });
 
     it('never names the nonexistent Direct Line MCP component anywhere in frontend source', () => {
+        // Searched rather than enumerated: a list of the files it might appear
+        // in goes stale the first time somebody adds a file. Case-insensitively,
+        // because the component does not exist in any casing, and this is the
+        // one panel whose whole purpose is that its claims are checkable.
         const forbiddenName = ['Direct', ' Line', ' MCP', ' server'].join('');
-        const sources = sourceFiles(FRONTEND_SOURCE).map((path) => readFileSync(path, 'utf8'));
+        const pattern = new RegExp(forbiddenName, 'i');
+        const offenders = sourceFiles(FRONTEND_SOURCE).filter((path) =>
+            pattern.test(readFileSync(path, 'utf8')),
+        );
 
-        expect(sources.some((source) => source.includes(forbiddenName))).toBe(false);
+        expect(offenders).toEqual([]);
     });
 
     it('carries both SOP queries so a retrieval miss can be attributed', () => {

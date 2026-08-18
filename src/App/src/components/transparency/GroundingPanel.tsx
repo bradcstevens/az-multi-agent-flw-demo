@@ -31,6 +31,20 @@ import { SECTION_HEADING } from '../../models/headingOutline';
  * - **no signal** — the panel describes itself and asserts nothing. It does
  *   *not* say the answer came from Foundry: nobody told it that, and a surface
  *   may say nothing but may not say something that is not so.
+ *
+ * The route **names the tool call that made the hop** (ADR-040, #143). It used
+ * to go straight from the orchestrator to the platform, which skipped the
+ * middle of its own sentence: the MCP tool call is the step that crossed the
+ * boundary, and this was the one panel not naming it. The identifier renders
+ * literally — that is the string an engineer in the room can go and find — with
+ * a plain-English gloss beside it so it is not jargon to everybody else.
+ *
+ * The tool is a **plain HTTP relay** to `POST /sop/ask`, and the only Direct
+ * Line client is the backend's SOP module. No supported way exists to expose a
+ * Copilot Studio agent *as* an MCP server (ADR-011), so no such component may
+ * be named here — in the panel whose whole purpose is that its claims are
+ * checkable, a name for something that does not exist would be the one false
+ * statement standing beside a set of true ones.
  */
 export interface GroundingPanelProps {
     source: SourceUsed | null;
@@ -38,6 +52,14 @@ export interface GroundingPanelProps {
 
 /** Where every cross-platform answer starts. */
 export const ROUTE_ORIGIN = 'Foundry orchestrator';
+
+/**
+ * The transport this repository actually built, named segment by segment.
+ *
+ * Exported because the presenter runbook quotes the route and its CI property
+ * reads it from here: a route the surface stopped showing is a presenter
+ * reading out a hop nobody can see.
+ */
 export const COPILOT_STUDIO_PLATFORM = 'Copilot Studio';
 export const SOP_TOOL_ROUTE_SEGMENT = 'search_store_procedures (MCP tool, plain HTTP)';
 export const SOP_ASK_ROUTE_SEGMENT = 'POST /sop/ask';
@@ -77,6 +99,13 @@ const GroundingPanel: React.FC<GroundingPanelProps> = ({ source }) => (
                 <div className="grounding-panel__route" data-testid="grounding-route">
                     <Caption1>{ROUTE_ORIGIN}</Caption1>
                     <ArrowRight16Regular aria-hidden="true" />
+                    {/*
+                      Conditional, because these segments are a claim about a
+                      *specific* transport. Printed for whatever `source_used`
+                      names, they would assert a route nobody observed — so
+                      another platform gets only what the panel can vouch for:
+                      origin, platform, source.
+                    */}
                     {source.platform === COPILOT_STUDIO_PLATFORM && (
                         <>
                             <Caption1>{SOP_TOOL_ROUTE_SEGMENT}</Caption1>
