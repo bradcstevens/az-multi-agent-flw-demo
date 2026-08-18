@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 
 import { STACKING_BREAKPOINT_QUERY } from '@/models/panelDrawer';
 
@@ -31,7 +31,6 @@ export const SHELL_STYLESHEET = join(STYLES, 'storeSurface.css');
 export const indexStylesheet = join(SRC, 'index.css');
 export const RAIL_STYLESHEET = join(STYLES, 'transparency.css');
 export const PLAN_PANEL_STYLESHEET = join(STYLES, 'planpanelright.css');
-export const CHAT_LIST_STYLESHEET = join(STYLES, 'ChatList.css');
 /**
  * The shared **Stacking breakpoint**, built from the one number that declares
  * it rather than restated here. `TransparencyRail.test` reads `storeSurface.css`
@@ -140,6 +139,43 @@ export const classTokensIn = (source: string): Set<string> => {
 export const isRendered = (className: string): boolean =>
     sourceFiles().some((path) => readFileSync(path, 'utf8').includes(className));
 
+/**
+ * Every stylesheet the application **actually loads**, derived from the imports
+ * that load them rather than from a directory listing.
+ *
+ * The list used to be `index.css` plus `src/styles/*.css`, which is neither the
+ * set the browser loads nor a superset of it. `App.tsx` imports `App.css` from
+ * `src/`, so every rule in it was invisible to every assertion here — and what
+ * it holds is a third copy of the chat list's row rules. Meanwhile three
+ * stylesheets under `commonComponents/` are imported by nothing at all, so a
+ * directory listing would have made dead files evidence.
+ *
+ * Derived, for #58's reason one level up: a *list* of stylesheets in a helper
+ * agrees with itself forever, while an import is what actually loads one. A
+ * stylesheet added tomorrow is covered the moment something imports it, and a
+ * stylesheet nobody imports never is.
+ */
+export const loadedStylesheets = (): { file: string; path: string }[] => {
+    const imported = new Set<string>();
+
+    for (const source of sourceFiles()) {
+        const code = readFileSync(source, 'utf8');
+        for (const match of code.matchAll(/import\s+['"]([^'"]+\.css)['"]/g)) {
+            const specifier = match[1];
+            imported.add(
+                specifier.startsWith('@/')
+                    ? join(SRC, specifier.slice(2))
+                    : resolve(dirname(source), specifier),
+            );
+        }
+    }
+
+    return Array.from(imported)
+        .filter((path) => existsSync(path))
+        .sort()
+        .map((path) => ({ file: relative(SRC, path), path }));
+};
+
 /** Every top-level rule in every stylesheet the surface loads. */
 export const allRules = (): Rule[] =>
     readdirSync(STYLES)
@@ -148,8 +184,7 @@ export const allRules = (): Rule[] =>
 
 /** Every rule the stylesheets declare, inside media queries as well as out. */
 export const allRulesIncludingMediaQueries = (): Rule[] =>
-    ['index.css', ...readdirSync(STYLES).filter((entry) => entry.endsWith('.css'))].flatMap((entry) => {
-        const path = entry === 'index.css' ? indexStylesheet : join(STYLES, entry);
+    loadedStylesheets().flatMap(({ file, path }) => {
         const css = withoutComments(readFileSync(path, 'utf8'));
         // Media-query bodies are parsed as their own stylesheets, so a rule
         // inside one is read exactly like a rule outside one.
@@ -160,10 +195,10 @@ export const allRulesIncludingMediaQueries = (): Rule[] =>
                 if (css[i] === '{') depth += 1;
                 if (css[i] === '}') {
                     depth -= 1;
-                    if (depth === 0) return rulesIn(css.slice(open + 1, i), entry);
+                    if (depth === 0) return rulesIn(css.slice(open + 1, i), file);
                 }
             }
             return [];
         });
-        return [...rulesIn(css, entry), ...inner];
+        return [...rulesIn(css, file), ...inner];
     });

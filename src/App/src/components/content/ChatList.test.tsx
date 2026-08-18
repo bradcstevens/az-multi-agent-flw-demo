@@ -1,15 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FluentProvider, teamsLightTheme } from '@fluentui/react-components';
-import { readFileSync } from 'node:fs';
 
 import ChatList from './ChatList';
 import { Chat } from '@/models';
-import {
-    CHAT_LIST_STYLESHEET,
-    allRulesIncludingMediaQueries,
-    rulesIn,
-} from '@/testing/stylesheets';
+import { allRulesIncludingMediaQueries, classesIn } from '@/testing/stylesheets';
 import { PlanStatus } from '../../models/enums';
 import { NO_CHATS_MESSAGE, chatStateLabel } from '../../models/chatState';
 import {
@@ -427,37 +422,160 @@ describe('the list holds chats in every state', () => {
  * How tall the list is allowed to be (#178).
  *
  * jsdom has no layout engine, so a hidden row is not observable here — what is
- * observable is the rule that hides it. These read the stylesheet on #58's
+ * observable is the rule that hides it. These read the stylesheets on #58's
  * finding: a rule listed in a test agrees with itself forever, while a rule
  * read out of the stylesheet keeps agreeing with the surface.
+ *
+ * Everything below is asked of **every stylesheet the application loads**,
+ * inside media queries as well as out, and of the **rendered** element chain
+ * rather than a class name typed here. The first version of this suite asked
+ * `ChatList.css` for its top-level `max-height` rules, which is the same rule
+ * spelled once: the cap could have come back as `height`, in a media query, in
+ * another stylesheet, or inline in the component, and every one of those would
+ * have been a green suite over a panel showing five chats.
  */
 describe("the chat list's height", () => {
-    const chatListRules = () =>
-        rulesIn(readFileSync(CHAT_LIST_STYLESHEET, 'utf8'), 'ChatList.css');
+    /**
+     * The elements between the panel's scroll region and a chat row, taken from
+     * the DOM the component actually produces.
+     *
+     * Read rather than listed because the containers are not all ours: Fluent's
+     * `Accordion`, `AccordionItem` and `AccordionPanel` sit between our
+     * container and our rows, and it was `.fui-AccordionPanel` — a class no
+     * source file in this repository contains — that carried the cap. A list
+     * typed here would have to be updated by whoever renames it, which is
+     * exactly the person who would not know to.
+     */
+    const listContainerClasses = (): Set<string> => {
+        renderList(MORNING);
 
-    it('is the height of the panel it sits in, not a window of its own', () => {
+        const row = screen.getByRole('button', { name: /^How do I close the store\?/ });
+        const classes = new Set<string>();
+
+        for (
+            let node = row.parentElement;
+            node !== null;
+            node = node.classList.contains('task-list-container') ? null : node.parentElement
+        ) {
+            node.classList.forEach((className) => classes.add(className));
+        }
+
+        return classes;
+    };
+
+    /** The rendered containers themselves, for what a stylesheet cannot say. */
+    const listContainerElements = (): HTMLElement[] => {
+        renderList(MORNING);
+
+        const row = screen.getByRole('button', { name: /^How do I close the store\?/ });
+        const containers: HTMLElement[] = [];
+
+        for (
+            let node = row.parentElement;
+            node !== null;
+            node = node.classList.contains('task-list-container') ? null : node.parentElement
+        ) {
+            containers.push(node);
+        }
+
+        return containers;
+    };
+
+    /** A height that bounds the box, as opposed to one that only floors it. */
+    const HEIGHTS = /(?:^|[;{\s])(?:max-)?(?:height|block-size)\s*:\s*([^;}]+)/g;
+    const UNBOUNDED = ['auto', 'none', '100%', 'inherit', 'initial', 'unset', 'revert'];
+
+    const boundsHeight = (body: string): boolean =>
+        Array.from(body.matchAll(HEIGHTS))
+            .map((match) => match[1].replace('!important', '').trim())
+            .some((value) => !UNBOUNDED.includes(value));
+
+    /** A scroll region of its own — the scrollbar nobody looks for. */
+    const OVERFLOWS = /(?:^|[;{\s])overflow(?:-y|-block)?\s*:\s*([^;}]+)/g;
+
+    const opensOwnScroll = (body: string): boolean =>
+        Array.from(body.matchAll(OVERFLOWS))
+            .map((match) => match[1].trim())
+            .some((value) => /\b(auto|scroll)\b/.test(value));
+
+    it('recognises the rule that caused this ticket, so the guards below cannot pass vacuously', () => {
+        /*
+          The detectors, checked against the deleted rule itself and against the
+          declarations that must keep passing. Without this, every assertion
+          below is "no rule matched", which is also what a broken detector says.
+        */
+        expect(boundsHeight('max-height: 280px !important; overflow-y: auto !important')).toBe(true);
+        expect(opensOwnScroll('max-height: 280px !important; overflow-y: auto !important')).toBe(true);
+
+        // A row flooring itself is not a cap, and `.task-tab` declares one.
+        expect(boundsHeight('min-height: 54px')).toBe(false);
+        // Filling the parent is how the panel's height reaches the list.
+        expect(boundsHeight('height: 100%')).toBe(false);
+        expect(opensOwnScroll('overflow: hidden')).toBe(false);
+    });
+
+    it('sits under the containers this suite thinks it does', () => {
+        // The other half of the vacuity guard: the assertions below are only
+        // worth anything if the class set they filter on is the real chain.
+        const containers = listContainerClasses();
+
+        expect(containers.has('task-list-container')).toBe(true);
+        expect(
+            Array.from(containers).some((className) => /^fui-Accordion/.test(className)),
+            'the Fluent accordion is no longer between the list and its rows',
+        ).toBe(true);
+    });
+
+    it('is bounded by the panel it sits in, in every stylesheet the application loads', () => {
         /*
           The defect: `max-height: 280px` with its own `overflow-y: auto` put
           five rows on screen and the rest behind a scrollbar *inside* a panel
-          that is already full height and already scrolls. A panel with a screen
-          of empty space beneath a list that claims to be finished — #60's
-          "content hidden behind a second scrollbar", in the column on the other
-          edge.
+          that is already full height and already scrolls — #60's "content
+          hidden behind a second scrollbar", in the column on the other edge.
 
-          Nothing about the list may declare a height. The one that bounds it is
-          the panel's, which is the surface's.
+          A rule is this list's own when every class it names is one of the
+          containers between the panel and a row. That is what makes the guard
+          hold wherever the cap is written: `.fui-AccordionPanel` in this
+          stylesheet, `body .fui-AccordionPanel` in another, or either inside a
+          media query.
         */
-        const capped = chatListRules()
-            .filter((rule) => /(?:^|[;{\s])max-height:/.test(rule.body))
-            .map((rule) => rule.selector);
+        const containers = listContainerClasses();
+
+        const offenders = allRulesIncludingMediaQueries().flatMap((rule) =>
+            rule.selector
+                .split(',')
+                .map((selector) => selector.trim())
+                .filter((selector) => {
+                    const classes = classesIn(selector);
+                    return classes.length > 0 && classes.every((className) => containers.has(className));
+                })
+                .filter(() => boundsHeight(rule.body) || opensOwnScroll(rule.body))
+                .map((selector) => `${rule.file}: ${selector}`),
+        );
 
         expect(
-            capped,
-            `${capped.join(', ')} caps the chat list at a height of its own`,
+            offenders,
+            `${offenders.join(', ')} bounds the chat list or opens a scroll region inside it`,
         ).toEqual([]);
     });
 
-    it('does not reach past itself to style every accordion in the application', () => {
+    it('is not bounded inline either, where no stylesheet could overrule it', () => {
+        /*
+          The escape a stylesheet-reading test cannot see, and the one this
+          repository has paid for twice: an inline style beats every rule and
+          every breakpoint (`CONTEXT.md`, and #25 and #60 before it). A
+          `max-height` moved onto the element would restore the defect with
+          every assertion above still green.
+        */
+        for (const container of listContainerElements()) {
+            expect(container.style.maxHeight, 'an inline max-height caps the list').toBe('');
+            expect(container.style.height, 'an inline height caps the list').toBe('');
+            expect(container.style.overflow, 'an inline overflow opens a second scrollbar').toBe('');
+            expect(container.style.overflowY, 'an inline overflow-y opens a second scrollbar').toBe('');
+        }
+    });
+
+    it('does not reach past itself to style Fluent for the whole application', () => {
         /*
           The cap was declared on `.fui-AccordionPanel` — a class Fluent
           generates — from a stylesheet named after the chat list, and held
@@ -467,25 +585,42 @@ describe("the chat list's height", () => {
           day Fluent renamed it". Here it also silently capped every other
           accordion the application might ever render.
 
-          Read across every stylesheet, not just this one: the hazard is the
-          idiom, and the next unscoped override will be written somewhere else.
-          A Fluent class *scoped under one of our own* is fine — that is what
-          `.follow-on-task .fui-Button` does — so only a selector that leads
-          with `.fui-` is a reach past the component.
+          Read across every loaded stylesheet, because the hazard is the idiom
+          and the next unscoped override will be written somewhere else. What
+          makes a rule a reach is that **no class of ours appears in it at
+          all** — so `body .fui-AccordionPanel` is caught, while
+          `.follow-on-task .fui-Button`, a Fluent class scoped under one of
+          ours, is exactly how it should be done.
         */
-        const unscoped = allRulesIncludingMediaQueries()
-            .flatMap((rule) =>
-                rule.selector
-                    .split(',')
-                    .map((selector) => selector.trim())
-                    .filter((selector) => /^\.fui-/.test(selector))
-                    .map((selector) => `${rule.file}: ${selector}`),
-            );
+        const rules = allRulesIncludingMediaQueries();
+
+        const unscoped = rules.flatMap((rule) =>
+            rule.selector
+                .split(',')
+                .map((selector) => selector.trim())
+                .filter((selector) => {
+                    const classes = classesIn(selector);
+                    return (
+                        classes.length > 0 &&
+                        classes.every((className) => className.startsWith('fui-'))
+                    );
+                })
+                .map((selector) => `${rule.file}: ${selector}`),
+        );
 
         expect(
             unscoped,
             `${unscoped.join(', ')} styles a Fluent class for the whole application`,
         ).toEqual([]);
+
+        // And the scan reaches rules of this kind at all, rather than reporting
+        // a clean surface because it is reading the wrong files.
+        expect(
+            rules.some((rule) =>
+                classesIn(rule.selector).some((className) => className.startsWith('fui-')),
+            ),
+            'no loaded stylesheet mentions a Fluent class — the scan is looking in the wrong place',
+        ).toBe(true);
     });
 
     it('renders every chat it has been given, not a windowful', () => {
