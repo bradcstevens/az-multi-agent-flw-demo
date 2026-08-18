@@ -81,7 +81,7 @@ disclosed where it is true.**
    never speak.
 
 3. **There is no fourth transparency panel.** Same measured arithmetic as
-   [ADR-038](./039-an-agent-dossier-shows-what-the-agent-was-told-verbatim.md): a 320px rail that
+   [ADR-039](./039-an-agent-dossier-shows-what-the-agent-was-told-verbatim.md): a 320px rail that
    already carries three panels and collapses to 32px when stacked (#60, #70).
 
 4. **The phrase "Direct Line MCP server" never renders anywhere on the surface.** This is not a
