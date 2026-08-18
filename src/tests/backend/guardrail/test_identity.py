@@ -21,9 +21,9 @@ class TestResolveSessionIdentity:
         assert resolve_session_identity({"other": "value"}) is ANONYMOUS
 
     def test_a_named_identity_is_carried_through(self):
-        identity = resolve_session_identity({"identity": {"display_name": "Tanya Reyes"}})
+        identity = resolve_session_identity({"identity": {"display_name": "Clara Reyes"}})
 
-        assert identity.display_name == "Tanya Reyes"
+        assert identity.display_name == "Clara Reyes"
         assert identity.is_anonymous is False
 
     def test_a_blank_display_name_is_still_anonymous(self):
@@ -37,7 +37,7 @@ class TestResolveSessionIdentity:
         direction — the opposite of the team-scope evaluation ADR-014 declines
         to be modelled on.
         """
-        assert resolve_session_identity({"identity": "Tanya"}) is ANONYMOUS
+        assert resolve_session_identity({"identity": "Clara"}) is ANONYMOUS
 
 
 class TestSessionIdentity:
@@ -46,4 +46,4 @@ class TestSessionIdentity:
         assert ANONYMOUS.display_name is None
 
     def test_a_named_identity_is_not_anonymous(self):
-        assert SessionIdentity(display_name="Tanya Reyes").is_anonymous is False
+        assert SessionIdentity(display_name="Clara Reyes").is_anonymous is False

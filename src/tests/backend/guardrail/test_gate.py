@@ -51,7 +51,7 @@ class TestASignedInIdentity:
     async def test_the_same_question_is_admitted_once_someone_is_signed_in(self):
         """The mocked unlock is a parameter of this gate, not a second gate.
 
-        "my name is Tanya, how much PTO do I have?" is the demo's closing beat:
+        "my name is Clara, how much PTO do I have?" is the demo's closing beat:
         refused anonymously, answered after sign-in, with nothing between the
         two moments but the identity.
         """
@@ -59,8 +59,8 @@ class TestASignedInIdentity:
         gate = IdentityBoundaryGate(embed=embedder)
 
         verdict = await gate.evaluate(
-            "my name is Tanya, how much PTO do I have?",
-            identity=SessionIdentity(display_name="Tanya Reyes"),
+            "my name is Clara, how much PTO do I have?",
+            identity=SessionIdentity(display_name="Clara Reyes"),
         )
 
         assert verdict.refused is False
@@ -74,7 +74,7 @@ class TestASignedInIdentity:
 
         await gate.evaluate(
             "whats left on my sick days",
-            identity=SessionIdentity(display_name="Tanya Reyes"),
+            identity=SessionIdentity(display_name="Clara Reyes"),
         )
 
         assert embedder.calls == []
@@ -103,8 +103,8 @@ class TestASignedInIdentity:
         gate = IdentityBoundaryGate(embed=embedder)
 
         verdict = await gate.evaluate(
-            "my name is Tanya, how much PTO do I have?",
-            identity=SessionIdentity(display_name="Tanya Reyes"),
+            "my name is Clara, how much PTO do I have?",
+            identity=SessionIdentity(display_name="Clara Reyes"),
         )
 
         assert verdict.refused is False
@@ -125,7 +125,7 @@ class TestASignedInIdentity:
 
         verdict = await gate.evaluate(
             "how do I restart the car wash?",
-            identity=SessionIdentity(display_name="Tanya Reyes"),
+            identity=SessionIdentity(display_name="Clara Reyes"),
         )
 
         assert verdict.refused is False
@@ -145,7 +145,7 @@ class TestASignedInIdentity:
 
         await gate.evaluate(
             "how do I restart the car wash?",
-            identity=SessionIdentity(display_name="Tanya Reyes"),
+            identity=SessionIdentity(display_name="Clara Reyes"),
         )
 
         assert embedder.calls == []
@@ -157,7 +157,7 @@ class TestTheKeywordFastPath:
         embedder = StubEmbedder()
         gate = IdentityBoundaryGate(embed=embedder)
 
-        verdict = await gate.evaluate("my name is Tanya, how much PTO do I have?")
+        verdict = await gate.evaluate("my name is Clara, how much PTO do I have?")
 
         assert verdict.refused is True
         assert verdict.reason is GateReason.KEYWORD

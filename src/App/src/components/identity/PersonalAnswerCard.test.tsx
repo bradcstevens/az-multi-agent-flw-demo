@@ -7,7 +7,7 @@ import { parsePersonalAnswer, PERSONAL_ANSWER_KIND } from '../../models/personal
 const answer = parsePersonalAnswer({
     personal_answer: {
         kind: PERSONAL_ANSWER_KIND,
-        display_name: 'Tanya Alvarez',
+        display_name: 'Clara Workman',
         role: 'Store associate, Store 223',
         facts: [
             { label: 'PTO balance', value: '34.5 hours' },
@@ -23,7 +23,7 @@ describe('the personal answer card', () => {
         render(<PersonalAnswerCard answer={answer} />);
 
         expect(screen.getByTestId('personal-answer-name')).toHaveTextContent(
-            'Tanya Alvarez',
+            'Clara Workman',
         );
     });
 
@@ -53,12 +53,12 @@ describe('the personal answer card', () => {
         // nothing, which is true. An empty card is better than a claim.
         render(
             <PersonalAnswerCard
-                answer={{ displayName: 'Tanya Alvarez', role: '', facts: [], provenanceLine: '' }}
+                answer={{ displayName: 'Clara Workman', role: '', facts: [], provenanceLine: '' }}
             />,
         );
 
         expect(screen.getByTestId('personal-answer-name')).toHaveTextContent(
-            'Tanya Alvarez',
+            'Clara Workman',
         );
         expect(screen.queryAllByRole('term')).toEqual([]);
     });

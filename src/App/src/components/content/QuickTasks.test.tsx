@@ -37,7 +37,7 @@ const SEVEN_TASKS = [
     { id: 'task-223-honest-miss', name: 'Restart the car wash', prompt: 'How do I restart the car wash?', created: '', creator: '', logo: 'Search', lane: 'fast' },
     { id: 'task-223-troubleshooting', name: 'The coffee brewer is down', prompt: 'The coffee brewer is down.', created: '', creator: '', logo: 'Wrench', lane: 'fast', follow_on: 'task-223-escalation' },
     { id: 'task-223-escalation', name: "I can't fix it", prompt: 'I have tried everything and I need someone to come out.', created: '', creator: '', logo: 'Document', lane: 'deliberate' },
-    { id: 'task-223-identity', name: 'How much PTO do I have?', prompt: 'My name is Tanya, how much PTO do I have?', created: '', creator: '', logo: 'Shield', lane: 'fast' },
+    { id: 'task-223-identity', name: 'How much PTO do I have?', prompt: 'My name is Clara, how much PTO do I have?', created: '', creator: '', logo: 'Shield', lane: 'fast' },
     { id: 'task-223-shift-tasks', name: 'What is due this shift?', prompt: 'What tasks are due on this shift?', created: '', creator: '', logo: '📋', lane: 'fast' },
     { id: 'task-223-shift-swap', name: 'Swap a shift', prompt: 'How do I swap a shift with another associate?', created: '', creator: '', logo: 'People', lane: 'fast' },
 ];

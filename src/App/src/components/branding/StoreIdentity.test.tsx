@@ -71,16 +71,16 @@ describe('the store identity', () => {
         // The closing beat's visible half (#27): the header gains a name, and
         // the delta between this render and the one above it is the whole
         // licensing and governance conversation the customer has been avoiding.
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
         renderIdentity();
 
-        expect(screen.getByTestId('store-identity-name')).toHaveTextContent('Tanya Alvarez');
+        expect(screen.getByTestId('store-identity-name')).toHaveTextContent('Clara Workman');
         expect(screen.queryByTestId('store-identity-user')).not.toBeInTheDocument();
     });
 
     it('renders no chip beside the named identity', () => {
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
 
         renderIdentity();
 
@@ -88,7 +88,7 @@ describe('the store identity', () => {
     });
 
     it('offers a way back to the anonymous, refusing state', async () => {
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
         renderIdentity();
 
         await userEvent.click(screen.getByTestId('store-identity-sign-out'));

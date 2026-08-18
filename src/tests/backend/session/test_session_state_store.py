@@ -155,16 +155,16 @@ class TestWritingIsAMerge:
 
     @pytest.mark.asyncio
     async def test_an_unmentioned_field_is_left_alone(self, store):
-        await store.write("sess-1", identity={"display_name": "Tanya"})
+        await store.write("sess-1", identity={"display_name": "Clara"})
         await store.write("sess-1", lane="fast")
         state = await store.read("sess-1")
-        assert state.identity.display_name == "Tanya"
+        assert state.identity.display_name == "Clara"
         assert state.lane == "fast"
 
     @pytest.mark.asyncio
     async def test_an_explicit_none_clears_the_field(self, store):
         """Signing out is a write, not the absence of one."""
-        await store.write("sess-1", identity={"display_name": "Tanya"})
+        await store.write("sess-1", identity={"display_name": "Clara"})
         await store.write("sess-1", identity=None)
         assert (await store.read("sess-1")).identity.display_name is None
 
@@ -186,7 +186,7 @@ class TestTheRecordsOwner:
         self, memory_store
     ):
         await SessionStateStore(memory_store, user_id="user-1").write(
-            "sess-1", identity={"display_name": "Tanya"}
+            "sess-1", identity={"display_name": "Clara"}
         )
 
         other = await SessionStateStore(memory_store, user_id="user-2").read("sess-1")
@@ -195,7 +195,7 @@ class TestTheRecordsOwner:
     @pytest.mark.asyncio
     async def test_another_users_record_cannot_unlock_the_gate(self, memory_store):
         await SessionStateStore(memory_store, user_id="user-1").write(
-            "sess-1", identity={"display_name": "Tanya"}
+            "sess-1", identity={"display_name": "Clara"}
         )
 
         identity = await SessionStateStore(
@@ -206,9 +206,9 @@ class TestTheRecordsOwner:
     @pytest.mark.asyncio
     async def test_the_writing_user_reads_their_own_record_back(self, memory_store):
         store = SessionStateStore(memory_store, user_id="user-1")
-        await store.write("sess-1", identity={"display_name": "Tanya"})
+        await store.write("sess-1", identity={"display_name": "Clara"})
 
-        assert (await store.read("sess-1")).identity.display_name == "Tanya"
+        assert (await store.read("sess-1")).identity.display_name == "Clara"
 
 
 class TestTheIdentityTheGateReads:
@@ -224,9 +224,9 @@ class TestTheIdentityTheGateReads:
 
     @pytest.mark.asyncio
     async def test_a_written_name_is_resolved(self, store):
-        await store.write("sess-1", identity={"display_name": "Tanya"})
+        await store.write("sess-1", identity={"display_name": "Clara"})
         identity = await store.resolve_identity("sess-1")
-        assert identity.display_name == "Tanya"
+        assert identity.display_name == "Clara"
         assert not identity.is_anonymous
 
     @pytest.mark.asyncio
