@@ -416,12 +416,22 @@ describe('deleting a chat from the panel', () => {
           observes the panel at all.
         */
         await waitFor(() => expect(apiService.getPlans).toHaveBeenCalledTimes(2));
-        expect(
-            screen.queryByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
-        ).not.toBeInTheDocument();
-        expect(
-            screen.queryByRole('button', { name: /^How do I swap a shift/ }),
-        ).not.toBeInTheDocument();
+        await waitFor(() =>
+            expect(
+                screen.queryByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
+            ).not.toBeInTheDocument(),
+        );
+        /*
+          The re-read's rejection is swallowed a tick after the call count
+          rises, so the row leaves on a later render than the one `getPlans`
+          resolves on. Waited rather than read once: the dialog check above has
+          already established the panel is what `queryByRole` can see.
+        */
+        await waitFor(() =>
+            expect(
+                screen.queryByRole('button', { name: /^How do I swap a shift/ }),
+            ).not.toBeInTheDocument(),
+        );
         expect(
             screen.getByRole('button', { name: /^The coffee machine/ }),
         ).toBeInTheDocument();
@@ -605,7 +615,12 @@ describe('deleting every chat from the panel (#76)', () => {
         expect(
             await screen.findByText(/1 chat could not be deleted/i),
         ).toBeInTheDocument();
-        expect(screen.getByRole('dialog', { name: DELETE_ALL_CHATS_TITLE })).toBeInTheDocument();
+        // Found rather than read: the chat-history drawer is a modalizer, so
+        // between the message landing and the sweep's render settling the
+        // delete dialog can still be outside what a role query can reach.
+        expect(
+            await screen.findByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
+        ).toBeInTheDocument();
     });
 
     it('still names a chat it kept running when the same sweep also failed', async () => {
