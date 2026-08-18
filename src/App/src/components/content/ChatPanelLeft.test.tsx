@@ -869,23 +869,32 @@ describe("the chat list's height", () => {
     };
 
     /*
-      The properties that bound a box and the ones that open a scroll region —
-      physical and logical spellings alike, because an element can be given
-      either and the engine reports what it was given.
+      What these containers may say about their own size, which is nothing.
 
-      A cap is free only when absent or `none`: `max-height: 100%` bounds the
-      list to the panel while the rows overflow it, which is this ticket's defect
-      with a different number in it. A size is free when absent, `auto`, or
-      filling its parent, which is how the panel's height reaches the list.
-      Anything else — including a `var()` this engine does not resolve — is
-      reported rather than assumed harmless.
+      The rule is deliberately stricter than "no `max-height: 280px`", because
+      two rounds of this ticket were spent discovering that the defect has more
+      than one spelling. `height: 100%` with `overflow-y: hidden` sizes the list
+      to the panel and then clips the rows that do not fit — every chat past the
+      fifth gone, with no scrollbar even to hint at them, which is worse than the
+      rule this ticket deleted. `max-height: 100%` is the same defect with a
+      percentage. And `overflow-y: var(--x)` cannot be read at all here, because
+      this engine does not resolve custom properties.
+
+      Between the panel's scroll region and a row there is nothing to decide: the
+      height belongs to the panel and the scrolling belongs to the panel. So any
+      height and any overflow on these containers is reported, and the only free
+      values are the ones that mean "I said nothing". A container that genuinely
+      needs to size itself can have this conversation in a review, which is
+      exactly where it belongs.
+
+      Physical and logical spellings both, because an element can be given
+      either and the engine reports what it was given.
     */
-    const CAPS = ['max-height', 'max-block-size'];
-    const SIZES = ['height', 'block-size'];
+    const HEIGHTS = ['height', 'max-height', 'block-size', 'max-block-size'];
     const SCROLLERS = ['overflow', 'overflow-y', 'overflow-block'];
 
-    const UNCAPPED = ['', 'none'];
-    const FILLS_PARENT = ['', 'auto', '100%', 'inherit', 'initial', 'unset', 'revert'];
+    const SAYS_NOTHING = ['', 'auto', 'none', 'initial', 'unset', 'revert'];
+    const NOT_A_SCROLL_REGION = ['', 'visible', 'initial', 'unset', 'revert'];
 
     /*
       Read with `getPropertyValue` and the CSS spelling of the property, which
@@ -898,19 +907,15 @@ describe("the chat list's height", () => {
     const valueOf = (style: CSSStyleDeclaration, property: string): string =>
         style.getPropertyValue(property).trim();
 
-    const boundsIn = (style: CSSStyleDeclaration): string[] => [
-        ...CAPS.filter((property) => !UNCAPPED.includes(valueOf(style, property))).map(
-            (property) => `${property}: ${valueOf(style, property)}`,
-        ),
-        ...SIZES.filter((property) => !FILLS_PARENT.includes(valueOf(style, property))).map(
-            (property) => `${property}: ${valueOf(style, property)}`,
-        ),
-    ];
-
-    const scrollsIn = (style: CSSStyleDeclaration): string[] =>
-        SCROLLERS.filter((property) => /\b(auto|scroll)\b/.test(valueOf(style, property))).map(
+    const boundsIn = (style: CSSStyleDeclaration): string[] =>
+        HEIGHTS.filter((property) => !SAYS_NOTHING.includes(valueOf(style, property))).map(
             (property) => `${property}: ${valueOf(style, property)}`,
         );
+
+    const scrollsIn = (style: CSSStyleDeclaration): string[] =>
+        SCROLLERS.filter(
+            (property) => !NOT_A_SCROLL_REGION.includes(valueOf(style, property)),
+        ).map((property) => `${property}: ${valueOf(style, property)}`);
 
     const describeElement = (element: HTMLElement): string =>
         `${element.tagName.toLowerCase()}.${Array.from(element.classList).join('.')}`;
