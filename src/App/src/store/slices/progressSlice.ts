@@ -29,6 +29,8 @@ export interface ProgressState {
     planId: string | null;
     lane: Lane | null;
     executor: string | null;
+    /** Executors that have spoken in the answer the surface is currently showing. */
+    participatingExecutors: string[];
 }
 
 const initialState: ProgressState = {
@@ -36,6 +38,7 @@ const initialState: ProgressState = {
     planId: null,
     lane: null,
     executor: null,
+    participatingExecutors: [],
 };
 
 const progressSlice = createSlice({
@@ -53,6 +56,7 @@ const progressSlice = createSlice({
             state.planId = action.payload ?? null;
             state.lane = null;
             state.executor = null;
+            state.participatingExecutors = [];
         },
         /**
          * The `createPlan` response came back, naming the plan and — usually —
@@ -78,7 +82,11 @@ const progressSlice = createSlice({
         /** `agent_message_streaming`, which carries the executor's own name. */
         agentResponding(state, action: PayloadAction<string | null | undefined>) {
             if (state.phase === 'done') return;
-            state.executor = action.payload ?? null;
+            const executor = action.payload?.trim() || null;
+            state.executor = executor;
+            if (executor && !state.participatingExecutors.includes(executor)) {
+                state.participatingExecutors.push(executor);
+            }
             state.phase = 'working';
         },
         /**
@@ -114,6 +122,7 @@ const progressSlice = createSlice({
         builder.addCase(planApprovalAccepted, (state) => {
             state.phase = 'sent';
             state.executor = null;
+            state.participatingExecutors = [];
         });
     },
 });
@@ -130,6 +139,7 @@ export const {
 export const selectRequestPhase = (s: RootState) => s.progress.phase;
 export const selectRoutedLane = (s: RootState) => s.progress.lane;
 export const selectRespondingExecutor = (s: RootState) => s.progress.executor;
+export const selectParticipatingExecutors = (s: RootState) => s.progress.participatingExecutors;
 
 /** What the surface says right now, or `null` for say nothing. */
 export const selectProgressNarration = createSelector(

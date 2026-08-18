@@ -452,8 +452,14 @@
 }
 
 .agent-dossier__description,
+.agent-dossier__participation,
 .agent-dossier__preamble {
     margin: 0;
+}
+
+.agent-dossier__participation {
+    color: var(--colorNeutralForeground2);
+    font-weight: var(--fontWeightSemibold);
 }
 
 .agent-dossier__preamble {

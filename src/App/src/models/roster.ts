@@ -15,12 +15,21 @@
 import { Agent, TeamConfig } from './Team';
 
 /** Every spelling of an executor id that might come back on the wire. */
-const aliases = (name: string): string[] => {
-    const snake = name
-        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+export const executorAliases = (name: string): string[] => {
+    const words = name.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+    const snake = words
         .replace(/\s+/g, '_')
         .toLowerCase();
-    return Array.from(new Set([name, snake, name.toLowerCase()]));
+    return Array.from(new Set([name, words, snake, name.toLowerCase()]));
+};
+
+/** Whether the executor named by the stream is this roster agent. */
+export const agentMatchesExecutor = (
+    agent: Pick<Agent, 'name'>,
+    executor: string | null | undefined,
+): boolean => {
+    const name = executor?.trim();
+    return Boolean(name && agent.name && executorAliases(agent.name).includes(name));
 };
 
 /**
@@ -40,7 +49,7 @@ export function modelsByExecutor(team: TeamConfig | null | undefined): Record<st
     const models: Record<string, string> = {};
     for (const agent of team?.agents ?? []) {
         if (!agent?.name || !agent.deployment_name) continue;
-        for (const alias of aliases(agent.name)) {
+        for (const alias of executorAliases(agent.name)) {
             models[alias] = agent.deployment_name;
         }
     }

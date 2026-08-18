@@ -7,6 +7,7 @@ import SimulatedTicketCard from "../escalation/SimulatedTicketCard";
 import { useAppSelector } from "../../store/hooks";
 import { selectRaisedTicket } from "../../store/slices/ticketSlice";
 import { selectSelectedTeam, selectTeamAgentCount } from "../../store/slices/teamSlice";
+import { selectParticipatingExecutors } from "../../store/slices/progressSlice";
 import "../../styles/planpanelright.css";
 import "../../styles/simulatedTicket.css";
 
@@ -37,6 +38,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   // second count is a second thing to disagree with the first.
   const availableTeam = useAppSelector(selectSelectedTeam);
   const availableCount = useAppSelector(selectTeamAgentCount);
+  const participatingExecutors = useAppSelector(selectParticipatingExecutors);
 
   if (!planData && !loading) {
     return <ContentNotFound subtitle="The requested page could not be found." />;
@@ -61,6 +63,7 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
       plan={planApprovalRequest?.team ?? null}
       available={availableTeam}
       availableCount={availableCount}
+      participatingExecutors={participatingExecutors}
     />
   );
 

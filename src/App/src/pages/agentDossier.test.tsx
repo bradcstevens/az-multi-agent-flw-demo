@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -21,16 +21,20 @@ vi.mock('@/api/apiService', () => {
     return { apiService, APIService: vi.fn(() => apiService) };
 });
 
-vi.mock('../store/PlanDataService', () => ({
-    PlanDataService: { fetchPlanData: vi.fn() },
-}));
+vi.mock('../store/PlanDataService', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../store/PlanDataService')>();
+    class TestPlanDataService extends actual.PlanDataService {}
+    TestPlanDataService.fetchPlanData = vi.fn();
+    return { ...actual, PlanDataService: TestPlanDataService };
+});
 
 import HomePage from './HomePage';
 import ChatPage from './ChatPage';
 import { TeamService } from '../store/TeamService';
 import { PlanDataService } from '../store/PlanDataService';
 import { ASSISTANT_NAME, STORE_ASSISTANT_TEAM_ID } from '../models/storeSurface';
-import { FakeSocket } from '@/testing/fakeSocket';
+import webSocketService from '@/store/WebSocketService';
+import { FakeSocket, frame } from '@/testing/fakeSocket';
 import { allRules, sourceFiles } from '@/testing/stylesheets';
 
 import planReducer from '@/store/slices/planSlice';
@@ -180,6 +184,17 @@ describe('the Agent dossier on the home surface', () => {
         expect(within(dossier).getByText('0.2')).toBeInTheDocument();
     });
 
+    it('states availability without making a participation claim', async () => {
+        renderHomeSurface();
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Shift Tasks Agent' }));
+
+        const dossier = screen.getByRole('dialog', { name: 'Agent dossier' });
+        expect(within(dossier).getByText('Available')).toBeInTheDocument();
+        expect(within(dossier).queryByText('Spoke in this answer')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('Available, has not spoken')).not.toBeInTheDocument();
+    });
+
     it('reads the configured facts after the prompt, in the order the spec sets out', async () => {
         renderHomeSurface();
 
@@ -264,6 +279,41 @@ describe('the Agent dossier on the home surface', () => {
         // Not even the container the three would have hung from.
         expect(within(dossier).queryByTestId('agent-dossier-configuration')).not.toBeInTheDocument();
         expect(within(dossier).queryByText('false')).not.toBeInTheDocument();
+    });
+});
+
+describe('the Agent dossier on the chat surface', () => {
+    it('names a specialist as available before its stream frame and as having spoken after it', async () => {
+        const connecting = webSocketService.connect('plan-1');
+        const socket = FakeSocket.latest()!;
+        socket.open();
+        await connecting;
+        renderChatSurface();
+
+        const opener = await screen.findByRole('button', { name: 'Shift Tasks Agent' });
+        await userEvent.click(opener);
+        let dossier = screen.getByRole('dialog', { name: 'Agent dossier' });
+        expect(within(dossier).getByText('Available, has not spoken')).toBeInTheDocument();
+        expect(within(dossier).queryByText('Spoke in this answer')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('meter-row-ShiftTasksAgent')).not.toBeInTheDocument();
+
+        await userEvent.keyboard('{Escape}');
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'shift_tasks_agent',
+                    content: 'Check the closing procedure.',
+                    is_final: false,
+                }),
+            );
+        });
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        await userEvent.click(opener);
+        dossier = screen.getByRole('dialog', { name: 'Agent dossier' });
+        expect(within(dossier).getByText('Spoke in this answer')).toBeInTheDocument();
+        expect(within(dossier).queryByText('Available, has not spoken')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('meter-row-ShiftTasksAgent')).not.toBeInTheDocument();
     });
 });
 

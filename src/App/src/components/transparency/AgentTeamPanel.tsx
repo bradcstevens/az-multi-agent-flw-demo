@@ -9,6 +9,7 @@ import {
     availabilityHeading,
     resolveAvailability,
 } from '../../models/agentAvailability';
+import { agentMatchesExecutor } from '../../models/roster';
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
 import { SECTION_HEADING, SUBSECTION_HEADING } from '../../models/headingOutline';
 import AgentDossier from './AgentDossier';
@@ -60,6 +61,13 @@ export interface AgentTeamPanelProps {
     available?: TeamConfig | null;
     /** Its size, from `selectTeamAgentCount`. Not recounted here. */
     availableCount?: number;
+    /**
+     * Executors the conversation's `agent_message_streaming` frames named.
+     *
+     * Omitted on the home surface, which has no conversation to make a
+     * participation claim about.
+     */
+    participatingExecutors?: readonly string[];
 }
 
 const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({
@@ -67,6 +75,7 @@ const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({
     plan = null,
     available = null,
     availableCount = 0,
+    participatingExecutors,
 }) => {
     const { agents, count } = resolveAvailability(team, plan, available, availableCount);
     const [dossierAgent, setDossierAgent] = useState<Agent | null>(null);
@@ -132,7 +141,19 @@ const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({
                     </Caption1>
                 </>
             )}
-            {dossierAgent && <AgentDossier agent={dossierAgent} onClose={closeDossier} />}
+            {dossierAgent && (
+                <AgentDossier
+                    agent={dossierAgent}
+                    participation={
+                        participatingExecutors === undefined
+                            ? undefined
+                            : participatingExecutors.some((executor) =>
+                                  agentMatchesExecutor(dossierAgent, executor),
+                              )
+                    }
+                    onClose={closeDossier}
+                />
+            )}
         </section>
     );
 };

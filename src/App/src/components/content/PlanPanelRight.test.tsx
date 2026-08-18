@@ -15,6 +15,7 @@ import teamReducer, { setSelectedTeam } from '@/store/slices/teamSlice';
 import { NO_ROSTER_MESSAGE } from '@/models/agentAvailability';
 import { SRC } from '@/testing/stylesheets';
 import { PLAN_ARRIVING } from '@/models/progressNarration';
+import progressReducer from '@/store/slices/progressSlice';
 
 const makeStore = () =>
     configureStore({
@@ -22,6 +23,7 @@ const makeStore = () =>
             transparency: transparencyReducer,
             ticket: ticketReducer,
             team: teamReducer,
+            progress: progressReducer,
         },
         middleware: (getDefaultMiddleware) =>
             getDefaultMiddleware({ serializableCheck: false }),

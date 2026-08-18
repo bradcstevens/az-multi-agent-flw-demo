@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 
 import AgentTeamPanel from './AgentTeamPanel';
-import { modelsByExecutor } from '../../models/roster';
+import { agentMatchesExecutor, modelsByExecutor } from '../../models/roster';
 import { AVAILABILITY_NOTE, NO_ROSTER_MESSAGE } from '../../models/agentAvailability';
 import { SUBSECTION_HEADING } from '../../models/headingOutline';
 import { TeamConfig } from '../../models/Team';
@@ -136,6 +136,14 @@ describe('modelsByExecutor', () => {
 
     it('answers to the snake_case form the executor stream uses', () => {
         expect(modelsByExecutor(roster).troubleshooting_agent).toBe('o4-mini');
+    });
+
+    it('answers to the display, snake_case, and lower-cased executor spellings', () => {
+        const agent = roster.agents[1];
+
+        expect(agentMatchesExecutor(agent, 'Shift Tasks Agent')).toBe(true);
+        expect(agentMatchesExecutor(agent, 'shift_tasks_agent')).toBe(true);
+        expect(agentMatchesExecutor(agent, 'shifttasksagent')).toBe(true);
     });
 
     it('omits an agent the roster assigned no model', () => {

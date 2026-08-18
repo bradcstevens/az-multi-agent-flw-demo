@@ -15,6 +15,8 @@ import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
 
 export interface AgentDossierProps {
     agent: Agent;
+    /** Undefined means the home surface, which has no conversation to claim about. */
+    participation?: boolean;
     onClose: () => void;
 }
 
@@ -25,7 +27,7 @@ const ConfiguredFact: React.FC<{ label: string; value: React.ReactNode }> = ({ l
     </div>
 );
 
-const AgentDossier: React.FC<AgentDossierProps> = ({ agent, onClose }) => {
+const AgentDossier: React.FC<AgentDossierProps> = ({ agent, participation, onClose }) => {
     /**
      * The knowledge base the agent actually reads: the backend attaches one
      * only where the pack both names it and switches it on, so a name behind
@@ -58,6 +60,13 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, onClose }) => {
                                 <dd>{agent.deployment_name}</dd>
                             </dl>
                         )}
+                        <p className="agent-dossier__participation">
+                            {participation === undefined
+                                ? AGENT_DOSSIER_COPY.available
+                                : participation
+                                  ? AGENT_DOSSIER_COPY.spokeInThisAnswer
+                                  : AGENT_DOSSIER_COPY.availableHasNotSpoken}
+                        </p>
                         {agent.description && (
                             <p className="agent-dossier__description">{agent.description}</p>
                         )}

@@ -7,6 +7,7 @@ import progressReducer, {
     requestSettled,
     socketConnected,
     selectProgressNarration,
+    selectParticipatingExecutors,
     selectRequestPhase,
 } from './progressSlice';
 import type { RootState } from '../store';
@@ -92,6 +93,21 @@ describe('the phase only ever advances', () => {
         expect(selectProgressNarration(asRoot(state))).toBe(
             'Troubleshooting Agent is responding...',
         );
+    });
+
+    it('keeps every executor that spoke for this answer and clears them for the next one', () => {
+        const settled = after(
+            requestSent(),
+            agentResponding('shift_tasks_agent'),
+            agentResponding('Troubleshooting Agent'),
+            requestSettled(),
+        );
+
+        expect(selectParticipatingExecutors(asRoot(settled))).toEqual([
+            'shift_tasks_agent',
+            'Troubleshooting Agent',
+        ]);
+        expect(selectParticipatingExecutors(asRoot(progressReducer(settled, requestSent())))).toEqual([]);
     });
 
     it('starts over on the next question, which is a new request and not a step back', () => {
