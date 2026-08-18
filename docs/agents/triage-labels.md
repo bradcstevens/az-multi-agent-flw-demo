@@ -25,7 +25,7 @@ the one with the most files.
 | -------------- | ---------------------------- |
 | planning       | `task-type:planning`         |
 | review         | `task-type:review`           |
-| implementation | `task-type:implementation`  |
+| implementation | `task-type:implementation`   |
 | test           | `task-type:test`             |
 | docs           | `task-type:docs`             |
 | chore          | `task-type:chore`            |
