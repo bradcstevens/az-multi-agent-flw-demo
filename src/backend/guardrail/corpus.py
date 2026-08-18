@@ -47,6 +47,7 @@ STORE_SCOPE_ANCHORS: Tuple[str, ...] = (
     "What temperature should the food equipment be held at?",
     "How is a fault with store equipment reported?",
     "How is the till operated for this transaction?",
+    "What is the process for swapping shifts between associates?",
 )
 
 # Personal, individual-identity questions asked on a shared store device. Every
