@@ -431,7 +431,8 @@
     font-family: var(--fontFamilyNumeric);
 }
 
-.agent-dossier__configuration {
+.agent-dossier__configuration,
+.agent-dossier__mcp-tools {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -443,12 +444,34 @@
     gap: 8px;
 }
 
-.agent-dossier__configuration dt {
+.agent-dossier__configuration dt,
+.agent-dossier__mcp-tools dt {
     color: var(--colorNeutralForeground3);
 }
 
-.agent-dossier__configuration dd {
+.agent-dossier__configuration dd,
+.agent-dossier__mcp-tools dd {
     margin: 0;
+}
+
+.agent-dossier__mcp-tools ul {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.agent-dossier__mcp-tools li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: baseline;
+}
+
+.agent-dossier__mcp-tools code {
+    font-family: var(--fontFamilyMonospace);
 }
 
 .agent-dossier__description,

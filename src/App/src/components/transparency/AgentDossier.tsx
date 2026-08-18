@@ -11,6 +11,7 @@ import { Dismiss20Regular } from '@fluentui/react-icons';
 
 import { Agent } from '../../models/Team';
 import { AGENT_DOSSIER_COPY } from '../../models/agentDossier';
+import { mcpToolsForDomain } from '../../models/agentMcpTools';
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
 
 export interface AgentDossierProps {
@@ -37,6 +38,7 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, participation, onClo
     /** A configured `false` is a choice the pack made; an omitted field is not. */
     const followUpQuestions = agent.user_responses ?? null;
     const temperature = agent.temperature ?? null;
+    const mcpTools = mcpToolsForDomain(agent.toolbox_filter);
     const hasConfiguredFacts =
         knowledgeBase !== null || followUpQuestions !== null || temperature !== null;
 
@@ -79,6 +81,23 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, participation, onClo
                                     {agent.system_message}
                                 </pre>
                             </>
+                        )}
+                        {mcpTools.length > 0 && (
+                            <dl className="agent-dossier__mcp-tools" data-testid="agent-dossier-mcp-tools">
+                                <ConfiguredFact
+                                    label={AGENT_DOSSIER_COPY.mcpToolsLabel}
+                                    value={
+                                        <ul>
+                                            {mcpTools.map((tool) => (
+                                                <li key={tool}>
+                                                    <code>{tool}</code>
+                                                    <span>{AGENT_DOSSIER_COPY.mcpToolGlosses[tool]}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    }
+                                />
+                            </dl>
                         )}
                         {hasConfiguredFacts && (
                             <dl
