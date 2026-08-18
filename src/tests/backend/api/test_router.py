@@ -2241,14 +2241,14 @@ class TestTheEchoStopsDecidingWhetherTheTurnEnded:
         # after the server settled the turn and the associate deleted the Chat
         # that settling made deletable. Answering that with a 500 would report
         # an outage every time somebody cleared their history.
-        self._echo(rt, EchoOutcome.no_such_chat)
+        self._echo(rt, EchoOutcome.no_such_plan_record)
 
         response = self._post(rt, streaming_message="streamed")
 
         assert response.status_code == 200
 
     def test_a_plan_record_that_no_longer_exists_does_not_claim_the_write_landed(self, rt):
-        self._echo(rt, EchoOutcome.no_such_chat)
+        self._echo(rt, EchoOutcome.no_such_plan_record)
 
         response = self._post(rt, streaming_message="streamed")
 

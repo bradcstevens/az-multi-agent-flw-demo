@@ -1460,8 +1460,9 @@ landed. The three outcomes, and which of them a route may call success, are
 `src/backend/chat/echo.py`. The streamed reply reaches the record through `record_streaming_message`
 (`src/backend/common/database/cosmosdb.py`), which reads raw for `_latest_plan`'s reason — a
 swallowed read turns an outage into *"no such record"* — and **patches one field** rather than
-re-reading and upserting the document, so a late echo cannot bump a finished turn's `_ts` above the
-live turn that succeeded it.
+re-reading and upserting the document, so a stale read cannot carry every other field back with it.
+That is not an `_ts` fix and does not close #165: Cosmos stamps `_ts` on any update, so a late echo
+still moves the record it touches to the front of the newest-first read. The ordering is #165's.
 _Avoid_: agent message callback, final message post, is_final
 
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that

@@ -8,8 +8,9 @@ allowed to answer with success.
 The distinction the old code lost is the one asserted hardest here. A store that
 refused a write and a **Plan record** that has gone are not the same event: the
 first is a write this process believed it had made and had not, and the second
-is ordinary — #108's rejection path deletes a Plan outright, and a Chat can be
-deleted between an agent speaking and the echo arriving. A broad `except`
+is ordinary — #108's rejection path deletes a Plan record outright, and the echo
+is fire-and-forget, so it can arrive after the server settled the turn and the
+associate deleted the Chat that settling made deletable. A broad `except`
 answered both, and a clean write, with `{"status": "message recorded"}`.
 """
 
@@ -23,11 +24,12 @@ class TestWhatCountsAsRecorded:
         assert MessageEchoed(EchoOutcome.recorded).persisted is True
 
     @pytest.mark.parametrize(
-        "outcome", [EchoOutcome.no_such_chat, EchoOutcome.refused]
+        "outcome", [EchoOutcome.no_such_plan_record, EchoOutcome.refused]
     )
     def test_nothing_else_did(self, outcome):
         # `persisted` answers one question — did every write the echo asked for
-        # land — and a Plan that has gone means the streaming message did not.
+        # land — and a **Plan record** that has gone means the streamed reply
+        # did not.
         assert MessageEchoed(outcome).persisted is False
 
 
@@ -39,7 +41,7 @@ class TestWhatCountsAsAStoreFailure:
         # The whole reason these are separate members. Answering a deleted Chat
         # with a 500 would report an outage every time somebody cleared their
         # history — and the route decides its status code off this property.
-        assert MessageEchoed(EchoOutcome.no_such_chat).store_failed is False
+        assert MessageEchoed(EchoOutcome.no_such_plan_record).store_failed is False
 
     def test_a_clean_write_is_not(self):
         assert MessageEchoed(EchoOutcome.recorded).store_failed is False
@@ -52,7 +54,7 @@ class TestWhatTheRouteMaySay:
         assert MessageEchoed(EchoOutcome.recorded).status == "message recorded"
 
     @pytest.mark.parametrize(
-        "outcome", [EchoOutcome.no_such_chat, EchoOutcome.refused]
+        "outcome", [EchoOutcome.no_such_plan_record, EchoOutcome.refused]
     )
     def test_no_other_outcome_says_that(self, outcome):
         # The exact sentence the route used to give unconditionally. If any
@@ -61,7 +63,7 @@ class TestWhatTheRouteMaySay:
         assert MessageEchoed(outcome).status != "message recorded"
 
     def test_a_plan_record_that_has_gone_names_what_did_not_land(self):
-        assert MessageEchoed(EchoOutcome.no_such_chat).status == (
+        assert MessageEchoed(EchoOutcome.no_such_plan_record).status == (
             "message recorded without its streaming message"
         )
 

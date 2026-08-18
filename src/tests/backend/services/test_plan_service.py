@@ -479,7 +479,8 @@ class TestTheEchoStopsDecidingWhetherTheTurnEnded:
     async def test_the_handler_writes_no_status_at_all(self):
         # The route to a **Settled status** is the settle-write, and this
         # handler having a second one is the defect #158 removed. Asserted as
-        # an absence against the store: no plan write of any kind leaves here.
+        # an absence against the store: no Plan record write of any kind
+        # leaves here.
         store = self._store()
 
         await PlanService.handle_agent_messages(
@@ -527,14 +528,14 @@ class TestTheEchoStopsDecidingWhetherTheTurnEnded:
     @pytest.mark.asyncio
     async def test_the_store_decides_whether_the_record_was_there(self):
         # Told apart at the seam that can tell, and reported unchanged: this
-        # handler neither invents `no_such_chat` nor upgrades it to a failure.
-        store = self._store(MessageEchoed(EchoOutcome.no_such_chat))
+        # handler neither invents `no_such_plan_record` nor upgrades it to a failure.
+        store = self._store(MessageEchoed(EchoOutcome.no_such_plan_record))
 
         result = await PlanService.handle_agent_messages(
             self._message(streaming_message="what it said"), "user-1"
         )
 
-        assert result.outcome is EchoOutcome.no_such_chat
+        assert result.outcome is EchoOutcome.no_such_plan_record
         assert result.store_failed is False
         assert result.persisted is False
         assert store.record_streaming_message.await_count == 1

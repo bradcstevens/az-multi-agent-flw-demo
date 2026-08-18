@@ -31,6 +31,10 @@ from .database_base import DatabaseBase
 # guard does not depend on which of the SDK's error classes carries it.
 PRECONDITION_FAILED = 412
 
+# What Cosmos answers a write aimed at a document that is not there. Read
+# off the status for the same reason as the code above.
+NOT_FOUND = 404
+
 
 class CosmosDBClient(DatabaseBase):
     """CosmosDB implementation of the database interface."""
@@ -708,12 +712,17 @@ class CosmosDBClient(DatabaseBase):
         same trap, and this method exists precisely so that nothing reports a
         write that did not land as one.
 
-        **Patched, not replaced.** The write this supersedes re-read the whole
-        document and upserted it, which bumped its ``_ts`` — and the Chat's
-        latest **Plan record** is chosen by ``_ts``, so a late echo could
-        promote a finished turn's record over the live one that succeeded it
-        (#165). Setting one field cannot. It also cannot take the rest of the
-        document with it, which is why :meth:`settle_turn` patches too.
+        **Patched, not replaced**, for the reason :meth:`settle_turn` patches:
+        the write this supersedes re-read the whole **Plan record** and upserted
+        it, taking the rest of the document with it and overwriting concurrent
+        changes to fields it never meant to touch. Setting one field cannot.
+
+        This does **not** close #165, and the narrower write should not be read
+        as closing it: Cosmos sets ``_ts`` on any update, so a late echo still
+        moves this record to the front of ``_latest_plan``'s ``_ts DESC``
+        ordering and can outrank the live turn that succeeded it. The ordering
+        is #165's to fix; what changed here is only that the write is smaller
+        and can report that it failed.
 
         Scoped to this client's own ``user_id``: a **Plan record** belonging to
         another associate is not found rather than written.
@@ -752,7 +761,7 @@ class CosmosDBClient(DatabaseBase):
                 "message — the record has gone",
                 plan_id,
             )
-            return MessageEchoed(EchoOutcome.no_such_chat)
+            return MessageEchoed(EchoOutcome.no_such_plan_record)
 
         try:
             await self.container.patch_item(
@@ -767,6 +776,16 @@ class CosmosDBClient(DatabaseBase):
                 ],
             )
         except Exception as e:
+            if getattr(e, "status_code", None) == NOT_FOUND:
+                # Deleted between the read and the write. The same ordinary
+                # event as an empty read, and reported the same way: a store
+                # that had nothing to write to did not fail.
+                self.logger.info(
+                    "Plan record %s went between the read and the write, so it "
+                    "did not take the streaming message",
+                    plan_id,
+                )
+                return MessageEchoed(EchoOutcome.no_such_plan_record)
             self.logger.warning(
                 "Failed storing the streaming message on plan record %s: %s",
                 plan_id,
@@ -1011,7 +1030,7 @@ class CosmosDBClient(DatabaseBase):
         Deduped in Python rather than by ``DISTINCT``: a Chat holds more than
         one Plan (#71) — the walkthrough's centrepiece pair is one chat with
         two — and sweeping the same partition twice reports the second pass as
-        ``no_such_chat``, which would put a phantom failure in front of the
+        ``no_such_plan_record``, which would put a phantom failure in front of the
         presenter.
 
         A store failure while enumerating is raised rather than read as an

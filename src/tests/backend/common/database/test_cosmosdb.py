@@ -1941,7 +1941,7 @@ class TestDeleteAllChats:
         # A Chat is a Session and holds more than one Plan (#71) — the
         # walkthrough's centrepiece pair is one chat with two. Deduped here
         # rather than left to the store's `DISTINCT`, because the second sweep
-        # of an already-deleted partition reports `no_such_chat` and the
+        # of an already-deleted partition reports `no_such_plan_record` and the
         # outcome would count a phantom failure.
         self._sessions(
             client,
@@ -2270,10 +2270,11 @@ class TestStoringTheStreamedReply:
     * **The read is raw.** `query_items` logs a failed query and returns `[]`,
       which would arrive here as *"there is no such **Plan record**"* and be
       answered 200 — an outage reported as a deletion.
-    * **The write is a patch.** The write this replaced re-read the whole
-      document and upserted it, bumping its `_ts`; the Chat's latest **Plan
-      record** is chosen by `_ts`, so a late echo could promote a finished
-      turn's record over the live one that succeeded it (#165).
+    * **The write is a patch**, so it cannot take the rest of the document with
+      it the way the whole-document upsert it replaced could. It does *not*
+      close #165: Cosmos stamps `_ts` on any update, so a late echo still moves
+      this record to the front of the `_ts DESC` ordering. That ordering is
+      #165's.
     """
 
     @pytest.fixture
@@ -2319,14 +2320,36 @@ class TestStoringTheStreamedReply:
 
     @pytest.mark.asyncio
     async def test_one_field_is_written_rather_than_the_document(self, client):
-        # The `_ts` bump #165 names. An upsert here would rewrite the whole
-        # record and move it to the front of the newest-first read.
+        # Not an `_ts` fix — Cosmos stamps that on any update, and #165 still
+        # owns the ordering that reads it. This is the narrower guarantee the
+        # settle-write makes for the same reason: a write that rebuilt the whole
+        # record from a stale read would carry every other field back with it.
         self._cosmos(client, found=[{"id": "plan-1", "session_id": "session-1"}])
 
         await client.record_streaming_message("plan-1", "what it said")
 
         client.container.upsert_item.assert_not_called()
         client.container.replace_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_record_deleted_under_the_write_is_not_a_store_failure(
+        self, client
+    ):
+        # The window between the read and the patch. Cosmos answers 404, and
+        # calling that an outage would 500 the browser for the ordinary case
+        # the empty read above is already forgiven for.
+        refusal = RuntimeError("not found")
+        refusal.status_code = 404
+        self._cosmos(
+            client,
+            found=[{"id": "plan-1", "session_id": "session-1"}],
+            refuses=refusal,
+        )
+
+        result = await client.record_streaming_message("plan-1", "what it said")
+
+        assert result.outcome is EchoOutcome.no_such_plan_record
+        assert result.store_failed is False
 
     @pytest.mark.asyncio
     async def test_the_write_is_aimed_at_the_records_own_partition(self, client):
@@ -2349,7 +2372,7 @@ class TestStoringTheStreamedReply:
 
         result = await client.record_streaming_message("plan-1", "what it said")
 
-        assert result.outcome is EchoOutcome.no_such_chat
+        assert result.outcome is EchoOutcome.no_such_plan_record
         assert result.store_failed is False
         client.container.patch_item.assert_not_called()
 

@@ -113,7 +113,8 @@ describe('the echo the browser sends back', () => {
 
     it('carries no verdict on whether the turn ended', () => {
         // Asserted as an absence, and against the last message of a turn —
-        // the one echo that used to say `is_final: true` and settle the Plan.
+        // the one echo that used to say `is_final: true` and settle the Plan
+        // record.
         const echoed = PlanDataService.createAgentMessageResponse(
             agentMessage,
             planData,
