@@ -55,6 +55,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [044](./044-an-agent-worktree-lives-in-the-containing-folder.md) | An agent worktree lives in the containing folder, and is collected once its commits are on `origin/main` | Accepted — bounds what an agent may create beside this repository |
 | [045](./045-the-feedback-loops-virtualenv-is-shared-across-worktrees.md) | The feedback loops' virtualenv is keyed by its inputs and shared across worktrees | Accepted — amends 005's per-worktree bootstrap |
 | [046](./046-the-feedback-loops-table-is-what-the-gate-runs.md) | The Feedback loops table is what the gate runs, so nothing in it may observe a deployment | Accepted — amends 005's table; removes the Demo validator's row |
+| [047](./047-ownership-defers-collection-only-while-the-owner-lives.md) | Ownership defers collection only while the owner lives, and a landed branch is collected like a worktree | Accepted — amends 044's ownership clause; extends the sweep to branches |
 
 ## Writing a new one
 
