@@ -68,6 +68,16 @@ class TestCorpusShape:
         # against store-scope anchors is what does.
         assert len(STORE_SCOPE_ANCHORS) >= 8
 
+    def test_store_anchors_cover_the_shift_swap_process(self):
+        # The Workforce beat is deliberately near personal shift language, so
+        # the counterweight must represent its between-associate procedure.
+        assert any(
+            "shift" in text.lower()
+            and "swap" in text.lower()
+            and "associate" in text.lower()
+            for text in STORE_SCOPE_ANCHORS
+        )
+
     def test_the_store_anchors_are_disjoint_from_the_negative_controls(self):
         # A control that is also an anchor scores 1.0 on the store side and
         # would flatter the margin the corpus is tuning.
