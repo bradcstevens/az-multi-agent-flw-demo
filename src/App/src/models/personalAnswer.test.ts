@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { PERSONAL_ANSWER_KIND, parsePersonalAnswer } from './personalAnswer';
 
+const provenance = 'A Provenance line received from the backend.';
+
 const payload = {
     kind: PERSONAL_ANSWER_KIND,
     display_name: 'Tanya Alvarez',
@@ -10,8 +12,7 @@ const payload = {
         { label: 'PTO balance', value: '34.5 hours' },
         { label: 'Next scheduled shift', value: 'Thursday, 06:00 - 14:00' },
     ],
-    provenance_line:
-        'No payroll system was queried — these figures were authored for this walkthrough.',
+    provenance_line: provenance,
 };
 
 describe('the personal answer', () => {
@@ -31,9 +32,7 @@ describe('the personal answer', () => {
     });
 
     it('carries the provenance line the associate record authored', () => {
-        expect(parsePersonalAnswer({ personal_answer: payload })?.provenanceLine).toContain(
-            'No payroll system was queried',
-        );
+        expect(parsePersonalAnswer({ personal_answer: payload })?.provenanceLine).toBe(provenance);
     });
 
     it('reads nothing out of a response that carries no answer', () => {

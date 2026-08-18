@@ -54,8 +54,7 @@ const ANSWER = {
         display_name: 'Tanya Alvarez',
         role: 'Store associate, Store 223',
         facts: [{ label: 'PTO balance', value: '34.5 hours' }],
-        provenance_line:
-            'No payroll system was queried — these figures were authored for this walkthrough.',
+        provenance_line: 'A Provenance line received from the backend.',
     },
 } as any;
 
