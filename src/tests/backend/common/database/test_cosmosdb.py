@@ -1023,6 +1023,148 @@ def _settled_chat(status="completed", etag="etag-1"):
     }
 
 
+class _PlanOrderingContainer:
+    """Small Cosmos-shaped seam that applies the requested ORDER BY."""
+
+    def __init__(self, rows):
+        self.rows = rows
+        self.queries = []
+
+    def query_items(self, **kwargs):
+        self.queries.append(kwargs)
+        query = kwargs["query"]
+        if "ORDER BY c.timestamp DESC, c.id DESC" in query:
+            rows = sorted(
+                self.rows,
+                key=lambda row: (row.get("timestamp", ""), row.get("id", "")),
+                reverse=True,
+            )
+        else:
+            rows = sorted(
+                self.rows,
+                key=lambda row: row.get("_ts", 0),
+                reverse=True,
+            )
+
+        async def cursor():
+            for row in rows:
+                yield row
+
+        return cursor()
+
+
+class _CompositeIndexUnavailable(Exception):
+    status_code = 400
+
+    def __str__(self):
+        return "The order by query does not have a corresponding composite index."
+
+
+class TestLatestPlanOrdering:
+    """The latest Plan is creation-ordered, not last-modified-ordered."""
+
+    @pytest.fixture
+    def client(self):
+        client = CosmosDBClient(
+            endpoint="https://test.documents.azure.com:443/",
+            credential="test_credential",
+            database_name="test_db",
+            container_name="test_container",
+            session_id="test_session",
+            user_id="test_user",
+        )
+        client._initialized = True
+        return client
+
+    @pytest.mark.asyncio
+    async def test_an_older_plan_written_last_does_not_become_latest(self, client):
+        client.container = _PlanOrderingContainer(
+            [
+                {
+                    "id": "plan-new",
+                    "timestamp": "2026-08-18T00:00:00+00:00",
+                    "_ts": 100,
+                    "overall_status": "in_progress",
+                },
+                {
+                    "id": "plan-old",
+                    "timestamp": "2026-08-17T00:00:00+00:00",
+                    "_ts": 200,
+                    "overall_status": "completed",
+                },
+            ]
+        )
+
+        status, plan_id, _etag, found = await client._latest_plan("session-1")
+
+        assert found is True
+        assert plan_id == "plan-new"
+        assert status == "in_progress"
+
+    @pytest.mark.asyncio
+    async def test_same_timestamp_uses_plan_id_as_a_deterministic_tie_break(self, client):
+        client.container = _PlanOrderingContainer(
+            [
+                {
+                    "id": "plan-a",
+                    "timestamp": "2026-08-18T00:00:00+00:00",
+                    "_ts": 100,
+                    "overall_status": "completed",
+                },
+                {
+                    "id": "plan-z",
+                    "timestamp": "2026-08-18T00:00:00+00:00",
+                    "_ts": 100,
+                    "overall_status": "in_progress",
+                },
+            ]
+        )
+
+        first = await client._latest_plan("session-1")
+        second = await client._latest_plan("session-1")
+
+        assert first == ("in_progress", "plan-z", None, True)
+        assert second == first
+
+    @pytest.mark.asyncio
+    async def test_index_build_uses_an_authorized_unordered_fallback(self, client):
+        rows = [
+            {
+                "id": "plan-new",
+                "timestamp": "2026-08-18T00:00:00+00:00",
+                "_ts": 100,
+                "overall_status": "in_progress",
+            },
+            {
+                "id": "plan-old",
+                "timestamp": "2026-08-17T00:00:00+00:00",
+                "_ts": 200,
+                "overall_status": "completed",
+            },
+        ]
+
+        def query_items(**kwargs):
+            if "ORDER BY" in kwargs["query"]:
+                raise _CompositeIndexUnavailable()
+
+            async def cursor():
+                for row in rows:
+                    yield row
+
+            return cursor()
+
+        client.container = Mock()
+        client.container.query_items = Mock(side_effect=query_items)
+
+        status, plan_id, _etag, found = await client._latest_plan("session-1")
+
+        assert (status, plan_id, found) == ("in_progress", "plan-new", True)
+        fallback = client.container.query_items.call_args_list[1].kwargs
+        assert "ORDER BY" not in fallback["query"]
+        assert "c.user_id=@user_id" in fallback["query"]
+        assert {"name": "@user_id", "value": "test_user"} in fallback["parameters"]
+
+
 class TestCosmosDBChatDeletion:
     """**Chat deletion** — the whole session partition, scoped to its owner.
 
@@ -1133,7 +1275,7 @@ class TestCosmosDBChatDeletion:
         read = self._status_query(client)
         assert "c.session_id=@session_id" in read["query"]
         assert "c.user_id=@user_id" in read["query"]
-        assert "ORDER BY c._ts DESC" in read["query"]
+        assert "ORDER BY c.timestamp DESC, c.id DESC" in read["query"]
         assert {"name": "@user_id", "value": "test_user"} in read["parameters"]
         assert {"name": "@session_id", "value": "session-1"} in read["parameters"]
 
@@ -1616,7 +1758,7 @@ class TestTheSettleWrite:
         read = client.container.query_items.call_args.kwargs
         assert "c.session_id=@session_id" in read["query"]
         assert "c.user_id=@user_id" in read["query"]
-        assert "ORDER BY c._ts DESC" in read["query"]
+        assert "ORDER BY c.timestamp DESC, c.id DESC" in read["query"]
         assert {"name": "@user_id", "value": "test_user"} in read["parameters"]
         written = client.container.patch_item.call_args
         assert written.args[0] == "plan-9"

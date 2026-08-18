@@ -65,6 +65,7 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2025-10-15
       resource: {
         id: container.name
         partitionKey: { paths: [ container.partitionKeyPath ] }
+        indexingPolicy: contains(container, 'indexingPolicy') ? container.?indexingPolicy : null
       }
       options: {}
     }

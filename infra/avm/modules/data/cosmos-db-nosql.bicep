@@ -82,6 +82,7 @@ module cosmosAccount 'br/public:avm/res/document-db/database-account:0.19.0' = {
           paths: [container.partitionKeyPath]
           kind: 'Hash'
           version: 2
+          indexingPolicy: contains(container, 'indexingPolicy') ? container.?indexingPolicy : null
         }]
       }
     ]

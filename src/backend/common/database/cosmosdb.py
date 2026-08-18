@@ -871,25 +871,75 @@ class CosmosDBClient(DatabaseBase):
         Raw for the reason ``delete_chat`` documents — ``query_items`` would
         drop a plan it cannot validate and turn an outage into an empty
         history — and it carries the ``_etag`` because the sweep's first delete
-        is conditional on it.
+        is conditional on it. The ordered query needs the composite index
+        provisioned with the memory container. During its online build, Cosmos
+        can reject that query, so the known index-not-ready response falls back
+        to an unordered read and applies the same ordering here.
         """
+        parameters = [
+            {"name": "@session_id", "value": session_id},
+            {"name": "@data_type", "value": DataType.plan},
+            {"name": "@user_id", "value": self.user_id},
+        ]
+        try:
+            rows = self.container.query_items(
+                query=(
+                    "SELECT TOP 1 c.overall_status, c.id, c._etag FROM c "
+                    "WHERE c.session_id=@session_id AND c.data_type=@data_type "
+                    "AND c.user_id=@user_id "
+                    "ORDER BY c.timestamp DESC, c.id DESC"
+                ),
+                parameters=parameters,
+            )
+
+            async for row in rows:
+                return row.get("overall_status"), row.get("id"), row.get("_etag"), True
+            return None, None, None, False
+        except Exception as error:
+            if not self._is_composite_index_not_ready(error):
+                raise
+            self.logger.warning(
+                "Latest-plan composite index is still building; using the "
+                "unordered fallback for session %s",
+                session_id,
+            )
+
         rows = self.container.query_items(
             query=(
-                "SELECT TOP 1 c.overall_status, c.id, c._etag FROM c "
+                "SELECT c.overall_status, c.id, c._etag, c.timestamp FROM c "
                 "WHERE c.session_id=@session_id AND c.data_type=@data_type "
-                "AND c.user_id=@user_id ORDER BY c._ts DESC"
+                "AND c.user_id=@user_id"
             ),
-            parameters=[
-                {"name": "@session_id", "value": session_id},
-                {"name": "@data_type", "value": DataType.plan},
-                {"name": "@user_id", "value": self.user_id},
-            ],
+            parameters=parameters,
+        )
+        candidates = [row async for row in rows]
+        if not candidates:
+            return None, None, None, False
+
+        latest = max(
+            candidates,
+            key=lambda row: (
+                row.get("timestamp") is not None,
+                row.get("timestamp") or "",
+                row.get("id") or "",
+            ),
+        )
+        return (
+            latest.get("overall_status"),
+            latest.get("id"),
+            latest.get("_etag"),
+            True,
         )
 
-        async for row in rows:
-            return row.get("overall_status"), row.get("id"), row.get("_etag"), True
-
-        return None, None, None, False
+    @staticmethod
+    def _is_composite_index_not_ready(error: Exception) -> bool:
+        """Recognize only Cosmos's transient missing-composite-index response."""
+        message = str(error).lower()
+        return (
+            getattr(error, "status_code", None) == 400
+            and "order by" in message
+            and "composite index" in message
+        )
 
     async def _count_partition(self, session_id: str) -> int:
         """How many documents are left in a Chat's partition."""
