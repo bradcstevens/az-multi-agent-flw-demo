@@ -2,7 +2,7 @@
 
 Repository instructions for coding agents working in this repo.
 
-## Worktrees
+## Worktrees and branches
 
 **Never `git worktree add ../<anything>`.** A worktree of this repository lives inside
 `az-multi-agent-flw-demo.worktrees/`, never in the parent directory beside it — the parent
@@ -13,19 +13,26 @@ bash scripts/worktree.sh add issue-123      # creates in the containing folder, 
 bash scripts/worktree.sh sweep --dry-run    # what would be collected, without acting
 ```
 
-A worktree is **collected once every commit in it is reachable from `origin/main`** — fetched and
-compared against the remote ref, never against local `main`, which drifts. The sweep runs on every
-creation, acts by default, and never passes `--force`: uncommitted files are stashed with an
-identifying message before removal, so nothing it does leaves this machine and `git stash list` is
-always the way back. It skips a worktree that is locked or was touched in the last 15 minutes, and
-exits non-zero — having removed nothing — when a stash fails or a worktree holds commits that exist
-on no remote. Worktrees another tool owns — git-loopy's `<run-id>/<lane>` lanes — are reported and
-never collected, because a paused run looks exactly like an abandoned worktree.
+A worktree or local branch is **collected once every commit in it is reachable from `origin/main`** —
+fetched and compared against the remote ref, never against local `main`, which drifts. The sweep runs
+on every creation, handles worktrees before branches, acts by default, and never passes `--force` to
+worktree removal: uncommitted files are stashed with an identifying message before removal, so nothing
+it does leaves this machine and `git stash list` is always the way back. A branch proved reachable is
+deleted locally with `git branch -D`; the proof is the judgement, not `-D`. It skips a worktree that is
+locked or was touched in the last 15 minutes, and exits non-zero — having removed nothing — when a
+worktree or branch holds commits that exist on no remote.
 
-[ADR-044](docs/ADR/044-an-agent-worktree-lives-in-the-containing-folder.md) is the decision and the
-evidence: thirteen flat siblings accumulated because no document said where a worktree belongs, and
-twelve separate sessions each answered that question differently. The decision logic is pure and
-lives in `scripts/worktree_hygiene.py`, so the CI-tooling loop tests the ladder that decides whether
+Worktrees another tool owns — git-loopy's `<run-id>/<lane>` lanes — defer only while a process holds
+that run's log open. If liveness cannot be determined, every owned lane defers and the sweep exits
+zero; a folder that remains cluttered is safer than collecting a live run. `main` and the primary
+checkout's branch are reported but never changed. `bash scripts/worktree.sh sweep --remote` only prints
+commands for a human to remove already-landed remote branches; it never runs them. `add` warns when the
+checkout's `AGENTS.md` differs from `origin/main`'s, so read that warning before improvising.
+
+[ADR-044](docs/ADR/044-an-agent-worktree-lives-in-the-containing-folder.md) establishes the containing
+folder and reachability rule. [ADR-047](docs/ADR/047-ownership-defers-collection-only-while-the-owner-lives.md)
+scopes ownership to a living run and extends the pass to branches. The decision logic is pure and lives
+in `scripts/worktree_hygiene.py`, so the CI-tooling loop tests the ladder that decides whether
 uncommitted work survives without needing a disk.
 
 ## Agent skills

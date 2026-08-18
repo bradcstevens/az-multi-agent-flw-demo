@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Where an agent worktree lives, and when it is collected.
+"""Where agent worktrees and branches live, and when they are collected.
 
-The answer to ADR-044. Two rules, and the whole file is their implementation:
+The answers to ADR-044 and ADR-047. The whole file implements their rules:
 
   **Location.** A worktree belongs inside ``<repo>.worktrees/``, never in the
   parent directory beside the repository itself.
 
-  **Lifetime.** A worktree is collected once every commit in it is reachable
-  from ``origin/main``.
+  **Lifetime.** A worktree or branch is collected once every commit in it is
+  reachable from ``origin/main``. A git-loopy lane defers only while its owner
+  holds its run log open.
 
 The second rule is phrased against the *remote* ref deliberately. Local ``main``
 drifts — it was two commits behind when this was written — and a sweep that asks
@@ -32,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -59,6 +61,11 @@ RETAINING = frozenset({SKIP_ACTIVE, ESCALATE, KEEP, DEFER})
 
 #: A branch namespace whose worktrees belong to the tool that made them.
 OWNED_BRANCH_PREFIXES = ("git-loopy/",)
+RUN_ID_PATTERN = r"[0-9A-HJKMNP-TV-Z]{26}"
+RUN_ID_RE = re.compile(rf"^{RUN_ID_PATTERN}$")
+LOG_RUN_ID_RE = re.compile(
+    rf"\.git-loopy/logs/[^/\n]*-(?P<run_id>{RUN_ID_PATTERN})\.(?:log|jsonl)(?:\s.*)?$"
+)
 
 
 def is_externally_owned(worktree: Path, repo: Path, branch: str | None) -> bool:
@@ -82,6 +89,30 @@ def is_externally_owned(worktree: Path, repo: Path, branch: str | None) -> bool:
     except ValueError:
         return False
     return len(relative.parts) > 1
+
+
+def _run_id(value: str | None) -> str | None:
+    """Return a git-loopy run ID only when the observation is unambiguous."""
+    return value if value and RUN_ID_RE.fullmatch(value) else None
+
+
+def owner_run_id_for_worktree(worktree: Path, repo: Path, branch: str | None) -> str | None:
+    """Identify the run that owns a lane from its structural location or branch."""
+    container = container_for(repo)
+    try:
+        relative = worktree.relative_to(container)
+    except ValueError:
+        relative = Path()
+    if len(relative.parts) > 1:
+        return _run_id(relative.parts[0])
+    return owner_run_id_for_branch(branch)
+
+
+def owner_run_id_for_branch(branch: str | None) -> str | None:
+    """Extract a run ID from git-loopy's branch namespace."""
+    if not branch or not branch.startswith(OWNED_BRANCH_PREFIXES):
+        return None
+    return _run_id(branch.split("/", 2)[1] if "/" in branch else None)
 
 
 def container_for(repo: Path) -> Path:
@@ -118,6 +149,7 @@ class Worktree:
     is_primary: bool
     sanctioned: bool
     externally_owned: bool
+    owner_run_id: str | None
     dirty: bool
     locked: bool
     idle_seconds: float
@@ -141,8 +173,25 @@ class Worktree:
 
 
 @dataclass(frozen=True)
+class Branch:
+    """What the sweep needs to know about one local branch."""
+
+    name: str
+    checked_out: bool
+    is_main: bool
+    is_current: bool
+    reachable_from_base: bool
+    commits_absent_from_remote: int
+    owner_run_id: str | None
+
+    @property
+    def label(self) -> str:
+        return f"branch {self.name}"
+
+
+@dataclass(frozen=True)
 class Verdict:
-    worktree: Worktree
+    worktree: Worktree | Branch
     action: str
     reason: str
 
@@ -151,6 +200,14 @@ class Verdict:
         return self.action in RETAINING
 
     def as_dict(self) -> dict:
+        if isinstance(self.worktree, Branch):
+            return {
+                "name": self.worktree.name,
+                "label": self.worktree.label,
+                "action": self.action,
+                "reason": self.reason,
+                "is_branch": True,
+            }
         return {
             "path": str(self.worktree.path),
             "label": self.worktree.label,
@@ -161,7 +218,25 @@ class Verdict:
         }
 
 
-def classify(worktree: Worktree, *, idle_seconds: float = IDLE_SECONDS) -> Verdict:
+def _defer_for_live_owner(
+    owner_run_id: str | None, live_run_ids: frozenset[str] | None
+) -> str | None:
+    """Return the reason to defer, or ``None`` when a known owner is dead."""
+    if live_run_ids is None:
+        return "owner liveness is undeterminable — reported, never collected"
+    if owner_run_id is None:
+        return "owner run is unknown — reported, never collected"
+    if owner_run_id in live_run_ids:
+        return f"owned by live run {owner_run_id} — reported, never collected"
+    return None
+
+
+def classify(
+    worktree: Worktree,
+    *,
+    idle_seconds: float = IDLE_SECONDS,
+    live_run_ids: frozenset[str] | None = None,
+) -> Verdict:
     """Decide what happens to one worktree.
 
     The order of these branches is the safety property. A live worktree is
@@ -173,11 +248,9 @@ def classify(worktree: Worktree, *, idle_seconds: float = IDLE_SECONDS) -> Verdi
         return Verdict(worktree, KEEP, "the primary checkout is never collected")
 
     if worktree.externally_owned:
-        return Verdict(
-            worktree,
-            DEFER,
-            "created by a run that manages its own worktrees — reported, never collected",
-        )
+        defer_reason = _defer_for_live_owner(worktree.owner_run_id, live_run_ids)
+        if defer_reason:
+            return Verdict(worktree, DEFER, defer_reason)
 
     if worktree.locked:
         return Verdict(worktree, SKIP_ACTIVE, "a git lock is present — a session is using it")
@@ -211,8 +284,49 @@ def classify(worktree: Worktree, *, idle_seconds: float = IDLE_SECONDS) -> Verdi
     )
 
 
-def plan(worktrees, *, idle_seconds: float = IDLE_SECONDS) -> list[Verdict]:
-    return [classify(worktree, idle_seconds=idle_seconds) for worktree in worktrees]
+def classify_branch(
+    branch: Branch, *, live_run_ids: frozenset[str] | None = None
+) -> Verdict:
+    """Apply the ADR-047 branch ladder after the worktree pass."""
+    if branch.is_main:
+        return Verdict(branch, KEEP, "the main branch is never collected")
+    if branch.is_current:
+        return Verdict(branch, KEEP, "the current branch is never collected")
+    if branch.checked_out:
+        return Verdict(branch, KEEP, "checked out in a worktree — the worktree goes first")
+
+    defer_reason = _defer_for_live_owner(branch.owner_run_id, live_run_ids)
+    if defer_reason and branch.owner_run_id is not None:
+        return Verdict(branch, DEFER, defer_reason)
+
+    if branch.reachable_from_base:
+        return Verdict(branch, COLLECT, f"every commit is already on {BASE_REF}")
+    if branch.commits_absent_from_remote:
+        count = branch.commits_absent_from_remote
+        plural = "s" if count != 1 else ""
+        return Verdict(
+            branch,
+            ESCALATE,
+            f"{count} commit{plural} exist on no remote — this is the only copy",
+        )
+    return Verdict(
+        branch,
+        KEEP,
+        f"not yet on {BASE_REF}, but every commit is pushed — work in flight",
+    )
+
+
+def plan(
+    worktrees, *, idle_seconds: float = IDLE_SECONDS, live_run_ids: frozenset[str] | None = None
+) -> list[Verdict]:
+    return [
+        classify(worktree, idle_seconds=idle_seconds, live_run_ids=live_run_ids)
+        for worktree in worktrees
+    ]
+
+
+def plan_branches(branches, *, live_run_ids: frozenset[str] | None = None) -> list[Verdict]:
+    return [classify_branch(branch, live_run_ids=live_run_ids) for branch in branches]
 
 
 def exit_code(verdicts) -> int:
@@ -242,14 +356,18 @@ def render(verdicts) -> str:
             continue
         lines.append(f"{action} ({len(chosen)}):")
         for verdict in chosen:
-            flag = "  [misplaced]" if not verdict.worktree.sanctioned else ""
+            flag = (
+                "  [misplaced]"
+                if isinstance(verdict.worktree, Worktree) and not verdict.worktree.sanctioned
+                else ""
+            )
             lines.append(f"  {verdict.worktree.label}{flag} — {verdict.reason}")
         lines.append("")
     return "\n".join(lines).rstrip()
 
 
 # --------------------------------------------------------------------------
-# Everything below talks to git. Nothing below decides anything.
+# Everything below crosses a system boundary. Nothing below decides anything.
 # --------------------------------------------------------------------------
 
 
@@ -309,6 +427,67 @@ def _has_lock(repo: Path, path: Path) -> bool:
     return any(Path(gitdir).glob("*.lock")) or (Path(gitdir) / "index.lock").exists()
 
 
+def parse_live_run_ids(lsof_output: str) -> frozenset[str]:
+    """Read run IDs from lsof's ``-F n`` file-name records."""
+    run_ids = set()
+    for line in lsof_output.splitlines():
+        path = line[1:] if line.startswith("n") else line
+        match = LOG_RUN_ID_RE.search(path)
+        if match:
+            run_ids.add(match.group("run_id"))
+    return frozenset(run_ids)
+
+
+def liveness_observation(
+    *, returncode: int, stdout: str, stderr: str
+) -> frozenset[str] | None:
+    """Turn lsof's result into either a known set or an unsafe-to-assume sentinel."""
+    if returncode == 0 and not stderr:
+        return parse_live_run_ids(stdout)
+    # lsof uses 1 with no diagnostics when none of its explicit file arguments
+    # is open. That is a known-empty observation, not a failed probe.
+    if returncode == 1 and not stdout and not stderr:
+        return frozenset()
+    return None
+
+
+def live_run_ids(repo: Path) -> frozenset[str] | None:
+    """Observe runs that still hold one of their logs open.
+
+    ``None`` is deliberately different from an empty set: a failed probe makes
+    every externally owned lane retain, because clutter is safer than collecting
+    a live run whose process table is unavailable.
+    """
+    logs = _primary(repo) / ".git-loopy" / "logs"
+    try:
+        if not logs.is_dir():
+            return None
+        log_files = [
+            *logs.glob("*.log"),
+            *logs.glob("*.jsonl"),
+        ]
+    except OSError:
+        return None
+    if not log_files:
+        return frozenset()
+
+    try:
+        observed = subprocess.run(
+            ["lsof", "-F", "n", "--", *(str(path) for path in log_files)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    return liveness_observation(
+        returncode=observed.returncode,
+        stdout=observed.stdout,
+        stderr=observed.stderr,
+    )
+
+
 def _primary(repo: Path) -> Path:
     """The main worktree, which git guarantees is listed first.
 
@@ -355,6 +534,7 @@ def discover(repo: Path, *, base: str = BASE_REF) -> list[Worktree]:
                 is_primary=is_primary,
                 sanctioned=is_sanctioned(path, primary),
                 externally_owned=is_externally_owned(path, primary, record.get("branch")),
+                owner_run_id=owner_run_id_for_worktree(path, primary, record.get("branch")),
                 dirty=dirty,
                 locked=bool(record.get("locked")) or _has_lock(repo, path),
                 idle_seconds=_idle_seconds(path),
@@ -365,10 +545,77 @@ def discover(repo: Path, *, base: str = BASE_REF) -> list[Worktree]:
     return worktrees
 
 
+def discover_branches(
+    repo: Path,
+    *,
+    base: str = BASE_REF,
+    owner_by_branch: dict[str, str] | None = None,
+    released_branches: frozenset[str] = frozenset(),
+) -> list[Branch]:
+    """Observe local branches after the worktree pass has released checked-out refs."""
+    records = _parse_worktree_list(_git(repo, "worktree", "list", "--porcelain"))
+    checked_out = {
+        branch
+        for record in records
+        if (branch := record.get("branch")) is not None
+    }
+    current = _git(repo, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+    names = _git(
+        repo,
+        "for-each-ref",
+        "--format=%(refname:short)",
+        "refs/heads",
+    ).splitlines()
+    owner_by_branch = owner_by_branch or {}
+
+    branches: list[Branch] = []
+    for name in names:
+        reachable = (
+            subprocess.run(
+                ["git", "-C", str(repo), "merge-base", "--is-ancestor", name, base],
+                capture_output=True,
+                check=False,
+            ).returncode
+            == 0
+        )
+        absent = int(_git(repo, "rev-list", "--count", name, "--not", "--remotes") or 0)
+        branches.append(
+            Branch(
+                name=name,
+                checked_out=name in checked_out and name not in released_branches,
+                is_main=name == "main",
+                is_current=name == current,
+                reachable_from_base=reachable,
+                commits_absent_from_remote=absent,
+                owner_run_id=owner_by_branch.get(name) or owner_run_id_for_branch(name),
+            )
+        )
+    return branches
+
+
 def _apply(repo: Path, verdict: Verdict, *, dry_run: bool) -> Verdict:
     """Carry out one verdict, downgrading to ESCALATE if the stash fails."""
     worktree = verdict.worktree
     if dry_run:
+        return verdict
+
+    if isinstance(worktree, Branch):
+        if verdict.action != COLLECT:
+            return verdict
+        # ADR-047 rung 6: reachability above is the judgement; -D only updates
+        # the local ref after that predicate has proved the branch safe.
+        removed = subprocess.run(
+            ["git", "-C", str(repo), "branch", "-D", worktree.name],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if removed.returncode != 0:
+            return replace(
+                verdict,
+                action=ESCALATE,
+                reason=f"git refused to delete it: {removed.stderr.strip()}",
+            )
         return verdict
 
     if verdict.action == STASH_THEN_COLLECT:
@@ -414,10 +661,109 @@ def _apply(repo: Path, verdict: Verdict, *, dry_run: bool) -> Verdict:
 
 def sweep(repo: Path, *, dry_run: bool = False, idle: float = IDLE_SECONDS) -> list[Verdict]:
     _git(repo, "fetch", "origin", "main", "--quiet", check=False)
-    verdicts = plan(discover(repo), idle_seconds=idle)
-    applied = [_apply(repo, verdict, dry_run=dry_run) for verdict in verdicts]
+    runs = live_run_ids(repo)
+    worktrees = discover(repo)
+    owner_by_branch = {
+        worktree.branch: worktree.owner_run_id
+        for worktree in worktrees
+        if worktree.branch and worktree.externally_owned and worktree.owner_run_id
+    }
+    worktree_verdicts = plan(worktrees, idle_seconds=idle, live_run_ids=runs)
+    applied_worktrees = [
+        _apply(repo, verdict, dry_run=dry_run) for verdict in worktree_verdicts
+    ]
+
+    released_branches = frozenset(
+        verdict.worktree.branch
+        for verdict in applied_worktrees
+        if isinstance(verdict.worktree, Worktree)
+        and verdict.worktree.branch
+        and verdict.action in {COLLECT, STASH_THEN_COLLECT}
+    )
+    branches = discover_branches(
+        repo,
+        owner_by_branch=owner_by_branch,
+        released_branches=released_branches if dry_run else frozenset(),
+    )
+    branch_verdicts = plan_branches(branches, live_run_ids=runs)
+    applied_branches = [_apply(repo, verdict, dry_run=dry_run) for verdict in branch_verdicts]
     _git(repo, "worktree", "prune", check=False)
-    return [verdict for verdict in applied if not verdict.worktree.is_primary]
+    return [
+        verdict
+        for verdict in [*applied_worktrees, *applied_branches]
+        if not isinstance(verdict.worktree, Worktree) or not verdict.worktree.is_primary
+    ]
+
+
+def discover_landed_remote_branches(repo: Path, *, base: str = BASE_REF) -> list[str]:
+    """Return remote branches that are already in origin/main without deleting them."""
+    refs = _git(
+        repo,
+        "for-each-ref",
+        "--format=%(refname:short)",
+        "refs/remotes/origin",
+    ).splitlines()
+    landed: list[str] = []
+    for ref in refs:
+        if ref in {"origin/HEAD", base}:
+            continue
+        if (
+            subprocess.run(
+                ["git", "-C", str(repo), "merge-base", "--is-ancestor", ref, base],
+                capture_output=True,
+                check=False,
+            ).returncode
+            == 0
+        ):
+            landed.append(ref.removeprefix("origin/"))
+    return sorted(landed)
+
+
+def render_remote_branches(branches: list[str]) -> str:
+    """Print human-run commands for the remote backlog; never execute them."""
+    if not branches:
+        return "No remote branches are already on origin/main."
+    commands = "\n".join(f"  git push origin --delete {branch}" for branch in branches)
+    return f"Remote branches already on {BASE_REF} (reported only):\n{commands}"
+
+
+def primary_report(repo: Path) -> str:
+    """Describe the primary branch without changing it."""
+    primary = _primary(repo)
+    branch = _git(primary, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+    label = branch or f"(detached at {_git(primary, 'rev-parse', 'HEAD')[:8]})"
+    distance = _git(
+        primary, "rev-list", "--left-right", "--count", f"{BASE_REF}...HEAD", check=False
+    ).split()
+    if len(distance) == 2:
+        behind, ahead = distance
+        return (
+            f"primary: {label} — {ahead} ahead, {behind} behind {BASE_REF}; "
+            "never changed"
+        )
+    return f"primary: {label} — distance from {BASE_REF} unavailable; never changed"
+
+
+def agents_md_drift_message(repo: Path) -> str | None:
+    """Warn when the checkout's agent instructions differ from origin/main."""
+    local = repo / "AGENTS.md"
+    try:
+        local_content = local.read_bytes()
+    except OSError:
+        return f"warning: {local} is unavailable for comparison with {BASE_REF}:AGENTS.md"
+    remote = subprocess.run(
+        ["git", "-C", str(repo), "show", f"{BASE_REF}:AGENTS.md"],
+        capture_output=True,
+        check=False,
+    )
+    if remote.returncode != 0:
+        return f"warning: unable to compare {local} with {BASE_REF}:AGENTS.md"
+    if local_content != remote.stdout:
+        return (
+            f"warning: {local} differs from {BASE_REF}:AGENTS.md; "
+            "read the current instructions before creating a worktree"
+        )
+    return None
 
 
 def add(repo: Path, slug: str, base: str = BASE_REF) -> Path:
@@ -428,6 +774,8 @@ def add(repo: Path, slug: str, base: str = BASE_REF) -> Path:
 
     target.parent.mkdir(parents=True, exist_ok=True)
     _git(repo, "fetch", "origin", "main", "--quiet", check=False)
+    if warning := agents_md_drift_message(repo):
+        print(warning, file=sys.stderr)
     subprocess.run(
         ["git", "-C", str(repo), "worktree", "add", str(target), "-b", slug, base],
         check=True,
@@ -442,6 +790,11 @@ def main(argv: list[str] | None = None) -> int:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="machine-readable report")
     common.add_argument("--dry-run", action="store_true", help="report without acting")
+    common.add_argument(
+        "--remote",
+        action="store_true",
+        help="report landed remote branches without deleting them",
+    )
     common.add_argument(
         "--idle-seconds",
         type=float,
@@ -471,12 +824,15 @@ def main(argv: list[str] | None = None) -> int:
         target = add(repo, args.slug, args.base)
         print(f"created {target}")
 
-    verdicts = sweep(repo, dry_run=args.dry_run, idle=args.idle_seconds)
+    if args.remote:
+        print(render_remote_branches(discover_landed_remote_branches(repo)))
+        return 0
 
+    verdicts = sweep(repo, dry_run=args.dry_run, idle=args.idle_seconds)
     if args.json:
         print(json.dumps([verdict.as_dict() for verdict in verdicts], indent=2))
     else:
-        print(render(verdicts))
+        print(f"{primary_report(repo)}\n\n{render(verdicts)}")
 
     return exit_code(verdicts)
 

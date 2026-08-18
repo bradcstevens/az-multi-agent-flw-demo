@@ -32,6 +32,7 @@ import pytest
 
 from worktree_hygiene import (
     BASE_REF,
+    Branch,
     COLLECT,
     CONTAINER_SUFFIX,
     DEFER,
@@ -40,13 +41,19 @@ from worktree_hygiene import (
     SKIP_ACTIVE,
     STASH_THEN_COLLECT,
     Worktree,
+    classify_branch,
     classify,
     container_for,
     exit_code,
     is_externally_owned,
     is_sanctioned,
+    liveness_observation,
+    owner_run_id_for_worktree,
+    parse_live_run_ids,
     plan,
+    plan_branches,
     render,
+    render_remote_branches,
     stash_message,
 )
 
@@ -69,6 +76,7 @@ def make(**overrides) -> Worktree:
         is_primary=False,
         sanctioned=True,
         externally_owned=False,
+        owner_run_id=None,
         dirty=False,
         locked=False,
         idle_seconds=10_000.0,
@@ -237,6 +245,14 @@ def test_a_run_scoped_lane_belongs_to_the_run_that_made_it():
     assert is_externally_owned(lane, PRIMARY, "issue-102-remediation")
 
 
+def test_a_run_scoped_lane_records_the_run_that_owns_it():
+    lane = CONTAINER / "01M06AG4CAAKZVEE35Y1QTPXQQ" / "issue-103"
+
+    assert owner_run_id_for_worktree(lane, PRIMARY, "issue-102-remediation") == (
+        "01M06AG4CAAKZVEE35Y1QTPXQQ"
+    )
+
+
 def test_an_owned_branch_namespace_is_enough_on_its_own():
     assert is_externally_owned(
         CONTAINER / "issue-50", PRIMARY, "git-loopy/01KZZ89E/integrate/issue-50"
@@ -267,6 +283,114 @@ def test_ownership_outranks_every_state_the_sweep_could_act_on():
 def test_deferring_never_makes_the_sweep_exit_non_zero():
     """It is not a problem, and it is not yours to fix."""
     assert exit_code(plan([make(externally_owned=True, commits_absent_from_remote=9)])) == 0
+
+
+def test_a_dead_run_owner_falls_through_to_collection_but_a_live_one_defers():
+    run_id = "01M06AG4CAAKZVEE35Y1QTPXQQ"
+    lane = make(externally_owned=True, owner_run_id=run_id)
+
+    assert classify(lane, live_run_ids=frozenset({run_id})).action == DEFER
+    assert classify(lane, live_run_ids=frozenset()).action == COLLECT
+
+
+def test_a_dead_run_owner_with_the_only_copy_escalates():
+    lane = make(
+        externally_owned=True,
+        owner_run_id="01M06AG4CAAKZVEE35Y1QTPXQQ",
+        reachable_from_base=False,
+        commits_absent_from_remote=1,
+    )
+
+    assert classify(lane, live_run_ids=frozenset()).action == ESCALATE
+
+
+def test_undeterminable_owner_liveness_defers_without_escalating():
+    lane = make(
+        externally_owned=True,
+        owner_run_id="01M06AG4CAAKZVEE35Y1QTPXQQ",
+        reachable_from_base=False,
+        commits_absent_from_remote=1,
+    )
+    verdicts = plan([lane], live_run_ids=None)
+
+    assert verdicts[0].action == DEFER
+    assert exit_code(verdicts) == 0
+
+
+def test_an_empty_successful_liveness_probe_means_no_run_is_live():
+    assert liveness_observation(returncode=0, stdout="", stderr="") == frozenset()
+
+
+def test_an_undeterminable_liveness_probe_remains_distinct_from_an_empty_one():
+    assert liveness_observation(returncode=2, stdout="", stderr="permission denied") is None
+
+
+def test_liveness_parser_reads_the_run_id_from_an_open_log_path():
+    output = (
+        "p47514\n"
+        "n/code/az-multi-agent-flw-demo/.git-loopy/logs/"
+        "2026-08-17T19-20-30Z-01M08JP4GPHSKED91XXPRX8AGZ.log\n"
+    )
+
+    assert parse_live_run_ids(output) == frozenset({"01M08JP4GPHSKED91XXPRX8AGZ"})
+
+
+# --------------------------------------------------------------------------
+# Branches
+# --------------------------------------------------------------------------
+
+
+def make_branch(**overrides) -> Branch:
+    defaults = dict(
+        name="issue-123",
+        checked_out=False,
+        is_main=False,
+        is_current=False,
+        reachable_from_base=True,
+        commits_absent_from_remote=0,
+        owner_run_id=None,
+    )
+    defaults.update(overrides)
+    return Branch(**defaults)
+
+
+def test_a_checked_out_branch_is_kept_until_its_worktree_is_collected():
+    branch = make_branch(checked_out=True)
+
+    assert classify_branch(branch, live_run_ids=frozenset()).action == KEEP
+    assert classify_branch(
+        make_branch(checked_out=False), live_run_ids=frozenset()
+    ).action == COLLECT
+
+
+@pytest.mark.parametrize("overrides", [{"is_main": True}, {"is_current": True}])
+def test_main_and_the_current_branch_are_never_candidates(overrides):
+    assert classify_branch(make_branch(**overrides), live_run_ids=frozenset()).action == KEEP
+
+
+def test_a_dead_run_branch_with_the_only_copy_escalates():
+    branch = make_branch(
+        owner_run_id="01M06AG4CAAKZVEE35Y1QTPXQQ",
+        reachable_from_base=False,
+        commits_absent_from_remote=2,
+    )
+
+    assert classify_branch(branch, live_run_ids=frozenset()).action == ESCALATE
+
+
+def test_remote_reporting_prints_deletion_commands_without_deleting_anything():
+    report = render_remote_branches(["closed-pr", "already-landed"])
+
+    assert "git push origin --delete closed-pr" in report
+    assert "git push origin --delete already-landed" in report
+
+
+def test_branch_collection_uses_proven_reachability_not_git_branch_ds_oracle():
+    literals = _argv_literals()
+
+    assert "-D" in literals
+    assert "-d" not in literals
+    assert "merge-base" in literals and "--is-ancestor" in literals
 
 
 # --------------------------------------------------------------------------
@@ -387,9 +511,11 @@ def test_the_shell_entry_point_only_fixes_the_entry_point():
 def test_agents_md_forbids_the_parent_directory_and_names_the_paved_road():
     agents = AGENTS.read_text(encoding="utf-8")
 
+    assert "## Worktrees and branches" in agents
     assert "git worktree add ../" in agents, "the forbidden form is not named"
     assert "scripts/worktree.sh add" in agents
     assert "044-an-agent-worktree-lives-in-the-containing-folder.md" in agents
+    assert "047-ownership-defers-collection-only-while-the-owner-lives.md" in agents
 
 
 def test_agents_md_and_the_adr_agree_on_the_base_ref():
