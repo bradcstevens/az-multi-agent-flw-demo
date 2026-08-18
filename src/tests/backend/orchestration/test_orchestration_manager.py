@@ -2357,6 +2357,17 @@ class TestTheApprovalIsTheTicketConfirmation:
         """
         import ast
 
+        # #108 made the verdict binary, so the approved branch is now a plain
+        # `if approval_response.approved:` rather than the `and`-guarded test
+        # it was written against. The seam being asserted is the same one:
+        # match either shape and let the call-site count do the work.
+        def _tests_approved(test) -> bool:
+            terms = test.values if isinstance(test, ast.BoolOp) else [test]
+            return any(
+                isinstance(term, ast.Attribute) and term.attr == "approved"
+                for term in terms
+            )
+
         path = os.path.join(
             os.path.dirname(__file__),
             "..",
@@ -2388,11 +2399,7 @@ class TestTheApprovalIsTheTicketConfirmation:
             node
             for node in ast.walk(handler)
             if isinstance(node, ast.If)
-            and isinstance(node.test, ast.BoolOp)
-            and any(
-                isinstance(term, ast.Attribute) and term.attr == "approved"
-                for term in node.test.values
-            )
+            and _tests_approved(node.test)
         )
         approved_body = (
             descendant

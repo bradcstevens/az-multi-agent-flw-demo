@@ -23,7 +23,9 @@ vi.mock('../store/PlanDataService', () => ({
     PlanDataService: { fetchPlanData: vi.fn() },
 }));
 
-import PlanPage from './PlanPage';
+import ChatPage from './ChatPage';
+import progressReducer from '../store/slices/progressSlice';
+import panelDrawerReducer from '../store/slices/panelDrawerSlice';
 import { PlanDataService } from '../store/PlanDataService';
 import { NO_ROSTER_MESSAGE } from '@/models/agentAvailability';
 import { FakeSocket } from '@/testing/fakeSocket';
@@ -43,7 +45,7 @@ import ticketReducer from '@/store/slices/ticketSlice';
  * `PlanPanelRight.test.tsx` proves the Agent Team panel names the roster when
  * it is handed `planData={null} loading`. That is the panel's half. This is the
  * other half, and it is the half the audience actually sees: the panel only
- * reaches the loading window because `PlanPage` renders it **outside** the
+ * reaches the loading window because `ChatPage` renders it **outside** the
  * `loading || !planData` branch. Move it inside — the shape a reader would
  * assume from the rest of that render — and every panel-level assertion here
  * stays green while the window goes back to a spinner with nothing beside it.
@@ -71,6 +73,8 @@ const makeStore = () =>
             streaming: streamingReducer,
             transparency: transparencyReducer,
             ticket: ticketReducer,
+            progress: progressReducer,
+            panelDrawer: panelDrawerReducer,
         },
         middleware: (getDefaultMiddleware) =>
             getDefaultMiddleware({ serializableCheck: false }),
@@ -80,9 +84,9 @@ const makeStore = () =>
 const renderLoadingWindow = (store = makeStore()) =>
     render(
         <Provider store={store}>
-            <MemoryRouter initialEntries={['/plan/plan-1']}>
+            <MemoryRouter initialEntries={['/chat/plan-1']}>
                 <Routes>
-                    <Route path="/plan/:planId" element={<PlanPage />} />
+                    <Route path="/chat/:id" element={<ChatPage />} />
                 </Routes>
             </MemoryRouter>
         </Provider>,

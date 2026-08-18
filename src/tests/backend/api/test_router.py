@@ -608,7 +608,16 @@ class TestProcessRequest:
 
         assert response.status_code == 200
         prior.cancel.assert_called_once_with()
-        rt.store.update_plan.assert_not_awaited()
+        # #102 persists this request's own Lane onto the record it just
+        # created, so "writes nothing" is no longer the way to say this. The
+        # property that matters is unchanged: nothing is written against the
+        # Chat this turn displaced, and no write carries a status.
+        written = [call.args[0] for call in rt.store.update_plan.await_args_list]
+        assert [plan.session_id for plan in written] == ["sess-1"]
+        assert all(
+            plan.overall_status == router_mod.PlanStatus.in_progress
+            for plan in written
+        )
 
     def test_the_rehearsed_closing_task_arms_its_sop_lookup(self, rt, monkeypatch):
         rt.store.get_team_by_id.return_value = MagicMock()

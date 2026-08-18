@@ -62,15 +62,10 @@ color: #2F2F4A; */
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  width: var(--panel-width, 500px);
   background-color: var(--colorNeutralBackground4);
   box-sizing: border-box;
   position: relative;
-}
-
-.panelLeft {
-  width: var(--panel-width, 500px);
-  display: flex;
-  flex-direction: column;
 }
 
 .team-selector-container {
