@@ -274,11 +274,12 @@ screen imply it.
 the room took you off the screen and back to the list. Beat 3 into beat 4 is the sequence this
 protects: the ticket's whole claim is that nothing had to be repeated.
 
-**What to do:** choose **Chat history** in the content toolbar, then open the conversation from the
-drawer — every chat is listed there, in whatever state it is in, and the one you want is usually the
-one at the top that did not finish. The drawer closes and returns you to the conversation. Type into
-the message box at the bottom; it invites you with *"Ask another question in this chat..."*, and what
-you send continues **that** conversation rather than starting a new one.
+**What to do:** the chat list is the column on the left — every chat is listed there, in whatever
+state it is in, and the one you want is usually the one at the top that did not finish. Open it and
+the panel stays where it is. Type into the message box at the bottom; it invites you with *"Ask
+another question in this chat..."*, and what you send continues **that** conversation rather than
+starting a new one. If somebody has pressed **Chat history** in the content toolbar, the column is
+closed — press it again to bring it back.
 
 **Say nothing about it.** It is a repair, not a beat. Use it and carry on.
 

@@ -35,13 +35,23 @@ export class ChatSurface {
         return this.page.getByRole('button', { name: 'New chat' });
     }
 
-    /** Chat history is a modal Panel drawer, not a column beside the conversation. */
+    /** Chat history is a pushing Panel drawer — a column beside the conversation, not a modal. */
     get chatHistoryDrawer(): Locator {
-        return this.page.getByRole('dialog');
+        return this.page.getByRole('navigation', { name: 'Chat history' });
     }
 
+    /**
+     * Ensure chat history is on screen (ADR-048).
+     *
+     * It is a column the surface opens with, so this asserts rather than
+     * presses: an unconditional click here would *close* the panel, which is
+     * the failure this helper existed to prevent under the overlay. The
+     * disclosure reports the state, so a run that finds it closed reopens it.
+     */
     async openChatHistory(): Promise<void> {
-        await this.chatHistoryToggle.click();
+        if ((await this.chatHistoryToggle.getAttribute('aria-expanded')) !== 'true') {
+            await this.chatHistoryToggle.click();
+        }
         await expect(this.chatHistoryDrawer).toBeVisible();
     }
 

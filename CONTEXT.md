@@ -751,14 +751,19 @@ over — so its layout moved to `storeSurface.css` too. The minimum is now 280px
 task-history panel's 280 plus the rail's 320 is 920px of columns in a shell that stacks at 900, and
 the 19px band above the breakpoint was clipped off the rail's end without a scrollbar.
 
-**Panel drawer** — a side panel the associate can open and close, and deliberately **not one
-mechanism applied twice** ([ADR-035](docs/ADR/035-the-rail-pushes-and-the-chat-panel-floats.md)).
-The **Transparency rail** *pushes*: closing it returns its width to the conversation, because the
-rail exists to be read **beside** the answer it explains and an overlay would cover the thing it is
-explaining. The chat-history panel *floats*: opening it covers the conversation, because navigation
-is never read alongside anything and re-wrapping the answer to show it buys nothing. Both are
-**desktop-only** — the drawer is a side-column rule, and the **Stacking breakpoint** releases it
-like every other one, so below 900px the rail is always open and the chat panel stays dropped.
+**Panel drawer** — a side panel the associate can open and close. Both drawers **push**: closing one
+returns its width to the conversation ([ADR-035](docs/ADR/035-the-rail-pushes-and-the-chat-panel-floats.md),
+[ADR-048](docs/ADR/048-the-chat-panel-is-a-column-the-surface-opens-with.md)). The **Transparency
+rail** pushes because it exists to be read **beside** the answer it explains and an overlay would
+cover the thing it is explaining. The chat-history panel was an overlay until #168, on the argument
+that navigation is never read alongside anything so re-wrapping the answer to show it buys nothing —
+true of a drawer that *opens*, and it was read as an argument about the default too. A column the
+surface already opens with has no open to pay for, and the surface was painting two columns with a
+hole where the third belonged. Both are **open at first paint** and both are **desktop-only** — the
+drawer is a side-column rule, and the **Stacking breakpoint** releases it like every other one, so
+below 900px the rail is always open and the chat panel stays dropped.
+They differ in one place, and only in the stylesheet: closed, the rail is a zero-width container,
+while the chat panel is **not rendered at all** and so has no collapsed rule to declare.
 _Avoid_: sidebar, flyout, minimise, collapse-all
 
 **Pinned panel** — a **Panel drawer** the presenter has touched, which stops it opening or closing

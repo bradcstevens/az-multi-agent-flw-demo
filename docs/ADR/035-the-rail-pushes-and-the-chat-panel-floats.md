@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted — the rail half stands; the chat panel's overlay and its closed default are
+**superseded by [ADR-048](./048-the-chat-panel-is-a-column-the-surface-opens-with.md)** (2026-08-18)
 
 ## Date
 

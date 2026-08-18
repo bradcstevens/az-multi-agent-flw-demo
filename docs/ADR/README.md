@@ -41,7 +41,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [028](./028-a-reviewable-plan-is-earned-by-a-transaction.md) | A reviewable plan is earned by a transaction, not by a question | Accepted |
 | [029](./029-an-issue-declares-its-model-with-one-task-type-label.md) | An issue declares its model with one `task-type:` label, over a committed table | Accepted |
 | [031](./031-leaving-a-chat-ends-its-turn.md) | Leaving a Chat ends its turn, and says so | Accepted |
-| [035](./035-the-rail-pushes-and-the-chat-panel-floats.md) | The rail pushes and the chat panel floats | Accepted |
+| [035](./035-the-rail-pushes-and-the-chat-panel-floats.md) | The rail pushes and the chat panel floats | Accepted — chat-panel half superseded by 047 |
 | [033](./033-a-one-tap-control-never-invents-the-words-it-offers.md) | A one-tap control never invents the words it offers | Accepted — replaces ADR-024's home-card rule |
 | [034](./034-the-identity-boundary-gate-covers-the-clarification-seam.md) | The Identity boundary gate covers the clarification seam | Accepted |
 | [036](./036-a-record-carries-its-own-provenance.md) | A record carries its own provenance, and the surface says nothing about itself | Accepted — retires `CONTEXT.md`'s Simulated label |
@@ -55,6 +55,7 @@ Every ADR in this directory appears in the table below; a CI-tooling test
 | [044](./044-an-agent-worktree-lives-in-the-containing-folder.md) | An agent worktree lives in the containing folder, and is collected once its commits are on `origin/main` | Accepted — bounds what an agent may create beside this repository |
 | [045](./045-the-feedback-loops-virtualenv-is-shared-across-worktrees.md) | The feedback loops' virtualenv is keyed by its inputs and shared across worktrees | Accepted — amends 005's per-worktree bootstrap |
 | [046](./046-the-feedback-loops-table-is-what-the-gate-runs.md) | The Feedback loops table is what the gate runs, so nothing in it may observe a deployment | Accepted — amends 005's table; removes the Demo validator's row |
+| [048](./048-the-chat-panel-is-a-column-the-surface-opens-with.md) | The chat panel is a column the surface opens with | Accepted — supersedes the chat-panel half of 035 |
 
 ## Writing a new one
 

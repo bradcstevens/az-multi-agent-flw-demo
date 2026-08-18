@@ -56,14 +56,35 @@ color: #2F2F4A; */
   color: var(--colorPaletteYellowForeground2, var(--colorNeutralForeground2));
 }
 
-/* Panel Layout Styles */
+/*
+ * The chat-history column (#168, ADR-048).
+ *
+ * A **Panel drawer** that pushes, like the **Transparency rail** on the other
+ * edge: open is this width, closed is the component unmounted and the width
+ * back with the conversation. There is no collapsed rule to declare, because a
+ * column that is not rendered occupies nothing.
+ *
+ * 280px is the number `storeSurface.css` already reasons with rather than a
+ * second one: 280 here, the conversation's 280 minimum and the rail's 320 is
+ * 880px of furniture under a shell that stacks at 900. The 500px it inherited
+ * came with the accelerator's drag-resize handle, which ADR-035 deleted — left
+ * behind, it overran the breakpoint by 220px and opened exactly the band #58
+ * was about.
+ *
+ * The hairline is on the right because that is the edge it meets the
+ * conversation at; the rail declares the mirror of it. Below the **Stacking
+ * breakpoint** neither is a lie that needs releasing — the component is not
+ * rendered there at all.
+ */
 .panelLeft {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  width: var(--panel-width, 500px);
+  width: 280px;
+  flex: none;
   background-color: var(--colorNeutralBackground4);
+  border-right: 1px solid var(--colorNeutralStroke2);
   box-sizing: border-box;
   position: relative;
 }
