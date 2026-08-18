@@ -101,8 +101,7 @@ class MockStartingTask:
     follow_on: List[str] = field(default_factory=list)
     context_dependent: bool = False
     ticket_on_approval: bool = False
-    plan_steps: List[dict] = field(default_factory=list)
-    plan_steps_authored: bool = False
+    plan_steps: Optional[List[dict]] = None
 
 @dataclass
 class MockTeamConfiguration:
@@ -429,13 +428,19 @@ class TestTeamConfigurationValidation:
         task = service._validate_and_parse_task(_valid_task_data(plan_steps=steps))
 
         assert task.plan_steps == [{**steps[0], "agent": ""}]
-        assert task.plan_steps_authored is True
 
     def test_omitted_plan_steps_preserve_the_generated_review_plan(self):
-        task = TeamService()._validate_and_parse_task(_valid_task_data())
+        """A task that never mentions a plan is not a task with an empty one:
+        the orchestrator keeps the plan it generated."""
+        assert TeamService()._validate_and_parse_task(_valid_task_data()).plan_steps is None
 
-        assert task.plan_steps == []
-        assert task.plan_steps_authored is False
+    def test_an_authored_empty_plan_is_not_an_omitted_one(self):
+        assert (
+            TeamService()
+            ._validate_and_parse_task(_valid_task_data(plan_steps=[]))
+            .plan_steps
+            == []
+        )
 
     def test_a_nonassociate_person_step_requires_an_authored_outcome(self):
         step = {
@@ -454,6 +459,47 @@ class TestTeamConfigurationValidation:
             TeamService()._validate_and_parse_task(
                 _valid_task_data(plan_steps=[step])
             )
+
+    def test_a_nonassociate_person_step_requires_an_id_to_be_waited_on(self):
+        """The step id is what a Verdict records and what `waitsOn` names, so a
+        Person step without one cannot be resolved or ordered.
+
+        Refused at upload rather than at approval: an authored step that
+        validates here and detonates on stage is the failure this boundary
+        exists to prevent."""
+        step = {
+            "action": "Ask Marcus Bell to confirm the agreed swap",
+            "assignee": {
+                "kind": "person",
+                "name": "Marcus Bell",
+                "relation": "peer",
+                "simulated": True,
+            },
+            "outcome": "approved",
+        }
+
+        with pytest.raises(ValueError, match="requires an id"):
+            TeamService()._validate_and_parse_task(
+                _valid_task_data(plan_steps=[step])
+            )
+
+    def test_the_associates_own_step_needs_neither(self):
+        """The approval itself satisfies it, so it records no Verdict and
+        nothing waits on it."""
+        step = {
+            "action": "Confirm the agreed swap",
+            "assignee": {
+                "kind": "person",
+                "name": "You",
+                "relation": "associate",
+                "simulated": False,
+            },
+        }
+
+        assert TeamService()._validate_and_parse_task(
+            _valid_task_data(plan_steps=[step])
+        ).plan_steps == [{**step, "agent": "", "id": None, "waitsOn": None,
+                          "outcome": None}]
 
     def test_a_ticket_status_reply_survives_the_upload(self):
         """The ticketing task owns the Fast-lane reply it offers after approval."""

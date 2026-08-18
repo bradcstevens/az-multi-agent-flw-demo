@@ -324,12 +324,14 @@ class StartingTask(BaseModel):
     # An authored Reviewable plan. A person step names who the system will ask
     # and the step it waits for, so a rehearsal never invents a colleague or an
     # approval order.
-    plan_steps: List[Dict[str, Any]] = Field(default_factory=list)
-    # ``plan_steps`` defaults to an empty list for backwards-compatible team
-    # definitions, so retain whether the author actually declared it. An omitted
-    # field lets the orchestrator keep its generated Reviewable plan; an explicit
-    # empty list is an authored empty plan.
-    plan_steps_authored: bool = False
+    #
+    # Three states, in one field rather than in a list and a flag beside it: a
+    # task that never mentions ``plan_steps`` carries ``None`` and keeps the
+    # orchestrator's generated plan, while an authored ``[]`` is an authored
+    # empty plan and replaces it. A derived "was it authored" boolean would be
+    # a second source of truth for what this field already says, and one that
+    # goes stale the first time a stored team configuration is rehydrated.
+    plan_steps: Optional[List[Dict[str, Any]]] = None
 
 
 class TeamConfiguration(BaseDataModel):

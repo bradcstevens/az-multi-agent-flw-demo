@@ -6,7 +6,9 @@ import uuid
 
 from backend.models.plan_models import (AgentDefinition, MPlan, MStep,
                                         PlannerResponsePlan,
-                                        PlannerResponseStep, PlanStatus)
+                                        PlannerResponseStep, PlanStatus,
+                                        Verdict)
+from provenance import VERDICT_PROVENANCE
 
 
 class TestPlanStatus:
@@ -83,6 +85,53 @@ class TestMStep:
                 "waitsOn": 2,
                 "outcome": outcome,
             }
+
+
+class TestTheVerdictCarriesItsProvenance:
+    """An invented person's action is disclosed in the record that carries it
+    (ADR-037). A Verdict needs that floor more than most records do: its
+    outcome is authored but its words are generated per run, so the words read
+    exactly like a colleague who really answered.
+    """
+
+    def _verdict(self, **overrides):
+        fields = {
+            "step_id": 3,
+            "assignee": {
+                "kind": "person",
+                "name": "Marcus Bell",
+                "relation": "peer",
+                "simulated": True,
+            },
+            "outcome": "approved",
+            "words": "I can confirm the Saturday swap works for me.",
+        }
+        fields.update(overrides)
+        return Verdict.model_validate(fields)
+
+    def test_the_verdict_names_the_workforce_system_that_was_not_consulted(self):
+        assert self._verdict().provenance_line == VERDICT_PROVENANCE
+
+    def test_there_is_no_provenance_flag_to_omit(self):
+        """Every Verdict this system produces is an invented person's decision
+        — there is no other kind — so the framing is a property of the record
+        rather than a field a caller could leave off."""
+        assert "provenance_line" in self._verdict().model_dump(mode="json")
+
+    def test_the_line_is_the_same_whichever_way_the_person_decided(self):
+        assert (
+            self._verdict(outcome="declined").provenance_line
+            == self._verdict(outcome="approved").provenance_line
+        )
+
+    def test_a_reader_who_knows_none_of_our_rules_can_tell_nothing_produced_it(self):
+        """ADR-037's floor is behavioural, not a naming convention: the line
+        alone must name the class of system that was not asked and say who
+        authored the content instead."""
+        line = self._verdict().provenance_line
+
+        assert "No workforce management system was consulted" in line
+        assert "authored for this walkthrough" in line
 
 
 class TestMPlan:

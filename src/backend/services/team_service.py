@@ -157,25 +157,41 @@ class TeamService:
             if field not in task_data:
                 raise ValueError(f"Starting task missing required field: {field}")
 
-        plan_steps_authored = "plan_steps" in task_data
-        raw_plan_steps = task_data.get("plan_steps", [])
-        if plan_steps_authored and not isinstance(raw_plan_steps, list):
-            raise ValueError("Starting task plan_steps must be a list")
-        plan_steps = [
-            MStep.model_validate(step).model_dump(mode="json")
-            for step in raw_plan_steps
-        ]
-        for step in plan_steps:
-            assignee = step.get("assignee")
-            if (
-                assignee
-                and assignee["kind"] == "person"
-                and assignee["relation"] != "associate"
-                and step["outcome"] is None
-            ):
-                raise ValueError(
-                    "A non-associate Person step requires an authored outcome"
-                )
+        plan_steps = None
+        if "plan_steps" in task_data:
+            raw_plan_steps = task_data["plan_steps"]
+            if not isinstance(raw_plan_steps, list):
+                raise ValueError("Starting task plan_steps must be a list")
+            plan_steps = [
+                MStep.model_validate(step).model_dump(mode="json")
+                for step in raw_plan_steps
+            ]
+            # A Person step assigned to somebody other than the associate is the
+            # only thing that creates post-approval waiting (#151, ADR-042), and
+            # both of the facts that resolution needs are authored here beside
+            # the people the step names: what that person decides, and the id a
+            # Verdict records and `waitsOn` orders by. Refused at upload rather
+            # than at approval, because an authored step that validates here and
+            # detonates on stage is what this boundary exists to prevent.
+            #
+            # Read the author's own JSON rather than the validated dump: the
+            # rule is about what the pack declares, so an omitted field and a
+            # null one are the same omission.
+            for step in raw_plan_steps:
+                assignee = step.get("assignee") or {}
+                if (
+                    assignee.get("kind") != "person"
+                    or assignee.get("relation") == "associate"
+                ):
+                    continue
+                if step.get("outcome") is None:
+                    raise ValueError(
+                        "A non-associate Person step requires an authored outcome"
+                    )
+                if step.get("id") is None:
+                    raise ValueError(
+                        "A non-associate Person step requires an id"
+                    )
 
         return StartingTask(
             id=task_data["id"],
@@ -204,7 +220,6 @@ class TeamService:
             context_dependent=task_data.get("context_dependent", False),
             ticket_on_approval=task_data.get("ticket_on_approval", False),
             plan_steps=plan_steps,
-            plan_steps_authored=plan_steps_authored,
         )
 
     async def save_team_configuration(self, team_config: TeamConfiguration) -> str:

@@ -133,6 +133,7 @@ class MockMStep:
             "action": self.action,
             "assignee": getattr(self, "assignee", None),
             "waitsOn": getattr(self, "waitsOn", None),
+            "outcome": getattr(self, "outcome", None),
         }
 
 

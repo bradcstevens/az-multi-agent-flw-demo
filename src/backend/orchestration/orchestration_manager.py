@@ -1114,7 +1114,21 @@ class OrchestrationManager:
 
     @staticmethod
     def _post_approval_person_steps(plan) -> list:
-        """Return non-associate Person steps in their declared dependency order."""
+        """Return non-associate Person steps in their declared dependency order.
+
+        The plan's own steps choose the post-approval mechanism (#151,
+        ADR-042). A Person step assigned to somebody other than the associate
+        is the only thing that creates waiting; the associate's own
+        confirmation step is satisfied by the approval that got here. Nothing
+        below reads the workflow's name, the task id or the lane, so the
+        Simulated ticket — whose plan has no such step — reaches no executor at
+        all rather than declining to use one, which is what keeps *there is no
+        submit tool* (#21) closed by construction.
+
+        The whole plan is ordered before it is filtered: `waitsOn` may name an
+        agent step, so the peer's turn comes after the associate's confirmation
+        even though only the peer records a Verdict.
+        """
         steps = getattr(plan, "steps", None)
         if not isinstance(steps, list):
             return []
@@ -1159,7 +1173,27 @@ class OrchestrationManager:
         associate_name: str,
         manager_chat_client,
     ) -> list:
-        """Generate Verdict records for already-authored non-associate outcomes."""
+        """Generate Verdict records for already-authored non-associate outcomes.
+
+        ADR-038's split, one spec later: *whether* each person approves is
+        authored on the Quick Task, and *what they say* rides the turn, so the
+        beat is rehearsable and pinnable while the words differ run to run.
+
+        The generation is also the pacing. Each verdict is a real request
+        taking real time, so the gap between two of them reports something that
+        happened (ADR-023) — there is no sleep here and nothing to tune. This
+        path never enters the clarification seam: that seam times out at 300s
+        and auto-approves with a synthetic answer (#87), which in this beat
+        would let a stalled demonstration fabricate a person's approval out of
+        nothing at all.
+
+        Both guards below are unreachable from real input — `TeamService`
+        refuses an authored Person step missing either fact, a generated plan
+        carries no assignees, and the chat client is attached to every
+        workflow. They fail loudly rather than substituting a fallback,
+        because a person's words invented outside this call is exactly the
+        thing the Provenance line on the record could not then disclose.
+        """
         if manager_chat_client is None:
             raise RuntimeError("Manager chat client is required to resolve Person steps")
 
@@ -1174,21 +1208,26 @@ class OrchestrationManager:
                 )
 
             assignee = step.assignee
+            action = (getattr(step, "action", "") or "").strip().rstrip(".")
             response = await manager_chat_client.get_response(
                 [
                     Message(
                         "system",
                         [
-                            "Write a brief, natural first-person response for a "
-                            "person in an approved shift-swap workflow. The "
-                            "decision is already fixed; do not change it."
+                            "Write a brief, natural first-person reply from a "
+                            "person who has just been asked to do something in "
+                            "a workflow an associate approved. Their decision "
+                            "is already made; put it in their own words and do "
+                            "not change it."
                         ],
                     ),
                     Message(
                         "user",
                         [
-                            f"{assignee.name} is the {assignee.relation}. Their "
-                            f"authored decision is {getattr(outcome, 'value', outcome)}. "
+                            f"{assignee.name} is the {assignee.relation}. "
+                            + (f"They were asked to: {action}. " if action else "")
+                            + "Their authored decision is "
+                            f"{getattr(outcome, 'value', outcome)}. "
                             + (
                                 f"Address the associate as {associate_name}. "
                                 if associate_name
@@ -1256,8 +1295,6 @@ class OrchestrationManager:
             if getattr(task, "id", None) == task_id:
                 plan_steps = getattr(task, "plan_steps", None)
                 if not isinstance(plan_steps, list):
-                    return None
-                if getattr(task, "plan_steps_authored", None) is False:
                     return None
                 from models.plan_models import MStep
 

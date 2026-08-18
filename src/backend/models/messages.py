@@ -76,7 +76,15 @@ class PlanApprovalRequest:
 
 @pydantic_dataclass(config=ConfigDict(extra="forbid"), slots=True)
 class PlanApprovalResponse:
-    """Response for plan approval from the frontend."""
+    """Response for plan approval from the frontend.
+
+    Extras are refused rather than ignored. The browser's verdict is *whether*
+    the associate approved and what they asked to change; what the people the
+    plan names then decide is authored on the Quick Task and read off the
+    running team's configuration (#151, ADR-042). A request that carries an
+    outcome is a request trying to author somebody else's decision, and it is
+    rejected rather than quietly dropped.
+    """
     m_plan_id: str
     approved: bool
     feedback: str | None = None

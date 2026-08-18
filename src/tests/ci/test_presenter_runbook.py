@@ -64,6 +64,16 @@ def _rendered() -> str:
     return re.sub(r"\s+", " ", RUNBOOK.read_text(encoding="utf-8"))
 
 
+def _unwrapped(text: str) -> str:
+    """Text with its line wrapping collapsed.
+
+    A sentence is one sentence whether the file it lives in broke it across
+    two lines or not, so a check about wording must not become a check about
+    line width.
+    """
+    return re.sub(r"\s+", " ", text)
+
+
 def _quick_tasks() -> list:
     pack = json.loads(STORE_PACK.read_text(encoding="utf-8"))
     return pack["starting_tasks"]
@@ -402,6 +412,35 @@ def test_every_provenance_line_is_in_the_simulation_register():
     assert not missing, (
         "the Simulation register is missing Provenance line constants: "
         f"{missing}"
+    )
+
+
+def test_no_component_composes_a_provenance_line():
+    """The Provenance line module owns the wording; the surface renders what
+    the record already carried.
+
+    A component that spells a line out is a second copy of a sentence the
+    presenter reads verbatim off the register, and only one of the two moves
+    when the register does. #137 removed the copies by hand; this keeps them
+    gone, including for the records added since.
+    """
+    lines = {
+        name: value
+        for name, value in vars(provenance).items()
+        if name.isupper() and isinstance(value, str)
+    }
+    surface = REPO_ROOT / "src" / "App" / "src"
+    composed = {
+        f"{path.relative_to(REPO_ROOT)}:{name}"
+        for path in surface.rglob("*")
+        if path.suffix in {".ts", ".tsx"}
+        for name, value in lines.items()
+        if _unwrapped(value) in _unwrapped(path.read_text(encoding="utf-8"))
+    }
+
+    assert not composed, (
+        "a Provenance line belongs to src/backend/provenance.py and reaches "
+        f"the surface on the record, not composed in a component: {sorted(composed)}"
     )
 
 

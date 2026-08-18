@@ -2275,20 +2275,15 @@ class TestTheApprovalIsTheTicketConfirmation:
         ]
 
     def test_a_quick_task_without_authored_plan_steps_preserves_the_generated_plan(self):
+        """One field carries all three states: a task that never mentioned a
+        plan keeps the orchestrator's generated one, and an authored empty plan
+        replaces it with nothing."""
         manager = OrchestrationManager()
         workflow = SimpleNamespace(
             _team_config=SimpleNamespace(
                 starting_tasks=[
-                    SimpleNamespace(
-                        id="ticket",
-                        plan_steps=[],
-                        plan_steps_authored=False,
-                    ),
-                    SimpleNamespace(
-                        id="empty-plan",
-                        plan_steps=[],
-                        plan_steps_authored=True,
-                    ),
+                    SimpleNamespace(id="ticket", plan_steps=None),
+                    SimpleNamespace(id="empty-plan", plan_steps=[]),
                 ]
             )
         )
@@ -2457,7 +2452,8 @@ class TestTheApprovalIsTheTicketConfirmation:
         ]
         assert len(first_run.requests) == 2
         assert first_run.requests[0][1].contents == [
-            "Marcus Bell is the peer. Their authored decision is approved. "
+            "Marcus Bell is the peer. They were asked to: Ask Marcus Bell to "
+            "confirm the agreed swap. Their authored decision is approved. "
             "Address the associate as Clara. Write only their response."
         ]
         assert len(second_run.requests) == 2
@@ -2508,6 +2504,73 @@ class TestTheApprovalIsTheTicketConfirmation:
             None, plan_steps=[], manager_chat_client=chat_client
         )
 
+        assert outcome.verdicts == []
+        assert chat_client.requests == []
+
+    def test_the_postapproval_boundary_can_consult_nothing_but_the_plan(self):
+        """A Person step assigned to somebody other than the associate is the
+        only thing that creates post-approval waiting (ADR-042).
+
+        Pinned as a property of the seam rather than as a promise in a review:
+        the selector is handed the plan and nothing else, so no later change
+        can quietly make the workflow's name, the task id or the lane decide
+        which runtime a plan gets.
+        """
+        import inspect
+
+        parameters = inspect.signature(
+            OrchestrationManager._post_approval_person_steps
+        ).parameters
+
+        assert list(parameters) == ["plan"]
+
+    @pytest.mark.asyncio
+    async def test_the_ticket_path_reaches_no_postapproval_executor(self):
+        """The Simulated ticket's plan has no Person step but the associate's
+        own, so approving it waits on nobody.
+
+        This is what keeps *there is no submit tool* (#21) closed by
+        construction: the ticket path does not decline to use the
+        post-approval mechanism, it never arrives at it, and nothing had to
+        read the task id or the lane to arrange that.
+        """
+        mock_convert.return_value.steps = [
+            real_plan_models.MStep(
+                id=1,
+                action="Write up what was already tried",
+                assignee={"kind": "agent", "name": "EscalationAgent"},
+            ),
+            real_plan_models.MStep(
+                id=2,
+                action="Confirm the ticket",
+                assignee={
+                    "kind": "person",
+                    "name": "You",
+                    "relation": "associate",
+                    "simulated": False,
+                },
+                waitsOn=1,
+            ),
+        ]
+        store = FakeTicketStore()
+        record = Mock()
+        record.read = AsyncMock(
+            return_value=Mock(
+                attempted=["Fitted a fresh paper filter"],
+                equipment="front counter coffee brewer, left head",
+            )
+        )
+        chat_client = FakeManagerChatClient([])
+
+        _review, outcome = await self._review(
+            store,
+            ticket_on_approval=True,
+            plan_steps=None,
+            record=record,
+            manager_chat_client=chat_client,
+        )
+
+        assert store.submitted == ["s-1"]
         assert outcome.verdicts == []
         assert chat_client.requests == []
 
