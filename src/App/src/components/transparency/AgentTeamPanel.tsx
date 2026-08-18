@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Body1Strong, Caption1, Caption1Strong } from '@fluentui/react-components';
 import { PeopleTeam20Regular } from '@fluentui/react-icons';
 
-import { TeamConfig } from '../../models/Team';
+import { Agent, TeamConfig } from '../../models/Team';
 import {
     AVAILABILITY_NOTE,
     NO_ROSTER_MESSAGE,
@@ -11,6 +11,7 @@ import {
 } from '../../models/agentAvailability';
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
 import { SECTION_HEADING, SUBSECTION_HEADING } from '../../models/headingOutline';
+import AgentDossier from './AgentDossier';
 
 /**
  * The Agent Team panel (issue #24).
@@ -68,6 +69,18 @@ const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({
     availableCount = 0,
 }) => {
     const { agents, count } = resolveAvailability(team, plan, available, availableCount);
+    const [dossierAgent, setDossierAgent] = useState<Agent | null>(null);
+    const openerRef = useRef<HTMLButtonElement | null>(null);
+
+    const openDossier = (agent: Agent, opener: HTMLButtonElement) => {
+        openerRef.current = opener;
+        setDossierAgent(agent);
+    };
+
+    const closeDossier = () => {
+        setDossierAgent(null);
+        openerRef.current?.focus();
+    };
 
     return (
         <section className="transparency-panel" data-testid="agent-team-panel">
@@ -95,10 +108,17 @@ const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({
                                 className="agent-team__member"
                                 data-testid={`agent-team-member-${agent.name}`}
                             >
-                                <Caption1Strong>
-                                    {getAgentDisplayNameWithSuffix(agent.name)}
-                                </Caption1Strong>
+                                <button
+                                    type="button"
+                                    className="agent-team__name"
+                                    onClick={(event) => openDossier(agent, event.currentTarget)}
+                                >
+                                    <Caption1Strong as="span">
+                                        {getAgentDisplayNameWithSuffix(agent.name)}
+                                    </Caption1Strong>
+                                </button>
                                 <Caption1
+                                    className="agent-team__model"
                                     data-testid="agent-team-model"
                                     title="The model deployment this agent is assigned"
                                 >
@@ -112,6 +132,7 @@ const AgentTeamPanel: React.FC<AgentTeamPanelProps> = ({
                     </Caption1>
                 </>
             )}
+            {dossierAgent && <AgentDossier agent={dossierAgent} onClose={closeDossier} />}
         </section>
     );
 };

@@ -376,11 +376,84 @@
 }
 
 /* The model a member runs on is a figure, and reads as one. */
-.agent-team__member > :last-child {
+.agent-team__model {
     color: var(--colorNeutralForeground3);
     font-family: var(--fontFamilyNumeric);
     font-size: var(--fontSizeBase100);
     white-space: nowrap;
+}
+
+.agent-team__name {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.agent-team__name:hover {
+    text-decoration: underline;
+}
+
+.agent-dossier {
+    width: min(720px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+}
+
+.agent-dossier__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.agent-dossier__content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.agent-dossier__model {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+}
+
+.agent-dossier__model dt {
+    color: var(--colorNeutralForeground3);
+}
+
+.agent-dossier__model dd {
+    margin: 0;
+    font-family: var(--fontFamilyNumeric);
+}
+
+.agent-dossier__description,
+.agent-dossier__preamble {
+    margin: 0;
+}
+
+.agent-dossier__preamble {
+    color: var(--colorNeutralForeground2);
+    font-weight: var(--fontWeightSemibold);
+}
+
+.agent-dossier__prompt {
+    display: block;
+    max-width: 100%;
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    box-sizing: border-box;
+    background-color: var(--colorNeutralBackground2);
+    border-radius: var(--borderRadiusMedium);
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: normal;
+    font-family: var(--fontFamilyBase);
 }
 
 /*
