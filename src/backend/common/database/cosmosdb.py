@@ -10,6 +10,7 @@ from azure.cosmos.aio import CosmosClient
 from azure.cosmos.aio._database import DatabaseProxy
 
 from chat.deletion import ChatDeletion, ChatsDeletion, DeletionOutcome, is_running
+from chat.echo import EchoOutcome, MessageEchoed
 from chat.settle import SettleOutcome, TurnSettled, settled_status
 
 from ..models.messages import (
@@ -29,6 +30,10 @@ from .database_base import DatabaseBase
 # rather than by catching `CosmosAccessConditionFailedError`, so the sweep's
 # guard does not depend on which of the SDK's error classes carries it.
 PRECONDITION_FAILED = 412
+
+# What Cosmos answers a write aimed at a document that is not there. Read
+# off the status for the same reason as the code above.
+NOT_FOUND = 404
 
 
 class CosmosDBClient(DatabaseBase):
@@ -691,6 +696,111 @@ class CosmosDBClient(DatabaseBase):
             return TurnSettled(SettleOutcome.refused)
 
         return TurnSettled(SettleOutcome.settled, status=terminal)
+
+    async def record_streaming_message(
+        self, plan_id: str, streaming_message: str
+    ) -> MessageEchoed:
+        """Write the turn's streamed reply onto its **Plan record** (#158).
+
+        The browser's echo is the only thing that persists this, so the write
+        has to be able to say it did not happen (ADR-043 decision 7). Two things
+        follow, and both are :meth:`settle_turn`'s for the same reasons.
+
+        **Read raw, not through** ``query_items``, which logs a failed query and
+        returns ``[]`` — so an outage would arrive here as *"there is no such
+        **Plan record**"* and be answered 200. ``_latest_plan`` documents the
+        same trap, and this method exists precisely so that nothing reports a
+        write that did not land as one.
+
+        **Patched, not replaced**, for the reason :meth:`settle_turn` patches:
+        the write this supersedes re-read the whole **Plan record** and upserted
+        it, taking the rest of the document with it and overwriting concurrent
+        changes to fields it never meant to touch. Setting one field cannot.
+
+        This does **not** close #165, and the narrower write should not be read
+        as closing it: Cosmos sets ``_ts`` on any update, so a late echo still
+        moves this record to the front of ``_latest_plan``'s ``_ts DESC``
+        ordering and can outrank the live turn that succeeded it. The ordering
+        is #165's to fix; what changed here is only that the write is smaller
+        and can report that it failed.
+
+        Scoped to this client's own ``user_id``: a **Plan record** belonging to
+        another associate is not found rather than written.
+        """
+        await self._ensure_initialized()
+
+        try:
+            rows = self.container.query_items(
+                query=(
+                    "SELECT TOP 1 c.id, c.session_id FROM c "
+                    "WHERE c.id=@plan_id AND c.data_type=@data_type "
+                    "AND c.user_id=@user_id"
+                ),
+                parameters=[
+                    {"name": "@plan_id", "value": plan_id},
+                    {"name": "@data_type", "value": DataType.plan},
+                    {"name": "@user_id", "value": self.user_id},
+                ],
+            )
+            record = None
+            async for row in rows:
+                record = row
+                break
+        except Exception as e:
+            self.logger.warning(
+                "Could not read plan record %s to store its streaming "
+                "message: %s",
+                plan_id,
+                e,
+            )
+            return MessageEchoed(EchoOutcome.refused)
+
+        if record is None:
+            self.logger.info(
+                "No plan record %s of this user's to hold the streaming "
+                "message — the record has gone",
+                plan_id,
+            )
+            return MessageEchoed(EchoOutcome.no_such_plan_record)
+
+        try:
+            await self.container.patch_item(
+                record["id"],
+                partition_key=record["session_id"],
+                patch_operations=[
+                    {
+                        "op": "set",
+                        "path": "/streaming_message",
+                        "value": streaming_message,
+                    }
+                ],
+            )
+        except Exception as e:
+            if getattr(e, "status_code", None) == NOT_FOUND:
+                # Deleted between the read and the write. The same ordinary
+                # event as an empty read, and reported the same way: a store
+                # that had nothing to write to did not fail.
+                #
+                # A 404 does not say *which* resource was missing, so this
+                # leans on what already happened rather than on the code alone:
+                # the transcript write landed in this container moments ago,
+                # and the read above found this very document in it. A missing
+                # container or database would have failed both. What is left
+                # for a 404 to mean here is the record itself.
+                self.logger.info(
+                    "Plan record %s went between the read and the write, so it "
+                    "did not take the streaming message",
+                    plan_id,
+                )
+                return MessageEchoed(EchoOutcome.no_such_plan_record)
+            self.logger.warning(
+                "Failed storing the streaming message on plan record %s: %s",
+                plan_id,
+                e,
+            )
+            return MessageEchoed(EchoOutcome.refused)
+
+        return MessageEchoed(EchoOutcome.recorded)
 
     async def delete_chat(self, session_id: str) -> ChatDeletion:
         """**Chat deletion** — every document in one Chat's session partition.

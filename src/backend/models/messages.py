@@ -171,12 +171,17 @@ class WebsocketMessageType(str, Enum):
 
 @dataclass(slots=True)
 class AgentMessageResponse:
-    """Response message representing an agent's contribution to a plan (stream or final)."""
+    """Response message representing an agent's contribution to a plan (stream or final).
+
+    Carries what was said and, on the turn's last message, the streamed reply
+    that was on screen. It does **not** carry whether the turn ended: the server
+    settles the turn it ended (#158, ADR-043 decision 7), and the field that
+    used to say so was the browser's second opinion on an answered question.
+    """
     plan_id: str
     agent: str
     content: str
     agent_type: AgentMessageType
-    is_final: bool = False
     raw_data: str | None = None
     streaming_message: str | None = None
     steps: List[Any] = field(default_factory=list)

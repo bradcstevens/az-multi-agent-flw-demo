@@ -328,6 +328,34 @@ describe('the panel shows chats in every state', () => {
     });
 });
 
+/*
+  The delete-all confirmation is asked for by the text of its title, never by a
+  role query.
+
+  #130's chat-history drawer is an `OverlayDrawer`, and tabster makes it a
+  trapped modalizer. These tests open the confirmation with `fireEvent`, which
+  never moves focus, so the dialog's own modalizer never becomes the active one
+  and tabster's sweep marks the dialog's portal `aria-hidden="true"`. That
+  sweep lands after these assertions on a developer's machine and before them
+  on the runner, which is the whole of the difference between this file passing
+  locally and failing in CI.
+
+  Once the sweep has landed no role query can reach it. `hidden: true` gets the
+  element back — but `computeAccessibleName` returns `''` for anything inside
+  an aria-hidden subtree, so a `name` filter matches nothing. Measured here
+  rather than assumed, and the reason 933daa12's `hidden: true` fix did not
+  work either: the confirmation was never absent from the DOM, it was nameless
+  in the accessibility tree.
+
+  A text query does not consult that tree. Fluent unmounts a closed Dialog's
+  surface, so the title being in the document is exactly the confirmation being
+  open — mutation-checked by letting a sweep succeed, which closes it and fails
+  every assertion below.
+*/
+const deleteAllConfirmation = () => screen.queryByText(DELETE_ALL_CHATS_TITLE);
+
+const findDeleteAllConfirmation = () => screen.findByText(DELETE_ALL_CHATS_TITLE);
+
 describe('deleting a chat from the panel', () => {
     /*
       #75 / ADR-026. The panel owns the request, the reload and the navigation:
@@ -474,9 +502,7 @@ describe('deleting a chat from the panel', () => {
         */
         await waitFor(() => expect(apiService.getPlans).toHaveBeenCalledTimes(2));
         await waitFor(() =>
-            expect(
-                screen.queryByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
-            ).not.toBeInTheDocument(),
+            expect(deleteAllConfirmation()).not.toBeInTheDocument(),
         );
         /*
           The re-read's rejection is swallowed a tick after the call count
@@ -672,12 +698,7 @@ describe('deleting every chat from the panel (#76)', () => {
         expect(
             await screen.findByText(/1 chat could not be deleted/i),
         ).toBeInTheDocument();
-        // Found rather than read: the chat-history drawer is a modalizer, so
-        // between the message landing and the sweep's render settling the
-        // delete dialog can still be outside what a role query can reach.
-        expect(
-            await screen.findByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
-        ).toBeInTheDocument();
+        expect(await findDeleteAllConfirmation()).toBeInTheDocument();
     });
 
     it('still names a chat it kept running when the same sweep also failed', async () => {
@@ -714,7 +735,7 @@ describe('deleting every chat from the panel (#76)', () => {
         await confirmDeleteAll();
 
         await waitFor(() => expect(apiService.deleteAllChats).toHaveBeenCalled());
-        expect(screen.getByRole('dialog', { name: DELETE_ALL_CHATS_TITLE })).toBeInTheDocument();
+        expect(deleteAllConfirmation()).toBeInTheDocument();
         expect(screen.getByText('offline')).toBeInTheDocument();
         expect(
             screen.getByRole('button', { name: /^The coffee machine/ }),

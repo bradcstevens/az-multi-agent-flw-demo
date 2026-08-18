@@ -70,12 +70,21 @@ interface UsePlanWebSocketProps {
 
 /**
  * Creates an AgentMessageResponse and persists it, then optionally reloads the chat list.
+ *
+ * What it sends is the transcript and, on the turn's last message, the streamed
+ * reply — the two things nothing else persists. It no longer sends a verdict:
+ * the server settles the turn it ended (#158, ADR-043 decision 7), and this
+ * surface echoing `is_final` back made a second writer of one fact.
+ *
+ * `refreshChatList` is what remains of that flag, named for the one thing it
+ * still decides: once the turn's last message has landed, repaint the chat
+ * list, because the row now reads the status the *server* settled.
  */
 function persistAgentMessage(
     agentMessageData: AgentMessageData,
     planData: ProcessedPlanData | null,
     dispatch: ReturnType<typeof useAppDispatch>,
-    isFinal = false,
+    refreshChatList = false,
     streamingMessage = '',
 ) {
     if (!planData?.plan) return;
@@ -83,18 +92,17 @@ function persistAgentMessage(
     const agentMessageResponse = PlanDataService.createAgentMessageResponse(
         agentMessageData,
         planData,
-        isFinal,
         streamingMessage,
     );
     apiService
         .sendAgentMessage(agentMessageResponse)
         .then(() => {
-            if (isFinal) {
+            if (refreshChatList) {
                 setTimeout(() => dispatch(setReloadLeftList(true)), 1000);
             }
         })
         .catch(() => {
-            if (isFinal) {
+            if (refreshChatList) {
                 setTimeout(() => dispatch(setReloadLeftList(true)), 1000);
             }
         });

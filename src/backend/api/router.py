@@ -21,6 +21,7 @@ from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
 from associate.answer import personal_answer_detail
 from associate.records import DEMO_ASSOCIATE, lookup_associate
 from chat.deletion import STILL_RUNNING_DETAIL, DeletionOutcome
+from chat.echo import NOT_RECORDED_DETAIL
 from chat.settle import SettleOutcome
 from chat.turn import TurnOutcome, end_turn
 from guardrail.gate import identity_boundary_gate
@@ -1531,7 +1532,9 @@ async def agent_message_user(
                 description: Optional internal m_plan id
     responses:
       200:
-        description: Message recorded successfully
+        description: >
+          The agent message was recorded. The body's status says what landed:
+          a plan record that has gone did not take the streaming message.
         schema:
           type: object
           properties:
@@ -1539,6 +1542,8 @@ async def agent_message_user(
               type: string
       401:
         description: Missing or invalid user information
+      500:
+        description: The message did not reach the store
     """
 
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
@@ -1562,16 +1567,10 @@ async def agent_message_user(
         except Exception:
             pass  # Don't fail request if span attribute fails
 
-    # Set the approval in the orchestration config
-
-    try:
-
-        result = await PlanService.handle_agent_messages(agent_message, user_id)
-        logger.debug("Agent message processed: %s", result)
-    except ValueError as ve:
-        logger.error("ValueError processing agent message: %s", ve)
-    except Exception as e:
-        logger.error("Error processing agent message: %s", e)
+    # What was said, and nothing about whether the turn ended: the server
+    # settles the turn it ended (#157, ADR-043), so this route stopped being a
+    # second writer of that fact (#158).
+    echoed = await PlanService.handle_agent_messages(agent_message, user_id)
 
     # Use dynamic event name with agent identifier
     event_name = f"Agent_Message_From_{agent_message.agent.replace(' ', '_')}"
@@ -1582,9 +1581,24 @@ async def agent_message_user(
     }
     if session_id:
         event_props["session_id"] = session_id
+    # Arrival telemetry, unchanged by #158: the agent did say this, whether or
+    # not the store kept it. What narrowed is the answer below, not this.
     track_event_if_configured(event_name, event_props)
+
+    if echoed.store_failed:
+        # The one thing this route may not do. It used to answer
+        # `{"status": "message recorded"}` whatever happened, so the browser
+        # was told the transcript had landed by the only layer that knew it
+        # had not.
+        logger.error(
+            "Agent message from %s was not recorded for plan record %s",
+            agent_message.agent,
+            agent_message.plan_id,
+        )
+        raise HTTPException(status_code=500, detail=NOT_RECORDED_DETAIL)
+
     return {
-        "status": "message recorded",
+        "status": echoed.status,
     }
 
 
