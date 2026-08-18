@@ -59,6 +59,11 @@ class TestSweep:
         assert min(thresholds) <= IDENTITY_BOUNDARY_SIMILARITY_THRESHOLD
         assert IDENTITY_BOUNDARY_SIMILARITY_THRESHOLD <= max(thresholds)
 
+    def test_the_recorded_threshold_is_the_latest_live_sweep_midpoint(self):
+        # The Clara Workman remeasurement on text-embedding-3-small produced a
+        # -0.2403 to +0.0312 separating band.
+        assert IDENTITY_BOUNDARY_SIMILARITY_THRESHOLD == pytest.approx(-0.1046)
+
     def test_an_unscoreable_probe_counts_as_refused(self):
         # Fail-closed all the way through the harness: a positive that could
         # not be embedded is still refused, and a negative that could not be

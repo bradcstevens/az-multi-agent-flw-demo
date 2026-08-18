@@ -93,15 +93,16 @@ def refuses(score: Optional[float], threshold: float) -> bool:
 #
 # It is *negative* by design. Zero would already separate the corpus — every
 # personal probe scored a positive margin and every store control a negative
-# one — but zero sits only 0.07 from the nearest probe and 0.24 from the
-# nearest control. The measured perfect band runs from -0.23 to +0.07, and its
-# midpoint puts 0.16 of margin either side, so an improvised paraphrase has
-# room to drift in both directions. Being below zero is the fail-closed half
-# of that: a request the deployment finds genuinely ambiguous is refused.
+# one — but zero sits only 0.03 from the nearest probe and 0.24 from the
+# nearest control. The Clara Workman remeasurement's perfect band runs from
+# -0.24 to +0.03, and its midpoint puts 0.14 of margin either side, so an
+# improvised paraphrase has room to drift in both directions. Being below zero
+# is the fail-closed half of that: a request the deployment finds genuinely
+# ambiguous is refused.
 #
 # Re-derive it by running the integration suite in src/tests/backend/guardrail,
 # which prints the sweep, the perfect band and the chosen value.
-IDENTITY_BOUNDARY_SIMILARITY_THRESHOLD = -0.08
+IDENTITY_BOUNDARY_SIMILARITY_THRESHOLD = -0.1046
 
 # The band the sweep walks. Scores are two-class margins, not raw cosine
 # similarities, so the band straddles zero: a request nearer a store anchor
