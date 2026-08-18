@@ -38,7 +38,14 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, participation, onClo
     /** A configured `false` is a choice the pack made; an omitted field is not. */
     const followUpQuestions = agent.user_responses ?? null;
     const temperature = agent.temperature ?? null;
-    const mcpTools = mcpToolsForDomain(agent.toolbox_filter);
+    /**
+     * The tools the agent actually holds, on the backend's own gate again: the
+     * factory attaches a toolbox only where the pack switches `use_toolbox` on,
+     * so a domain behind `use_toolbox: false` is no toolbox at all. A standing
+     * claim is the one thing here that is true before a question is typed, and
+     * it has to be true.
+     */
+    const mcpTools = agent.use_toolbox ? mcpToolsForDomain(agent.toolbox_filter) : [];
     const hasConfiguredFacts =
         knowledgeBase !== null || followUpQuestions !== null || temperature !== null;
 

@@ -19,5 +19,11 @@ export const mcpToolsForDomain = (domain?: string): readonly McpToolName[] => {
         return [];
     }
 
-    return MCP_TOOLS_BY_DOMAIN[domain] ?? [];
+    // An own-property check, not a plain lookup: the mirror is an object
+    // literal, so a bare `MCP_TOOLS_BY_DOMAIN[domain]` answers `Object` for
+    // `constructor` and a function for `toString` — truthy values that survive
+    // the `??` and reach the dossier as something it cannot render.
+    return Object.prototype.hasOwnProperty.call(MCP_TOOLS_BY_DOMAIN, domain)
+        ? MCP_TOOLS_BY_DOMAIN[domain]
+        : [];
 };

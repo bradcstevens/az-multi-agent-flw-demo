@@ -107,6 +107,12 @@ def test_a_change_to_either_end_of_the_contract_runs_the_contract_test():
     # `test_personal_answer_contract.py` spans the socket for the Mocked
     # unlock, and it is also the only thing that checks the browser authors no
     # associate's name of its own.
+    # `agentMcpTools.ts` (#147) is the fifth: the browser is sent an agent's
+    # *domain* and never its tool names, so the Agent dossier mirrors the
+    # mapping client-side, and `test_agent_tool_contract.py` is the only thing
+    # that reads that mirror and the backend's `DOMAIN_ALLOWED_TOOLS`
+    # together. vitest can check the mirror has a gloss for every tool it
+    # names; it cannot notice that the backend renamed one underneath it.
     for path in (
         "src/App/src/models/transparency.ts",
         "src/App/src/models/ticket.ts",
@@ -114,6 +120,7 @@ def test_a_change_to_either_end_of_the_contract_runs_the_contract_test():
         "src/App/src/models/rehearsedReply.ts",
         "src/App/src/models/personalAnswer.ts",
         "src/App/src/models/signedInDevice.ts",
+        "src/App/src/models/agentMcpTools.ts",
     ):
         assert text.count(f"'{path}'") >= 2, (
             f"a change to {path} does not run the transparency contract test on "

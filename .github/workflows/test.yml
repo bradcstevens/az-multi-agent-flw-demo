@@ -65,6 +65,14 @@ on:
       # contract asserts that the browser authors no associate name of its own.
       - 'src/App/src/models/personalAnswer.ts'
       - 'src/App/src/models/signedInDevice.ts'
+      # The browser's half of the Agent dossier's MCP disclosure (#147). Fifth
+      # time, same reason: the browser is sent an agent's *domain* and never
+      # its tool names, so the dossier mirrors the mapping client-side, and
+      # `test_agent_tool_contract.py` is the only thing that reads that mirror
+      # and the backend's `DOMAIN_ALLOWED_TOOLS` together. vitest can tell that
+      # every mirrored tool has a gloss; it cannot tell that the backend
+      # renamed one underneath it, which is a false claim on screen.
+      - 'src/App/src/models/agentMcpTools.ts'
       # The SOP corpus, for the six Quick Tasks (#26). Two of the walkthrough's
       # taps are read out of `content/sop/corpus.toml` rather than restated —
       # the rehearsed honest miss and the rehearsed hit — and the hit names a
@@ -142,6 +150,14 @@ on:
       # contract asserts that the browser authors no associate name of its own.
       - 'src/App/src/models/personalAnswer.ts'
       - 'src/App/src/models/signedInDevice.ts'
+      # The browser's half of the Agent dossier's MCP disclosure (#147). Fifth
+      # time, same reason: the browser is sent an agent's *domain* and never
+      # its tool names, so the dossier mirrors the mapping client-side, and
+      # `test_agent_tool_contract.py` is the only thing that reads that mirror
+      # and the backend's `DOMAIN_ALLOWED_TOOLS` together. vitest can tell that
+      # every mirrored tool has a gloss; it cannot tell that the backend
+      # renamed one underneath it, which is a false claim on screen.
+      - 'src/App/src/models/agentMcpTools.ts'
       # The SOP corpus, for the six Quick Tasks (#26). Two of the walkthrough's
       # taps are read out of `content/sop/corpus.toml` rather than restated —
       # the rehearsed honest miss and the rehearsed hit — and the hit names a

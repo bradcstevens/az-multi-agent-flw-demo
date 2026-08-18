@@ -64,6 +64,7 @@ const TEAM = {
             description: 'Answers routine store-procedure questions from the Store SOP Assistant.',
             system_message: VERBATIM_SYSTEM_MESSAGE,
             toolbox_filter: 'sop',
+            use_toolbox: true,
             use_knowledge_base: true,
             knowledge_base_name: 'store-operations-kb',
             user_responses: true,
@@ -75,11 +76,16 @@ const TEAM = {
             name: 'WorkforceAgent',
             deployment_name: 'gpt-5.4-mini',
             system_message: 'You answer HR process questions and never an individual record.',
+            toolbox_filter: 'workforce',
+            use_toolbox: false,
             use_knowledge_base: false,
             knowledge_base_name: 'store-operations-kb',
             user_responses: false,
             temperature: null,
         },
+        // No `toolbox_filter` the browser's mirror carries, deliberately: the
+        // real pack gives this agent the `escalation` domain, and the point
+        // here is what the dossier does when it recognises none.
         { input_key: '', type: '', name: 'EscalationAgent', toolbox_filter: 'unknown-domain' },
     ],
     starting_tasks: [],
@@ -301,6 +307,22 @@ describe('the Agent dossier on the home surface', () => {
         // Not even the container the three would have hung from.
         expect(within(dossier).queryByTestId('agent-dossier-configuration')).not.toBeInTheDocument();
         expect(within(dossier).queryByText('false')).not.toBeInTheDocument();
+    });
+
+    it('states a toolbox the pack switched off as no tools at all', async () => {
+        renderHomeSurface();
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Workforce Agent' }));
+
+        const dossier = screen.getByRole('dialog', { name: 'Agent dossier' });
+        // The pack names a domain and sets `use_toolbox` false, which is what
+        // the backend reads before it attaches anything: this agent holds no
+        // tools, so a standing claim that it holds two would be the false
+        // disclosure the split exists to prevent.
+        expect(within(dossier).queryByText('MCP tools')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('list_workforce_procedures')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('get_workforce_procedure')).not.toBeInTheDocument();
+        expect(within(dossier).queryByTestId('agent-dossier-mcp-tools')).not.toBeInTheDocument();
     });
 
     it('does not guess MCP tools for a domain the browser does not recognise', async () => {

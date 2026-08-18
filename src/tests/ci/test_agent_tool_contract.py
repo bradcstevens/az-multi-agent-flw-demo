@@ -29,20 +29,32 @@ def _store_pack_domains() -> set[str]:
     return {agent["toolbox_filter"] for agent in pack["agents"]}
 
 
-def _browser_mirror() -> dict[str, list[str]]:
-    """Read the browser's domain-to-tool mirror without restating its values."""
-    source = BROWSER_MIRROR.read_text(encoding="utf-8")
+def _parse_browser_mirror(source: str) -> dict[str, list[str]]:
+    """Read a domain-to-tool mirror out of its TypeScript declaration."""
     declaration = re.search(
         r"export const MCP_TOOLS_BY_DOMAIN[^=]*=\s*\{(.*?)\n\};", source, re.S
     )
     assert declaration, "agentMcpTools.ts no longer declares MCP_TOOLS_BY_DOMAIN"
 
+    # Comments come out before anything is counted. A tool a comment has
+    # switched off is not a tool the dossier lists, and a bare scrape of every
+    # quoted string would count it as one — reporting an agreement with the
+    # backend that the browser is not actually keeping. A trailing `//` would
+    # otherwise drop its whole domain from the parse instead.
+    body = re.sub(r"/\*.*?\*/", "", declaration.group(1), flags=re.S)
+    body = re.sub(r"//[^\n]*", "", body)
+
     return {
         domain: re.findall(r"'([^']+)'", tools)
         for domain, tools in re.findall(
-            r"^\s*(\w+):\s*\[([^\]]*)\],?$", declaration.group(1), re.M
+            r"^\s*(\w+):\s*\[([^\]]*)\],?\s*$", body, re.M
         )
     }
+
+
+def _browser_mirror() -> dict[str, list[str]]:
+    """Read the browser's domain-to-tool mirror without restating its values."""
+    return _parse_browser_mirror(BROWSER_MIRROR.read_text(encoding="utf-8"))
 
 
 def _backend_allowlist() -> dict[str, list[str]]:
@@ -70,4 +82,22 @@ def test_the_agent_dossier_mirrors_each_domain_the_store_pack_uses():
     assert set(browser) == domains
     assert {domain: browser[domain] for domain in domains} == {
         domain: backend[domain] for domain in domains
+    }
+
+
+def test_a_tool_a_comment_switched_off_is_not_a_tool_the_dossier_lists():
+    # The parse is what decides whether this contract is holding anything, and
+    # a scrape of every quoted string counts a tool that a comment has taken
+    # off the screen. That reports an agreement the dossier is not keeping:
+    # the browser renders one tool, the backend allows two, and CI stays green.
+    mirror = _parse_browser_mirror(
+        "export const MCP_TOOLS_BY_DOMAIN: Readonly<X> = {\n"
+        "    sop: [/* 'search_store_procedures', */ 'read_store_procedures'],\n"
+        "    escalation: ['draft_service_ticket'], // 'get_ticket_status',\n"
+        "};\n"
+    )
+
+    assert mirror == {
+        "sop": ["read_store_procedures"],
+        "escalation": ["draft_service_ticket"],
     }
