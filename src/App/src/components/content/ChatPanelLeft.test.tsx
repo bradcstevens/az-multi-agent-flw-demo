@@ -775,10 +775,6 @@ describe("the chat list's height", () => {
         overall_status: PlanStatus.COMPLETED,
     })) as unknown as Plan[];
 
-    /** A rule worth loading: one that could bound a box or scroll it. */
-    const SIZES_OR_SCROLLS =
-        /(?:^|[;{\s])(?:(?:max-)?(?:height|block-size)|overflow(?:-y|-block)?)\s*:/i;
-
     /**
      * The elements between the panel's scroll region and a chat row, taken from
      * the DOM the panel actually produces.
@@ -830,45 +826,61 @@ describe("the chat list's height", () => {
      * returned rather than swallowed.
      */
     /**
-     * The same selector with its **state** taken out, for the question "could
-     * this rule ever be about one of these containers".
+     * The states this engine will not answer for.
      *
-     * `matches()` answers about the DOM as it stands, and a stylesheet is not
-     * written about the DOM as it stands: `.panelLeft .fui-AccordionPanel:focus-within
-     * { max-height: 280px; overflow: hidden }` matches nothing until an
-     * associate tabs into a row, and then clips the list. So the declaration
-     * pass strips pseudo-classes before asking, which can only widen what it
-     * looks at — a rule that turns out not to apply is a rule a human should
-     * still be shown, given what it is declaring and where.
-     *
-     * A pseudo-*element* is excluded rather than stripped: `::before` is a
-     * generated box beside the container, and a height on it bounds nothing
-     * here.
+     * jsdom evaluates `:focus` and refuses `:focus-within`; there is no pointer,
+     * so `:hover` and `:active` never match anything. A rule waiting on one of
+     * these is a rule about the DOM in a state the loop cannot put it in.
      */
-    const whateverTheState = (selector: string): string | null => {
-        if (/::/.test(selector)) return null;
-
-        const structural = selector.replace(/:(?!:)[a-z-]+(\([^)]*\))?/gi, '').trim();
-
-        return structural === '' ? null : structural;
-    };
+    const STATES_THIS_ENGINE_CANNOT_TRY =
+        /:(hover|active|focus|focus-within|focus-visible|target|checked)\b/i;
 
     const loadRulesFor = (
         containers: HTMLElement[],
-        { whateverState = false }: { whateverState?: boolean } = {},
     ): { unload: () => void; unreadable: string[]; declarations: CSSStyleDeclaration[] } => {
-        const applies = (selector: string): boolean => {
-            const asked = whateverState ? whateverTheState(selector) : selector;
-            if (asked === null) return false;
+        const containerClasses = new Set(
+            containers.flatMap((container) => Array.from(container.classList)),
+        );
 
+        const applies = (selector: string): boolean => {
             try {
                 // Selector lists are handed over whole: `matches` understands
                 // `.a, .b`, and splitting on commas is what broke `:is(a, b)`.
-                return containers.some((container) => container.matches(asked));
+                if (containers.some((container) => container.matches(selector))) return true;
             } catch {
                 // A selector this engine cannot parse cannot be ruled out.
                 return true;
             }
+
+            /*
+              The engine said no, but for a rule waiting on a state it cannot
+              try, "no" means "not right now". `.panelLeft
+              .fui-AccordionPanel:focus-within { max-height: 280px }` clips the
+              list the moment an associate tabs into a row, and jsdom will not
+              match `:focus-within` even with the row focused — measured, not
+              assumed.
+
+              So the fallback is deliberately lexical and deliberately narrow:
+              it reports such a rule only when the selector also names one of
+              these containers. It cannot skip anything the engine accepted, and
+              it cannot reach a `:hover` rule about some other part of the
+              surface. An earlier attempt rewrote the selector to remove the
+              state instead, and mangled `:is(:not(.a), .b)` into nonsense —
+              the selector grammar declining to be approximated.
+
+              It does over-report in one shape: a state rule about a *row*
+              whose selector happens to name a container on the way down, such
+              as `.panelLeft .task-list-container .task-tab:hover { height:
+              54px }`. That is the error worth making. Narrowing it means
+              deciding which compound the selector ends in, which is parsing the
+              grammar again, and a miss there is the defect this ticket exists
+              about while an over-report is one honest rule discussed in a
+              review.
+            */
+            return (
+                STATES_THIS_ENGINE_CANNOT_TRY.test(selector) &&
+                classesIn(selector).some((className) => containerClasses.has(className))
+            );
         };
 
         const injected: HTMLStyleElement[] = [];
@@ -933,6 +945,20 @@ describe("the chat list's height", () => {
         'overflow-inline',
         'overflow-block',
     ];
+
+    /**
+     * Which rules are worth loading, **derived from the properties above**
+     * rather than spelled a second time.
+     *
+     * They were two lists, and they drifted the moment one grew: `overflow-x`
+     * was added to what is checked and not to what is loaded, so the rule that
+     * declared it was skipped before anything could check it. One list cannot
+     * disagree with itself.
+     */
+    const SIZES_OR_SCROLLS = new RegExp(
+        `(?:^|[;{\\s])(?:${[...HEIGHTS, ...SCROLLERS].join('|')})\\s*:`,
+        'i',
+    );
 
     const SAYS_NOTHING = ['', 'auto', 'none', 'initial', 'unset', 'revert'];
     const NOT_A_SCROLL_REGION = ['', 'visible', 'initial', 'unset', 'revert'];
@@ -1001,16 +1027,16 @@ describe("the chat list's height", () => {
           that does not apply — leaves the forbidden declaration in the
           stylesheet and this panel one edit from showing five chats again.
 
-          Asked of every rule that could ever be about these containers, not
-          only the ones matching the DOM as it stands: a cap behind
-          `:focus-within` clips the list the moment an associate tabs into a
-          row, and is invisible to a question asked of an unfocused panel.
+          A stylesheet is not written about the DOM as it stands, so a rule
+          waiting on a state this engine cannot try is loaded anyway — see
+          `applies`. A cap behind `:focus-within` clips the list the moment an
+          associate tabs into a row.
 
           Read off the CSSOM rather than parsed here, so it is still the engine
           saying what the rule declares.
         */
         const containers = await listContainers();
-        const { unload, declarations } = loadRulesFor(containers, { whateverState: true });
+        const { unload, declarations } = loadRulesFor(containers);
 
         try {
             const declared = declarations.flatMap((style) => [
