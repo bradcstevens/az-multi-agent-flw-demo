@@ -18,11 +18,25 @@ export interface AgentDossierProps {
     onClose: () => void;
 }
 
+const ConfiguredFact: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+    <div className="agent-dossier__fact">
+        <dt>{label}</dt>
+        <dd>{value}</dd>
+    </div>
+);
+
 const AgentDossier: React.FC<AgentDossierProps> = ({ agent, onClose }) => {
-    const hasConfiguredDetails =
-        Boolean(agent.knowledge_base_name) ||
-        agent.user_responses !== undefined ||
-        agent.temperature !== null && agent.temperature !== undefined;
+    /**
+     * The knowledge base the agent actually reads: the backend attaches one
+     * only where the pack both names it and switches it on, so a name behind
+     * `use_knowledge_base: false` is no knowledge base at all.
+     */
+    const knowledgeBase = agent.use_knowledge_base ? agent.knowledge_base_name || null : null;
+    /** A configured `false` is a choice the pack made; an omitted field is not. */
+    const followUpQuestions = agent.user_responses ?? null;
+    const temperature = agent.temperature ?? null;
+    const hasConfiguredFacts =
+        knowledgeBase !== null || followUpQuestions !== null || temperature !== null;
 
     return (
         <Dialog open onOpenChange={(_, data) => !data.open && onClose()}>
@@ -57,29 +71,32 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, onClose }) => {
                                 </pre>
                             </>
                         )}
-                        {hasConfiguredDetails && (
-                            <dl className="agent-dossier__configuration">
-                                {agent.knowledge_base_name && (
-                                    <div>
-                                        <dt>{AGENT_DOSSIER_COPY.knowledgeBaseLabel}</dt>
-                                        <dd>{agent.knowledge_base_name}</dd>
-                                    </div>
+                        {hasConfiguredFacts && (
+                            <dl
+                                className="agent-dossier__configuration"
+                                data-testid="agent-dossier-configuration"
+                            >
+                                {knowledgeBase !== null && (
+                                    <ConfiguredFact
+                                        label={AGENT_DOSSIER_COPY.knowledgeBaseLabel}
+                                        value={knowledgeBase}
+                                    />
                                 )}
-                                {agent.user_responses !== undefined && (
-                                    <div>
-                                        <dt>{AGENT_DOSSIER_COPY.followUpQuestionsLabel}</dt>
-                                        <dd>
-                                            {agent.user_responses
+                                {followUpQuestions !== null && (
+                                    <ConfiguredFact
+                                        label={AGENT_DOSSIER_COPY.followUpQuestionsLabel}
+                                        value={
+                                            followUpQuestions
                                                 ? AGENT_DOSSIER_COPY.followUpQuestionsEnabled
-                                                : AGENT_DOSSIER_COPY.followUpQuestionsDisabled}
-                                        </dd>
-                                    </div>
+                                                : AGENT_DOSSIER_COPY.followUpQuestionsDisabled
+                                        }
+                                    />
                                 )}
-                                {agent.temperature !== null && agent.temperature !== undefined && (
-                                    <div>
-                                        <dt>{AGENT_DOSSIER_COPY.temperatureLabel}</dt>
-                                        <dd>{agent.temperature}</dd>
-                                    </div>
+                                {temperature !== null && (
+                                    <ConfiguredFact
+                                        label={AGENT_DOSSIER_COPY.temperatureLabel}
+                                        value={temperature}
+                                    />
                                 )}
                             </dl>
                         )}

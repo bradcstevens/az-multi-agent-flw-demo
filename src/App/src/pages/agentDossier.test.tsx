@@ -59,9 +59,21 @@ const TEAM = {
             deployment_name: 'gpt-5.4-mini',
             description: 'Answers routine store-procedure questions from the Store SOP Assistant.',
             system_message: VERBATIM_SYSTEM_MESSAGE,
+            use_knowledge_base: true,
             knowledge_base_name: 'store-operations-kb',
             user_responses: true,
             temperature: 0.2,
+        },
+        {
+            input_key: '',
+            type: '',
+            name: 'WorkforceAgent',
+            deployment_name: 'gpt-5.4-mini',
+            system_message: 'You answer HR process questions and never an individual record.',
+            use_knowledge_base: false,
+            knowledge_base_name: 'store-operations-kb',
+            user_responses: false,
+            temperature: null,
         },
         { input_key: '', type: '', name: 'EscalationAgent' },
     ],
@@ -168,6 +180,44 @@ describe('the Agent dossier on the home surface', () => {
         expect(within(dossier).getByText('0.2')).toBeInTheDocument();
     });
 
+    it('reads the configured facts after the prompt, in the order the spec sets out', async () => {
+        renderHomeSurface();
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Shift Tasks Agent' }));
+
+        const dossier = screen.getByRole('dialog', { name: 'Agent dossier' });
+        const prompt = within(dossier).getByTestId('agent-dossier-prompt');
+        const configuration = within(dossier).getByTestId('agent-dossier-configuration');
+
+        // What the agent was told is read before how it was configured to use it.
+        expect(
+            prompt.compareDocumentPosition(configuration) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        expect(
+            Array.from(configuration.querySelectorAll('dt')).map((label) => label.textContent),
+        ).toEqual(['Knowledge base', 'Follow-up questions', 'Temperature']);
+    });
+
+    it('states a knowledge base the pack switched off as no knowledge base at all', async () => {
+        renderHomeSurface();
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Workforce Agent' }));
+
+        const dossier = screen.getByRole('dialog', { name: 'Agent dossier' });
+        // The pack names one and sets `use_knowledge_base` false, which is what
+        // the backend reads before it attaches anything: this agent reads none.
+        expect(within(dossier).queryByText('Knowledge base')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('store-operations-kb')).not.toBeInTheDocument();
+        // Every agent in the store pack runs at the deployment's own temperature.
+        expect(within(dossier).queryByText('Temperature')).not.toBeInTheDocument();
+        // A configured `false` is a choice the pack made, said in plain English.
+        expect(
+            within(dossier).getByText('Will not ask you follow-up questions'),
+        ).toBeInTheDocument();
+        expect(within(dossier).queryByText('false')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('null')).not.toBeInTheDocument();
+    });
+
     it('returns focus to the name when Escape closes the dialog', async () => {
         renderHomeSurface();
 
@@ -211,6 +261,8 @@ describe('the Agent dossier on the home surface', () => {
         expect(within(dossier).queryByText('Knowledge base')).not.toBeInTheDocument();
         expect(within(dossier).queryByText('Follow-up questions')).not.toBeInTheDocument();
         expect(within(dossier).queryByText('Temperature')).not.toBeInTheDocument();
+        // Not even the container the three would have hung from.
+        expect(within(dossier).queryByTestId('agent-dossier-configuration')).not.toBeInTheDocument();
         expect(within(dossier).queryByText('false')).not.toBeInTheDocument();
     });
 });

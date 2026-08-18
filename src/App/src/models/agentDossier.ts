@@ -1,9 +1,10 @@
 /**
- * The authored framing for an Agent dossier (issue #144).
+ * The authored framing for an Agent dossier (issues #144, #145).
  *
  * The roster supplies the configuration it was given. These are the surface's
  * words about that configuration, kept together so the dossier makes each
- * claim one way.
+ * claim one way — including the plain-English reading of `user_responses`,
+ * which the room is not reading as a config file.
  */
 export const AGENT_DOSSIER_COPY = {
     accessibleName: 'Agent dossier',

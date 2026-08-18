@@ -438,7 +438,7 @@
     margin: 0;
 }
 
-.agent-dossier__configuration div {
+.agent-dossier__fact {
     display: flex;
     gap: 8px;
 }
