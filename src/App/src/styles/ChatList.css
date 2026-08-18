@@ -207,6 +207,8 @@
   `max-height`/`transition` pair was fighting that motion for the open one.
 
   The list is bounded by the panel it sits in, which is bounded by the surface.
-  `ChatList.test` reads this stylesheet and fails if a height returns.
+  `ChatPanelLeft.test` is where that is asserted — the panel is rendered whole
+  there, so a rule scoped `.panelLeft .fui-AccordionPanel` is visible to it,
+  which it is not to any suite that renders the list on its own.
 */
 

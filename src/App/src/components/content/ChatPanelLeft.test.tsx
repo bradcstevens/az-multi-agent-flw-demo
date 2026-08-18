@@ -829,14 +829,42 @@ describe("the chat list's height", () => {
      * assertion. One at a time, a rule it cannot parse is one rule, and it is
      * returned rather than swallowed.
      */
+    /**
+     * The same selector with its **state** taken out, for the question "could
+     * this rule ever be about one of these containers".
+     *
+     * `matches()` answers about the DOM as it stands, and a stylesheet is not
+     * written about the DOM as it stands: `.panelLeft .fui-AccordionPanel:focus-within
+     * { max-height: 280px; overflow: hidden }` matches nothing until an
+     * associate tabs into a row, and then clips the list. So the declaration
+     * pass strips pseudo-classes before asking, which can only widen what it
+     * looks at — a rule that turns out not to apply is a rule a human should
+     * still be shown, given what it is declaring and where.
+     *
+     * A pseudo-*element* is excluded rather than stripped: `::before` is a
+     * generated box beside the container, and a height on it bounds nothing
+     * here.
+     */
+    const whateverTheState = (selector: string): string | null => {
+        if (/::/.test(selector)) return null;
+
+        const structural = selector.replace(/:(?!:)[a-z-]+(\([^)]*\))?/gi, '').trim();
+
+        return structural === '' ? null : structural;
+    };
+
     const loadRulesFor = (
         containers: HTMLElement[],
+        { whateverState = false }: { whateverState?: boolean } = {},
     ): { unload: () => void; unreadable: string[]; declarations: CSSStyleDeclaration[] } => {
         const applies = (selector: string): boolean => {
+            const asked = whateverState ? whateverTheState(selector) : selector;
+            if (asked === null) return false;
+
             try {
                 // Selector lists are handed over whole: `matches` understands
                 // `.a, .b`, and splitting on commas is what broke `:is(a, b)`.
-                return containers.some((container) => container.matches(selector));
+                return containers.some((container) => container.matches(asked));
             } catch {
                 // A selector this engine cannot parse cannot be ruled out.
                 return true;
@@ -891,7 +919,20 @@ describe("the chat list's height", () => {
       either and the engine reports what it was given.
     */
     const HEIGHTS = ['height', 'max-height', 'block-size', 'max-block-size'];
-    const SCROLLERS = ['overflow', 'overflow-y', 'overflow-block'];
+    /*
+      Both axes, and both spellings of both. CSS computes a non-`visible` value
+      on one axis into `auto` on the other, so `overflow-x: hidden` on a list
+      container is a vertical scroll region declared sideways — and jsdom
+      reports it only under `overflow-x`, leaving `overflow` and `overflow-y`
+      empty.
+    */
+    const SCROLLERS = [
+        'overflow',
+        'overflow-x',
+        'overflow-y',
+        'overflow-inline',
+        'overflow-block',
+    ];
 
     const SAYS_NOTHING = ['', 'auto', 'none', 'initial', 'unset', 'revert'];
     const NOT_A_SCROLL_REGION = ['', 'visible', 'initial', 'unset', 'revert'];
@@ -960,11 +1001,16 @@ describe("the chat list's height", () => {
           that does not apply — leaves the forbidden declaration in the
           stylesheet and this panel one edit from showing five chats again.
 
+          Asked of every rule that could ever be about these containers, not
+          only the ones matching the DOM as it stands: a cap behind
+          `:focus-within` clips the list the moment an associate tabs into a
+          row, and is invisible to a question asked of an unfocused panel.
+
           Read off the CSSOM rather than parsed here, so it is still the engine
           saying what the rule declares.
         */
         const containers = await listContainers();
-        const { unload, declarations } = loadRulesFor(containers);
+        const { unload, declarations } = loadRulesFor(containers, { whateverState: true });
 
         try {
             const declared = declarations.flatMap((style) => [

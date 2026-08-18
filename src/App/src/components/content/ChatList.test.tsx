@@ -4,7 +4,6 @@ import { FluentProvider, teamsLightTheme } from '@fluentui/react-components';
 
 import ChatList from './ChatList';
 import { Chat } from '@/models';
-import { allRulesIncludingMediaQueries } from '@/testing/stylesheets';
 import { PlanStatus } from '../../models/enums';
 import { NO_CHATS_MESSAGE, chatStateLabel } from '../../models/chatState';
 import {
