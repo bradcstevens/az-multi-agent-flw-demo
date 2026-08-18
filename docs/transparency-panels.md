@@ -265,6 +265,38 @@ each an observed event and run from a question being sent to its answer arriving
 standing fact that is true before any of them and is not advanced past. `progressNarration.test.ts`
 fails if a phase for it is ever added, or if any phase's words mention it.
 
+## The Agent dossier is a standing record, not a fourth panel
+
+The rail still has exactly **three panels** — Grounding, Token meter, Agent Team — and the
+**Agent dossier** (ADR-039, #99) is not a fourth. It is a per-agent overlay opened by clicking a
+name in the Agent Team panel, and the distinction that keeps it out of the rail's count is scope:
+
+| | Scope | Cleared by |
+| --- | --- | --- |
+| A panel | **One answer, one conversation, or the whole walkthrough** (see above) | A socket signal — `requestStarted`, `conversationStarted`, or nothing |
+| The Agent dossier | **Standing, per agent** — true before any question is asked and unchanged by the next one | Nothing; it is read straight off the roster each time it is opened |
+
+That split has a rule of thumb: **which tools an agent *holds* is standing and belongs to the Agent
+dossier; which hop *this answer* took is observed and belongs to the Grounding panel.** The dossier
+answers "what is this agent, what was it told, what can it reach" — `description`, the verbatim
+`system_message`, and the rest of the pack's configuration — none of which changes between one
+question and the next. The Grounding panel answers "where did *this* answer come from", which is
+worthless as a standing fact: a question answered inside Foundry emits no `source_used` at all, so
+freezing the last hop on screen would credit Copilot Studio with an answer it never gave.
+
+The dossier does inherit one panel rule at a new seam: **Available vs participating** (see "It
+states availability, never participation" above). It reads participation from the **Progress
+narration**'s signal — never from the Token meter, because an agent that spoke and reported no
+usage sends no meter event, and a meter-sourced dossier would deny an agent the room just watched
+answer. On the home surface, where there is no conversation to have participated in, it states
+availability alone, the same restraint the Agent Team panel already makes.
+
+**There is no manager dossier**, and that is not an omission. The manager's instructions are
+composed per request — they vary by lane and by session — so there is no single verbatim string to
+show, unlike every agent the dossier does cover. And the manager decides who answers rather than
+answering itself, so a dossier for it would sit in the roster's count of agents that can participate
+and falsify the very number the Agent Team panel states beneath it.
+
 ## Presenter alert
 
 Rendered as visibly a different object from a reply: `role="alert"`, its own icon, a "Proactive

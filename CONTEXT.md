@@ -777,7 +777,7 @@ The panel leads with the **platform** and not the document — `Copilot Studio`,
 `Foundry orchestrator → search_store_procedures (MCP tool, plain HTTP) → POST /sop/ask → Direct Line
 → Copilot Studio → Dataverse` — because the claim R6 exists to make is that *this one answer left
 Foundry*. **Dataverse**, never SharePoint. The route **names the MCP tool**
-([ADR-039](docs/ADR/040-the-grounding-panel-names-the-hop-it-observed.md), #99): it used to read
+([ADR-040](docs/ADR/040-the-grounding-panel-names-the-hop-it-observed.md), #99): it used to read
 `Foundry orchestrator → Copilot Studio → Dataverse`, which skipped the middle of its own sentence —
 the tool call is the step that made the hop, and the panel that exists to prove the hop was the one
 place not naming it. There is **no Direct Line MCP server** and that phrase never renders: the tool
@@ -1276,7 +1276,7 @@ _Avoid_: agents assigned, agents identified, agents selected
 
 **Agent dossier** — the per-agent record the surface opens when an agent's name is clicked in the
 **Agent Team** panel: what that agent is, what it was told, and what it can reach
-([ADR-038](docs/ADR/039-an-agent-dossier-shows-what-the-agent-was-told-verbatim.md), #99). It shows
+([ADR-039](docs/ADR/039-an-agent-dossier-shows-what-the-agent-was-told-verbatim.md), #99). It shows
 `system_message` **verbatim** — byte-identical to the store pack, never paraphrased, summarised or
 redacted — because *"the prompt it's using"* over anything else is a claim nobody can guarantee, in
 the object whose whole value is that it is checkable. `description` leads, an authored preamble
@@ -1310,7 +1310,7 @@ Task** and the **Presenter alert**
 
 **Copilot Studio link** — the optional way out of the **Agent dossier** to the **Copilot Studio SOP
 agent**'s own chat surface
-([ADR-040](docs/ADR/041-the-copilot-studio-chat-url-is-a-credential.md), #99). It hangs off
+([ADR-041](docs/ADR/041-the-copilot-studio-chat-url-is-a-credential.md), #99). It hangs off
 **ShiftTasksAgent**'s dossier as the *tool's* destination, that being the only agent holding
 `search_store_procedures`; the SOP assistant has no `TeamAgent` record and no prompt this repository
 can render.
