@@ -1191,6 +1191,15 @@ def test_given_the_shift_swap_transaction_when_read_then_its_people_and_order_ar
             "simulated": True,
         },
     ]
+    assert [
+        (step["id"], step.get("outcome"))
+        for step in steps
+        if step["assignee"].get("relation") != "associate"
+        and step["assignee"]["kind"] == "person"
+    ] == [
+        (3, "approved"),
+        (4, "approved"),
+    ]
 
 
 def test_given_the_shift_swap_transaction_when_read_then_it_trips_no_personal_scope_keyword(

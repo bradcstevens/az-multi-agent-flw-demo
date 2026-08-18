@@ -10,6 +10,8 @@ from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
+from provenance import VERDICT_PROVENANCE
+
 
 class PlanStatus(str, Enum):
     CREATED = "created"
@@ -18,6 +20,13 @@ class PlanStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class VerdictOutcome(str, Enum):
+    """The authored decision for a Person step after plan approval."""
+
+    APPROVED = "approved"
+    DECLINED = "declined"
 
 
 class AgentAssignee(BaseModel):
@@ -50,6 +59,17 @@ class MStep(BaseModel):
     action: str = ""
     assignee: Optional[Assignee] = None
     waitsOn: Optional[int] = None
+    outcome: Optional[VerdictOutcome] = None
+
+
+class Verdict(BaseModel):
+    """One non-associate Person step resolved after the plan is approved."""
+
+    step_id: int
+    assignee: PersonAssignee
+    outcome: VerdictOutcome
+    words: str
+    provenance_line: str = VERDICT_PROVENANCE
 
 
 class MPlan(BaseModel):
@@ -64,6 +84,7 @@ class MPlan(BaseModel):
     team: List[str] = []
     facts: str = ""
     steps: List[MStep] = []
+    verdicts: List[Verdict] = Field(default_factory=list)
     # Which revision of this Reviewable plan the associate is looking at, and
     # what they asked to change to get it (#108). Carried on the approval frame
     # so the surface can tell a fresh plan from one already sent back.

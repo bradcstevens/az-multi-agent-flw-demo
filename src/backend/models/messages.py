@@ -5,6 +5,9 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List
 
+from pydantic import ConfigDict
+from pydantic.dataclasses import dataclass as pydantic_dataclass
+
 from common.models.messages import AgentMessageType
 from models.plan_models import MPlan, PlanStatus
 
@@ -71,7 +74,7 @@ class PlanApprovalRequest:
         }
 
 
-@dataclass(slots=True)
+@pydantic_dataclass(config=ConfigDict(extra="forbid"), slots=True)
 class PlanApprovalResponse:
     """Response for plan approval from the frontend."""
     m_plan_id: str

@@ -157,6 +157,26 @@ class TeamService:
             if field not in task_data:
                 raise ValueError(f"Starting task missing required field: {field}")
 
+        plan_steps_authored = "plan_steps" in task_data
+        raw_plan_steps = task_data.get("plan_steps", [])
+        if plan_steps_authored and not isinstance(raw_plan_steps, list):
+            raise ValueError("Starting task plan_steps must be a list")
+        plan_steps = [
+            MStep.model_validate(step).model_dump(mode="json")
+            for step in raw_plan_steps
+        ]
+        for step in plan_steps:
+            assignee = step.get("assignee")
+            if (
+                assignee
+                and assignee["kind"] == "person"
+                and assignee["relation"] != "associate"
+                and step["outcome"] is None
+            ):
+                raise ValueError(
+                    "A non-associate Person step requires an authored outcome"
+                )
+
         return StartingTask(
             id=task_data["id"],
             name=task_data["name"],
@@ -183,10 +203,8 @@ class TeamService:
             follow_on=list(task_data.get("follow_on") or []),
             context_dependent=task_data.get("context_dependent", False),
             ticket_on_approval=task_data.get("ticket_on_approval", False),
-            plan_steps=[
-                MStep.model_validate(step).model_dump(mode="json")
-                for step in task_data.get("plan_steps") or []
-            ],
+            plan_steps=plan_steps,
+            plan_steps_authored=plan_steps_authored,
         )
 
     async def save_team_configuration(self, team_config: TeamConfiguration) -> str:

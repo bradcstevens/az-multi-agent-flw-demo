@@ -326,6 +326,7 @@ invented person's action is disclosed in the record that carries it, never only 
 | Simulated sign-in | No identity provider signed the associate in; the name is authored session state for this walkthrough. |
 | Associate record | No payroll system was queried — these figures were authored for this walkthrough. |
 | Presenter alert | No shift-task system pushed this alert — it was authored for this walkthrough. |
+| Shift-swap verdict | No workforce management system was consulted — this verdict was authored for this walkthrough. |
 | Workforce procedure library | No employment system supplied the procedure; the Workforce agent describes authored process content. |
 
 When a later walkthrough record is invented, add its **Provenance line** constant in

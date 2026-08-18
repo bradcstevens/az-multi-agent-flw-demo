@@ -5,7 +5,7 @@ import json
 import logging
 import uuid
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 import models.messages as messages
@@ -84,6 +84,7 @@ class PlanReviewOutcome:
     responses: Optional[dict]
     revision: PlanRevision
     approved: bool
+    verdicts: list = field(default_factory=list)
 
 
 class OrchestrationManager:
@@ -540,6 +541,10 @@ class OrchestrationManager:
                             user_id=user_id,
                             ticket_on_approval=ticket_on_approval,
                             plan_steps=plan_steps,
+                            associate_name=address_name.strip(),
+                            manager_chat_client=getattr(
+                                workflow, "_manager_chat_client", None
+                            ),
                             revision=revision,
                         )
                         revision = outcome.revision
@@ -963,6 +968,8 @@ class OrchestrationManager:
         user_id: str,
         ticket_on_approval: bool = False,
         plan_steps: list | None = None,
+        associate_name: str = "",
+        manager_chat_client=None,
         revision: PlanRevision | None = None,
     ) -> PlanReviewOutcome:
         """Present collected plan review requests and gather the verdicts.
@@ -984,6 +991,7 @@ class OrchestrationManager:
         """
         revision = revision or PlanRevision()
         responses: dict = {}
+        verdicts: list = []
         approved_all = True
 
         for request_id, plan_review in plan_requests.items():
@@ -1004,7 +1012,7 @@ class OrchestrationManager:
             # what they asked to change.
             mplan.revision = revision.number
             mplan.revision_feedback = list(revision.feedback)
-            if plan_steps:
+            if plan_steps is not None:
                 from models.plan_models import MStep
 
                 mplan.steps = [
@@ -1056,6 +1064,15 @@ class OrchestrationManager:
                     user_id,
                     draft_from_record=ticket_on_approval,
                 )
+                person_steps = self._post_approval_person_steps(mplan)
+                if person_steps:
+                    resolved_verdicts = await self._resolve_person_steps(
+                        person_steps,
+                        associate_name=associate_name,
+                        manager_chat_client=manager_chat_client,
+                    )
+                    mplan.verdicts = resolved_verdicts
+                    verdicts.extend(resolved_verdicts)
                 continue
 
             feedback = getattr(approval_response, "feedback", None) or ""
@@ -1092,7 +1109,110 @@ class OrchestrationManager:
             responses=responses or None,
             revision=revision,
             approved=bool(responses) and approved_all,
+            verdicts=verdicts,
         )
+
+    @staticmethod
+    def _post_approval_person_steps(plan) -> list:
+        """Return non-associate Person steps in their declared dependency order."""
+        steps = getattr(plan, "steps", None)
+        if not isinstance(steps, list):
+            return []
+
+        unresolved = list(steps)
+        step_ids = {
+            step.id for step in steps
+            if isinstance(getattr(step, "id", None), int)
+        }
+        resolved_ids: set[int] = set()
+        ordered_steps = []
+
+        while unresolved:
+            ready = [
+                step for step in unresolved
+                if (
+                    getattr(step, "waitsOn", None) is None
+                    or getattr(step, "waitsOn") not in step_ids
+                    or getattr(step, "waitsOn") in resolved_ids
+                )
+            ]
+            if not ready:
+                raise ValueError("Reviewable plan contains a waitsOn cycle")
+            for step in ready:
+                unresolved.remove(step)
+                ordered_steps.append(step)
+                if isinstance(getattr(step, "id", None), int):
+                    resolved_ids.add(step.id)
+
+        return [
+            step for step in ordered_steps
+            if (
+                getattr(getattr(step, "assignee", None), "kind", None) == "person"
+                and getattr(step.assignee, "relation", None) != "associate"
+            )
+        ]
+
+    async def _resolve_person_steps(
+        self,
+        person_steps: list,
+        *,
+        associate_name: str,
+        manager_chat_client,
+    ) -> list:
+        """Generate Verdict records for already-authored non-associate outcomes."""
+        if manager_chat_client is None:
+            raise RuntimeError("Manager chat client is required to resolve Person steps")
+
+        from models.plan_models import Verdict
+
+        verdicts = []
+        for step in person_steps:
+            outcome = getattr(step, "outcome", None)
+            if outcome is None:
+                raise ValueError(
+                    f"Person step {getattr(step, 'id', '?')} has no authored outcome"
+                )
+
+            assignee = step.assignee
+            response = await manager_chat_client.get_response(
+                [
+                    Message(
+                        "system",
+                        [
+                            "Write a brief, natural first-person response for a "
+                            "person in an approved shift-swap workflow. The "
+                            "decision is already fixed; do not change it."
+                        ],
+                    ),
+                    Message(
+                        "user",
+                        [
+                            f"{assignee.name} is the {assignee.relation}. Their "
+                            f"authored decision is {getattr(outcome, 'value', outcome)}. "
+                            + (
+                                f"Address the associate as {associate_name}. "
+                                if associate_name
+                                else ""
+                            )
+                            + "Write only their response."
+                        ],
+                    ),
+                ]
+            )
+            words = str(getattr(response, "text", "") or "").strip()
+            if not words:
+                raise ValueError(
+                    f"Manager generated no words for Person step {getattr(step, 'id', '?')}"
+                )
+            verdicts.append(
+                Verdict(
+                    step_id=step.id,
+                    assignee=assignee,
+                    outcome=outcome,
+                    words=words,
+                )
+            )
+        return verdicts
 
     def _task_requires_ticket_on_approval(self, workflow, input_task) -> bool:
         """Whether this request names the active team's ticketing task.
@@ -1118,28 +1238,32 @@ class OrchestrationManager:
         )
         return False
 
-    def _task_plan_steps(self, workflow, input_task) -> list:
+    def _task_plan_steps(self, workflow, input_task) -> list | None:
         """Return the active Quick Task's authored Reviewable plan steps.
 
         The browser can name a Quick Task but cannot choose its people or
         ordering. Those facts belong to the active team's content pack.
+        ``None`` means no task declared an authored plan; an authored empty
+        list remains empty and replaces generated steps.
         """
         task_id = getattr(input_task, "starting_task_id", None)
         team_config = getattr(workflow, "_team_config", None)
         tasks = getattr(team_config, "starting_tasks", None)
         if not isinstance(task_id, str) or not task_id or not isinstance(tasks, list):
-            return []
+            return None
 
         for task in tasks:
             if getattr(task, "id", None) == task_id:
                 plan_steps = getattr(task, "plan_steps", None)
                 if not isinstance(plan_steps, list):
-                    return []
+                    return None
+                if getattr(task, "plan_steps_authored", None) is False:
+                    return None
                 from models.plan_models import MStep
 
                 return [MStep.model_validate(step) for step in plan_steps]
 
-        return []
+        return None
 
     async def _handle_tool_approvals(
         self,

@@ -325,6 +325,11 @@ class StartingTask(BaseModel):
     # and the step it waits for, so a rehearsal never invents a colleague or an
     # approval order.
     plan_steps: List[Dict[str, Any]] = Field(default_factory=list)
+    # ``plan_steps`` defaults to an empty list for backwards-compatible team
+    # definitions, so retain whether the author actually declared it. An omitted
+    # field lets the orchestrator keep its generated Reviewable plan; an explicit
+    # empty list is an authored empty plan.
+    plan_steps_authored: bool = False
 
 
 class TeamConfiguration(BaseDataModel):

@@ -190,7 +190,8 @@
             "relation": "peer",
             "simulated": true
           },
-          "waitsOn": 2
+          "waitsOn": 2,
+          "outcome": "approved"
         },
         {
           "id": 4,
@@ -201,7 +202,8 @@
             "relation": "manager",
             "simulated": true
           },
-          "waitsOn": 3
+          "waitsOn": 3,
+          "outcome": "approved"
         },
         {
           "id": 5,

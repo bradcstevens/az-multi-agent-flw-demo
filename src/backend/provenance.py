@@ -14,3 +14,7 @@ ASSOCIATE_RECORD_PROVENANCE = (
 PRESENTER_ALERT_PROVENANCE = (
     "No shift-task system pushed this alert — it was authored for this walkthrough."
 )
+VERDICT_PROVENANCE = (
+    "No workforce management system was consulted — this verdict was authored "
+    "for this walkthrough."
+)

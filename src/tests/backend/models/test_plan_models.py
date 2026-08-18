@@ -50,12 +50,29 @@ class TestMStep:
             "action": "do thing",
             "assignee": None,
             "waitsOn": None,
+            "outcome": None,
         }
 
     def test_person_step_preserves_the_authored_assignee_and_order(self):
-        step = MStep.model_validate(
-            {
+        for outcome in ("approved", "declined"):
+            step = MStep.model_validate(
+                {
+                    "id": 3,
+                    "action": "Ask Marcus Bell to confirm the agreed swap",
+                    "assignee": {
+                        "kind": "person",
+                        "name": "Marcus Bell",
+                        "relation": "peer",
+                        "simulated": True,
+                    },
+                    "waitsOn": 2,
+                    "outcome": outcome,
+                }
+            )
+
+            assert step.model_dump(mode="json") == {
                 "id": 3,
+                "agent": "",
                 "action": "Ask Marcus Bell to confirm the agreed swap",
                 "assignee": {
                     "kind": "person",
@@ -64,21 +81,8 @@ class TestMStep:
                     "simulated": True,
                 },
                 "waitsOn": 2,
+                "outcome": outcome,
             }
-        )
-
-        assert step.model_dump(mode="json") == {
-            "id": 3,
-            "agent": "",
-            "action": "Ask Marcus Bell to confirm the agreed swap",
-            "assignee": {
-                "kind": "person",
-                "name": "Marcus Bell",
-                "relation": "peer",
-                "simulated": True,
-            },
-            "waitsOn": 2,
-        }
 
 
 class TestMPlan:

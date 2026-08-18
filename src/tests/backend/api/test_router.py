@@ -1768,6 +1768,19 @@ class TestPlanApproval:
         assert resp.status_code == 200
         assert resp.json()["status"] == "approval recorded"
 
+    def test_approval_rejects_a_browser_authored_person_outcome(self, rt):
+        """A browser may approve the plan, but only its active team authors
+        the decisions the post-approval Person steps will record."""
+        rt.orchestration_config.approvals = {"m-1": None}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval",
+            json=self._payload(outcome="declined"),
+        )
+
+        assert resp.status_code == 422
+        rt.orchestration_config.set_approval_result.assert_not_called()
+
     def test_a_second_verdict_on_an_approved_plan_changes_nothing(self, rt):
         rt.orchestration_config.approvals = {"m-1": True}
 

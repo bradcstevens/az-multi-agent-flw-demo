@@ -102,6 +102,7 @@ class MockStartingTask:
     context_dependent: bool = False
     ticket_on_approval: bool = False
     plan_steps: List[dict] = field(default_factory=list)
+    plan_steps_authored: bool = False
 
 @dataclass
 class MockTeamConfiguration:
@@ -421,12 +422,38 @@ class TestTeamConfigurationValidation:
                     "simulated": True,
                 },
                 "waitsOn": 2,
+                "outcome": "approved",
             }
         ]
 
-        assert service._validate_and_parse_task(
-            _valid_task_data(plan_steps=steps)
-        ).plan_steps == [{**steps[0], "agent": ""}]
+        task = service._validate_and_parse_task(_valid_task_data(plan_steps=steps))
+
+        assert task.plan_steps == [{**steps[0], "agent": ""}]
+        assert task.plan_steps_authored is True
+
+    def test_omitted_plan_steps_preserve_the_generated_review_plan(self):
+        task = TeamService()._validate_and_parse_task(_valid_task_data())
+
+        assert task.plan_steps == []
+        assert task.plan_steps_authored is False
+
+    def test_a_nonassociate_person_step_requires_an_authored_outcome(self):
+        step = {
+            "id": 3,
+            "action": "Ask Marcus Bell to confirm the agreed swap",
+            "assignee": {
+                "kind": "person",
+                "name": "Marcus Bell",
+                "relation": "peer",
+                "simulated": True,
+            },
+            "waitsOn": 2,
+        }
+
+        with pytest.raises(ValueError, match="requires an authored outcome"):
+            TeamService()._validate_and_parse_task(
+                _valid_task_data(plan_steps=[step])
+            )
 
     def test_a_ticket_status_reply_survives_the_upload(self):
         """The ticketing task owns the Fast-lane reply it offers after approval."""

@@ -8,13 +8,37 @@ Tests OrchestrationManager:
 """
 
 import asyncio
+import importlib.util
 import json
 import logging
 import os
 import sys
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
+
+_backend_path = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend")
+)
+if _backend_path not in sys.path:
+    sys.path.insert(0, _backend_path)
+
+_provenance_path = os.path.join(_backend_path, "provenance.py")
+_provenance_spec = importlib.util.spec_from_file_location(
+    "provenance", _provenance_path
+)
+_provenance = importlib.util.module_from_spec(_provenance_spec)
+sys.modules["provenance"] = _provenance
+_provenance_spec.loader.exec_module(_provenance)
+
+_plan_models_path = os.path.join(_backend_path, "models", "plan_models.py")
+_plan_models_spec = importlib.util.spec_from_file_location(
+    "models.plan_models", _plan_models_path
+)
+real_plan_models = importlib.util.module_from_spec(_plan_models_spec)
+sys.modules["models.plan_models"] = real_plan_models
+_plan_models_spec.loader.exec_module(real_plan_models)
 
 # Set up required environment variables before any imports
 os.environ.update({
@@ -315,6 +339,7 @@ mock_messages_module.PlanApprovalRequest = MockPlanApprovalRequest
 mock_messages_module.PlanApprovalResponse = MockPlanApprovalResponse
 sys.modules['models'] = Mock()
 sys.modules['models.messages'] = mock_messages_module
+sys.modules['models.plan_models'] = real_plan_models
 
 # ---- Mock plan_review_helpers ----
 class MockMPlan:
@@ -1421,6 +1446,7 @@ class TestTokenUsageEmission:
     """
 
     def setup_method(self):
+        sys.modules["models.plan_models"] = real_plan_models
         connection_config.send_status_update_async.reset_mock()
         orchestration_config.get_current_orchestration.return_value = None
 
@@ -2142,6 +2168,18 @@ class FakeTicketStore:
         return self.ticket
 
 
+class FakeManagerChatClient:
+    """The manager's chat-client seam, with per-run verdict words."""
+
+    def __init__(self, words):
+        self._words = iter(words)
+        self.requests = []
+
+    async def get_response(self, messages):
+        self.requests.append(messages)
+        return Mock(text=next(self._words))
+
+
 def _submitted_ticket(**overrides):
     fields = {"ticket_id": "SIM-223-0041", "status": "submitted"}
     fields.update(overrides)
@@ -2162,6 +2200,7 @@ class TestTheApprovalIsTheTicketConfirmation:
 
     def setup_method(self):
         connection_config.send_status_update_async.reset_mock()
+        mock_convert.return_value = MockMPlan()
         mock_wait_approval.return_value = MockPlanApprovalResponse(
             approved=True, m_plan_id="test-plan-id"
         )
@@ -2203,7 +2242,7 @@ class TestTheApprovalIsTheTicketConfirmation:
             is False
         )
 
-    def test_an_authored_transaction_not_the_browser_names_the_plan_people(self):
+    def test_an_authored_transaction_not_the_browser_names_the_plan_people_or_outcomes(self):
         steps = [
             {
                 "id": 3,
@@ -2215,6 +2254,7 @@ class TestTheApprovalIsTheTicketConfirmation:
                     "simulated": True,
                 },
                 "waitsOn": 2,
+                "outcome": "approved",
             }
         ]
         workflow = Mock()
@@ -2223,12 +2263,42 @@ class TestTheApprovalIsTheTicketConfirmation:
         )
 
         actual = OrchestrationManager()._task_plan_steps(
-            workflow, Mock(starting_task_id="task-223-shift-swap")
+            workflow,
+            Mock(
+                starting_task_id="task-223-shift-swap",
+                plan_steps=[{**steps[0], "outcome": "declined"}],
+            ),
         )
 
         assert [step.model_dump(mode="json") for step in actual] == [
             {**steps[0], "agent": ""}
         ]
+
+    def test_a_quick_task_without_authored_plan_steps_preserves_the_generated_plan(self):
+        manager = OrchestrationManager()
+        workflow = SimpleNamespace(
+            _team_config=SimpleNamespace(
+                starting_tasks=[
+                    SimpleNamespace(
+                        id="ticket",
+                        plan_steps=[],
+                        plan_steps_authored=False,
+                    ),
+                    SimpleNamespace(
+                        id="empty-plan",
+                        plan_steps=[],
+                        plan_steps_authored=True,
+                    ),
+                ]
+            )
+        )
+
+        assert manager._task_plan_steps(
+            workflow, SimpleNamespace(starting_task_id="ticket")
+        ) is None
+        assert manager._task_plan_steps(
+            workflow, SimpleNamespace(starting_task_id="empty-plan")
+        ) == []
 
     async def _review(
         self,
@@ -2241,6 +2311,8 @@ class TestTheApprovalIsTheTicketConfirmation:
         record=None,
         revision=None,
         plan_steps=None,
+        associate_name="",
+        manager_chat_client=None,
     ):
         mock_wait_approval.return_value = MockPlanApprovalResponse(
             approved=approved, m_plan_id="test-plan-id", feedback=feedback
@@ -2255,14 +2327,20 @@ class TestTheApprovalIsTheTicketConfirmation:
             "_troubleshooting_store",
             AsyncMock(return_value=(record, session) if record else (None, None)),
         ):
+            kwargs = {
+                "ticket_on_approval": ticket_on_approval,
+                "plan_steps": plan_steps,
+                "associate_name": associate_name,
+                **({} if revision is None else {"revision": revision}),
+            }
+            if manager_chat_client is not None:
+                kwargs["manager_chat_client"] = manager_chat_client
             outcome = await manager._handle_plan_reviews(
                 {"req-1": review},
                 participant_names=["EscalationAgent"],
                 task_text="I can't fix it, raise a ticket",
                 user_id="user-1",
-                ticket_on_approval=ticket_on_approval,
-                plan_steps=plan_steps,
-                **({} if revision is None else {"revision": revision}),
+                **kwargs,
             )
         return review, outcome
 
@@ -2279,14 +2357,159 @@ class TestTheApprovalIsTheTicketConfirmation:
                     "simulated": True,
                 },
                 "waitsOn": 2,
+                "outcome": "approved",
             }
         ]
 
-        await self._review(None, plan_steps=steps)
+        await self._review(
+            None,
+            plan_steps=steps,
+            manager_chat_client=FakeManagerChatClient(["Marcus confirms the swap."]),
+        )
 
         assert [
             step.model_dump(mode="json") for step in mock_convert.return_value.steps
         ] == [{**steps[0], "agent": ""}]
+
+    @pytest.mark.asyncio
+    async def test_approval_resolves_nonassociate_person_steps_in_waits_on_order(self):
+        """The plan's own Person steps choose the post-approval mechanism."""
+        steps = [
+            {
+                "id": 4,
+                "action": "Ask Dana Reyes to approve the swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Dana Reyes",
+                    "relation": "manager",
+                    "simulated": True,
+                },
+                "waitsOn": 3,
+                "outcome": "approved",
+            },
+            {
+                "id": 1,
+                "action": "Check the swap procedure",
+                "assignee": {"kind": "agent", "name": "WorkforceAgent"},
+            },
+            {
+                "id": 2,
+                "action": "Confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "You",
+                    "relation": "associate",
+                    "simulated": False,
+                },
+                "waitsOn": 1,
+            },
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+                "outcome": "approved",
+            },
+        ]
+        first_run = FakeManagerChatClient([
+            "I can confirm the Saturday swap works for me.",
+            "I approve the Saturday swap.",
+        ])
+        second_run = FakeManagerChatClient([
+            "The Saturday swap is fine by me.",
+            "The swap has my approval.",
+        ])
+        orchestration_config.wait_for_clarification.reset_mock()
+
+        with patch.object(
+            asyncio,
+            "sleep",
+            AsyncMock(side_effect=AssertionError("post-approval must not delay")),
+        ) as sleep:
+            _review, first = await self._review(
+                None,
+                plan_steps=steps,
+                associate_name="Clara",
+                manager_chat_client=first_run,
+            )
+            _review, second = await self._review(
+                None, plan_steps=steps, manager_chat_client=second_run
+            )
+
+        assert [
+            (verdict.step_id, verdict.assignee.name, verdict.outcome, verdict.words)
+            for verdict in first.verdicts
+        ] == [
+            (3, "Marcus Bell", "approved", "I can confirm the Saturday swap works for me."),
+            (4, "Dana Reyes", "approved", "I approve the Saturday swap."),
+        ]
+        assert [verdict.outcome for verdict in second.verdicts] == [
+            "approved",
+            "approved",
+        ]
+        assert [verdict.words for verdict in second.verdicts] != [
+            verdict.words for verdict in first.verdicts
+        ]
+        assert len(first_run.requests) == 2
+        assert first_run.requests[0][1].contents == [
+            "Marcus Bell is the peer. Their authored decision is approved. "
+            "Address the associate as Clara. Write only their response."
+        ]
+        assert len(second_run.requests) == 2
+        orchestration_config.wait_for_clarification.assert_not_called()
+        sleep.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_associate_only_person_steps_never_invoke_the_postapproval_executor(self):
+        steps = [
+            {
+                "id": 1,
+                "action": "Confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "You",
+                    "relation": "associate",
+                    "simulated": False,
+                },
+            }
+        ]
+        chat_client = FakeManagerChatClient([])
+
+        _review, outcome = await self._review(
+            None, plan_steps=steps, manager_chat_client=chat_client
+        )
+
+        assert outcome.verdicts == []
+        assert chat_client.requests == []
+
+    @pytest.mark.asyncio
+    async def test_an_empty_authored_plan_never_invokes_the_postapproval_executor(self):
+        mock_convert.return_value.steps = [
+            real_plan_models.MStep(
+                id=3,
+                action="Ask Marcus Bell to confirm the agreed swap",
+                assignee={
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                outcome="approved",
+            )
+        ]
+        chat_client = FakeManagerChatClient([])
+
+        _review, outcome = await self._review(
+            None, plan_steps=[], manager_chat_client=chat_client
+        )
+
+        assert outcome.verdicts == []
+        assert chat_client.requests == []
 
     @pytest.mark.asyncio
     async def test_approving_an_escalation_drafts_from_the_carried_record(self):
