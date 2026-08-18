@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Prototype: Verdict conversation records</title>
+  <style>
+    body { background: #f7f7f7; color: #202020; font: 16px system-ui, sans-serif; margin: 0 auto; max-width: 720px; padding: 32px; }
+    h1 { margin-bottom: 4px; }
+    .question { color: #555; margin-top: 0; }
+    .conversation, .state { background: white; border: 1px solid #ddd; border-radius: 8px; margin: 24px 0; padding: 20px; }
+    .record { border-top: 1px solid #ddd; padding: 16px 0; }
+    .record:first-child { border-top: 0; padding-top: 0; }
+    .who { font-weight: 700; }
+    .provenance { color: #555; font-size: 14px; margin-bottom: 0; }
+    button { background: #0f6cbd; border: 0; border-radius: 4px; color: white; cursor: pointer; font: inherit; margin-right: 8px; padding: 9px 12px; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    dt { font-weight: 700; }
+    dd { margin: 0 0 10px; }
+  </style>
+</head>
+<body>
+  <h1>Prototype: Verdict conversation records</h1>
+  <p class="question">
+    Question: can the conversation show each pushed Verdict only after it lands, in
+    <code>waitsOn</code> order, while rendering only record-owned words and provenance?
+  </p>
+
+  <p>
+    <button id="peer">Push Marcus's Verdict</button>
+    <button id="manager">Push Dana's Verdict</button>
+    <button id="reset">Reset</button>
+  </p>
+
+  <section class="conversation">
+    <h2>Conversation</h2>
+    <div id="records"></div>
+  </section>
+
+  <section class="state">
+    <h2>Current state</h2>
+    <dl id="state"></dl>
+  </section>
+
+  <script>
+    const steps = [
+      { stepId: 3, name: "Marcus Bell", waitsOn: 2, words: "I approve the Saturday shift swap.", provenance: "No workforce management system was consulted — this verdict was authored for this walkthrough." },
+      { stepId: 4, name: "Dana Reyes", waitsOn: 3, words: "I approve the shift coverage change.", provenance: "No workforce management system was consulted — this verdict was authored for this walkthrough." },
+    ];
+    let verdicts = [];
+
+    function canLand(step) {
+      return !verdicts.some((verdict) => verdict.stepId === step.stepId)
+        && (step.waitsOn === 2 || verdicts.some((verdict) => verdict.stepId === step.waitsOn));
+    }
+
+    function push(stepId) {
+      const step = steps.find((candidate) => candidate.stepId === stepId);
+      if (canLand(step)) verdicts = [...verdicts, step];
+      render();
+    }
+
+    function render() {
+      document.querySelector("#records").innerHTML = verdicts.map((verdict) => `
+        <article class="record">
+          <div class="who">${verdict.name}</div>
+          <p>${verdict.words}</p>
+          ${verdict.provenance ? `<p class="provenance">${verdict.provenance}</p>` : ""}
+        </article>
+      `).join("") || "<p>No Verdict has landed. Marcus Bell and Dana Reyes are waiting plainly in the plan.</p>";
+
+      document.querySelector("#state").innerHTML = steps.map((step) => `
+        <dt>${step.name}</dt>
+        <dd>${verdicts.some((verdict) => verdict.stepId === step.stepId) ? "Verdict pushed" : "Waiting"}</dd>
+      `).join("");
+
+      document.querySelector("#peer").disabled = !canLand(steps[0]);
+      document.querySelector("#manager").disabled = !canLand(steps[1]);
+    }
+
+    document.querySelector("#peer").addEventListener("click", () => push(3));
+    document.querySelector("#manager").addEventListener("click", () => push(4));
+    document.querySelector("#reset").addEventListener("click", () => { verdicts = []; render(); });
+    render();
+  </script>
+</body>
+</html>
