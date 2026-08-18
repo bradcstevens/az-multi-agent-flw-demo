@@ -203,14 +203,6 @@ describe('the Simulated ticket on the chat surface (issue #22)', () => {
         expect(screen.getByText(/Fitted a fresh paper filter/)).toBeInTheDocument();
     });
 
-    it('labels it simulated wherever it is shown', () => {
-        const store = makeStore();
-        store.dispatch(ticketRaised(raised));
-
-        renderPanel(store);
-
-        expect(screen.getAllByTestId('simulated-badge').length).toBeGreaterThan(0);
-    });
 });
 
 describe('the loading window names the specialists standing by (issue #65)', () => {

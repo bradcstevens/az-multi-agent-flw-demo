@@ -146,11 +146,6 @@ export class ChatSurface {
         return this.page.getByTestId('simulated-ticket-id');
     }
 
-    /** The badge that makes the ticket's simulated nature explicit. */
-    get ticketSimulatedBadge(): Locator {
-        return this.simulatedTicket.getByTestId('simulated-badge');
-    }
-
     /** The authored choices for the clarification that is currently pending. */
     async rehearsedReplyLabels(): Promise<string[]> {
         return this.rehearsedReplies.getByRole('button').allInnerTexts();

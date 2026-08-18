@@ -198,7 +198,8 @@ is visible on stage and is a live follow-up, not an oversight.
 `src/backend/transparency/alert.py` holds seven rehearsed alerts, each naming a
 real `SOP-NNN` from the corpus so that the presenter's chord lands on a beat
 that leads straight into the cross-platform hop. They are rehearsed words, not
-a live signal, which is why `SimulatedBadge` goes on them.
+a live signal, so each alert carries a Provenance line naming the shift-task
+system that did not push it.
 
 ## Not verified
 

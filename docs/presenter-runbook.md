@@ -134,7 +134,7 @@ until it offers to escalate.
 and I can't fix it. I need someone to come out."*
 
 **What happens:** this one takes the **deliberate lane** — a plan appears and waits for you. Press
-**Approve Task Plan**. A service ticket card appears, marked *Simulated*.
+**Approve Task Plan**. A service ticket card appears with its `SIM-223-…` number.
 
 **Say, while they read the ticket:** *"Everything I told it three minutes ago is already in this
 ticket. Nobody re-typed it, and there was one confirmation, not two — approving the plan **is**
@@ -169,13 +169,9 @@ It is the answer to *"you just hardcoded that"*, and it is worth more than the s
 **Tap:** the **Sign in to continue** button **inside the refusal**. It is deliberately not a
 separate login screen.
 
-**Say, before you tap:** *"Simulated sign-in — no identity provider is involved."* Say it out
-loud, unprompted. A stakeholder who works this out for themselves afterwards stops believing
-everything else you showed them.
-
 **What happens:** the header gains a name, and the *same question, unedited* is asked again — and
-answered out of an authored associate record. Alongside its *Simulated* badge, the record carries a
-Provenance line that no payroll system was queried.
+answered out of an authored associate record. The record carries a Provenance line that no payroll
+system was queried.
 
 **They should be looking at:** the header changing, and the same words getting a different
 outcome.
@@ -194,9 +190,8 @@ need to be in a chat for the next part to work.
 while you do it.
 
 **What lands:** an alert card arrives on its own, with the conversation already finished — visibly
-not an answer, with its own heading, a *Simulated* badge, and a Provenance line naming the
-shift-task system that did not push it — about the coffee station deep clean due before the 15:00
-handover, naming SOP-104.
+not an answer, with its own heading and a Provenance line naming the shift-task system that did not
+push it — about the coffee station deep clean due before the 15:00 handover, naming SOP-104.
 
 **Say:** *"Nobody asked it anything just then. It can act on a shift event and put the procedure
 one tap away."*
@@ -309,9 +304,8 @@ nobody at Circle K. The only thing here that is yours is the banner on the front
 would be uploaded to the same Copilot Studio agent by whoever owns them today, without an engineer
 in the loop; that is the point of putting them there rather than in code.
 
-**"Is that a real ticket?"** No — it is marked *Simulated* on the card. Nothing here writes to a
-service desk. Everything invented carries that badge, and nothing that is real does: the Copilot
-Studio hop, the token counts and the model assignments are not badged, because they are measured.
+**"Is that a real ticket?"** No — look at the ticket number, `SIM-223-0007`. Nothing here writes to
+a service desk.
 
 **"Is that a real sign-in?"** No. There is no Entra, no MSAL, no identity provider anywhere in the
 flow — the name is written into the session and that is the whole of it. The point of the beat is

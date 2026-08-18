@@ -426,17 +426,6 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
           */}
           {policyBlock && (
             <PolicyBlockNotice block={policyBlock}>
-              {/*
-                The door in the wall (#27). The boundary is meant to read as a
-                door rather than a wall, and the delta between the refusal above
-                and the answer that replaces it is the licensing and governance
-                conversation this whole demo exists to open.
-
-                The sign-in is mocked end to end. It is said out loud, here,
-                beside the button — a stakeholder who discovers afterwards that
-                an identity provider was implied has stopped believing the rest
-                of the demonstration.
-              */}
               <div className="home-input-policy-block-door">
                 <Button
                   appearance="primary"
@@ -448,9 +437,6 @@ const HomeInput: React.FC<HomeInputProps> = ({ selectedTeam }) => {
                 >
                   Sign in to continue
                 </Button>
-                <Caption1 className="home-input-policy-block-note">
-                  Simulated sign-in — no identity provider is involved.
-                </Caption1>
               </div>
             </PolicyBlockNotice>
           )}

@@ -99,9 +99,9 @@ nothing, ever.
    against the pack.
 
 5. **The three flagged lines stay exactly as they are.** They are pinned by CI and by ADR-017. The
-   preamble carries the framing instead — this is **Disclosure in words** applied to the prompt
-   itself, and it is authored in the frontend's own copy module on the `storeSurface.ts` precedent,
-   so it adds no field to `TeamAgent`.
+   preamble carries the framing instead — the prompt states its own constraints, and it is authored
+   in the frontend's own copy module on the `storeSurface.ts` precedent, so it adds no field to
+   `TeamAgent`.
 
 6. **Participation is stated, and read from the narration's signal.** The dossier says *spoke in this
    answer* or *available, has not spoken*, and on the home surface — where there is no conversation —

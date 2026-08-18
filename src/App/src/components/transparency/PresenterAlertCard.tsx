@@ -3,7 +3,6 @@ import { Badge, Body1, Body1Strong, Caption1 } from '@fluentui/react-components'
 import { Alert24Regular } from '@fluentui/react-icons';
 
 import { PresenterAlert } from '../../models/transparency';
-import SimulatedBadge from '../branding/SimulatedBadge';
 
 /**
  * The Presenter alert, rendered (issue #24, R8).
@@ -34,13 +33,6 @@ const PresenterAlertCard: React.FC<PresenterAlertCardProps> = ({ alert }) => (
             <Badge appearance="outline" color="warning" data-testid="presenter-alert-kind">
                 Proactive alert
             </Badge>
-            {/*
-              The words are the server's, chosen from a rehearsed roster (#23)
-              rather than produced by a shift-task system this demo talks to.
-              An audience that finds that out afterwards discounts the panels
-              that *are* connected, so it is said here rather than discovered.
-            */}
-            <SimulatedBadge what="This shift task" />
         </div>
         <Body1 className="presenter-alert__content">{alert.content}</Body1>
         {alert.provenanceLine && (

@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react';
 
 import PersonalAnswerCard from './PersonalAnswerCard';
 import { parsePersonalAnswer, PERSONAL_ANSWER_KIND } from '../../models/personalAnswer';
-import { SIMULATED_LABEL } from '../../models/storeSurface';
 
 const answer = parsePersonalAnswer({
     personal_answer: {
@@ -39,16 +38,6 @@ describe('the personal answer card', () => {
             'PTO balance',
             'Hours scheduled this week',
         ]);
-    });
-
-    it('labels the record as simulated, unconditionally', () => {
-        // No payroll system was queried and nobody signed in. A stakeholder who
-        // finds that out afterwards has stopped believing the rest of the demo.
-        render(<PersonalAnswerCard answer={answer} />);
-
-        expect(screen.getByTestId('personal-answer')).toHaveTextContent(
-            new RegExp(SIMULATED_LABEL, 'i'),
-        );
     });
 
     it('renders the provenance line the associate record carried', () => {

@@ -8,28 +8,16 @@ The delta between those two moments is the licensing and governance conversation
 been avoiding. Nothing else in the walkthrough makes that argument, so everything here exists to
 make the two moments comparable and the second one honest.
 
-## What is mocked, and where it is said out loud
+## What is mocked, and where the record says so
 
 The handoff is mocked **end to end**. There is no Entra, no Okta, no Auth0, no MSAL, no OAuth
 anywhere in the flow — `POST /api/v4/session_state/{id}/sign_in` writes an authored name into
 server-side **Session state** and that is the whole of the identity provider.
 
-Said out loud in three places, because a stakeholder who discovers afterwards that an identity
-provider was implied has stopped believing the rest of the demonstration:
-
-| Surface | What it says |
-| --- | --- |
-| The button | *Simulated sign-in — no identity provider is involved.* |
-| The header | The **Simulated label**, beside the associate's name |
-| The answer | The **Simulated label**, plus a note naming the record as authored |
-
-**All three change under [ADR-036](ADR/036-a-record-carries-its-own-provenance.md) (#92), which
-retires the Simulated label.** The table above is what ships today. After spec 2 the three become
-**one**: the button's line and the header's badge are the surface talking about itself and both go,
-while the answer keeps its disclosure as a **Provenance line** — the record naming the system that
-was not consulted. Nothing about *"said out loud"* is given up; the sentence above about a
-stakeholder who discovers an identity provider was implied is the reason the answer's line survives
-when the other two do not.
+The header states only the **Session identity** it was given. When the identity boundary gate admits
+the personal question, the associate record carries a **Provenance line** naming the payroll system
+that was not queried. That line travels with the record into a screenshot or the **Recorded
+fallback**, where browser-authored prose would not.
 
 Asserted rather than assumed, on both sides of the socket:
 `test_router.py::test_no_identity_provider_is_involved` reads the backend modules the flow runs

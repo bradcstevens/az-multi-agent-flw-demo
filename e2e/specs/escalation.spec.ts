@@ -104,7 +104,6 @@ test.describe('the escalation beat', () => {
         await plan.approveButton.click();
         await expect(plan.simulatedTicket).toBeVisible({ timeout: 120_000 });
         await expect(plan.ticketNumber).toHaveText(ticketNumberPattern());
-        await expect(plan.ticketSimulatedBadge).toBeVisible();
         expect((await plan.ticketFields()).steps_attempted).toContain(reported);
     });
 

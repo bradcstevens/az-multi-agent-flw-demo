@@ -24,7 +24,7 @@ finds out.
 | What is a question | `orchestration/clarification.py` | Pure. Which of the framework's pauses is a **Clarification**, and what the agent is told on a turn that asks nothing. |
 | The bridge | `GET`/`POST /api/v4/escalation/ticket` | What the MCP container calls. |
 | The tool | `src/mcp_server/services/escalation_service.py` | `draft_service_ticket`, on the `escalation` domain. One tool. |
-| The card | `src/App/src/components/escalation/SimulatedTicketCard.tsx` | Every row, and the `SimulatedBadge`. |
+| The card | `src/App/src/components/escalation/SimulatedTicketCard.tsx` | Every row, including the ticket number. |
 
 ## The approval is the confirmation, and it is not instructed
 
@@ -137,14 +137,9 @@ distinguishable from a record of nothing.
 `ticket_id_for` is a sha256 of the session, rendered `SIM-223-NNNN`. A counter is shared state that
 a container restart resets, and a reissued number is two different faults wearing one identity at a
 service desk. Deriving it means the same session asks twice and reads the same number back, and
-`SIM-` says on the number itself what the badge says on the card.
-
-## The badge is a property of the card
-
-There is no `simulated` flag on the wire and the card does not read one. Every ticket this system
-produces is simulated, so a flag would be a field that could be omitted, and an omitted flag is an
-unbadged ticket that looks real. `SimulatedBadge` renders unconditionally — the same reasoning #25
-used to decide *which* things carry it: label the invented things, and only those.
+`SIM-` says on the number itself that it is a walkthrough ticket, wherever the number travels.
+`SIMULATED_NOTICE` remains in the escalation module's confirmation text; it travels with the
+escalation record rather than being invented by the ticket card.
 
 ## Where it renders and when it clears
 

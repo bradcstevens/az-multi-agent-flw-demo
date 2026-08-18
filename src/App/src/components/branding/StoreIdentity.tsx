@@ -10,7 +10,6 @@ import {
 import { forgetSignedInDevice } from '../../models/signedInDevice';
 import { useSignedInName } from '../../hooks/useSignedInDevice';
 import { ANONYMOUS_IDENTITY_LABEL, STORE_LABEL } from '../../models/storeSurface';
-import SimulatedBadge from './SimulatedBadge';
 import '../../styles/storeSurface.css';
 
 /**
@@ -45,13 +44,10 @@ const StoreIdentity: React.FC = () => {
                 <Caption1Strong>{STORE_LABEL}</Caption1Strong>
             </span>
 
-            <SimulatedBadge what={STORE_LABEL} />
-
             {signedInName ? (
                 <span className="store-identity__user" data-testid="store-identity-name">
                     <Person20Regular aria-hidden="true" />
                     <Caption1Strong>{signedInName}</Caption1Strong>
-                    <SimulatedBadge what="This sign-in" />
                     <Button
                         appearance="subtle"
                         size="small"

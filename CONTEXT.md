@@ -902,7 +902,7 @@ authenticated, which is why the **words and the recipient are both the server's*
 a name from a rehearsed roster in `transparency.alert` and there is no parameter that accepts prose.
 That roster is **seven alerts** since #19, each naming a real `SOP-NNN` from the **SOP corpus**, so
 whichever one the chord lands on leads straight into the cross-platform hop rather than stopping at
-a reminder. Rehearsed words, not a live signal, which is why `SimulatedBadge` goes on them.
+a reminder. Rehearsed words, not a live signal, which is why each alert record carries its own **Provenance line**.
 
 **Presenter chord** — the client half: **Ctrl + Alt + Shift + A**, matched on `event.code` and not
 `event.key` (with Alt held, several layouts compose a different character, and a chord that only
@@ -1303,8 +1303,8 @@ The three prompt lines that read badly on a projector — EscalationAgent's *"no
 and *"every ticket is simulated"*, WorkforceAgent's *"there is no employment system connected"* — are
 **left exactly as written**. They are requirements: `test_store_pack.py` pins the first by substring
 and [ADR-017](docs/ADR/017-workforce-agent-answers-process-never-record.md) is the third. Since the
-badges came off they are also **Disclosure in words** at its strongest — an audience watching an
-agent be *told* to disclose.
+badges came off they are direct disclosure in the prompt itself — an audience watching an agent be
+*told* to disclose.
 _Avoid_: agent card, agent profile, agent info, agent details pane — **card** is already the **Quick
 Task** and the **Presenter alert**
 

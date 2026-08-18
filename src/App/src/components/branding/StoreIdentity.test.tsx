@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import { readFileSync } from 'node:fs';
 
 import StoreIdentity from './StoreIdentity';
 import appReducer, { hydrateCurrentUser } from '../../store/slices/appSlice';
@@ -10,6 +11,7 @@ import {
     forgetSignedInDevice,
     rememberSignedInName,
 } from '../../models/signedInDevice';
+import { sourceFiles } from '@/testing/stylesheets';
 
 const renderIdentity = () => {
     const store = configureStore({ reducer: { app: appReducer } });
@@ -47,10 +49,22 @@ describe('the store identity', () => {
         expect(screen.queryByTestId('store-identity-name')).not.toBeInTheDocument();
     });
 
-    it('labels the store as simulated, because Store 223 is not a real store', () => {
+    it('renders no simulation badge anywhere on the store surface', () => {
+        // The old five renders were an enumeration, not an exhaustive test
+        // fixture. Source-wide inspection makes a newly added card fail too.
+        const badgedSources = sourceFiles().filter((path) =>
+            /<SimulatedBadge\b|<Badge\b[^>]*>[\s\S]*?(?:simulated-badge|SIMULATED_LABEL|Simulated)/.test(
+                readFileSync(path, 'utf8'),
+            ),
+        );
+
+        expect(badgedSources, 'simulation badges must not return to any surface state').toEqual([]);
+    });
+
+    it('renders no chip beside the store while anonymous', () => {
         renderIdentity();
 
-        expect(screen.getByTestId('store-identity')).toHaveTextContent(/simulated/i);
+        expect(screen.queryByTestId('simulated-badge')).not.toBeInTheDocument();
     });
 
     it('shows the named identity once the mocked sign-in has run', () => {
@@ -65,14 +79,12 @@ describe('the store identity', () => {
         expect(screen.queryByTestId('store-identity-user')).not.toBeInTheDocument();
     });
 
-    it('labels the signed-in associate as simulated too', () => {
-        // The sign-in is mocked end to end, and an unlabelled name on a header
-        // is the one claim in this demo a stakeholder would take for real.
+    it('renders no chip beside the named identity', () => {
         rememberSignedInName('Tanya Alvarez');
 
         renderIdentity();
 
-        expect(screen.getByTestId('store-identity-name')).toHaveTextContent(/simulated/i);
+        expect(screen.queryByTestId('simulated-badge')).not.toBeInTheDocument();
     });
 
     it('offers a way back to the anonymous, refusing state', async () => {

@@ -25,7 +25,7 @@ screenshot has already lost the argument it exists to make.
 | Claim | Value |
 | --- | --- |
 | Assistant | Circle K Frontline Store Assistant |
-| Store | Store 223 — **labelled simulated** |
+| Store | Store 223 |
 | User | *No user signed in*, until the **Mocked unlock** (#27) names one |
 | Team identifier | `00000000-0000-0000-0000-000000000223` |
 
@@ -283,21 +283,16 @@ defaults precisely because nobody had asked. The two rendered assertions feed a 
 test carries the same reply, so "exactly one top-level heading" is asserted with an agent talking
 rather than only on a silent page. Mutation-checked by dropping the role.
 
-## Labelling what is simulated
+## Records carry their own provenance
 
-`SimulatedBadge` marks anything whose content was authored for the walkthrough rather than produced
-by a connected system:
+The surface makes no assertion about itself. An invented record instead carries a **Provenance line**
+that names the system that did not produce it: the associate record names payroll, and the
+**Presenter alert** names the shift-task system. The service ticket's `SIM-223-` identifier travels
+with the ticket itself.
 
-| Labelled | Why |
-| --- | --- |
-| **Store 223** | A fictional store, with fictional employees and invented procedures |
-| The **Presenter alert** | Its words come from a rehearsed roster in `transparency.alert` (#23), not from a shift-task system |
-| The **Simulated ticket** | When #22 lands |
-
-The converse matters as much, and is easier to get wrong: a badge on a **real** Foundry answer, a
-real Copilot Studio hop or a measured token count gives away the demo's strongest evidence. A
-stakeholder who is told everything is simulated has been told nothing. Label the invented things,
-and only those.
+The converse matters as much: the **Foundry** answer, **Copilot Studio** hop and measured token count
+show receipts a fabrication cannot produce. A label beside those receipts would discount the
+evidence the demonstration exists to show.
 
 ## Which agent answered
 

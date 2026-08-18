@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react';
 
 import SimulatedTicketCard from './SimulatedTicketCard';
 import { parseRaisedTicket } from '../../models/ticket';
-import { SIMULATED_LABEL } from '../../models/storeSurface';
 
 const ticket = parseRaisedTicket({
     ticket_id: 'SIM-223-0041',
@@ -62,34 +61,9 @@ describe('the Simulated ticket card', () => {
         expect(screen.getByText('not reported')).toBeInTheDocument();
     });
 
-    it('is labelled simulated', () => {
-        // The number above it is the part an associate could read down a
-        // telephone to somebody who was never in the room.
+    it('renders no component-authored service-desk notice', () => {
         render(<SimulatedTicketCard ticket={ticket} />);
 
-        expect(screen.getByTestId('simulated-badge')).toHaveTextContent(
-            SIMULATED_LABEL,
-        );
-    });
-
-    it('says on the card itself that no service desk receives it', () => {
-        render(<SimulatedTicketCard ticket={ticket} />);
-
-        expect(screen.getByText(/No service desk receives this ticket/)).toBeInTheDocument();
-    });
-
-    it('badges the ticket without being told to by the payload', () => {
-        // Every ticket this system raises is simulated — there is no other
-        // kind and no code path that produces one. A flag on the wire would be
-        // one omission away from an unbadged ticket on a stakeholder's screen.
-        const bare = parseRaisedTicket({
-            ticket_id: 'SIM-223-0007',
-            status: 'submitted',
-            fields: [{ name: 'symptom', value: 'cold coffee' }],
-        })!;
-
-        render(<SimulatedTicketCard ticket={bare} />);
-
-        expect(screen.getByTestId('simulated-badge')).toBeInTheDocument();
+        expect(screen.queryByText(/No service desk receives this ticket/)).not.toBeInTheDocument();
     });
 });

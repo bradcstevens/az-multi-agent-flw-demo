@@ -107,6 +107,7 @@ describe('the door beside the refusal', () => {
 
         expect(await screen.findByTestId('policy-block')).toBeInTheDocument();
         expect(screen.getByTestId('sign-in-to-continue')).toBeInTheDocument();
+        expect(screen.queryByText(/Simulated sign-in/)).not.toBeInTheDocument();
     });
 
     it('offers no way in when nothing has been refused', () => {

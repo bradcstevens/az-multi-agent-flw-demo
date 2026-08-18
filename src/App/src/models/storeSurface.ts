@@ -20,7 +20,7 @@ export const ASSISTANT_NAME = 'Circle K Frontline Store Assistant';
 /** The short form, for places too narrow for the full name. */
 export const ASSISTANT_SHORT_NAME = 'Frontline Store Assistant';
 
-/** The store the shared device belongs to. Fictional — see `SIMULATED_LABEL`. */
+/** The store the shared device belongs to. */
 export const STORE_LABEL = 'Store 223';
 
 /**
@@ -35,9 +35,6 @@ export const STORE_ASSISTANT_TEAM_ID = '00000000-0000-0000-0000-000000000223';
 
 /** What the surface says when nobody has signed in. */
 export const ANONYMOUS_IDENTITY_LABEL = 'No user signed in';
-
-/** The label every simulated element carries. */
-export const SIMULATED_LABEL = 'Simulated';
 
 /**
  * The one assistant, resolved out of whatever the backend returned.
