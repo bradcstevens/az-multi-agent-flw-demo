@@ -12,7 +12,14 @@ export interface Agent {
     capabilities?: string[];
     role?: string;
     use_rag?: boolean;        // New: Flag for RAG capabilities
-    use_mcp?: boolean;        // New: Flag for MCP (Model Context Protocol)
+    use_toolbox?: boolean;
+    toolbox_filter?: string;
+    use_knowledge_base?: boolean;
+    knowledge_base_name?: string;
+    use_file_search?: boolean;
+    vector_store_name?: string;
+    user_responses?: boolean;
+    temperature?: number | null;
     coding_tools?: boolean;   // New: Flag for coding capabilities
 }
 
