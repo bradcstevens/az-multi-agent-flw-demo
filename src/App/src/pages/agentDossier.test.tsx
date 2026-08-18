@@ -188,7 +188,7 @@ describe('the Agent dossier on the home surface', () => {
         expect(within(dossier).getByText('0.2')).toBeInTheDocument();
     });
 
-    it('reads the standing MCP tools after the prompt and before configured facts', async () => {
+    it('lists the SOP tool and its gloss after the prompt but before configured facts', async () => {
         renderHomeSurface();
 
         await userEvent.click(await screen.findByRole('button', { name: 'Shift Tasks Agent' }));
@@ -198,6 +198,8 @@ describe('the Agent dossier on the home surface', () => {
         const tools = within(dossier).getByTestId('agent-dossier-mcp-tools');
         const configuration = within(dossier).getByTestId('agent-dossier-configuration');
 
+        expect(within(tools).getByText('search_store_procedures')).toBeInTheDocument();
+        expect(within(tools).getByText('Searches store procedures')).toBeInTheDocument();
         expect(
             prompt.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
@@ -247,6 +249,8 @@ describe('the Agent dossier on the home surface', () => {
         expect(within(dossier).queryByText('store-operations-kb')).not.toBeInTheDocument();
         // Every agent in the store pack runs at the deployment's own temperature.
         expect(within(dossier).queryByText('Temperature')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('MCP tools')).not.toBeInTheDocument();
+        expect(within(dossier).queryByTestId('agent-dossier-mcp-tools')).not.toBeInTheDocument();
         // A configured `false` is a choice the pack made, said in plain English.
         expect(
             within(dossier).getByText('Will not ask you follow-up questions'),
@@ -300,6 +304,8 @@ describe('the Agent dossier on the home surface', () => {
         expect(within(dossier).queryByText('Temperature')).not.toBeInTheDocument();
         // Not even the container the three would have hung from.
         expect(within(dossier).queryByTestId('agent-dossier-configuration')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('MCP tools')).not.toBeInTheDocument();
+        expect(within(dossier).queryByTestId('agent-dossier-mcp-tools')).not.toBeInTheDocument();
         expect(within(dossier).queryByText('false')).not.toBeInTheDocument();
     });
 

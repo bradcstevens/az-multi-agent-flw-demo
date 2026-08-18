@@ -22,6 +22,11 @@ on:
       # `test_transparency_contract.py`, which is the only thing that spans the
       # socket. The vitest suite hand-writes its payloads and cannot notice.
       - 'src/App/src/models/transparency.ts'
+      # The Agent dossier mirrors the backend's MCP allowlist for each store
+      # assistant toolbox domain; `test_agent_tool_contract.py` catches a
+      # tool renamed on either side before the dossier makes a false claim.
+      - 'src/App/src/models/agentDossier.ts'
+      - 'src/App/src/models/agentMcpTools.ts'
       # The browser's half of the Simulated ticket contract (#22), for the
       # same reason: `test_ticket_contract.py` is the only thing that spans
       # the socket for the ticket, and `ticket.test.ts` hand-writes its
@@ -99,6 +104,11 @@ on:
       # `test_transparency_contract.py`, which is the only thing that spans the
       # socket. The vitest suite hand-writes its payloads and cannot notice.
       - 'src/App/src/models/transparency.ts'
+      # The Agent dossier mirrors the backend's MCP allowlist for each store
+      # assistant toolbox domain; `test_agent_tool_contract.py` catches a
+      # tool renamed on either side before the dossier makes a false claim.
+      - 'src/App/src/models/agentDossier.ts'
+      - 'src/App/src/models/agentMcpTools.ts'
       # The browser's half of the Simulated ticket contract (#22), for the
       # same reason: `test_ticket_contract.py` is the only thing that spans
       # the socket for the ticket, and `ticket.test.ts` hand-writes its
