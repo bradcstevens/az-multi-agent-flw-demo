@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FluentProvider, teamsLightTheme } from '@fluentui/react-components';
+import { readFileSync } from 'node:fs';
 
 import ChatList from './ChatList';
 import { Chat } from '@/models';
+import {
+    CHAT_LIST_STYLESHEET,
+    allRulesIncludingMediaQueries,
+    rulesIn,
+} from '@/testing/stylesheets';
 import { PlanStatus } from '../../models/enums';
 import { NO_CHATS_MESSAGE, chatStateLabel } from '../../models/chatState';
 import {
@@ -414,5 +420,115 @@ describe('the list holds chats in every state', () => {
         openMenuFor('How do I swap a shift?');
 
         expect(deleteItem()).not.toHaveAttribute('aria-disabled', 'true');
+    });
+});
+
+/**
+ * How tall the list is allowed to be (#178).
+ *
+ * jsdom has no layout engine, so a hidden row is not observable here — what is
+ * observable is the rule that hides it. These read the stylesheet on #58's
+ * finding: a rule listed in a test agrees with itself forever, while a rule
+ * read out of the stylesheet keeps agreeing with the surface.
+ */
+describe("the chat list's height", () => {
+    const chatListRules = () =>
+        rulesIn(readFileSync(CHAT_LIST_STYLESHEET, 'utf8'), 'ChatList.css');
+
+    it('is the height of the panel it sits in, not a window of its own', () => {
+        /*
+          The defect: `max-height: 280px` with its own `overflow-y: auto` put
+          five rows on screen and the rest behind a scrollbar *inside* a panel
+          that is already full height and already scrolls. A panel with a screen
+          of empty space beneath a list that claims to be finished — #60's
+          "content hidden behind a second scrollbar", in the column on the other
+          edge.
+
+          Nothing about the list may declare a height. The one that bounds it is
+          the panel's, which is the surface's.
+        */
+        const capped = chatListRules()
+            .filter((rule) => /(?:^|[;{\s])max-height:/.test(rule.body))
+            .map((rule) => rule.selector);
+
+        expect(
+            capped,
+            `${capped.join(', ')} caps the chat list at a height of its own`,
+        ).toEqual([]);
+    });
+
+    it('does not reach past itself to style every accordion in the application', () => {
+        /*
+          The cap was declared on `.fui-AccordionPanel` — a class Fluent
+          generates — from a stylesheet named after the chat list, and held
+          there with `!important`. That is #59's finding exactly: a class
+          "reached for from outside the component, kept winning with
+          `!important`", which "would have stopped matching without a word the
+          day Fluent renamed it". Here it also silently capped every other
+          accordion the application might ever render.
+
+          Read across every stylesheet, not just this one: the hazard is the
+          idiom, and the next unscoped override will be written somewhere else.
+          A Fluent class *scoped under one of our own* is fine — that is what
+          `.follow-on-task .fui-Button` does — so only a selector that leads
+          with `.fui-` is a reach past the component.
+        */
+        const unscoped = allRulesIncludingMediaQueries()
+            .flatMap((rule) =>
+                rule.selector
+                    .split(',')
+                    .map((selector) => selector.trim())
+                    .filter((selector) => /^\.fui-/.test(selector))
+                    .map((selector) => `${rule.file}: ${selector}`),
+            );
+
+        expect(
+            unscoped,
+            `${unscoped.join(', ')} styles a Fluent class for the whole application`,
+        ).toEqual([]);
+    });
+
+    it('renders every chat it has been given, not a windowful', () => {
+        /*
+          The claim the panel makes, asserted where it can be. The cap was a
+          stylesheet, so this passed while the surface hid nine of these — it
+          stands as the guard for the day someone answers a long history by
+          slicing the list in JavaScript instead.
+        */
+        const morning = Array.from({ length: 12 }, (_, i) =>
+            completed(`chat-${i}`, `Rehearsal question ${i}`),
+        );
+
+        renderList(morning);
+
+        for (const chat of morning) {
+            expect(screen.getByText(chat.name)).toBeInTheDocument();
+        }
+    });
+
+    it('still collapses when the heading is pressed', async () => {
+        /*
+          What the deleted rules were nominally for. `AccordionPanel` mounts
+          through a `Collapse` motion with `unmountOnExit`, so a closed panel is
+          not in the DOM at all and the `max-height: 0` pair was answering a
+          state that cannot occur — but "dead rule" is a claim about behaviour,
+          so it is asserted rather than reasoned about.
+        */
+        renderList(MORNING);
+
+        const heading = screen.getByRole('button', { name: /^Chats/ });
+        expect(heading).toHaveAttribute('aria-expanded', 'true');
+
+        fireEvent.click(heading);
+
+        expect(heading).toHaveAttribute('aria-expanded', 'false');
+        await waitFor(() =>
+            expect(screen.queryByText('How do I close the store?')).not.toBeInTheDocument(),
+        );
+
+        fireEvent.click(heading);
+
+        expect(heading).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByText('How do I close the store?')).toBeInTheDocument();
     });
 });

@@ -31,6 +31,7 @@ export const SHELL_STYLESHEET = join(STYLES, 'storeSurface.css');
 export const indexStylesheet = join(SRC, 'index.css');
 export const RAIL_STYLESHEET = join(STYLES, 'transparency.css');
 export const PLAN_PANEL_STYLESHEET = join(STYLES, 'planpanelright.css');
+export const CHAT_LIST_STYLESHEET = join(STYLES, 'ChatList.css');
 /**
  * The shared **Stacking breakpoint**, built from the one number that declares
  * it rather than restated here. `TransparencyRail.test` reads `storeSurface.css`
