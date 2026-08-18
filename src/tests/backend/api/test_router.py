@@ -1508,6 +1508,28 @@ class TestPerRequestPlanReview:
         assert rt.orchestration_manager.get_current_or_new_orchestration.await_count == 1
         assert self._plan_review_passed(rt) is False
 
+    def test_an_unconfigured_allowlist_settles_the_turn_it_ended(self, rt):
+        """A configuration error is loud, and does not leave a Plan hanging.
+
+        With ``SUPPORTED_MODELS`` unset the factory now builds nothing and says
+        so (#113) rather than emptying the team one caught exception at a time.
+        That refusal reaches this route *after* the turn's Plan is written, so
+        the Plan is settled ``failed`` before the 500 — ADR-043's rule is that
+        the server settles the turn it ended, and a turn that ended on a
+        configuration error is still a turn that ended.
+        """
+        rt.orchestration_manager.get_current_or_new_orchestration.side_effect = (
+            router_mod.SupportedModelsNotConfigured("SUPPORTED_MODELS is not set.")
+        )
+
+        response = self._post(rt, lane="fast")
+
+        assert response.status_code == 500
+        assert "SUPPORTED_MODELS" in response.json()["detail"]
+        settled = rt.store.settle_turn.await_args.args
+        assert settled[1] is router_mod.PlanStatus.failed
+        rt.orchestration_manager.return_value.run_orchestration.assert_not_awaited()
+
     def test_an_authored_ticket_status_inquiry_turns_the_approval_gate_off(self, rt):
         """The word ``ticket`` cannot override the reply's declared Fast lane."""
         response = self._post(

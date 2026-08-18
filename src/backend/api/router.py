@@ -703,13 +703,32 @@ async def process_request(
             current_workflow._is_running = False
             current_workflow._terminated = True
         team_service = TeamService(memory_store)
-        await OrchestrationManager.get_current_or_new_orchestration(
-            user_id=user_id,
-            team_config=team,
-            team_switched=False,
-            team_service=team_service,
-            plan_review=lane.plan_review,
-        )
+        try:
+            await OrchestrationManager.get_current_or_new_orchestration(
+                user_id=user_id,
+                team_config=team,
+                team_switched=False,
+                team_service=team_service,
+                plan_review=lane.plan_review,
+            )
+        except SupportedModelsNotConfigured as e:
+            # A deployment with no allowlist builds no agents at all (#113).
+            # Raised here rather than caught inside the factory's per-agent
+            # loop, so it reaches this route — and this route has already
+            # written the turn's Plan. Settled `failed` before the 500, because
+            # ADR-043's rule is that the server settles the turn it ended, and
+            # a turn that ends on a configuration error is still a turn that
+            # ended: left alone it is a Plan that claims to still be working
+            # and never stops.
+            logger.error("Orchestration refused — %s", e)
+            await settle_the_turn(
+                memory_store, input_task.session_id, PlanStatus.failed, plan_id
+            )
+            track_event_if_configured(
+                "Error_Orchestration_Supported_Models_Not_Configured",
+                {"user_id": user_id, "error": str(e)},
+            )
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     try:
 

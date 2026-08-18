@@ -470,7 +470,12 @@ class TeamService:
             for d in deployments
             if d.get("status") == "Succeeded"
         ]
-        deployments_observed = bool(available_models)
+        # Whether the *listing* answered, not whether it answered well. A
+        # project holding only failed or still-provisioning deployments has been
+        # observed, and its models genuinely are missing; reading the succeeded
+        # subset here would file that real answer under "could not ask" and
+        # admit the team on a question nobody put.
+        deployments_observed = bool(deployments)
 
         # A model the allowlist already refused needs no second complaint about
         # its deployment: one cause, one sentence.

@@ -828,6 +828,27 @@ class TestValidateTeamModels:
         assert result.is_valid is True
 
     @pytest.mark.asyncio
+    async def test_a_failed_deployment_is_an_answer_not_a_silence(self):
+        """Only an empty *listing* is ambiguous, not an empty succeeded subset.
+
+        A project holding a failed or still-provisioning deployment has been
+        read successfully, and the model really is not usable. Deciding on the
+        succeeded subset would file that answer under *could not ask* and admit
+        the team on a question nobody put.
+        """
+        service = TeamService()
+        foundry = MagicMock()
+        foundry.list_model_deployments = AsyncMock(
+            return_value=[{"name": "custom-model", "status": "Failed"}]
+        )
+        with patch.object(team_service_module, "FoundryService", return_value=foundry):
+            cfg = {"agents": [{"deployment_name": "custom-model"}]}
+            result = await service.validate_team_models(cfg)
+        assert result.deployments_observed is True
+        assert result.missing_models == ["custom-model"]
+        assert result.is_valid is False
+
+    @pytest.mark.asyncio
     async def test_unobserved_deployments_are_not_a_wall_of_missing_models(self):
         """An empty listing means *not observed*, not *nothing is deployed*.
 
