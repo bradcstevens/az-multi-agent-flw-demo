@@ -250,6 +250,20 @@ def test_the_anonymous_opening_is_explained_rather_than_merely_stated():
     )
 
 
+def test_the_mocked_unlock_describes_named_address_without_promising_model_prose():
+    """The governance beat proves the manager learned a name, not a phrase.
+
+    The browser may assert the deterministic handoff but never wording a model
+    chose, so the runbook must say both halves without promising a greeting it
+    cannot guarantee.
+    """
+    runbook = _rendered()
+    unlock = runbook[runbook.index("Sign in to continue") : runbook.index("### 7.")]
+
+    assert "before sign-in it cannot know your name; after it, the manager does" in unlock
+    assert "Do not promise an exact greeting or browser-test its wording" in unlock
+
+
 def test_every_provenance_line_is_in_the_simulation_register():
     """Every source-owned Provenance line has a presenter-owned register row.
 

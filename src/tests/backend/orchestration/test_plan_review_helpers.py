@@ -132,7 +132,9 @@ sys.modules['models.plan_models'] = Mock(MPlan=MockMPlan, MStep=MockMStep)
 class MockPlanToMPlanConverter:
     @staticmethod
     def convert(plan_text, facts, team, task):
-        return MockMPlan()
+        plan = MockMPlan()
+        plan.user_request = task
+        return plan
 
 sys.modules['orchestration.helper.plan_to_mplan_converter'] = Mock(
     PlanToMPlanConverter=MockPlanToMPlanConverter,
@@ -371,6 +373,15 @@ class TestGetMagenticPromptKwargs:
         # Assert
         assert "FINAL ANSWER RULES" in result["final_answer_prompt"]
 
+    def test_when_the_manager_answers_then_the_prompt_keeps_offers_out_and_address_in(self):
+        final_prompt = get_magentic_prompt_kwargs(has_user_responses=False)[
+            "final_answer_prompt"
+        ]
+
+        assert "Do NOT offer further help. Provide the answer and end with a polite closing." in final_prompt
+        assert "Address the associate by name when a name is provided in the task context." in final_prompt
+        assert "be friendly" not in final_prompt
+
     def test_given_default_when_called_then_user_responses_is_false(self):
         # Act
         result = get_magentic_prompt_kwargs()
@@ -434,6 +445,7 @@ class TestConvertPlanReviewToMplan:
         # Assert
         assert isinstance(result, MockMPlan)
         assert result.user_id == "user-1"
+        assert result.user_request == "Do something"
 
     def test_given_none_ledger_when_called_then_raises_value_error(self):
         # Arrange

@@ -394,7 +394,9 @@ class OrchestrationManager:
     # ---------------------------
     # Execution
     # ---------------------------
-    async def run_orchestration(self, user_id: str, input_task) -> None:
+    async def run_orchestration(
+        self, user_id: str, input_task, address_name: str = ""
+    ) -> None:
         """
         Execute the Magentic workflow for the provided user and task description.
 
@@ -421,6 +423,14 @@ class OrchestrationManager:
             workflow, input_task
         )
         self.logger.debug("Task: %s", task_text)
+        # The associate's words feed every record and decision. Only the
+        # manager's initial view receives the per-turn address.
+        manager_task_text = task_text
+        if address_name.strip():
+            manager_task_text = (
+                f"The associate you are speaking with is {address_name.strip()}.\n\n"
+                f"Associate request:\n{task_text}"
+            )
 
         # ---- Team-scope gate (generic, team-agnostic) -------------------
 
@@ -458,7 +468,7 @@ class OrchestrationManager:
 
             # Initial run — stream events, collect any pending requests
             pending = await self._process_event_stream(
-                workflow.run(task_text, stream=True),
+                workflow.run(manager_task_text, stream=True),
                 user_id=user_id,
                 final_output_ref=final_output_ref,
                 orchestrator_chunks=orchestrator_chunks,

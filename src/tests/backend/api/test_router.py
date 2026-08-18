@@ -658,6 +658,13 @@ class TestTheIdentityBoundaryGate:
         assert resp.status_code == 200
         rt.orchestration_manager.assert_called()
 
+    def test_an_anonymous_store_question_carries_no_manager_address(self, rt):
+        self._post(rt, self.STORE)
+
+        call = rt.orchestration_manager.return_value.run_orchestration.await_args
+        assert call.kwargs["address_name"] == ""
+        assert call.args[1].description == self.STORE
+
     def test_a_paraphrase_with_no_personal_vocabulary_is_still_refused(self, rt):
         """The similarity tier, exercised through the endpoint."""
         paraphrase = "Am I working tomorrow evening?"
@@ -788,6 +795,15 @@ class TestTheMockedUnlock:
 
         assert "personal_answer" not in resp.json()
         rt.orchestration_manager.assert_called()
+
+    def test_a_store_question_carries_the_authored_address_name_to_the_manager(self, rt):
+        self._sign_in(rt)
+
+        self._post(rt, self.STORE)
+
+        call = rt.orchestration_manager.return_value.run_orchestration.await_args
+        assert call.kwargs["address_name"] == DEMO_ASSOCIATE.address_name
+        assert call.args[1].description == self.STORE
 
     def test_an_anonymous_personal_question_is_still_refused(self, rt):
         """Nothing about adding an answer may soften the refusal."""

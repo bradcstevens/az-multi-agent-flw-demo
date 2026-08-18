@@ -345,6 +345,10 @@ async def process_request(
         identity = await session_state.resolve_identity(input_task.session_id)
     else:
         identity = ANONYMOUS
+    associate_record = lookup_associate(identity.display_name)
+    address_name = (
+        associate_record.address_name if associate_record is not None else ""
+    )
     verdict = await identity_boundary_gate().evaluate(
         input_task.description, identity
     )
@@ -371,8 +375,7 @@ async def process_request(
     # direction: the agents say they hold nothing about an individual, and
     # nobody is ever shown a balance nobody authored.
     if verdict.personal:
-        record = lookup_associate(identity.display_name)
-        if record is not None:
+        if associate_record is not None:
             track_event_if_configured(
                 "Identity_Boundary_Unlocked",
                 {
@@ -387,7 +390,7 @@ async def process_request(
                 # plan id here would send the surface to a page that does not
                 # exist.
                 "plan_id": None,
-                "personal_answer": personal_answer_detail(record),
+                "personal_answer": personal_answer_detail(associate_record),
             }
 
     try:
@@ -574,7 +577,11 @@ async def process_request(
 
         async def run_orchestration_task(rehearsal_token):
             try:
-                await OrchestrationManager().run_orchestration(user_id, input_task)
+                await OrchestrationManager().run_orchestration(
+                    user_id,
+                    input_task,
+                    address_name=address_name,
+                )
             finally:
                 # The rehearsal marker's bound (#54). It stands for every SOP
                 # tool call this turn makes rather than only the first, so the

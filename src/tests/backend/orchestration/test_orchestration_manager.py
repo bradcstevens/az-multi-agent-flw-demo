@@ -936,6 +936,54 @@ class TestRunOrchestration:
         assert call_args[0][0] == "object task desc"
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("address_name", ["", "   "])
+    async def test_given_no_address_name_when_run_then_the_workflow_sees_the_unmodified_task(
+        self, address_name
+    ):
+        mock_workflow = Mock()
+        mock_workflow.run = Mock(return_value=_async_iter([]))
+        mock_workflow._executors = {}
+        mock_workflow.executors = {}
+        mock_workflow.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = mock_workflow
+        task = Mock(description="How do I close the store?")
+
+        await OrchestrationManager().run_orchestration(
+            user_id="user-1",
+            input_task=task,
+            address_name=address_name,
+        )
+
+        assert mock_workflow.run.call_args.args[0] == task.description
+
+    @pytest.mark.asyncio
+    async def test_given_an_address_name_when_run_then_only_the_workflow_sees_it(self):
+        mock_workflow = Mock()
+        mock_workflow.run = Mock(return_value=_async_iter([]))
+        mock_workflow._executors = {}
+        mock_workflow.executors = {}
+        mock_workflow.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = mock_workflow
+        task = Mock(description="How do I close the store?")
+        manager = OrchestrationManager()
+        manager._evaluate_team_scope = AsyncMock(return_value=None)
+
+        await manager.run_orchestration(
+            user_id="user-1",
+            input_task=task,
+            address_name="Tanya",
+        )
+
+        assert mock_workflow.run.call_args.args[0] == (
+            "The associate you are speaking with is Tanya.\n\n"
+            "Associate request:\nHow do I close the store?"
+        )
+        manager._evaluate_team_scope.assert_awaited_once_with(
+            mock_workflow, task.description
+        )
+        assert task.description == "How do I close the store?"
+
+    @pytest.mark.asyncio
     async def test_given_workflow_error_when_run_then_sends_error_ws_and_raises(self):
         # Arrange
         mock_workflow = Mock()

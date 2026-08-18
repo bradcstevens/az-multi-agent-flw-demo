@@ -21,6 +21,9 @@ class TestTheDemoAssociate:
     def test_the_demo_associate_has_a_display_name(self):
         assert DEMO_ASSOCIATE.display_name.strip()
 
+    def test_the_demo_associate_has_an_authored_address_name(self):
+        assert DEMO_ASSOCIATE.address_name == "Tanya"
+
     def test_the_demo_associate_is_the_one_the_boundary_probe_names(self):
         """The Quick Task says "My name is Tanya" — signing in as anybody else
         makes the beat a non sequitur on stage."""
@@ -80,3 +83,6 @@ class TestTheRecordIsSimulated:
     def test_a_record_can_be_built_with_no_facts(self):
         """Total: the type does not require the demo's own content."""
         assert AssociateRecord(display_name="Nobody").facts == ()
+
+    def test_a_record_can_omit_an_address_name(self):
+        assert AssociateRecord(display_name="Nobody").address_name == ""

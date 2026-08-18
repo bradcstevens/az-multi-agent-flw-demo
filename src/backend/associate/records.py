@@ -50,6 +50,9 @@ class AssociateRecord:
     """
 
     display_name: str
+    # This is authored rather than derived from ``display_name``: a name is not
+    # safely separable into a given-name-like address.
+    address_name: str = ""
     role: str = ""
     facts: Tuple[AssociateFact, ...] = field(default_factory=tuple)
 
@@ -60,6 +63,7 @@ class AssociateRecord:
 # answered, and the name has to be the same one both times.
 DEMO_ASSOCIATE = AssociateRecord(
     display_name="Tanya Alvarez",
+    address_name="Tanya",
     role=f"Store associate, Store {STORE_NUMBER}",
     facts=(
         AssociateFact("PTO balance", "34.5 hours"),

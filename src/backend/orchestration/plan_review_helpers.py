@@ -294,6 +294,7 @@ FINAL ANSWER RULES:
   under /api/v4/images/), embed it in your answer using markdown image syntax
   ![description](url). NEVER present an image as a bare URL or a plain link.
 - Do NOT offer further help. Provide the answer and end with a polite closing.
+- Address the associate by name when a name is provided in the task context.
 """
 
     kwargs: dict = {

@@ -171,7 +171,10 @@ separate login screen.
 
 **What happens:** the header gains a name, and the *same question, unedited* is asked again — and
 answered out of an authored associate record. The record carries a Provenance line that no payroll
-system was queried.
+system was queried. The next manager reply can address the associate by the authored address name:
+before sign-in it cannot know your name; after it, the manager does. Do not promise an exact
+greeting or browser-test its wording — that is model prose. The backend tests the structure instead:
+the name reaches only the manager after sign-in, never the associate's task or plan record.
 
 **They should be looking at:** the header changing, and the same words getting a different
 outcome.
