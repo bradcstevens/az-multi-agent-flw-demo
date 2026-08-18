@@ -5,14 +5,12 @@ import PanelFooter from "@/commonComponents/components/Panels/PanelFooter";
 import {
   Button,
   Caption1,
-  DrawerBody,
   Dialog,
   DialogActions,
   DialogBody,
   DialogContent,
   DialogSurface,
   DialogTitle,
-  OverlayDrawer,
   Toast,
   ToastBody,
   ToastTitle,
@@ -30,17 +28,11 @@ import {
 } from "../../api/config";
 import { TaskService } from "@/store";
 import "../../styles/ChatPanelLeft.css";
-import { ASSISTANT_NAME, CHAT_HISTORY_LABEL } from "../../models/storeSurface";
-import {
-  CHAT_HISTORY_DRAWER_ID,
-  CHAT_HISTORY_DRAWER_TOGGLE_ID,
-} from "../../models/panelDrawer";
+import { ASSISTANT_NAME } from "../../models/storeSurface";
+import { CHAT_HISTORY_DRAWER_ID } from "../../models/panelDrawer";
 import { useDesktopDrawer } from "../../hooks/usePanelDrawer";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import {
-  chatHistoryDrawerSetOpen,
-  selectChatHistoryDrawerOpen,
-} from "../../store/slices/panelDrawerSlice";
+import { useAppSelector } from "../../store/hooks";
+import { selectChatHistoryDrawerOpen } from "../../store/slices/panelDrawerSlice";
 import StoreAssistantLogo from "../branding/StoreAssistantLogo";
 import {
   CANCEL_DELETE_LABEL,
@@ -54,6 +46,22 @@ import {
   sweepFailureMessage,
 } from "../../models/chatDeletion";
 
+/**
+ * The chat-history column (#168, ADR-047).
+ *
+ * A **Panel drawer** that *pushes*: the surface opens with it, the
+ * `Chat history` disclosure closes it, and closed it is not rendered — the
+ * width goes back to the conversation and there is nothing left to declare a
+ * collapsed rule about. It was a modal `OverlayDrawer` under ADR-035, which
+ * could only ever be closed at first paint, because a panel covering its own
+ * content before anyone has asked for it is incoherent. That was a reason to
+ * stop floating it rather than a reason to open the surface with a hole where
+ * its third column belongs.
+ *
+ * Below the **Stacking breakpoint** it is dropped entirely, exactly as before:
+ * 280px of navigation beside a 390px viewport leaves the conversation
+ * unusable, and the conversation is the one thing that must still work there.
+ */
 const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
   reloadChats,
   restReload,
@@ -61,7 +69,6 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
   isLoadingTeam
 }) => {
   const { dispatchToast } = useToastController("toast");
-  const dispatch = useAppDispatch();
   const isDesktopDrawer = useDesktopDrawer();
   const drawerOpen = useAppSelector(selectChatHistoryDrawerOpen);
   const navigate = useNavigate();
@@ -93,13 +100,12 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
   const [deleteAllFailure, setDeleteAllFailure] = useState<string | null>(null);
   const [keptRunningNotice, setKeptRunningNotice] = useState<string | null>(null);
 
-  const closeDrawer = useCallback(() => {
-    dispatch(chatHistoryDrawerSetOpen(false));
-    window.setTimeout(() => {
-      document.getElementById(CHAT_HISTORY_DRAWER_TOGGLE_ID)?.focus();
-    }, 0);
-  }, [dispatch]);
-
+  /*
+    Navigation leaves the panel alone (#168, ADR-047). The overlay closed
+    itself here because it was covering the conversation it had just been
+    asked to open; a column covers nothing, and closing it would take the
+    presenter's next choice off the screen the moment they made this one.
+  */
   const loadPlansData = useCallback(async (forceRefresh = false) => {
     try {
       setPlansLoading(true);
@@ -179,7 +185,6 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
       const selectedChat = chats.find((chat) => chat.id === chatId);
       if (!selectedChat) return;
       const performNavigation = () => {
-        closeDrawer();
         navigate(`/chat/${selectedChat.planId}`);
       };
 
@@ -196,7 +201,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
         performNavigation();
       }
     },
-    [chats, closeDrawer, navigate, onLeavingChat, selectedChatId]
+    [chats, navigate, onLeavingChat, selectedChatId]
   );
 
   const handleChatDelete = useCallback(
@@ -242,7 +247,6 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
 
   const handleLogoClick = useCallback(() => {
     const performNavigation = () => {
-      closeDrawer();
       navigate("/");
     };
 
@@ -251,7 +255,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
     } else {
       performNavigation();
     }
-  }, [closeDrawer, navigate, onLeavingChat]);
+  }, [navigate, onLeavingChat]);
 
   // The count the confirmation states (#76) — only the chats the sweep can
   // actually take, so the number said before the fact matches what a running
@@ -343,23 +347,10 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
     }
   }, [chats, loadPlansData, navigate, selectedChatId]);
 
-  if (!isDesktopDrawer) return null;
+  if (!isDesktopDrawer || !drawerOpen) return null;
 
   return (
-    <OverlayDrawer
-      position="start"
-      aria-label={CHAT_HISTORY_LABEL}
-      open={drawerOpen}
-      onOpenChange={(_, data) => {
-        if (data.open) {
-          dispatch(chatHistoryDrawerSetOpen(true));
-          return;
-        }
-        closeDrawer();
-      }}
-    >
-      <DrawerBody>
-      <PanelLeft id={CHAT_HISTORY_DRAWER_ID}>
+    <PanelLeft id={CHAT_HISTORY_DRAWER_ID}>
         <PanelLeftToolbar
           linkTo={onLeavingChat ? undefined : "/"}
           onTitleClick={onLeavingChat ? handleLogoClick : undefined}
@@ -477,9 +468,7 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
           */}
           <div className="panel-footer-content" />
         </PanelFooter>
-      </PanelLeft>
-        </DrawerBody>
-    </OverlayDrawer>
+    </PanelLeft>
   );
 };
 

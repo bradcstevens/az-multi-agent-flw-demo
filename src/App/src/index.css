@@ -208,7 +208,20 @@ pre {
     left: 12px;
     top: 12px;
 }
-/* The conversation's single readable measure. */
+/* The conversation's single readable measure, centred in the column it caps. */
 .conversation-measure {
   max-width: 800px;
+  /*
+   * A measure caps the line; it does not pin the transcript to an edge (#168).
+   * Capped and unmargined, the conversation rendered in the left 800px of a
+   * 1600px column and the other 800px was empty background between the answer
+   * and the rail that explains it — from a projector, the gutter was the
+   * widest thing on the surface.
+   *
+   * `margin-inline` rather than `margin: 0 auto`, because the vertical margins
+   * belong to the components that stack these blocks and this rule owns only
+   * where the block sits across the column. Auto margins also centre a flex
+   * item, which is what `.content` makes of the outermost one.
+   */
+  margin-inline: auto;
 }

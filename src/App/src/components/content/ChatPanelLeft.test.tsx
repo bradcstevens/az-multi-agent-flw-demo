@@ -25,6 +25,7 @@ import { ASSISTANT_NAME } from '../../models/storeSurface';
 import panelDrawerReducer from '../../store/slices/panelDrawerSlice';
 import {
     CHAT_HISTORY_DRAWER_TOGGLE_CLASS,
+    STACKING_BREAKPOINT_PX,
 } from '../../models/panelDrawer';
 import {
     allRulesIncludingMediaQueries,
@@ -75,24 +76,41 @@ const renderDrawer = () =>
 describe('the chat-history panel drawer', () => {
     afterEach(() => vi.unstubAllGlobals());
 
-    it('opens over the conversation and Escape returns focus to its disclosure', async () => {
+    it('is a column the surface opens with, and the disclosure closes and returns (#168)', async () => {
+        /*
+          The default is the panel (ADR-047). A surface that opens with a hole
+          where its third column belongs makes the presenter find a control
+          before the chat list exists at all, and the overlay it replaced could
+          not be the default at any width: a panel covering its own content at
+          first paint is incoherent, which is a reason to stop floating it
+          rather than a reason to hide navigation.
+        */
         renderDrawer();
 
         const toggle = screen.getByRole('button', { name: 'Chat history' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(await screen.findByRole('navigation', { name: 'Chat history' })).toBeInTheDocument();
+
+        fireEvent.click(toggle);
+
+        await waitFor(() =>
+            expect(screen.queryByRole('navigation', { name: 'Chat history' })).not.toBeInTheDocument(),
+        );
         expect(toggle).toHaveAttribute('aria-expanded', 'false');
-        expect(screen.queryByRole('navigation', { name: 'Chat history' })).not.toBeInTheDocument();
 
         fireEvent.click(toggle);
 
         expect(await screen.findByRole('navigation', { name: 'Chat history' })).toBeInTheDocument();
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    });
 
-        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    it('pushes rather than floats, so it covers nothing it sits beside (#168)', () => {
+        // The one assertion that fails if the overlay comes back: a modal
+        // drawer is a `dialog`, it dims what it is read beside, and what it
+        // dims here is the answer the chat list was opened to get back to.
+        renderDrawer();
 
-        await waitFor(() =>
-            expect(screen.queryByRole('navigation', { name: 'Chat history' })).not.toBeInTheDocument(),
-        );
-        await waitFor(() => expect(toggle).toHaveFocus());
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it('releases every chat-history drawer rule at the stacking breakpoint', () => {
@@ -108,6 +126,28 @@ describe('the chat-history panel drawer', () => {
                     /display:\s*none/.test(rule.body),
             ),
         ).toBe(true);
+    });
+
+    it('leaves the conversation enough width to be a conversation (#168)', () => {
+        /*
+          The panel is a column now, so its width is subtracted from the answer
+          at every desktop width rather than only while it is open. 280px is
+          the number `storeSurface.css` already reasons with — 280 beside the
+          conversation's 280 minimum and the rail's 320 is 880px of furniture
+          under a shell that stacks at 900. The 500px it inherited from the
+          accelerator's drag-resize handle overruns that by 220px, and the
+          band it opens is the one #58 was entirely about.
+        */
+        const [panel] = allRulesIncludingMediaQueries().filter((rule) =>
+            rule.selector.split(',').some((selector) => selector.trim() === '.panelLeft'),
+        );
+
+        const width = /(?:^|[;{\s])width:\s*([^;}]+)/.exec(panel.body)?.[1].trim();
+        expect(width).toBe('280px');
+        expect(
+            280 + 280 + 320,
+            'the three columns are wider than the width they stack at',
+        ).toBeLessThan(STACKING_BREAKPOINT_PX);
     });
 
     it('keeps chat history dropped below the stacking breakpoint', () => {
@@ -253,7 +293,13 @@ describe('one chat is one row', () => {
         await waitFor(() =>
             expect(screen.getByTestId('here')).toHaveTextContent('/chat/plan-escalation'),
         );
-        expect(screen.queryByRole('navigation', { name: 'Chat history' })).not.toBeInTheDocument();
+        /*
+          And the panel is still there afterwards (#168). The overlay closed on
+          navigation because it was covering the conversation it had just been
+          asked to open; a column covers nothing, and closing it would take the
+          presenter's next choice off the screen the moment they made this one.
+        */
+        expect(screen.getByRole('navigation', { name: 'Chat history' })).toBeInTheDocument();
     });
 
     it('highlights the chat that is open, escalation included', async () => {

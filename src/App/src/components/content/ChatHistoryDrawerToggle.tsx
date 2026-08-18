@@ -5,7 +5,6 @@ import { useDesktopDrawer } from '@/hooks/usePanelDrawer';
 import {
     CHAT_HISTORY_DRAWER_ID,
     CHAT_HISTORY_DRAWER_TOGGLE_CLASS,
-    CHAT_HISTORY_DRAWER_TOGGLE_ID,
 } from '@/models/panelDrawer';
 import { CHAT_HISTORY_LABEL } from '@/models/storeSurface';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -15,7 +14,11 @@ import {
 } from '@/store/slices/panelDrawerSlice';
 
 /**
- * The chat-history **Panel drawer** disclosure (issue #130, ADR-035).
+ * The chat-history **Panel drawer** disclosure (issue #130, ADR-035, ADR-047).
+ *
+ * A static label plus `aria-expanded`, never a name that flips between *Show*
+ * and *Hide*. What it controls is a column the surface opens with, so at first
+ * paint it reports itself expanded and the press closes it.
  *
  * It is absent below the **Stacking breakpoint** because chat history stays
  * dropped there; a control for a drawer that cannot exist would only add a
@@ -31,7 +34,6 @@ const ChatHistoryDrawerToggle: React.FC = () => {
     return (
         <Button
             appearance="subtle"
-            id={CHAT_HISTORY_DRAWER_TOGGLE_ID}
             className={CHAT_HISTORY_DRAWER_TOGGLE_CLASS}
             aria-controls={CHAT_HISTORY_DRAWER_ID}
             aria-expanded={open}

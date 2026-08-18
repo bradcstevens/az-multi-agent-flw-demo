@@ -1,5 +1,5 @@
 /**
- * The **Panel drawer**'s mechanics (issue #127, ADR-035).
+ * The **Panel drawer**'s mechanics (issue #127, ADR-035; issue #168, ADR-047).
  *
  * A drawer is a side-column rule, and every side-column rule on this surface is
  * released at the **Stacking breakpoint**: below it the columns stack, so there
@@ -13,6 +13,10 @@
  * `TransparencyRail.test` reads the stylesheet and fails if the two ever
  * disagree. Two breakpoints that drift apart is #58, and the band between them
  * would be a rail with room and no headings in it.
+ *
+ * Both drawers push now. The chat-history panel's collapsed state needs no
+ * class of its own because the column is simply not rendered — a distinction
+ * the rail cannot borrow, since its container declares the width it gives up.
  */
 
 /** The **Stacking breakpoint**, in pixels, as `storeSurface.css` declares it. */
@@ -58,6 +62,3 @@ export const CHAT_HISTORY_DRAWER_ID = 'chat-history-drawer';
 
 /** The desktop-only disclosure class the Stacking breakpoint removes. */
 export const CHAT_HISTORY_DRAWER_TOGGLE_CLASS = 'chat-history-drawer-toggle';
-
-/** The disclosure to receive focus after the modal drawer closes. */
-export const CHAT_HISTORY_DRAWER_TOGGLE_ID = 'chat-history-drawer-toggle';

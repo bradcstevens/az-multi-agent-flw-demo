@@ -155,14 +155,15 @@ describe('leaving a chat', () => {
         'ends the displayed turn once when the associate chooses %s',
         async (_, trigger) => {
             renderLeavingChat();
-            if (_ === 'New chat') {
-                fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-                await screen.findByRole('button', { name: 'New chat' });
-            } else {
-                await screen.findByRole('button', {
-                    name: /^The freezer needs a new filter/,
-                });
-            }
+            /*
+              One wait for every trigger (#168, ADR-047). `New chat` used to
+              need a preamble of its own — Escape, to dismiss the modal drawer
+              that was covering it — and the panel is a column now, so all
+              three triggers are on the screen the moment the list has loaded.
+            */
+            await screen.findByRole('button', {
+                name: /^The freezer needs a new filter/,
+            });
             await openInFlightSocket();
 
             fireEvent.click(trigger());
@@ -218,7 +219,6 @@ describe('leaving a chat', () => {
             .mockResolvedValueOnce(PLAN_DATA);
 
         renderLeavingChat();
-        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
         fireEvent.click(await screen.findByRole('button', { name: 'New chat' }));
 
         await waitFor(() =>
