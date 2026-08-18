@@ -61,12 +61,17 @@ describe("the surface's stylesheets", () => {
       "reached for from outside the component, kept winning with `!important`",
       "would have stopped matching without a word the day Fluent renamed it".
 
-      What makes a rule a reach is that **no class of ours appears in it at
-      all** — so `body .fui-AccordionPanel` is caught, while
-      `.follow-on-task .fui-Button` is exactly how it should be done. The
-      property is deliberately not part of the question: the hazard is the reach
-      itself, and a guard that only objected to heights would let the next one
-      through on a different property.
+      What makes a rule a reach is that **no class of ours positively scopes
+      it** — so `body .fui-AccordionPanel` is caught, while
+      `.follow-on-task .fui-Button` is exactly how it should be done. A class
+      inside a negation is not a scope: `.fui-Button:not(.ours)` styles every
+      Fluent button on the surface *except* one, which is the reach with an
+      exception clause, so negations are stripped before the question is asked.
+
+      The property is deliberately not part of the question: the hazard is the
+      reach itself, and a guard that only objected to heights would let the next
+      one through on a different property. That breadth is wider than #178's own
+      acceptance criterion and is tracked as its own decision in #181.
     */
     const rules = allRulesIncludingMediaQueries();
 
@@ -75,9 +80,9 @@ describe("the surface's stylesheets", () => {
         .split(",")
         .map((selector) => selector.trim())
         .filter((selector) => {
-          const classes = classesIn(selector);
+          const scoping = classesIn(selector.replace(/:not\([^)]*\)/g, " "));
           return (
-            classes.length > 0 && classes.every((className) => className.startsWith("fui-"))
+            scoping.length > 0 && scoping.every((className) => className.startsWith("fui-"))
           );
         })
         .map((selector) => `${rule.file}: ${selector}`),

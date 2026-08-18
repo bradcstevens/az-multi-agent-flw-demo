@@ -167,6 +167,12 @@ const withoutAnyComments = (code: string): string =>
  * One import specifier, resolved the way the bundler resolves it. A bare
  * specifier is a package and stops the walk; `@/` is the alias `vite.config`
  * and `tsconfig` both point at `src`.
+ *
+ * The `.js` candidates are not decoration. TypeScript lets a module import
+ * `./PanelLeftToolbar.js` and be served `PanelLeftToolbar.tsx`, and this
+ * repository does exactly that in `PanelLeft.tsx` and `Content.tsx` — the file
+ * on the other end of both imports loads `Panel.css`. Without the substitution
+ * the walk stops at the edge and a stylesheet's only path in can vanish.
  */
 const resolveImport = (from: string, specifier: string): string | null => {
     if (!specifier.startsWith('.') && !specifier.startsWith('@/')) return null;
@@ -175,16 +181,37 @@ const resolveImport = (from: string, specifier: string): string | null => {
         ? join(SRC, specifier.slice(2))
         : resolve(dirname(from), specifier);
 
+    const asTypeScript = base.replace(/\.jsx?$/, '');
+
     const candidates = [
         base,
         `${base}.ts`,
         `${base}.tsx`,
+        `${asTypeScript}.ts`,
+        `${asTypeScript}.tsx`,
         join(base, 'index.ts'),
         join(base, 'index.tsx'),
     ];
 
     return candidates.find((path) => existsSync(path) && statSync(path).isFile()) ?? null;
 };
+
+/**
+ * The specifiers a module loads: a side-effect import, anything with a `from`
+ * clause — `export … from` included — and a dynamic `import()`.
+ *
+ * Anchored at a statement boundary and required to carry `from`, so an ordinary
+ * exported string constant is not mistaken for an edge: `export const PATH =
+ * './seed'` names a file and imports nothing.
+ */
+const specifiersIn = (code: string): string[] => [
+    ...Array.from(code.matchAll(/(?:^|[;}\n])\s*import\s*['"]([^'"]+)['"]/g), (m) => m[1]),
+    ...Array.from(
+        code.matchAll(/(?:^|[;}\n])\s*(?:import|export)\b[^'";]*?\sfrom\s*['"]([^'"]+)['"]/g),
+        (m) => m[1],
+    ),
+    ...Array.from(code.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g), (m) => m[1]),
+];
 
 /**
  * The inventory, computed once per test process.
@@ -213,18 +240,14 @@ export const loadedStylesheets = (): { file: string; path: string }[] => {
 
         const code = withoutAnyComments(readFileSync(module, 'utf8'));
         /*
-          Static, re-exported and dynamic alike: `import x from 'y'`, the
-          side-effect `import 'y'` that loads every stylesheet here, and
-          `await import('y')`.
-
           `export … from` is not optional. Half this application's modules are
           reached through a barrel — `pages/index.tsx`, `models/index.tsx`,
           `store/index.ts`, `api/index.tsx` — and a barrel re-exports rather
           than imports, so a walk that reads only `import` stops dead at the
           first one and reports two stylesheets for the whole surface.
         */
-        for (const match of code.matchAll(/\b(?:import|export)\b[^'"();]*\(?\s*['"]([^'"]+)['"]/g)) {
-            const resolved = resolveImport(module, match[1]);
+        for (const specifier of specifiersIn(code)) {
+            const resolved = resolveImport(module, specifier);
             if (resolved === null) continue;
             if (resolved.endsWith('.css')) stylesheets.add(resolved);
             else if (/\.tsx?$/.test(resolved)) queue.push(resolved);

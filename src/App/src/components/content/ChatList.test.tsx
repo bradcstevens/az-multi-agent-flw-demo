@@ -421,18 +421,26 @@ describe('the list holds chats in every state', () => {
 /**
  * How tall the list is allowed to be (#178).
  *
- * jsdom has no layout engine, so a hidden row is not observable here — what is
- * observable is the rule that hides it. These read the stylesheets on #58's
- * finding: a rule listed in a test agrees with itself forever, while a rule
- * read out of the stylesheet keeps agreeing with the surface.
+ * jsdom has no layout engine, so a hidden row is not observable here. What *is*
+ * observable is the **computed style** of the rendered element, and that is
+ * what this asks: the surface's own stylesheets are loaded into the document,
+ * the list is rendered, and each container between the panel and a row is asked
+ * what height and overflow it ended up with.
  *
- * Everything below is asked of **every stylesheet the application loads**,
- * inside media queries as well as out, and of the **rendered** element chain
- * rather than a class name typed here. The first version of this suite asked
- * `ChatList.css` for its top-level `max-height` rules, which is the same rule
- * spelled once: the cap could have come back as `height`, in a media query, in
- * another stylesheet, or inline in the component, and every one of those would
- * have been a green suite over a panel showing five chats.
+ * Three earlier versions of this suite parsed the stylesheets by hand and each
+ * review found another hole in the parser rather than in the surface —
+ * `:is()`'s commas split into invalid fragments, `var()` indirection read as a
+ * literal, a selector jsdom could not parse silently treated as no match, an
+ * inline `maxBlockSize` unrecognised beside a `maxHeight` that was. Every one of
+ * those is CSS the browser understands perfectly well, so the engine answers
+ * instead: it resolves the cascade, specificity, `!important`, selector lists,
+ * inline styles and logical properties, because that is its job.
+ *
+ * Media queries are the one thing jsdom does not evaluate, so the rules inside
+ * them are flattened in — every rule the stylesheets declare is loaded, whatever
+ * query it sits in. That is stricter than the browser and deliberately so:
+ * below the **Stacking breakpoint** this panel is not rendered at all, so a
+ * rule capping it there would be dead code claiming to be a layout.
  */
 describe("the chat list's height", () => {
     /**
@@ -463,153 +471,212 @@ describe("the chat list's height", () => {
         return containers;
     };
 
+    /** A rule worth loading: one that could bound a box or scroll it. */
+    const SIZES_OR_SCROLLS =
+        /(?:^|[;{\s])(?:(?:max-)?(?:height|block-size)|overflow(?:-y|-block)?)\s*:/i;
+
     /**
-     * One declaration block, as property/value pairs.
+     * The surface's own rules, in the document, for the containers they apply
+     * to — so the engine resolves them and this suite only has to read the
+     * answer.
      *
-     * Parsed rather than matched, because the property is half the question:
-     * `max-height: 100%` bounds the list to the panel's height while the rows
-     * overflow it, and `min-height: 54px` — which every row declares — bounds
-     * nothing. A regex that keeps only the value cannot tell those apart, and
-     * the first version of this suite accepted the first one.
+     * Loaded one rule at a time rather than as one sheet, because jsdom rejects
+     * a *stylesheet* wholesale when any rule in it defeats its parser: the whole
+     * surface silently failed to load behind a green assertion the first time
+     * this was written as a single `<style>`. One rule at a time, a rule it
+     * cannot parse is one rule, and it is returned rather than swallowed.
+     *
+     * Only rules that **match one of the containers** are loaded. That keeps the
+     * set small, and it keeps `Chat.css`'s nested `.messages` — the one rule in
+     * 273 that jsdom cannot parse, and a conversation class that matches nothing
+     * here — from being reported as a hole in a guard it has nothing to do with.
      */
-    const declarations = (css: string): [string, string][] =>
-        css
-            .split(';')
-            .map((declaration) => declaration.split(':'))
-            .filter((parts) => parts.length >= 2)
-            .map(([property, ...value]) => [
-                property.trim().toLowerCase(),
-                value.join(':').replace('!important', '').trim().toLowerCase(),
-            ]);
+    const loadRulesFor = (
+        containers: HTMLElement[],
+    ): { unload: () => void; unreadable: string[] } => {
+        const applies = (selector: string): boolean => {
+            try {
+                // Selector lists are handed over whole: `matches` understands
+                // `.a, .b`, and splitting on commas is what broke `:is(a, b)`.
+                return containers.some((container) => container.matches(selector));
+            } catch {
+                // A selector this engine cannot parse cannot be ruled out.
+                return true;
+            }
+        };
 
-    /** Physical and logical alike: a stylesheet may use either spelling. */
-    const CAPS = ['max-height', 'max-block-size'];
-    const SIZES = ['height', 'block-size'];
-    const NO_CAP = ['none', 'inherit', 'initial', 'unset', 'revert', ''];
-    const FILLS_PARENT = ['auto', '100%', 'inherit', 'initial', 'unset', 'revert', ''];
+        const injected: HTMLStyleElement[] = [];
+        const unreadable: string[] = [];
 
-    const boundsHeight = (css: string): boolean =>
-        declarations(css).some(
-            ([property, value]) =>
-                (CAPS.includes(property) && !NO_CAP.includes(value)) ||
-                (SIZES.includes(property) && !FILLS_PARENT.includes(value)),
+        for (const rule of allRulesIncludingMediaQueries()) {
+            if (!SIZES_OR_SCROLLS.test(rule.body)) continue;
+            if (!applies(rule.selector)) continue;
+
+            const style = document.createElement('style');
+            style.textContent = `${rule.selector}{${rule.body}}`;
+            document.head.appendChild(style);
+            injected.push(style);
+
+            if (style.sheet === null || style.sheet.cssRules.length !== 1) {
+                unreadable.push(`${rule.file}: ${rule.selector}`);
+            }
+        }
+
+        return { unload: () => injected.forEach((style) => style.remove()), unreadable };
+    };
+
+    /*
+      The computed properties that bound a box, and the ones that open a scroll
+      region — physical and logical spellings alike, because an element can be
+      given either and the engine reports what it was given.
+
+      A cap is free only when it is absent or `none`: `max-height: 100%` bounds
+      the list to the panel while the rows overflow it, which is this ticket's
+      defect with a different number in it. A size is free when it is absent,
+      `auto`, or filling its parent, which is how the panel's height reaches the
+      list. Anything else — including a `var()` this engine does not resolve — is
+      reported rather than assumed harmless.
+    */
+    const CAPS = ['maxHeight', 'maxBlockSize'] as const;
+    const SIZES = ['height', 'blockSize'] as const;
+    const SCROLLERS = ['overflow', 'overflowY', 'overflowBlock'] as const;
+
+    const UNCAPPED = ['', 'none'];
+    const FILLS_PARENT = ['', 'auto', '100%', 'inherit', 'initial', 'unset', 'revert'];
+
+    /** What bounds this element, as the engine resolved it. */
+    const bounds = (element: HTMLElement): string[] => {
+        const computed = getComputedStyle(element);
+
+        return [
+            ...CAPS.filter((property) => !UNCAPPED.includes(computed[property])).map(
+                (property) => `${property}: ${computed[property]}`,
+            ),
+            ...SIZES.filter((property) => !FILLS_PARENT.includes(computed[property])).map(
+                (property) => `${property}: ${computed[property]}`,
+            ),
+        ];
+    };
+
+    /** What opens a scroll region inside this element. */
+    const scrolls = (element: HTMLElement): string[] => {
+        const computed = getComputedStyle(element);
+
+        return SCROLLERS.filter((property) => /\b(auto|scroll)\b/.test(computed[property])).map(
+            (property) => `${property}: ${computed[property]}`,
         );
+    };
 
-    /** A scroll region of its own — the scrollbar nobody looks for. */
-    const SCROLLERS = ['overflow', 'overflow-y', 'overflow-block'];
+    const describeElement = (element: HTMLElement): string =>
+        `${element.tagName.toLowerCase()}.${Array.from(element.classList).join('.')}`;
 
-    const opensOwnScroll = (css: string): boolean =>
-        declarations(css).some(
-            ([property, value]) =>
-                SCROLLERS.includes(property) && /\b(auto|scroll)\b/.test(value),
-        );
-
-    it('recognises the rule that caused this ticket, so the guards below cannot pass vacuously', () => {
-        /*
-          The detectors, checked against the deleted rule itself and against the
-          declarations that must keep passing. Without this, every assertion
-          below is "no rule matched", which is also what a broken detector says.
-        */
-        expect(boundsHeight('max-height: 280px !important; overflow-y: auto !important')).toBe(true);
-        expect(opensOwnScroll('max-height: 280px !important; overflow-y: auto !important')).toBe(true);
-
-        // The same cap in its logical spelling, which is not a different rule.
-        expect(boundsHeight('max-block-size: 280px')).toBe(true);
-        expect(opensOwnScroll('overflow-block: scroll')).toBe(true);
-
-        /*
-          And the cap that hides behind a percentage: `max-height: 100%` bounds
-          the list to the panel while the rows overflow it, which is the defect
-          with a different number in it. `height: 100%` is how the panel's own
-          height reaches the list, and a row flooring itself — `.task-tab`
-          declares `min-height: 54px` — is not a cap at all.
-        */
-        expect(boundsHeight('max-height: 100%')).toBe(true);
-        expect(boundsHeight('height: 100%')).toBe(false);
-        expect(boundsHeight('min-height: 54px')).toBe(false);
-        expect(opensOwnScroll('overflow: hidden')).toBe(false);
-    });
-
-    it('sits under the containers this suite thinks it does', () => {
-        // The other half of the vacuity guard: the assertions below are only
-        // worth anything if the chain they are asked of is the real one.
-        const containers = listContainers();
-        const classes = containers.flatMap((element) => Array.from(element.classList));
-
-        expect(classes).toContain('task-list-container');
-        expect(
-            classes.some((className) => /^fui-Accordion/.test(className)),
-            'the Fluent accordion is no longer between the list and its rows',
-        ).toBe(true);
-    });
-
-    it('is bounded by the panel it sits in, in every stylesheet the application loads', () => {
+    it('is bounded by the panel it sits in, not by anything of its own', () => {
         /*
           The defect: `max-height: 280px` with its own `overflow-y: auto` put
           five rows on screen and the rest behind a scrollbar *inside* a panel
           that is already full height and already scrolls — #60's "content
           hidden behind a second scrollbar", in the column on the other edge.
-
-          A rule is this list's own when it **matches one of the containers**,
-          asked of the rendered element rather than of the class names in the
-          selector. That is what makes the guard hold wherever the cap is
-          written: `.fui-AccordionPanel` in this stylesheet, `body
-          .fui-AccordionPanel` in another, `[role="region"]` in a third, or any
-          of them inside a media query. Matching on class names alone missed the
-          classless ones entirely.
         */
         const containers = listContainers();
+        const { unload, unreadable } = loadRulesFor(containers);
 
-        const matches = (selector: string): boolean => {
-            try {
-                return containers.some((container) => container.matches(selector));
-            } catch {
-                // A selector jsdom cannot parse — `::before`, or a `:has()` it
-                // does not implement. It cannot be silently treated as "no
-                // match", so it is reported rather than skipped.
-                return /(?:max-)?(?:height|block-size)|overflow/.test(selector);
-            }
-        };
-
-        const offenders = allRulesIncludingMediaQueries().flatMap((rule) =>
-            rule.selector
-                .split(',')
-                .map((selector) => selector.trim())
-                .filter((selector) => selector.length > 0 && matches(selector))
-                .filter(() => boundsHeight(rule.body) || opensOwnScroll(rule.body))
-                .map((selector) => `${rule.file}: ${selector}`),
-        );
-
-        expect(
-            offenders,
-            `${offenders.join(', ')} bounds the chat list or opens a scroll region inside it`,
-        ).toEqual([]);
-    });
-
-    it('is not bounded inline either, where no stylesheet could overrule it', () => {
-        /*
-          The escape a stylesheet-reading test cannot see, and the one this
-          repository has paid for twice: an inline style beats every rule and
-          every breakpoint (`CONTEXT.md`, and #25 and #60 before it). A
-          `max-height` moved onto the element would restore the defect with
-          every assertion above still green.
-
-          Asked of `cssText` through the same two detectors the stylesheets are
-          asked through, rather than of four named properties: a guard that
-          knows about `maxHeight` and not `maxBlockSize` is a guard with a
-          spelling in it, and the stylesheet half already knows better.
-        */
-        for (const container of listContainers()) {
-            const inline = container.style.cssText;
-
-            expect(boundsHeight(inline), `an inline height caps the list: ${inline}`).toBe(false);
+        try {
             expect(
-                opensOwnScroll(inline),
-                `an inline overflow opens a second scrollbar: ${inline}`,
-            ).toBe(false);
+                unreadable,
+                `${unreadable.join(', ')} applies to the chat list and could not be read`,
+            ).toEqual([]);
+
+            for (const container of containers) {
+                expect(
+                    bounds(container),
+                    `${describeElement(container)} bounds the chat list's height`,
+                ).toEqual([]);
+                expect(
+                    scrolls(container),
+                    `${describeElement(container)} opens a scroll region inside the panel`,
+                ).toEqual([]);
+            }
+        } finally {
+            unload();
         }
     });
 
+    it('would say so if the rule that caused this ticket came back', () => {
+        /*
+          The guard, proved rather than trusted. The assertion above is "no
+          container is bounded", which is also what a guard that has stopped
+          looking says — and it *had* stopped looking once already: loaded as
+          one sheet, jsdom rejected the surface's whole stylesheet over one
+          nested rule and every assertion passed against no styles at all.
+
+          So the deleted rule goes back, exactly as it was written: on
+          `.fui-AccordionPanel`, a class no source file here contains, with
+          `!important` on both declarations.
+        */
+        const containers = listContainers();
+        const { unload } = loadRulesFor(containers);
+
+        const cap = document.createElement('style');
+        cap.textContent =
+            '.fui-AccordionPanel { max-height: 280px !important; overflow-y: auto !important; }';
+        document.head.appendChild(cap);
+
+        try {
+            const panel = containers.find((element) =>
+                element.classList.contains('fui-AccordionPanel'),
+            );
+
+            expect(
+                panel,
+                'the Fluent accordion panel is no longer a container of the rows',
+            ).toBeDefined();
+            expect(bounds(panel as HTMLElement)).toContain('maxHeight: 280px');
+            expect(scrolls(panel as HTMLElement)).toContain('overflowY: auto');
+        } finally {
+            cap.remove();
+            unload();
+        }
+    });
+
+    it('reads the surface it thinks it is reading', () => {
+        /*
+          The other half of the proof, and the one the single-sheet version
+          needed: that this loader really pulls rules out of the surface's own
+          stylesheets and gets them applying, rather than quietly loading
+          nothing and reporting a clean list.
+
+          Proved with a rule that exists — `storeSurface.css` declares
+          `overflow: hidden` on `.panelContent`, the panel's own scroll region —
+          asked of a probe element carrying that class. A rule of the suite's
+          own invention would only prove that jsdom applies stylesheets, which
+          was never in doubt; this proves the path from the repository's CSS
+          files to a computed value.
+        */
+        const containers = listContainers();
+        const probe = document.createElement('div');
+        probe.className = 'panelContent';
+        document.body.appendChild(probe);
+
+        const { unload } = loadRulesFor([...containers, probe]);
+
+        try {
+            const classes = containers.flatMap((element) => Array.from(element.classList));
+
+            expect(classes).toContain('task-list-container');
+            expect(
+                classes.some((className) => /^fui-Accordion/.test(className)),
+                'the Fluent accordion is no longer between the list and its rows',
+            ).toBe(true);
+
+            expect(
+                getComputedStyle(probe).overflow,
+                "the surface's own stylesheets are not reaching the rendered surface",
+            ).toBe('hidden');
+        } finally {
+            unload();
+            probe.remove();
+        }
+    });
     it('renders every chat it has been given, not a windowful', () => {
         /*
           The claim the panel makes, asserted where it can be. The cap was a
