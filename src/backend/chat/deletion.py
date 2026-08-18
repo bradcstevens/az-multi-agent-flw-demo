@@ -42,10 +42,13 @@ SETTLED_STATUSES = frozenset(
     }
 )
 
-# What the surface says when it keeps a chat. ADR-026's own noted cost: a
-# running Chat cannot be deleted, so the refusal has to explain itself rather
-# than read as a control that simply did not work.
-STILL_RUNNING_DETAIL = "This chat is still running, so it cannot be deleted yet."
+# What the surface says about a chat whose turn is still in flight. ADR-026's
+# own noted cost, answered rather than restated: a running Chat cannot be
+# deleted *as it stands*, so the refusal has to explain itself rather than read
+# as a control that simply did not work. #122 makes it a door — `end_turn=true`
+# ends the turn first, through the same primitive **Leaving a Chat** uses — so
+# this names the act rather than the wall.
+STILL_RUNNING_DETAIL = "This chat is still running, so deleting it ends its turn first."
 
 
 class DeletionOutcome(str, Enum):

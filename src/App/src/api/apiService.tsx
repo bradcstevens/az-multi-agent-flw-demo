@@ -205,10 +205,21 @@ export class APIService {
      * the history, and a cached list is the one way a deleted row comes back.
      *
      * @param sessionId The Chat's `session_id` — never the plan id a row opens.
+     * @param endTurn Ask for the turn to be ended first (#122, ADR-031 §5).
+     *   The way out of `in_progress` is to end the turn, never to loosen the
+     *   guard, and the ask travels on the request because the associate is the
+     *   one making it — no heuristic about abandonment lives at either end.
+     *   Sent only when the row the associate confirmed said the Chat was
+     *   running, so a settled row's delete can never end a turn that started
+     *   after the list was read.
      */
-    async deleteChat(sessionId: string): Promise<ChatDeletionResponse> {
+    async deleteChat(
+        sessionId: string,
+        endTurn = false
+    ): Promise<ChatDeletionResponse> {
+        const door = endTurn ? '?end_turn=true' : '';
         const deleted = await apiClient.delete<ChatDeletionResponse>(
-            `${API_ENDPOINTS.CHATS}/${encodeURIComponent(sessionId)}`
+            `${API_ENDPOINTS.CHATS}/${encodeURIComponent(sessionId)}${door}`
         );
         this._cache.invalidate(new RegExp(`^plans_`));
         return deleted;
