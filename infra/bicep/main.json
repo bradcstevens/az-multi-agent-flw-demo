@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.45.15.27210",
-      "templateHash": "14804470904809990403"
+      "templateHash": "7600850809518392354"
     },
     "name": "Multi-Agent Custom Automation Engine - Vanilla Bicep",
     "description": "Vanilla Bicep orchestrator for the Multi-Agent Custom Automation Engine accelerator. This deployment intentionally excludes WAF features such as private networking, scale-out, redundancy, bastion, and VM resources while keeping router-compatible outputs."
@@ -2028,7 +2028,33 @@
             "value": [
               {
                 "name": "[variables('cosmosDbDatabaseMemoryContainerName')]",
-                "partitionKeyPath": "[variables('cosmosDbDatabaseMemoryPartitionKey')]"
+                "partitionKeyPath": "[variables('cosmosDbDatabaseMemoryPartitionKey')]",
+                "indexingPolicy": {
+                  "automatic": true,
+                  "indexingMode": "consistent",
+                  "includedPaths": [
+                    {
+                      "path": "/*"
+                    }
+                  ],
+                  "excludedPaths": [
+                    {
+                      "path": "/\"_etag\"/?"
+                    }
+                  ],
+                  "compositeIndexes": [
+                    [
+                      {
+                        "path": "/timestamp",
+                        "order": "descending"
+                      },
+                      {
+                        "path": "/id",
+                        "order": "descending"
+                      }
+                    ]
+                  ]
+                }
               }
             ]
           }
@@ -2040,7 +2066,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.45.15.27210",
-              "templateHash": "17272927369391163104"
+              "templateHash": "10330746273759804250"
             }
           },
           "parameters": {
@@ -2106,7 +2132,8 @@
                     "paths": [
                       "[parameters('containers')[copyIndex()].partitionKeyPath]"
                     ]
-                  }
+                  },
+                  "indexingPolicy": "[if(contains(parameters('containers')[copyIndex()], 'indexingPolicy'), tryGet(parameters('containers')[copyIndex()], 'indexingPolicy'), null())]"
                 },
                 "options": {}
               },

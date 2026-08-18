@@ -438,6 +438,32 @@ module cosmosDBModule './modules/data/cosmos-db-nosql.bicep' = {
       {
         name: cosmosDbDatabaseMemoryContainerName
         partitionKeyPath: cosmosDbDatabaseMemoryPartitionKey
+        indexingPolicy: {
+          automatic: true
+          indexingMode: 'consistent'
+          includedPaths: [
+            {
+              path: '/*'
+            }
+          ]
+          excludedPaths: [
+            {
+              path: '/"_etag"/?'
+            }
+          ]
+          compositeIndexes: [
+            [
+              {
+                path: '/timestamp'
+                order: 'descending'
+              }
+              {
+                path: '/id'
+                order: 'descending'
+              }
+            ]
+          ]
+        }
       }
     ]
   }

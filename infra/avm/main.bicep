@@ -956,6 +956,32 @@ module cosmosDBModule './modules/data/cosmos-db-nosql.bicep' = {
       {
         name: cosmosDbDatabaseMemoryContainerName
         partitionKeyPath: '/session_id'
+        indexingPolicy: {
+          automatic: true
+          indexingMode: 'consistent'
+          includedPaths: [
+            {
+              path: '/*'
+            }
+          ]
+          excludedPaths: [
+            {
+              path: '/"_etag"/?'
+            }
+          ]
+          compositeIndexes: [
+            [
+              {
+                path: '/timestamp'
+                order: 'descending'
+              }
+              {
+                path: '/id'
+                order: 'descending'
+              }
+            ]
+          ]
+        }
       }
     ]
     publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
