@@ -76,15 +76,15 @@ interface UsePlanWebSocketProps {
  * the server settles the turn it ended (#158, ADR-043 decision 7), and this
  * surface echoing `is_final` back made a second writer of one fact.
  *
- * `endsTheTurn` is what remains of that flag, and it decides only what it says:
- * once the last message of a turn has landed, repaint the chat list, because
- * the row now reads the status the *server* settled.
+ * `refreshChatList` is what remains of that flag, named for the one thing it
+ * still decides: once the turn's last message has landed, repaint the chat
+ * list, because the row now reads the status the *server* settled.
  */
 function persistAgentMessage(
     agentMessageData: AgentMessageData,
     planData: ProcessedPlanData | null,
     dispatch: ReturnType<typeof useAppDispatch>,
-    endsTheTurn = false,
+    refreshChatList = false,
     streamingMessage = '',
 ) {
     if (!planData?.plan) return;
@@ -97,12 +97,12 @@ function persistAgentMessage(
     apiService
         .sendAgentMessage(agentMessageResponse)
         .then(() => {
-            if (endsTheTurn) {
+            if (refreshChatList) {
                 setTimeout(() => dispatch(setReloadLeftList(true)), 1000);
             }
         })
         .catch(() => {
-            if (endsTheTurn) {
+            if (refreshChatList) {
                 setTimeout(() => dispatch(setReloadLeftList(true)), 1000);
             }
         });

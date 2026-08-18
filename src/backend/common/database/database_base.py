@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Type
 from models.plan_models import MPlan
 
 from chat.deletion import ChatDeletion, ChatsDeletion
+from chat.echo import MessageEchoed
 from chat.settle import TurnSettled
 
 from ..models.messages import (
@@ -233,6 +234,20 @@ class DatabaseBase(ABC):
         ``plan_id``, when the caller knows which Plan its turn ran, binds the
         write to it: a turn that ended after its successor's Plan was written
         settles nothing rather than settling the successor.
+        """
+        pass
+
+    @abstractmethod
+    async def record_streaming_message(
+        self, plan_id: str, streaming_message: str
+    ) -> MessageEchoed:
+        """Write the turn's streamed reply onto its **Plan record** (#158).
+
+        The browser's echo is the only thing that persists this, so the write
+        has to be able to report that it did not happen: ADR-043 decision 7
+        stops the route answering success for a write that did not land, and it
+        can only do that if the store tells a **Plan record** that is gone from
+        one it could not read.
         """
         pass
 

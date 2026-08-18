@@ -19,11 +19,12 @@ Three outcomes, and they are told apart because only one of them is a write this
 system believed it had made and had not:
 
 * **`recorded`** — every write the echo asked for landed.
-* **`no_such_chat`** — the transcript row landed; the Plan it names is gone, so
-  the streaming message had nowhere to go. Ordinary rather than a fault: #108's
-  rejection path deletes a Plan document outright, and a Chat may be deleted
-  between an agent speaking and the echo arriving. Not a store failure, and not
-  a 500 — but not a clean write either, and the route says so.
+* **`no_such_chat`** — the transcript row landed; the **Plan record** it names is
+  gone, so the streaming message had nowhere to go. Ordinary rather than a
+  fault: #108's rejection path deletes a Plan record outright, and the echo is
+  fire-and-forget — it can arrive after the server settled the turn (#157) and
+  the associate deleted the Chat that settling made deletable. Not a store
+  failure, and not a 500 — but not a clean write either, and the route says so.
 * **`refused`** — the store refused a write. **Not success.** The record does
   not say what this process believes it says, and the route is the last layer
   that can admit it.
@@ -44,8 +45,8 @@ class EchoOutcome(str, Enum):
     #: The agent message — and the streaming message, when the echo carried one
     #: — are on the record.
     recorded = "recorded"
-    #: The agent message is on the record. The Plan it names is not, so its
-    #: streaming message was not stored.
+    #: The agent message is on the record. The **Plan record** it names is not,
+    #: so its streaming message was not stored.
     no_such_chat = "no_such_chat"
     #: The store refused a write. **Not success.**
     refused = "refused"
@@ -72,9 +73,10 @@ class MessageEchoed:
     def store_failed(self) -> bool:
         """Whether a write this process believed it had made had not.
 
-        True for `refused` alone. A Plan that has gone is not a store failure —
-        there was nothing to write to — and answering it with a 500 would report
-        an outage every time somebody deleted a chat mid-turn.
+        True for `refused` alone. A **Plan record** that has gone is not a store
+        failure — there was nothing to write to — and answering it with a 500
+        would report an outage every time an associate deleted a settled Chat
+        before its echo arrived.
         """
         return self.outcome is EchoOutcome.refused
 

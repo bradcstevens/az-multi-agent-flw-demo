@@ -1453,10 +1453,15 @@ deleted. That verdict is the **settle-write**'s alone
 ([ADR-043](docs/ADR/043-the-server-settles-the-turn-it-ended.md) decision 7). What the route *says*
 is narrowed with it: the handler used to wrap everything in a broad `except` and return a falsy
 result the route logged and discarded, so a store failure, a missing **Plan record** and a clean
-write were all answered `{"status": "message recorded"}`. Now a refused write is a 500, and a Plan
-that has gone — ordinary, since the rejection path deletes one outright and a Chat may be deleted
-mid-turn — is neither an error nor a claim that the streaming message landed. The three outcomes,
-and which of them a route may call success, are `src/backend/chat/echo.py`.
+write were all answered `{"status": "message recorded"}`. Now a refused write is a 500, and a **Plan
+record** that has gone — ordinary, since the rejection path deletes one outright and a settled Chat
+may be deleted before its echo arrives — is neither an error nor a claim that the streaming message
+landed. The three outcomes, and which of them a route may call success, are
+`src/backend/chat/echo.py`. The streamed reply reaches the record through `record_streaming_message`
+(`src/backend/common/database/cosmosdb.py`), which reads raw for `_latest_plan`'s reason — a
+swallowed read turns an outage into *"no such record"* — and **patches one field** rather than
+re-reading and upserting the document, so a late echo cannot bump a finished turn's `_ts` above the
+live turn that succeeded it.
 _Avoid_: agent message callback, final message post, is_final
 
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that

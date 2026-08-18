@@ -40,6 +40,7 @@ from backend.common.models.messages import (
     UserCurrentTeam,
 )
 from chat.deletion import ChatDeletion, DeletionOutcome
+from chat.echo import EchoOutcome
 from chat.settle import SettleOutcome
 from models.plan_models import MPlan
 
@@ -2256,6 +2257,137 @@ class AsyncIteratorMock:
         item = self.items[self.index]
         self.index += 1
         return item
+
+
+class TestStoringTheStreamedReply:
+    """The echo's surviving write (#158, ADR-043 decision 7).
+
+    The browser no longer tells the record whether the turn ended, but it is
+    still the only thing that persists the streamed reply — so this write has to
+    be able to say it did not happen. Two properties carry that, and both are
+    `settle_turn`'s:
+
+    * **The read is raw.** `query_items` logs a failed query and returns `[]`,
+      which would arrive here as *"there is no such **Plan record**"* and be
+      answered 200 — an outage reported as a deletion.
+    * **The write is a patch.** The write this replaced re-read the whole
+      document and upserted it, bumping its `_ts`; the Chat's latest **Plan
+      record** is chosen by `_ts`, so a late echo could promote a finished
+      turn's record over the live one that succeeded it (#165).
+    """
+
+    @pytest.fixture
+    def client(self):
+        client = CosmosDBClient(
+            endpoint="https://test.documents.azure.com:443/",
+            credential="test_credential",
+            database_name="test_db",
+            container_name="test_container",
+            session_id="test_session",
+            user_id="test_user",
+        )
+        client._initialized = True
+        client.container = AsyncMock()
+        return client
+
+    @staticmethod
+    def _cosmos(client, found=None, raises=None, refuses=None):
+        def query_items(**kwargs):
+            async def cursor():
+                if raises is not None:
+                    raise raises
+                for row in found or []:
+                    yield row
+
+            return cursor()
+
+        client.container.query_items = Mock(side_effect=query_items)
+        client.container.patch_item = AsyncMock(side_effect=refuses)
+
+    @pytest.mark.asyncio
+    async def test_the_streamed_reply_is_written_onto_the_record(self, client):
+        self._cosmos(client, found=[{"id": "plan-1", "session_id": "session-1"}])
+
+        result = await client.record_streaming_message("plan-1", "what it said")
+
+        assert result.outcome is EchoOutcome.recorded
+        assert result.persisted is True
+        written = client.container.patch_item.call_args
+        assert written.kwargs["patch_operations"] == [
+            {"op": "set", "path": "/streaming_message", "value": "what it said"}
+        ]
+
+    @pytest.mark.asyncio
+    async def test_one_field_is_written_rather_than_the_document(self, client):
+        # The `_ts` bump #165 names. An upsert here would rewrite the whole
+        # record and move it to the front of the newest-first read.
+        self._cosmos(client, found=[{"id": "plan-1", "session_id": "session-1"}])
+
+        await client.record_streaming_message("plan-1", "what it said")
+
+        client.container.upsert_item.assert_not_called()
+        client.container.replace_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_the_write_is_aimed_at_the_records_own_partition(self, client):
+        # A Chat is a session partition (ADR-025). Patching a plan id against
+        # the wrong partition key writes nothing and reports success.
+        self._cosmos(client, found=[{"id": "plan-1", "session_id": "session-1"}])
+
+        await client.record_streaming_message("plan-1", "what it said")
+
+        assert client.container.patch_item.call_args.kwargs["partition_key"] == (
+            "session-1"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_record_that_is_gone_is_not_a_store_failure(self, client):
+        # #108's rejection path deletes a Plan record outright, and a settled
+        # Chat may be deleted before its echo arrives. Nothing to write to is
+        # not a store that refused to write.
+        self._cosmos(client, found=[])
+
+        result = await client.record_streaming_message("plan-1", "what it said")
+
+        assert result.outcome is EchoOutcome.no_such_chat
+        assert result.store_failed is False
+        client.container.patch_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_read_that_fell_over_is_a_store_failure(self, client):
+        # The whole reason the read is raw. Through `query_items` this would
+        # have come back as an empty result and been reported as a record that
+        # had been deleted — an outage answered 200.
+        self._cosmos(client, raises=RuntimeError("Cosmos is down"))
+
+        result = await client.record_streaming_message("plan-1", "what it said")
+
+        assert result.outcome is EchoOutcome.refused
+        assert result.store_failed is True
+
+    @pytest.mark.asyncio
+    async def test_a_write_the_store_refused_is_reported(self, client):
+        self._cosmos(
+            client,
+            found=[{"id": "plan-1", "session_id": "session-1"}],
+            refuses=RuntimeError("Cosmos is down"),
+        )
+
+        result = await client.record_streaming_message("plan-1", "what it said")
+
+        assert result.outcome is EchoOutcome.refused
+        assert result.persisted is False
+
+    @pytest.mark.asyncio
+    async def test_the_read_is_scoped_to_its_owner(self, client):
+        # A plan id is not a secret. Writing the streamed reply onto another
+        # associate's record would put one conversation's words in another's.
+        self._cosmos(client, found=[{"id": "plan-1", "session_id": "session-1"}])
+
+        await client.record_streaming_message("plan-1", "what it said")
+
+        parameters = client.container.query_items.call_args.kwargs["parameters"]
+        assert {"name": "@user_id", "value": "test_user"} in parameters
 
 
 if __name__ == "__main__":

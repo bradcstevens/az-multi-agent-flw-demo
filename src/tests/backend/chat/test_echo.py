@@ -35,7 +35,7 @@ class TestWhatCountsAsAStoreFailure:
     def test_a_refusal_is_one(self):
         assert MessageEchoed(EchoOutcome.refused).store_failed is True
 
-    def test_a_plan_that_has_gone_is_not(self):
+    def test_a_plan_record_that_has_gone_is_not(self):
         # The whole reason these are separate members. Answering a deleted Chat
         # with a 500 would report an outage every time somebody cleared their
         # history — and the route decides its status code off this property.
@@ -60,7 +60,7 @@ class TestWhatTheRouteMaySay:
         # however the route is written.
         assert MessageEchoed(outcome).status != "message recorded"
 
-    def test_a_plan_that_has_gone_names_what_did_not_land(self):
+    def test_a_plan_record_that_has_gone_names_what_did_not_land(self):
         assert MessageEchoed(EchoOutcome.no_such_chat).status == (
             "message recorded without its streaming message"
         )

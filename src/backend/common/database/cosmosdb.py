@@ -10,6 +10,7 @@ from azure.cosmos.aio import CosmosClient
 from azure.cosmos.aio._database import DatabaseProxy
 
 from chat.deletion import ChatDeletion, ChatsDeletion, DeletionOutcome, is_running
+from chat.echo import EchoOutcome, MessageEchoed
 from chat.settle import SettleOutcome, TurnSettled, settled_status
 
 from ..models.messages import (
@@ -691,6 +692,89 @@ class CosmosDBClient(DatabaseBase):
             return TurnSettled(SettleOutcome.refused)
 
         return TurnSettled(SettleOutcome.settled, status=terminal)
+
+    async def record_streaming_message(
+        self, plan_id: str, streaming_message: str
+    ) -> MessageEchoed:
+        """Write the turn's streamed reply onto its **Plan record** (#158).
+
+        The browser's echo is the only thing that persists this, so the write
+        has to be able to say it did not happen (ADR-043 decision 7). Two things
+        follow, and both are :meth:`settle_turn`'s for the same reasons.
+
+        **Read raw, not through** ``query_items``, which logs a failed query and
+        returns ``[]`` — so an outage would arrive here as *"there is no such
+        **Plan record**"* and be answered 200. ``_latest_plan`` documents the
+        same trap, and this method exists precisely so that nothing reports a
+        write that did not land as one.
+
+        **Patched, not replaced.** The write this supersedes re-read the whole
+        document and upserted it, which bumped its ``_ts`` — and the Chat's
+        latest **Plan record** is chosen by ``_ts``, so a late echo could
+        promote a finished turn's record over the live one that succeeded it
+        (#165). Setting one field cannot. It also cannot take the rest of the
+        document with it, which is why :meth:`settle_turn` patches too.
+
+        Scoped to this client's own ``user_id``: a **Plan record** belonging to
+        another associate is not found rather than written.
+        """
+        await self._ensure_initialized()
+
+        try:
+            rows = self.container.query_items(
+                query=(
+                    "SELECT TOP 1 c.id, c.session_id FROM c "
+                    "WHERE c.id=@plan_id AND c.data_type=@data_type "
+                    "AND c.user_id=@user_id"
+                ),
+                parameters=[
+                    {"name": "@plan_id", "value": plan_id},
+                    {"name": "@data_type", "value": DataType.plan},
+                    {"name": "@user_id", "value": self.user_id},
+                ],
+            )
+            record = None
+            async for row in rows:
+                record = row
+                break
+        except Exception as e:
+            self.logger.warning(
+                "Could not read plan record %s to store its streaming "
+                "message: %s",
+                plan_id,
+                e,
+            )
+            return MessageEchoed(EchoOutcome.refused)
+
+        if record is None:
+            self.logger.info(
+                "No plan record %s of this user's to hold the streaming "
+                "message — the record has gone",
+                plan_id,
+            )
+            return MessageEchoed(EchoOutcome.no_such_chat)
+
+        try:
+            await self.container.patch_item(
+                record["id"],
+                partition_key=record["session_id"],
+                patch_operations=[
+                    {
+                        "op": "set",
+                        "path": "/streaming_message",
+                        "value": streaming_message,
+                    }
+                ],
+            )
+        except Exception as e:
+            self.logger.warning(
+                "Failed storing the streaming message on plan record %s: %s",
+                plan_id,
+                e,
+            )
+            return MessageEchoed(EchoOutcome.refused)
+
+        return MessageEchoed(EchoOutcome.recorded)
 
     async def delete_chat(self, session_id: str) -> ChatDeletion:
         """**Chat deletion** — every document in one Chat's session partition.

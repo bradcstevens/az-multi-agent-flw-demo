@@ -2159,7 +2159,7 @@ class TestTheEchoStopsDecidingWhetherTheTurnEnded:
 
     The other half is the answer it gives. The handler wrapped its work in a
     broad `except` and returned a falsy result the route logged and discarded,
-    so a store failure, a Plan that had gone and a clean write were all answered
+    so a store failure, a **Plan record** that had gone and a clean write were all answered
     `{"status": "message recorded"}` — a write that did not happen, reported as
     one that did, by the only layer that knew.
     """
@@ -2220,31 +2220,34 @@ class TestTheEchoStopsDecidingWhetherTheTurnEnded:
         with pytest.raises(RuntimeError):
             self._post(rt)
 
-    def test_a_failed_write_is_not_counted_as_a_message_that_arrived(self, rt):
-        # Telemetry is a record too. `Agent_Message_From_X` for a message that
-        # never reached the store is the same false claim one layer over.
+    def test_a_failed_write_is_still_counted_as_a_message_that_arrived(self, rt):
+        # Arrival telemetry is unchanged by #158. The agent did say this,
+        # whether or not the store kept it, and dropping the event exactly
+        # during an outage would blind the dashboard when it matters most.
+        # What narrowed is the answer to the browser, not this.
         self._echo(rt, EchoOutcome.refused)
 
         self._post(rt)
 
-        assert not [
+        assert [
             call
             for call in rt.track_event.call_args_list
             if str(call.args[0]).startswith("Agent_Message_From_")
         ]
 
-    def test_a_plan_that_no_longer_exists_is_not_a_500(self, rt):
-        # Ordinary rather than a fault: #108's rejection path deletes the Plan
-        # document outright, and a Chat can be deleted between an agent
-        # speaking and this echo arriving. Answering that with a 500 would
-        # report an outage every time somebody cleared their history.
+    def test_a_plan_record_that_no_longer_exists_is_not_a_500(self, rt):
+        # Ordinary rather than a fault: #108's rejection path deletes a Plan
+        # record outright, and the echo is fire-and-forget, so it can arrive
+        # after the server settled the turn and the associate deleted the Chat
+        # that settling made deletable. Answering that with a 500 would report
+        # an outage every time somebody cleared their history.
         self._echo(rt, EchoOutcome.no_such_chat)
 
         response = self._post(rt, streaming_message="streamed")
 
         assert response.status_code == 200
 
-    def test_a_plan_that_no_longer_exists_does_not_claim_the_write_landed(self, rt):
+    def test_a_plan_record_that_no_longer_exists_does_not_claim_the_write_landed(self, rt):
         self._echo(rt, EchoOutcome.no_such_chat)
 
         response = self._post(rt, streaming_message="streamed")

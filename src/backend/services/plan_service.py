@@ -214,9 +214,11 @@ class PlanService:
         writers of one fact.
 
         The streaming message is written when the echo carries one, which is
-        exactly when it used to be written — the browser sends it on the turn's
-        last message and nowhere else — but read off the payload it belongs to
-        rather than off a flag beside it.
+        exactly when it used to be written: the browser sends the streamed
+        reply on the turn's last message and an empty string on every other, so
+        the payload's own field says what the flag beside it used to. Writing
+        an empty one was a no-op before and is skipped now, which keeps a
+        Cosmos round trip off every streamed line.
 
         Args:
             agent_message: what the agent said, as the browser echoed it back.
@@ -236,7 +238,7 @@ class PlanService:
             await memory_store.add_agent_message(agent_msg)
         except Exception:
             logger.exception(
-                "The agent message for plan '%s' did not reach the store",
+                "The agent message for plan record '%s' did not reach the store",
                 agent_msg.plan_id,
             )
             return MessageEchoed(EchoOutcome.refused)
@@ -245,37 +247,21 @@ class PlanService:
         if not streaming_message:
             return MessageEchoed(EchoOutcome.recorded)
 
+        # Through the store's own operation, which tells a **Plan record** that
+        # has gone from one it could not read. A `get_plan` and an upsert here
+        # could not: the read behind it answers an outage with an empty result,
+        # so a store that was down would arrive as a record that was deleted.
         try:
-            plan = await memory_store.get_plan(agent_msg.plan_id)
+            return await memory_store.record_streaming_message(
+                agent_msg.plan_id, streaming_message
+            )
         except Exception:
             logger.exception(
-                "Could not read plan '%s' to store its streaming message",
+                "The streaming message for plan record '%s' did not reach the "
+                "store",
                 agent_msg.plan_id,
             )
             return MessageEchoed(EchoOutcome.refused)
-
-        if plan is None:
-            # Ordinary rather than a fault: #108's rejection path deletes the
-            # Plan document outright, and a Chat can be deleted between an
-            # agent speaking and this echo arriving. Nothing to write to is not
-            # a store that refused to write.
-            logger.info(
-                "No plan '%s' to hold the streaming message — the record has gone",
-                agent_msg.plan_id,
-            )
-            return MessageEchoed(EchoOutcome.no_such_chat)
-
-        plan.streaming_message = streaming_message
-        try:
-            await memory_store.update_plan(plan)
-        except Exception:
-            logger.exception(
-                "The streaming message for plan '%s' did not reach the store",
-                agent_msg.plan_id,
-            )
-            return MessageEchoed(EchoOutcome.refused)
-
-        return MessageEchoed(EchoOutcome.recorded)
 
     @staticmethod
     async def handle_human_clarification(

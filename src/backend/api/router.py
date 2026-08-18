@@ -1532,7 +1532,9 @@ async def agent_message_user(
                 description: Optional internal m_plan id
     responses:
       200:
-        description: Message recorded successfully
+        description: >
+          The agent message was recorded. The body's status says what landed:
+          a plan record that has gone did not take the streaming message.
         schema:
           type: object
           properties:
@@ -1570,18 +1572,6 @@ async def agent_message_user(
     # second writer of that fact (#158).
     echoed = await PlanService.handle_agent_messages(agent_message, user_id)
 
-    if echoed.store_failed:
-        # The one thing this route may not do. It used to answer
-        # `{"status": "message recorded"}` whatever happened, so the browser
-        # was told the transcript had landed by the only layer that knew it
-        # had not.
-        logger.error(
-            "Agent message from %s was not recorded for plan %s",
-            agent_message.agent,
-            agent_message.plan_id,
-        )
-        raise HTTPException(status_code=500, detail=NOT_RECORDED_DETAIL)
-
     # Use dynamic event name with agent identifier
     event_name = f"Agent_Message_From_{agent_message.agent.replace(' ', '_')}"
     event_props = {
@@ -1591,7 +1581,22 @@ async def agent_message_user(
     }
     if session_id:
         event_props["session_id"] = session_id
+    # Arrival telemetry, unchanged by #158: the agent did say this, whether or
+    # not the store kept it. What narrowed is the answer below, not this.
     track_event_if_configured(event_name, event_props)
+
+    if echoed.store_failed:
+        # The one thing this route may not do. It used to answer
+        # `{"status": "message recorded"}` whatever happened, so the browser
+        # was told the transcript had landed by the only layer that knew it
+        # had not.
+        logger.error(
+            "Agent message from %s was not recorded for plan record %s",
+            agent_message.agent,
+            agent_message.plan_id,
+        )
+        raise HTTPException(status_code=500, detail=NOT_RECORDED_DETAIL)
+
     return {
         "status": echoed.status,
     }
