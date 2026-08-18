@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -93,6 +94,7 @@ import backend.services.plan_service as plan_service_module
 from backend.services.plan_service import (
     PlanService, build_agent_message_from_agent_message_response,
     build_agent_message_from_user_clarification)
+from chat.echo import EchoOutcome  # noqa: E402  (pure: dataclasses and an enum)
 
 # ---------------------------------------------------------------------------
 # Test data helpers
@@ -119,7 +121,6 @@ class MockAgentMessageResponse:
     raw_data: Any = None
     steps: List = None
     next_steps: List = None
-    is_final: bool = False
     streaming_message: str = ""
 
 
@@ -356,7 +357,6 @@ class TestPlanService:
             plan_id="test-plan",
             agent="TestAgent",
             content="Agent message content",
-            is_final=False
         )
         mock_db = MagicMock()
         mock_db.add_agent_message = AsyncMock()
@@ -364,7 +364,7 @@ class TestPlanService:
 
         result = await PlanService.handle_agent_messages(mock_message, "test-user")
 
-        assert result is True
+        assert result.persisted is True
         mock_db.add_agent_message.assert_called_once()
 
     @pytest.mark.asyncio
@@ -373,8 +373,7 @@ class TestPlanService:
             plan_id="test-plan",
             agent="TestAgent",
             content="Final message",
-            is_final=True,
-            streaming_message="Stream completed"
+            streaming_message="Stream completed",
         )
         mock_db = MagicMock()
         mock_plan = MagicMock()
@@ -385,9 +384,8 @@ class TestPlanService:
 
         result = await PlanService.handle_agent_messages(mock_message, "test-user")
 
-        assert result is True
+        assert result.persisted is True
         assert mock_plan.streaming_message == "Stream completed"
-        assert mock_plan.overall_status == MockPlanStatus.completed
         mock_db.update_plan.assert_called_once()
 
     @pytest.mark.asyncio
@@ -397,7 +395,7 @@ class TestPlanService:
             side_effect=Exception("Database error")
         )
         result = await PlanService.handle_agent_messages(mock_message, "user")
-        assert result is False
+        assert result.store_failed is True
 
     @pytest.mark.asyncio
     async def test_handle_human_clarification_success(self):
@@ -433,3 +431,168 @@ class TestPlanService:
     def test_logging_integration(self):
         logger = logging.getLogger('backend.services.plan_service')
         assert logger is not None
+
+
+# ---------------------------------------------------------------------------
+# The echo records what was said, and decides nothing (#158, ADR-043 §7)
+# ---------------------------------------------------------------------------
+class TestTheEchoStopsDecidingWhetherTheTurnEnded:
+    """One fact, one writer.
+
+    The browser echoing an agent message back was the only writer of a
+    **Settled status** anywhere in the system, off one branch of one handler.
+    #157 gave that fact a writer that is present when the turn ends; this
+    handler keeping it as well would be two writers of one fact, which is how
+    they come to disagree.
+
+    So the transcript and the streaming message still land here, and
+    `overall_status` never does — asserted against a Plan record that would
+    happily accept the write, so the assertion is about what this handler *does*
+    rather than about what a stand-in refused.
+    """
+
+    def _store(self, plan=None):
+        store = MagicMock()
+        store.add_agent_message = AsyncMock()
+        store.get_plan = AsyncMock(return_value=plan)
+        store.update_plan = AsyncMock()
+        mock_database_factory.DatabaseFactory.get_database = AsyncMock(
+            return_value=store
+        )
+        return store
+
+    def _plan(self):
+        # A real object rather than a `MagicMock`, which answers to any
+        # attribute and so cannot tell a write that happened from one that did
+        # not.
+        class PlanRecord:
+            def __init__(self):
+                self.overall_status = "in_progress"
+                self.streaming_message = None
+
+        return PlanRecord()
+
+    @pytest.mark.asyncio
+    async def test_the_final_message_does_not_settle_the_plan(self):
+        plan = self._plan()
+        self._store(plan)
+
+        await PlanService.handle_agent_messages(
+            MockAgentMessageResponse(
+                plan_id="p-1",
+                agent="TestAgent",
+                content="the answer",
+                streaming_message="the streamed answer",
+            ),
+            "user-1",
+        )
+
+        assert plan.overall_status == "in_progress"
+
+    @pytest.mark.asyncio
+    async def test_the_streaming_message_still_reaches_the_record(self):
+        # The narrowing's other half: nothing else persists this, so removing
+        # it along with the verdict would lose the streamed reply on reload.
+        plan = self._plan()
+        store = self._store(plan)
+
+        result = await PlanService.handle_agent_messages(
+            MockAgentMessageResponse(
+                plan_id="p-1", agent="TestAgent", streaming_message="what it said"
+            ),
+            "user-1",
+        )
+
+        assert plan.streaming_message == "what it said"
+        store.update_plan.assert_awaited_once_with(plan)
+        assert result.persisted is True
+
+    @pytest.mark.asyncio
+    async def test_a_message_with_no_streamed_reply_touches_no_plan(self):
+        # Every message before the last one. The old code read the Plan only on
+        # the echo that claimed to be final; reading it on every message would
+        # be a Cosmos round trip per streamed line.
+        store = self._store(self._plan())
+
+        result = await PlanService.handle_agent_messages(
+            MockAgentMessageResponse(plan_id="p-1", agent="TestAgent", content="hi"),
+            "user-1",
+        )
+
+        store.add_agent_message.assert_awaited_once()
+        store.get_plan.assert_not_awaited()
+        store.update_plan.assert_not_awaited()
+        assert result.persisted is True
+
+    @pytest.mark.asyncio
+    async def test_a_plan_that_no_longer_exists_is_not_a_store_failure(self):
+        # Ordinary rather than a fault: #108's rejection path deletes the Plan
+        # document outright, and a Chat can be deleted between an agent
+        # speaking and this echo arriving. The old code walked into
+        # `None.streaming_message`, hit the broad `except`, and reported it as
+        # exactly the same thing as Cosmos being down.
+        store = self._store(plan=None)
+
+        result = await PlanService.handle_agent_messages(
+            MockAgentMessageResponse(
+                plan_id="p-gone", agent="TestAgent", streaming_message="what it said"
+            ),
+            "user-1",
+        )
+
+        assert result.outcome is EchoOutcome.no_such_chat
+        assert result.store_failed is False
+        assert result.persisted is False
+        store.update_plan.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_transcript_that_did_not_land_is_reported_as_a_failure(self):
+        store = self._store(self._plan())
+        store.add_agent_message = AsyncMock(side_effect=RuntimeError("Cosmos is down"))
+
+        result = await PlanService.handle_agent_messages(
+            MockAgentMessageResponse(plan_id="p-1", agent="TestAgent", content="hi"),
+            "user-1",
+        )
+
+        assert result.store_failed is True
+        assert result.persisted is False
+
+    @pytest.mark.asyncio
+    async def test_a_streaming_message_that_did_not_land_is_reported_as_a_failure(self):
+        store = self._store(self._plan())
+        store.update_plan = AsyncMock(side_effect=RuntimeError("Cosmos is down"))
+
+        result = await PlanService.handle_agent_messages(
+            MockAgentMessageResponse(
+                plan_id="p-1", agent="TestAgent", streaming_message="what it said"
+            ),
+            "user-1",
+        )
+
+        assert result.store_failed is True
+
+    @pytest.mark.asyncio
+    async def test_a_plan_that_could_not_be_read_is_reported_as_a_failure(self):
+        store = self._store(self._plan())
+        store.get_plan = AsyncMock(side_effect=RuntimeError("Cosmos is down"))
+
+        result = await PlanService.handle_agent_messages(
+            MockAgentMessageResponse(
+                plan_id="p-1", agent="TestAgent", streaming_message="what it said"
+            ),
+            "user-1",
+        )
+
+        assert result.store_failed is True
+
+    @pytest.mark.asyncio
+    async def test_nothing_in_the_handler_writes_a_settled_status(self):
+        # The read a reviewer would do, made mechanical: #157's writer is the
+        # one that settles a turn, and a second one reappearing here is the
+        # defect this ticket removed coming back.
+        source = Path(plan_service_module.__file__).read_text(encoding="utf-8")
+
+        assert "PlanStatus.completed" not in source
+        assert "PlanStatus.failed" not in source
+        assert "PlanStatus.canceled" not in source

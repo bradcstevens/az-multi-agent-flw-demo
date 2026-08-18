@@ -103,6 +103,11 @@ from chat.deletion import (  # noqa: E402
     ChatsDeletion,
     DeletionOutcome,
 )
+from chat.echo import (  # noqa: E402
+    NOT_RECORDED_DETAIL,
+    EchoOutcome,
+    MessageEchoed,
+)
 from chat.settle import SettleOutcome, TurnSettled  # noqa: E402
 from provenance import ASSOCIATE_RECORD_PROVENANCE  # noqa: E402
 from guardrail.corpus import (  # noqa: E402
@@ -222,7 +227,9 @@ def rt(monkeypatch):
     plan_service = MagicMock()
     plan_service.handle_plan_approval = AsyncMock(return_value=True)
     plan_service.handle_human_clarification = AsyncMock(return_value=True)
-    plan_service.handle_agent_messages = AsyncMock(return_value=True)
+    plan_service.handle_agent_messages = AsyncMock(
+        return_value=MessageEchoed(EchoOutcome.recorded)
+    )
 
     orchestration_manager = MagicMock()
     orchestration_manager.get_current_or_new_orchestration = AsyncMock()
@@ -284,6 +291,8 @@ def rt(monkeypatch):
         )
     )
 
+    track_event = MagicMock()
+
     monkeypatch.setattr(router_mod, "get_authenticated_user_details", get_user)
     monkeypatch.setattr(router_mod, "identity_boundary_gate", lambda: gate)
     monkeypatch.setattr(router_mod, "DatabaseFactory", database_factory)
@@ -293,7 +302,7 @@ def rt(monkeypatch):
     monkeypatch.setattr(router_mod, "connection_config", connection_config)
     monkeypatch.setattr(router_mod, "orchestration_config", orchestration_config)
     monkeypatch.setattr(router_mod, "team_config", team_config)
-    monkeypatch.setattr(router_mod, "track_event_if_configured", MagicMock())
+    monkeypatch.setattr(router_mod, "track_event_if_configured", track_event)
     monkeypatch.setattr(
         router_mod, "find_first_available_team", find_first_available_team
     )
@@ -322,6 +331,7 @@ def rt(monkeypatch):
         gate=gate,
         embedder=embedder,
         sop=sop,
+        track_event=track_event,
     )
 
 
@@ -2133,10 +2143,126 @@ class TestAgentMessage:
         assert resp.status_code == 200
         assert resp.json()["status"] == "message recorded"
 
-    def test_plan_service_error(self, rt):
-        rt.plan_service.handle_agent_messages = AsyncMock(side_effect=Exception("boom"))
-        resp = rt.client.post("/api/v4/agent_message", json=self._payload())
-        assert resp.status_code == 200
+
+# ---------------------------------------------------------------------------
+# /agent_message — the browser stops deciding whether a turn ended
+# (#158, ADR-043 decision 7)
+# ---------------------------------------------------------------------------
+class TestTheEchoStopsDecidingWhetherTheTurnEnded:
+    """One fact, one writer — and a route that claims only what it did.
+
+    This echo was the only writer of a **Settled status** anywhere in the
+    system. Now that the server settles the turn it ended (#157), it is a second
+    opinion on a question already answered, so it was narrowed: it still carries
+    the transcript and the streaming message, which nothing else persists, and
+    it no longer carries the verdict.
+
+    The other half is the answer it gives. The handler wrapped its work in a
+    broad `except` and returned a falsy result the route logged and discarded,
+    so a store failure, a Plan that had gone and a clean write were all answered
+    `{"status": "message recorded"}` — a write that did not happen, reported as
+    one that did, by the only layer that knew.
+    """
+
+    def _payload(self, **kw):
+        data = {
+            "plan_id": "p-1",
+            "agent": "My Agent",
+            "content": "hello",
+            "agent_type": "AI_Agent",
+        }
+        data.update(kw)
+        return data
+
+    def _echo(self, rt, outcome):
+        rt.plan_service.handle_agent_messages = AsyncMock(
+            return_value=MessageEchoed(outcome)
+        )
+
+    def _post(self, rt, **kw):
+        return rt.client.post("/api/v4/agent_message", json=self._payload(**kw))
+
+    def test_the_echo_settles_nothing(self, rt):
+        # The route's whole change, stated as an absence. Whatever it writes,
+        # it is not a terminal status: that fact has a writer that is present
+        # when the turn ends, and a second one is how the two come to disagree.
+        response = self._post(rt, streaming_message="the streamed answer")
+
+        assert response.status_code == 200
+        rt.store.settle_turn.assert_not_awaited()
+        rt.store.update_plan.assert_not_awaited()
+
+    def test_the_transcript_and_the_streamed_reply_still_arrive(self, rt):
+        # The narrowing's other half: nothing else persists either of these, so
+        # the echo survives carrying exactly them.
+        response = self._post(rt, content="the answer", streaming_message="streamed")
+
+        assert response.status_code == 200
+        echoed = rt.plan_service.handle_agent_messages.await_args.args[0]
+        assert echoed.content == "the answer"
+        assert echoed.streaming_message == "streamed"
+
+    def test_a_write_that_did_not_land_is_not_answered_as_success(self, rt):
+        self._echo(rt, EchoOutcome.refused)
+
+        response = self._post(rt)
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == NOT_RECORDED_DETAIL
+
+    def test_a_handler_that_raises_is_not_answered_as_success(self, rt):
+        # The broad `except` in the route is gone too. It caught whatever the
+        # handler could not, and answered 200 anyway.
+        rt.plan_service.handle_agent_messages = AsyncMock(
+            side_effect=RuntimeError("Cosmos is down")
+        )
+
+        with pytest.raises(RuntimeError):
+            self._post(rt)
+
+    def test_a_failed_write_is_not_counted_as_a_message_that_arrived(self, rt):
+        # Telemetry is a record too. `Agent_Message_From_X` for a message that
+        # never reached the store is the same false claim one layer over.
+        self._echo(rt, EchoOutcome.refused)
+
+        self._post(rt)
+
+        assert not [
+            call
+            for call in rt.track_event.call_args_list
+            if str(call.args[0]).startswith("Agent_Message_From_")
+        ]
+
+    def test_a_plan_that_no_longer_exists_is_not_a_500(self, rt):
+        # Ordinary rather than a fault: #108's rejection path deletes the Plan
+        # document outright, and a Chat can be deleted between an agent
+        # speaking and this echo arriving. Answering that with a 500 would
+        # report an outage every time somebody cleared their history.
+        self._echo(rt, EchoOutcome.no_such_chat)
+
+        response = self._post(rt, streaming_message="streamed")
+
+        assert response.status_code == 200
+
+    def test_a_plan_that_no_longer_exists_does_not_claim_the_write_landed(self, rt):
+        self._echo(rt, EchoOutcome.no_such_chat)
+
+        response = self._post(rt, streaming_message="streamed")
+
+        assert response.json()["status"] != "message recorded"
+        assert response.json()["status"] == (
+            "message recorded without its streaming message"
+        )
+
+    def test_an_older_browser_still_echoing_is_final_is_not_an_error(self, rt):
+        # The field is gone from the request model, and a tab open across the
+        # deploy that removed it keeps sending it. Ignored, not rejected — a
+        # 422 here would lose the transcript of every turn answered by a stale
+        # client.
+        response = self._post(rt, is_final=True)
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "message recorded"
 
 
 # ---------------------------------------------------------------------------

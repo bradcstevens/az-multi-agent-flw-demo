@@ -47,10 +47,17 @@ export interface AgentMessageResponse {
     content: string;
     /** Type of agent (Human or AI) */
     agent_type: AgentMessageType;
-    is_final: boolean;
     /** Raw data associated with the message */
     raw_data: string;
 
+    /**
+     * The streamed reply as it stood, on the turn's last message.
+     *
+     * Nothing else persists it, which is why the echo survives at all. What the
+     * echo no longer carries is whether the turn ended: the server settles the
+     * turn it ended (#158, ADR-043 decision 7), so this surface stopped being a
+     * second writer of a fact it learned second-hand.
+     */
     streaming_message: string;
 
 }

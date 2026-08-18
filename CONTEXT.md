@@ -1444,6 +1444,21 @@ broadcasts, is not a status: it maps onto `failed` here and is refused by the se
 the store is touched, so no fourth member is coined by accident.
 _Avoid_: terminal state, final status, deletable status
 
+**The echo** — `POST /v4/agent_message`, the browser telling the server what an agent said. It is
+the only writer of a **Chat**'s transcript and of the streamed reply, which is why it survives at
+all; since #158 it writes nothing else. It used to set `overall_status = completed` when the browser
+echoed `is_final` back, making two writers of one fact and putting a regex over a stringified Python
+repr — the flag arrives in three shapes — in the path that decided whether a Chat could ever be
+deleted. That verdict is the **settle-write**'s alone
+([ADR-043](docs/ADR/043-the-server-settles-the-turn-it-ended.md) decision 7). What the route *says*
+is narrowed with it: the handler used to wrap everything in a broad `except` and return a falsy
+result the route logged and discarded, so a store failure, a missing **Plan record** and a clean
+write were all answered `{"status": "message recorded"}`. Now a refused write is a 500, and a Plan
+that has gone — ordinary, since the rejection path deletes one outright and a Chat may be deleted
+mid-turn — is neither an error nor a claim that the streaming message landed. The three outcomes,
+and which of them a route may call success, are `src/backend/chat/echo.py`.
+_Avoid_: agent message callback, final message post, is_final
+
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that
 session partition — its plans, transcript, `m_plan`, **Troubleshooting record**, **Simulated
 ticket**, and **Session state** — scoped to its `user_id`, so one associate cannot delete another's

@@ -3,6 +3,7 @@ import logging
 from dataclasses import asdict
 
 import models.messages as messages
+from chat.echo import EchoOutcome, MessageEchoed
 from common.database.database_factory import DatabaseFactory
 from common.models.messages import (AgentMessageData, AgentMessageType,
                                     AgentType, PlanStatus)
@@ -202,40 +203,79 @@ class PlanService:
     @staticmethod
     async def handle_agent_messages(
         agent_message: messages.AgentMessageResponse, user_id: str
-    ) -> bool:
-        """
-        Process an AgentMessage coming from the client.
+    ) -> MessageEchoed:
+        """Record what an agent said — and nothing about whether the turn ended.
+
+        The browser's echo carries the transcript and the streaming message,
+        which nothing else persists, so this is a narrowing rather than a
+        removal (#158, ADR-043 decision 7). What it no longer carries is a
+        verdict: the terminal status of a turn is written by the server that
+        ended it, and this handler writing `overall_status` as well made two
+        writers of one fact.
+
+        The streaming message is written when the echo carries one, which is
+        exactly when it used to be written — the browser sends it on the turn's
+        last message and nowhere else — but read off the payload it belongs to
+        rather than off a flag beside it.
 
         Args:
-            standard_message: messages.AgentMessage (contains relevant message data)
-            user_id: authenticated user id
+            agent_message: what the agent said, as the browser echoed it back.
+            user_id: authenticated user id.
 
         Returns:
-            dict with status and metadata
-
-        Raises:
-            ValueError on invalid state
+            A `MessageEchoed` saying which writes landed. A store failure is one
+            of the three answers rather than a swallowed exception, because the
+            route above may not report a write that did not happen.
         """
-        try:
-            agent_msg = build_agent_message_from_agent_message_response(
-                agent_message, user_id
-            )
+        agent_msg = build_agent_message_from_agent_message_response(
+            agent_message, user_id
+        )
 
-            # Persist if your database layer supports it.
-            # Look for or implement something like: memory_store.add_agent_message(agent_msg)
+        try:
             memory_store = await DatabaseFactory.get_database(user_id=user_id)
             await memory_store.add_agent_message(agent_msg)
-            if agent_message.is_final:
-                plan = await memory_store.get_plan(agent_msg.plan_id)
-                plan.streaming_message = agent_message.streaming_message
-                plan.overall_status = PlanStatus.completed
-                await memory_store.update_plan(plan)
-            return True
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "Failed to handle human clarification -> agent message: %s", e
+                "The agent message for plan '%s' did not reach the store",
+                agent_msg.plan_id,
             )
-            return False
+            return MessageEchoed(EchoOutcome.refused)
+
+        streaming_message = getattr(agent_message, "streaming_message", None)
+        if not streaming_message:
+            return MessageEchoed(EchoOutcome.recorded)
+
+        try:
+            plan = await memory_store.get_plan(agent_msg.plan_id)
+        except Exception:
+            logger.exception(
+                "Could not read plan '%s' to store its streaming message",
+                agent_msg.plan_id,
+            )
+            return MessageEchoed(EchoOutcome.refused)
+
+        if plan is None:
+            # Ordinary rather than a fault: #108's rejection path deletes the
+            # Plan document outright, and a Chat can be deleted between an
+            # agent speaking and this echo arriving. Nothing to write to is not
+            # a store that refused to write.
+            logger.info(
+                "No plan '%s' to hold the streaming message — the record has gone",
+                agent_msg.plan_id,
+            )
+            return MessageEchoed(EchoOutcome.no_such_chat)
+
+        plan.streaming_message = streaming_message
+        try:
+            await memory_store.update_plan(plan)
+        except Exception:
+            logger.exception(
+                "The streaming message for plan '%s' did not reach the store",
+                agent_msg.plan_id,
+            )
+            return MessageEchoed(EchoOutcome.refused)
+
+        return MessageEchoed(EchoOutcome.recorded)
 
     @staticmethod
     async def handle_human_clarification(

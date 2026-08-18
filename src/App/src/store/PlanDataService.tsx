@@ -238,7 +238,6 @@ export class PlanDataService {
   static createAgentMessageResponse(
     agentMessage: AgentMessageData,
     planData: ProcessedPlanData,
-    is_final: boolean = false,
     streaming_message: string = ''
   ): AgentMessageResponse {
     if (!planData || !planData.plan) {
@@ -249,7 +248,6 @@ export class PlanDataService {
       agent: agentMessage.agent,
       content: agentMessage.content,
       agent_type: agentMessage.agent_type,
-      is_final: is_final,
       raw_data: JSON.stringify(agentMessage.raw_data),
       streaming_message: streaming_message
     };
