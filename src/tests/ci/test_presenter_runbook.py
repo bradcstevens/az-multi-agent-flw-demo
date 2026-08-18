@@ -36,6 +36,15 @@ RESUME_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "resume.ts"
 AGENT_AVAILABILITY = (
     REPO_ROOT / "src" / "App" / "src" / "models" / "agentAvailability.ts"
 )
+GROUNDING_PANEL = (
+    REPO_ROOT
+    / "src"
+    / "App"
+    / "src"
+    / "components"
+    / "transparency"
+    / "GroundingPanel.tsx"
+)
 SOP_CORPUS = REPO_ROOT / "content" / "sop" / "corpus.toml"
 
 
@@ -118,6 +127,27 @@ def test_the_chord_is_the_chord_the_browser_listens_for():
     label = _exported_string(CHORD_MODULE, "PRESENTER_CHORD_LABEL")
     assert label in _rendered(), (
         f"the runbook does not name the chord the browser listens for ({label})"
+    )
+
+
+def test_the_runbook_quotes_the_grounding_route_the_panel_exports():
+    """A presenter's route names every observed hop, not a parallel story.
+
+    The surface owns the known Copilot Studio transport segments. Dataverse stays
+    supplied by `source_used`, so the panel can still refuse to claim this route
+    for a platform it did not observe.
+    """
+    names = (
+        "ROUTE_ORIGIN",
+        "SOP_TOOL_ROUTE_SEGMENT",
+        "SOP_ASK_ROUTE_SEGMENT",
+        "DIRECT_LINE_ROUTE_SEGMENT",
+        "COPILOT_STUDIO_PLATFORM",
+    )
+    route = " → ".join(_exported_string(GROUNDING_PANEL, name) for name in names)
+
+    assert f"{route} → Dataverse" in _rendered(), (
+        "the runbook does not quote the Grounding panel's observed route"
     )
 
 

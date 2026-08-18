@@ -37,7 +37,11 @@ export interface GroundingPanelProps {
 }
 
 /** Where every cross-platform answer starts. */
-const ROUTE_ORIGIN = 'Foundry orchestrator';
+export const ROUTE_ORIGIN = 'Foundry orchestrator';
+export const COPILOT_STUDIO_PLATFORM = 'Copilot Studio';
+export const SOP_TOOL_ROUTE_SEGMENT = 'search_store_procedures (MCP tool, plain HTTP)';
+export const SOP_ASK_ROUTE_SEGMENT = 'POST /sop/ask';
+export const DIRECT_LINE_ROUTE_SEGMENT = 'Direct Line';
 
 const GroundingPanel: React.FC<GroundingPanelProps> = ({ source }) => (
     <section
@@ -73,6 +77,16 @@ const GroundingPanel: React.FC<GroundingPanelProps> = ({ source }) => (
                 <div className="grounding-panel__route" data-testid="grounding-route">
                     <Caption1>{ROUTE_ORIGIN}</Caption1>
                     <ArrowRight16Regular aria-hidden="true" />
+                    {source.platform === COPILOT_STUDIO_PLATFORM && (
+                        <>
+                            <Caption1>{SOP_TOOL_ROUTE_SEGMENT}</Caption1>
+                            <ArrowRight16Regular aria-hidden="true" />
+                            <Caption1>{SOP_ASK_ROUTE_SEGMENT}</Caption1>
+                            <ArrowRight16Regular aria-hidden="true" />
+                            <Caption1>{DIRECT_LINE_ROUTE_SEGMENT}</Caption1>
+                            <ArrowRight16Regular aria-hidden="true" />
+                        </>
+                    )}
                     <Caption1>{source.platform}</Caption1>
                     {source.source && (
                         <>

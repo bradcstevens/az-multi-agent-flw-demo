@@ -1,8 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
-import GroundingPanel from './GroundingPanel';
+import GroundingPanel, {
+    COPILOT_STUDIO_PLATFORM,
+    DIRECT_LINE_ROUTE_SEGMENT,
+    ROUTE_ORIGIN,
+    SOP_ASK_ROUTE_SEGMENT,
+    SOP_TOOL_ROUTE_SEGMENT,
+} from './GroundingPanel';
 import { parseSourceUsed } from '../../models/transparency';
+
+const FRONTEND_SOURCE = join(__dirname, '..', '..');
+
+function sourceFiles(directory: string): string[] {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(directory, entry.name);
+        return entry.isDirectory()
+            ? sourceFiles(path)
+            : entry.isFile()
+              ? [path]
+              : [];
+    });
+}
 
 const cited = parseSourceUsed({
     platform: 'Copilot Studio',
@@ -28,6 +49,12 @@ const uncited = parseSourceUsed({
     citations: [],
 });
 
+const otherPlatform = parseSourceUsed({
+    platform: 'Another platform',
+    source: 'Another source',
+    citations: [],
+});
+
 describe('the Grounding panel', () => {
     it('names the platform that answered, so the hop is visible as a hop', () => {
         render(<GroundingPanel source={cited} />);
@@ -35,14 +62,39 @@ describe('the Grounding panel', () => {
         expect(screen.getByTestId('grounding-platform')).toHaveTextContent('Copilot Studio');
     });
 
-    it('shows the route the answer took, ending at Dataverse rather than SharePoint', () => {
+    it('names every observed hop to the Dataverse source rather than SharePoint', () => {
         render(<GroundingPanel source={cited} />);
 
         const route = screen.getByTestId('grounding-route');
-        expect(route).toHaveTextContent('Foundry orchestrator');
-        expect(route).toHaveTextContent('Copilot Studio');
-        expect(route).toHaveTextContent('Dataverse');
+        expect(route).toHaveTextContent(
+            'Foundry orchestratorsearch_store_procedures (MCP tool, plain HTTP)POST /sop/askDirect LineCopilot StudioDataverse',
+        );
         expect(route).not.toHaveTextContent(/SharePoint/i);
+    });
+
+    it('exports the observed Copilot Studio route segments for the runbook contract', () => {
+        expect(ROUTE_ORIGIN).toBe('Foundry orchestrator');
+        expect(SOP_TOOL_ROUTE_SEGMENT).toBe('search_store_procedures (MCP tool, plain HTTP)');
+        expect(SOP_ASK_ROUTE_SEGMENT).toBe('POST /sop/ask');
+        expect(DIRECT_LINE_ROUTE_SEGMENT).toBe('Direct Line');
+        expect(COPILOT_STUDIO_PLATFORM).toBe('Copilot Studio');
+    });
+
+    it('does not claim the Copilot Studio transport for another platform', () => {
+        render(<GroundingPanel source={otherPlatform} />);
+
+        const route = screen.getByTestId('grounding-route');
+        expect(route).toHaveTextContent('Foundry orchestratorAnother platformAnother source');
+        expect(route).not.toHaveTextContent('search_store_procedures');
+        expect(route).not.toHaveTextContent('POST /sop/ask');
+        expect(route).not.toHaveTextContent('Direct Line');
+    });
+
+    it('never names the nonexistent Direct Line MCP component anywhere in frontend source', () => {
+        const forbiddenName = ['Direct', ' Line', ' MCP', ' server'].join('');
+        const sources = sourceFiles(FRONTEND_SOURCE).map((path) => readFileSync(path, 'utf8'));
+
+        expect(sources.some((source) => source.includes(forbiddenName))).toBe(false);
     });
 
     it('carries both SOP queries so a retrieval miss can be attributed', () => {

@@ -81,8 +81,8 @@ Tap the card, then send. Use **New chat** between conversations, except where be
 **They should be looking at:** the **Grounding** panel on the right.
 
 **What lands:** numbered closing steps, and the Grounding panel lights up reading **Copilot
-Studio**, over the route *Foundry orchestrator → Copilot Studio → Dataverse*, citing
-**SOP-102**.
+Studio**, over the route *Foundry orchestrator → search_store_procedures (MCP tool, plain HTTP)
+→ POST /sop/ask → Direct Line → Copilot Studio → Dataverse*, citing **SOP-102**.
 
 **The claim:** this one answer left Azure AI Foundry, was produced by a low-code agent your
 business team owns in Copilot Studio, and came out of Dataverse — while every other answer in
