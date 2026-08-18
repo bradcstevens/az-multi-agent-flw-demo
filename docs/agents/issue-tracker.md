@@ -11,6 +11,8 @@ Issues and PRDs for this repo live as GitHub issues in [`bradcstevens/az-multi-a
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
+An issue is closed only when the code that satisfies it is on `main`. Work on a branch, even when complete and pushed, remains open until it has landed on `main`.
+
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
 
 > **Never add a git remote pointing at a SAML-enforced organisation** (notably anything under
