@@ -104,7 +104,7 @@ Seven things follow, and they are part of this decision rather than separate wor
    | `review` | `gpt-5.6-sol` | `xhigh` | 272k |
    | `implementation` | `gpt-5.6-terra` | `high` | 272k |
    | `test` | `gpt-5.6-terra` | `high` | 272k |
-   | `docs` | `claude-sonnet-5` | `medium` | 200k |
+   | `docs` | `gpt-5.6-luna` | `medium` | 200k |
    | `chore` | `gpt-5.6-luna` | `low` | 200k |
    | `bugfix` | `claude-opus-5` | `xhigh` | 200k |
 
@@ -114,12 +114,15 @@ Seven things follow, and they are part of this decision rather than separate wor
    `gpt-5.6-terra` for its 272k window (decision 6). `review` takes `gpt-5.6-sol` rather than
    `gpt-5.6-terra` because the author is now `terra` and a reviewer that is literally the author is
    not a reviewer; `sol` keeps the 272k window a diff review needs while being materially stronger
-   than the model whose work it reads. `docs` stays on `claude-sonnet-5` precisely *because* the tie-
-   break is speed — the documentation here is enforced (the runbook string-for-string, the ADR index
-   by `test_durable_record.py`), but both `sonnet` and `opus` clear it comfortably, and `sonnet` is
-   faster. `chore` stays on the roster's fastest model on **speed** grounds, which is the only
-   justification the rule still permits now that price is not one; `@ low` rather than `@ none`
-   because a lockfile bump that goes wrong is a red CI, and `none` disables reasoning outright.
+   than the model whose work it reads. `docs` takes `gpt-5.6-luna` because the tie-break is speed
+   and this is the row where it bites hardest — the documentation here is enforced (the runbook
+   string-for-string, the ADR index by `test_durable_record.py`), so the bar is a bar every model on
+   the roster clears, and once quality is not the discriminator the rule says take the fastest.
+   `@ medium` rather than `chore`'s `@ low` because an enforced string is a narrower target to hit
+   than a lockfile bump. `chore` stays on the roster's fastest model on **speed** grounds, which is
+   the only justification the rule still permits now that price is not one; `@ low` rather than
+   `@ none` because a lockfile bump that goes wrong is a red CI, and `none` disables reasoning
+   outright.
 
 5. **The table is project-scoped and committed.** `git-loopy config path` resolves the project table
    to `<repo-root>/git-loopy/config.toml` — no leading dot; `.git-loopy/` is the `.gitignore`d runner
