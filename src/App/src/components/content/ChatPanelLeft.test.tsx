@@ -416,9 +416,21 @@ describe('deleting a chat from the panel', () => {
           observes the panel at all.
         */
         await waitFor(() => expect(apiService.getPlans).toHaveBeenCalledTimes(2));
+        /*
+          `hidden: true` throughout this file's delete-all assertions. The
+          chat-history drawer is opened modal here, and Fluent's modalizer
+          marks every other root `isOthersAccessible: false` once it settles —
+          which is after the awaits below on a slow runner and before them on a
+          fast one. Without it "the dialog is gone" is also satisfied by a
+          dialog that is merely trapped, so the assertion would pass for the
+          wrong reason exactly when it matters.
+        */
         await waitFor(() =>
             expect(
-                screen.queryByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
+                screen.queryByRole('dialog', {
+                    name: DELETE_ALL_CHATS_TITLE,
+                    hidden: true,
+                }),
             ).not.toBeInTheDocument(),
         );
         /*
@@ -615,11 +627,14 @@ describe('deleting every chat from the panel (#76)', () => {
         expect(
             await screen.findByText(/1 chat could not be deleted/i),
         ).toBeInTheDocument();
-        // Found rather than read: the chat-history drawer is a modalizer, so
-        // between the message landing and the sweep's render settling the
-        // delete dialog can still be outside what a role query can reach.
+        // Found rather than read, and `hidden: true`: the chat-history drawer's
+        // modalizer traps this dialog out of the accessibility tree once it
+        // settles, which on a slow runner is before this line.
         expect(
-            await screen.findByRole('dialog', { name: DELETE_ALL_CHATS_TITLE }),
+            await screen.findByRole('dialog', {
+                name: DELETE_ALL_CHATS_TITLE,
+                hidden: true,
+            }),
         ).toBeInTheDocument();
     });
 
@@ -657,7 +672,12 @@ describe('deleting every chat from the panel (#76)', () => {
         await confirmDeleteAll();
 
         await waitFor(() => expect(apiService.deleteAllChats).toHaveBeenCalled());
-        expect(screen.getByRole('dialog', { name: DELETE_ALL_CHATS_TITLE })).toBeInTheDocument();
+        expect(
+            screen.getByRole('dialog', {
+                name: DELETE_ALL_CHATS_TITLE,
+                hidden: true,
+            }),
+        ).toBeInTheDocument();
         expect(screen.getByText('offline')).toBeInTheDocument();
         expect(
             screen.getByRole('button', { name: /^The coffee machine/ }),

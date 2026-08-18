@@ -111,6 +111,25 @@ def test_the_browser_deletes_a_chat_by_its_session():
     assert "planId" not in call.group(1)
 
 
+def test_the_browser_asks_for_the_door_at_the_name_the_route_serves():
+    # The way out of `in_progress` is to end the turn, never to loosen the
+    # guard (#122, ADR-031 §5), and the ask travels on the request. A third
+    # place for that name to come from is a door the surface opens and the
+    # route does not, which reads to the associate as the refusal it replaced.
+    served = re.search(
+        r'end_turn_first:\s*bool\s*=\s*Query\(\s*False,\s*alias="(\w+)"\s*\)',
+        ROUTER.read_text(encoding="utf-8"),
+    )
+    assert served, "the delete route no longer offers an end-the-turn door"
+
+    called = re.search(
+        r"async deleteChat\((.*?)\n    \}", _code_only(API_SERVICE), re.S
+    )
+    assert called, "apiService no longer offers deleteChat"
+
+    assert f"{served.group(1)}=true" in called.group(1)
+
+
 def test_the_single_plan_primitive_has_no_caller_left():
     # ADR-026 left `delete_plan_by_plan_id` alone: it takes one document, is
     # not scoped by `user_id`, and returns `True` even when it deleted nothing.
