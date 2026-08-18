@@ -79,7 +79,6 @@ The typical arrangement of components:
   {/* Top Section */}
   <Header>
     <HeaderTools>
-      <PanelRightToggles />
     </HeaderTools>
   </Header>
   

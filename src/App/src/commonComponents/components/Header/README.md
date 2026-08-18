@@ -6,7 +6,6 @@ The Header components form the top navigation bar of your Coral application, pro
 
 - `Header`: Main container component for the top bar
 - `HeaderTools`: Container for right-aligned actions and tools
-- `PanelRightToggles`: Container for toggle buttons that control right panel visibility
 
 ## Phase 1: UI Customization
 
@@ -34,20 +33,6 @@ The `HeaderTools` component is a container for right-aligned elements:
   <ToolbarDivider />          // Visual separator
   {/* Other right-aligned tools */}
 </HeaderTools>
-```
-
-### PanelRightToggles Component
-
-This component contains toggle buttons for showing/hiding right panels:
-
-```jsx
-<PanelRightToggles>
-  <ToggleButton 
-    appearance="subtle" 
-    icon={<History />}        // Replace with your icon
-  />
-  {/* Add more toggle buttons as needed */}
-</PanelRightToggles>
 ```
 
 ### Styling
@@ -123,15 +108,6 @@ function MyHeader() {
       <HeaderTools>
         <Avatar />
         <ToolbarDivider />
-        <PanelRightToggles>
-          <ToggleButton 
-            appearance="subtle" 
-            icon={<History />}
-            checked={isHistoryPanelOpen}
-            onClick={toggleHistoryPanel}
-          />
-          {/* Other toggles */}
-        </PanelRightToggles>
       </HeaderTools>
     </Header>
   );
@@ -181,10 +157,6 @@ function UserProfile() {
 | children | ReactNode | null | Content to render in the header |
 
 ### HeaderTools Props
-
-This component primarily acts as a container and doesn't accept special props beyond standard React props.
-
-### PanelRightToggles Props
 
 This component primarily acts as a container and doesn't accept special props beyond standard React props.
 
