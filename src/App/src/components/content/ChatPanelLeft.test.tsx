@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import selectorParser from 'postcss-selector-parser';
 
 vi.mock('@/api', () => ({
     apiService: {
@@ -826,61 +827,67 @@ describe("the chat list's height", () => {
      * returned rather than swallowed.
      */
     /**
-     * The states this engine will not answer for.
+     * The same selector with the **states this engine cannot try** taken out,
+     * parsed rather than pattern-matched.
      *
-     * jsdom evaluates `:focus` and refuses `:focus-within`; there is no pointer,
-     * so `:hover` and `:active` never match anything. A rule waiting on one of
-     * these is a rule about the DOM in a state the loop cannot put it in.
+     * jsdom evaluates `:focus` and refuses `:focus-within` — measured, with a
+     * descendant actually focused — and it has no pointer, so `:hover` and
+     * `:active` never match. A stylesheet is not written about the DOM as it
+     * stands, and `.panelContent > *:focus-within { max-height: 280px }` bounds
+     * this list the moment an associate tabs into a row.
+     *
+     * Two hand-written attempts at this failed and are the reason a parser is a
+     * dependency now. A regex strip mangled `:is(:not(.a), .b)` into invalid
+     * nonsense; a lexical "does the selector name a container" gate missed the
+     * selector above, whose only class belongs to the panel's scroll region
+     * while its *subject* is a container. The grammar declines to be
+     * approximated, so it is parsed: `postcss-selector-parser` is what
+     * autoprefixer reads selectors with.
+     *
+     * A branch carrying a pseudo-*element* is dropped rather than stripped —
+     * `::before` is a generated box beside the container, and a height on it
+     * bounds nothing here. Stripping `:not()` and `:is()` only widens what is
+     * looked at, which is the safe direction for a guard.
      */
-    const STATES_THIS_ENGINE_CANNOT_TRY =
-        /:(hover|active|focus|focus-within|focus-visible|target|checked)\b/i;
+    const withoutStates = (selector: string): string | null => {
+        try {
+            const parsed = selectorParser().astSync(selector);
+
+            parsed.each((branch) => {
+                if (branch.some((node) => node.type === 'pseudo' && node.value.startsWith('::'))) {
+                    branch.remove();
+                }
+            });
+            parsed.walkPseudos((pseudo) => {
+                if (!pseudo.value.startsWith('::')) pseudo.remove();
+            });
+
+            const stripped = String(parsed).trim();
+            return stripped === '' ? null : stripped;
+        } catch {
+            return null;
+        }
+    };
 
     const loadRulesFor = (
         containers: HTMLElement[],
     ): { unload: () => void; unreadable: string[]; declarations: CSSStyleDeclaration[] } => {
-        const containerClasses = new Set(
-            containers.flatMap((container) => Array.from(container.classList)),
-        );
-
         const applies = (selector: string): boolean => {
-            try {
-                // Selector lists are handed over whole: `matches` understands
-                // `.a, .b`, and splitting on commas is what broke `:is(a, b)`.
-                if (containers.some((container) => container.matches(selector))) return true;
-            } catch {
-                // A selector this engine cannot parse cannot be ruled out.
-                return true;
+            // Selector lists are handed over whole: `matches` understands
+            // `.a, .b`, and splitting on commas is what broke `:is(a, b)`.
+            const asked = [selector, withoutStates(selector)];
+
+            for (const candidate of asked) {
+                if (candidate === null) continue;
+                try {
+                    if (containers.some((container) => container.matches(candidate))) return true;
+                } catch {
+                    // A selector this engine cannot parse cannot be ruled out.
+                    return true;
+                }
             }
 
-            /*
-              The engine said no, but for a rule waiting on a state it cannot
-              try, "no" means "not right now". `.panelLeft
-              .fui-AccordionPanel:focus-within { max-height: 280px }` clips the
-              list the moment an associate tabs into a row, and jsdom will not
-              match `:focus-within` even with the row focused — measured, not
-              assumed.
-
-              So the fallback is deliberately lexical and deliberately narrow:
-              it reports such a rule only when the selector also names one of
-              these containers. It cannot skip anything the engine accepted, and
-              it cannot reach a `:hover` rule about some other part of the
-              surface. An earlier attempt rewrote the selector to remove the
-              state instead, and mangled `:is(:not(.a), .b)` into nonsense —
-              the selector grammar declining to be approximated.
-
-              It does over-report in one shape: a state rule about a *row*
-              whose selector happens to name a container on the way down, such
-              as `.panelLeft .task-list-container .task-tab:hover { height:
-              54px }`. That is the error worth making. Narrowing it means
-              deciding which compound the selector ends in, which is parsing the
-              grammar again, and a miss there is the defect this ticket exists
-              about while an over-report is one honest rule discussed in a
-              review.
-            */
-            return (
-                STATES_THIS_ENGINE_CANNOT_TRY.test(selector) &&
-                classesIn(selector).some((className) => containerClasses.has(className))
-            );
+            return false;
         };
 
         const injected: HTMLStyleElement[] = [];
