@@ -865,16 +865,54 @@ class CosmosDBClient(DatabaseBase):
 
         return ChatDeletion.swept(deleted=deleted, failed=failed)
 
+    # Written once and shared by all three reads below, so that the whole of
+    # the authorization — the `user_id` predicate — cannot be dropped from one
+    # of them while it survives in the others.
+    _PLAN_SCOPE = (
+        "c.session_id=@session_id AND c.data_type=@data_type "
+        "AND c.user_id=@user_id"
+    )
+
     async def _latest_plan(self, session_id: str):
         """The Chat's latest Plan, read raw: status, id, ``_etag``, found.
 
         Raw for the reason ``delete_chat`` documents — ``query_items`` would
         drop a plan it cannot validate and turn an outage into an empty
         history — and it carries the ``_etag`` because the sweep's first delete
-        is conditional on it. The ordered query needs the composite index
-        provisioned with the memory container. During its online build, Cosmos
-        can reject that query, so the known index-not-ready response falls back
-        to an unordered read and applies the same ordering here.
+        is conditional on it.
+
+        **Latest means created last** (#165): ``ORDER BY c.timestamp DESC,
+        c.id DESC``. ``_ts`` is last-modified, so ordering by it let any write
+        to an older Plan promote it above the Plan the Chat is actually
+        running; the id tie-break makes two Plans created in the same instant
+        resolve to the same one on every read, in every process. That two-
+        property order needs the composite index provisioned with the memory
+        container.
+
+        **The ordering cannot omit a Plan, and that guarantee is here rather
+        than in the store.** Cosmos leaves out of an ``ORDER BY`` result every
+        document missing the ordering property, so a Plan without ``timestamp``
+        would read as *no Plan at all* and ``delete_chat`` would offer to
+        delete the Chat running it — silently. That is the hazard that stopped
+        #157 making this change. A composite index over the ordering paths is
+        documented to return such documents, but this read does not rest on
+        that documentation, on the index having finished building, or on
+        anything else nobody in this process can see: **when the ordered query
+        names no Plan, the Plans the ordering cannot place are asked for by
+        name** — ``NOT IS_DEFINED(c.timestamp)`` is a predicate, and no index
+        behaviour drops a document from a predicate. It runs only on the answer
+        that would otherwise be *no Plan*, so the path every turn takes still
+        costs one query, and it can only turn *no Plan* into *a Plan*: the
+        direction that keeps a Chat rather than deletes it.
+
+        A Plan the ordering cannot place never outranks one it can — that is
+        Cosmos's own DESC ordering, where undefined sorts below every value,
+        and :meth:`_plan_ordering` holds every row this class sorts itself to
+        the same rule, so the store's answer and this one cannot disagree.
+
+        During the composite index's online build Cosmos rejects the ordered
+        query. Only that known response falls back — to an unordered read of
+        the same scope, ordered here instead.
         """
         parameters = [
             {"name": "@session_id", "value": session_id},
@@ -885,16 +923,14 @@ class CosmosDBClient(DatabaseBase):
             rows = self.container.query_items(
                 query=(
                     "SELECT TOP 1 c.overall_status, c.id, c._etag FROM c "
-                    "WHERE c.session_id=@session_id AND c.data_type=@data_type "
-                    "AND c.user_id=@user_id "
+                    f"WHERE {self._PLAN_SCOPE} "
                     "ORDER BY c.timestamp DESC, c.id DESC"
                 ),
                 parameters=parameters,
             )
 
             async for row in rows:
-                return row.get("overall_status"), row.get("id"), row.get("_etag"), True
-            return None, None, None, False
+                return self._plan_answer(row)
         except Exception as error:
             if not self._is_composite_index_not_ready(error):
                 raise
@@ -903,33 +939,59 @@ class CosmosDBClient(DatabaseBase):
                 "unordered fallback for session %s",
                 session_id,
             )
+            return self._latest_of(
+                await self._plan_rows(
+                    "SELECT c.overall_status, c.id, c._etag, c.timestamp FROM c "
+                    f"WHERE {self._PLAN_SCOPE}",
+                    parameters,
+                )
+            )
 
-        rows = self.container.query_items(
-            query=(
-                "SELECT c.overall_status, c.id, c._etag, c.timestamp FROM c "
-                "WHERE c.session_id=@session_id AND c.data_type=@data_type "
-                "AND c.user_id=@user_id"
-            ),
-            parameters=parameters,
+        # The ordered read named no Plan. Either this Chat holds none — the
+        # ordinary answer — or it holds one the ordering could not place, and
+        # only a predicate can tell those two apart.
+        unplaceable = await self._plan_rows(
+            "SELECT c.overall_status, c.id, c._etag, c.timestamp FROM c "
+            f"WHERE {self._PLAN_SCOPE} AND NOT IS_DEFINED(c.timestamp)",
+            parameters,
         )
-        candidates = [row async for row in rows]
-        if not candidates:
+        if unplaceable:
+            self.logger.warning(
+                "Chat %s holds %s plan(s) without a timestamp: the ordered "
+                "read cannot place them, so the newest by id answers for it",
+                session_id,
+                len(unplaceable),
+            )
+        return self._latest_of(unplaceable)
+
+    async def _plan_rows(self, query: str, parameters: list) -> list:
+        """Every row of a plan read, drawn raw off the cursor."""
+        rows = self.container.query_items(query=query, parameters=parameters)
+        return [row async for row in rows]
+
+    @classmethod
+    def _latest_of(cls, rows: list):
+        """``ORDER BY c.timestamp DESC, c.id DESC`` applied here, not by Cosmos."""
+        if not rows:
             return None, None, None, False
 
-        latest = max(
-            candidates,
-            key=lambda row: (
-                row.get("timestamp") is not None,
-                row.get("timestamp") or "",
-                row.get("id") or "",
-            ),
-        )
-        return (
-            latest.get("overall_status"),
-            latest.get("id"),
-            latest.get("_etag"),
-            True,
-        )
+        return cls._plan_answer(max(rows, key=cls._plan_ordering))
+
+    @staticmethod
+    def _plan_ordering(row: dict) -> tuple:
+        """The ordering key, with Cosmos's own place for a missing timestamp.
+
+        Undefined sorts below every value in Cosmos, so a Plan the store's
+        ``ORDER BY`` could not place sorts last here too: never dropped, and
+        never ahead of a Plan that carries a timestamp.
+        """
+        timestamp = row.get("timestamp")
+        return (timestamp is not None, timestamp or "", row.get("id") or "")
+
+    @staticmethod
+    def _plan_answer(row: dict):
+        """The four things every caller of ``_latest_plan`` is handed."""
+        return row.get("overall_status"), row.get("id"), row.get("_etag"), True
 
     @staticmethod
     def _is_composite_index_not_ready(error: Exception) -> bool:

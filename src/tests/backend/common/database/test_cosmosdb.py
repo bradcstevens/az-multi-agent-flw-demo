@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import re
 import sys
 import os
 from unittest.mock import AsyncMock, Mock, call, patch
@@ -1023,34 +1024,96 @@ def _settled_chat(status="completed", etag="etag-1"):
     }
 
 
-class _PlanOrderingContainer:
-    """Small Cosmos-shaped seam that applies the requested ORDER BY."""
+class _CosmosPlanContainer:
+    """A store seam that answers a plan read the way Cosmos answers it.
 
-    def __init__(self, rows):
+    Three of the store's behaviours are modelled on purpose, because
+    ``_latest_plan`` is built to survive all three:
+
+    * **an ``ORDER BY`` omits every document that does not carry the ordering
+      property.** That is the fail-silent hazard #157 refused to ship into —
+      a Plan without ``timestamp`` vanishing from the read, and Chat deletion
+      seeing a Chat with a live Plan as a Chat with no Plan at all. Modelling
+      it here is what makes these tests evidence about the *read* rather than
+      about a composite index nobody in this process can see;
+    * **a projection returns the properties it asked for, and only those the
+      document has**, so a read cannot lean on a field it did not select and a
+      row can genuinely arrive without ``timestamp``;
+    * **a predicate is honoured**, so the query that asks for the documents the
+      ordering cannot place is answered with them.
+
+    The ordering is parsed out of the query text rather than hard-coded, so
+    what is applied is what the read asked the store for. Pointed at the
+    previous ``ORDER BY c._ts DESC`` these tests fail on the answer rather than
+    on the seam.
+    """
+
+    _SELECT = re.compile(r"SELECT\s+(?:TOP\s+(\d+)\s+)?(.+?)\s+FROM c", re.S)
+    _ORDER_BY = re.compile(r"ORDER BY\s+(.+?)\s*$", re.S)
+
+    def __init__(self, rows, raises=None):
         self.rows = rows
+        self.raises = raises
         self.queries = []
 
     def query_items(self, **kwargs):
-        self.queries.append(kwargs)
         query = kwargs["query"]
-        if "ORDER BY c.timestamp DESC, c.id DESC" in query:
-            rows = sorted(
-                self.rows,
-                key=lambda row: (row.get("timestamp", ""), row.get("id", "")),
-                reverse=True,
-            )
-        else:
-            rows = sorted(
-                self.rows,
-                key=lambda row: row.get("_ts", 0),
-                reverse=True,
-            )
+        self.queries.append(kwargs)
+
+        # The `user_id` predicate is the whole of the authorization, so it is
+        # required of *every* read this seam answers — including the one that
+        # only runs when the ordering could not place a Plan.
+        for predicate in (
+            "c.session_id=@session_id",
+            "c.data_type=@data_type",
+            "c.user_id=@user_id",
+        ):
+            assert predicate in query, f"unscoped plan read: {query}"
+
+        if self.raises is not None and "ORDER BY" in query:
+            raise self.raises
+
+        top, fields = self._SELECT.search(query).groups()
+        rows = self._ordered(query, [r for r in self.rows if self._matches(query, r)])
+        if top is not None:
+            rows = rows[: int(top)]
+        rows = [self._projected(fields, row) for row in rows]
 
         async def cursor():
             for row in rows:
                 yield row
 
         return cursor()
+
+    @staticmethod
+    def _matches(query, row):
+        if "NOT IS_DEFINED(c.timestamp)" in query:
+            return "timestamp" not in row
+        return True
+
+    @classmethod
+    def _ordered(cls, query, rows):
+        clause = cls._ORDER_BY.search(query)
+        if clause is None:
+            return list(rows)
+
+        terms = []
+        for term in clause.group(1).split(","):
+            path, _, direction = term.strip().partition(" ")
+            terms.append((path[len("c."):], direction.strip().upper() != "ASC"))
+
+        # Cosmos drops from an ORDER BY result every document with no value for
+        # an ordering property. Nothing about this is configurable, and the
+        # read under test is the only place it can be answered.
+        placed = [row for row in rows if all(name in row for name, _ in terms)]
+        for name, descending in reversed(terms):
+            placed.sort(key=lambda row: row[name], reverse=descending)
+        return placed
+
+    @staticmethod
+    def _projected(fields, row):
+        names = [field.strip()[len("c."):] for field in fields.split(",")]
+        return {name: row[name] for name in names if name in row}
 
 
 class _CompositeIndexUnavailable(Exception):
@@ -1061,7 +1124,16 @@ class _CompositeIndexUnavailable(Exception):
 
 
 class TestLatestPlanOrdering:
-    """The latest Plan is creation-ordered, not last-modified-ordered."""
+    """The latest Plan is the one created last, and the read never loses one.
+
+    Asserted through ``_CosmosPlanContainer`` — a seam that orders, projects
+    and *omits* the way Cosmos does — rather than through a mock handed a
+    canned list: a mock returns whatever the test gave it whatever the query
+    said, so an ordering pinned only that way is pinned as a string.
+    """
+
+    OLDER = "2026-08-17T00:00:00+00:00"
+    NEWER = "2026-08-18T00:00:00+00:00"
 
     @pytest.fixture
     def client(self):
@@ -1076,93 +1148,205 @@ class TestLatestPlanOrdering:
         client._initialized = True
         return client
 
+    @staticmethod
+    def _plan(plan_id, status, created=None, written=0, etag="etag-1"):
+        """A Plan document.
+
+        ``created`` left out is a Plan the ordering cannot place — the case
+        the whole of this suite exists for. ``written`` is Cosmos's ``_ts``,
+        the last-modified stamp this read used to order by and now must not.
+        """
+        row = {"id": plan_id, "overall_status": status, "_ts": written}
+        if created is not None:
+            row["timestamp"] = created
+        if etag is not None:
+            row["_etag"] = etag
+        return row
+
     @pytest.mark.asyncio
     async def test_an_older_plan_written_last_does_not_become_latest(self, client):
-        client.container = _PlanOrderingContainer(
+        # The defect itself: `_ts` is last-modified, so any write to the
+        # finished older Plan promoted it above the Plan the Chat is running —
+        # and Chat deletion then offered to delete a live turn.
+        client.container = _CosmosPlanContainer(
             [
-                {
-                    "id": "plan-new",
-                    "timestamp": "2026-08-18T00:00:00+00:00",
-                    "_ts": 100,
-                    "overall_status": "in_progress",
-                },
-                {
-                    "id": "plan-old",
-                    "timestamp": "2026-08-17T00:00:00+00:00",
-                    "_ts": 200,
-                    "overall_status": "completed",
-                },
+                self._plan("plan-new", "in_progress", self.NEWER, written=100),
+                self._plan("plan-old", "completed", self.OLDER, written=200),
             ]
         )
 
-        status, plan_id, _etag, found = await client._latest_plan("session-1")
-
-        assert found is True
-        assert plan_id == "plan-new"
-        assert status == "in_progress"
+        assert await client._latest_plan("session-1") == (
+            "in_progress",
+            "plan-new",
+            "etag-1",
+            True,
+        )
 
     @pytest.mark.asyncio
-    async def test_same_timestamp_uses_plan_id_as_a_deterministic_tie_break(self, client):
-        client.container = _PlanOrderingContainer(
+    async def test_same_timestamp_uses_plan_id_as_a_deterministic_tie_break(
+        self, client
+    ):
+        client.container = _CosmosPlanContainer(
             [
-                {
-                    "id": "plan-a",
-                    "timestamp": "2026-08-18T00:00:00+00:00",
-                    "_ts": 100,
-                    "overall_status": "completed",
-                },
-                {
-                    "id": "plan-z",
-                    "timestamp": "2026-08-18T00:00:00+00:00",
-                    "_ts": 100,
-                    "overall_status": "in_progress",
-                },
+                self._plan("plan-a", "completed", self.NEWER),
+                self._plan("plan-z", "in_progress", self.NEWER),
             ]
         )
 
         first = await client._latest_plan("session-1")
         second = await client._latest_plan("session-1")
 
-        assert first == ("in_progress", "plan-z", None, True)
+        assert first == ("in_progress", "plan-z", "etag-1", True)
         assert second == first
 
     @pytest.mark.asyncio
+    async def test_a_plan_the_ordering_cannot_place_is_not_omitted(self, client):
+        # The hazard that stopped #157 making this change, asserted against a
+        # store that *does* omit: Cosmos leaves a document with no `timestamp`
+        # out of an ORDER BY result, so this Chat's only Plan — running —
+        # would read as no Plan at all and the Chat would be deletable,
+        # silently. The read asks for what the ordering could not place rather
+        # than trusting the composite index to hand it over.
+        client.container = _CosmosPlanContainer(
+            [self._plan("plan-1", "in_progress", created=None, etag="e1")]
+        )
+
+        assert await client._latest_plan("session-1") == (
+            "in_progress",
+            "plan-1",
+            "e1",
+            True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_the_newest_of_the_plans_the_ordering_cannot_place_answers(
+        self, client
+    ):
+        # More than one, and none of them placeable: the same id tie-break the
+        # ordered read uses, so two reads of one store still agree.
+        client.container = _CosmosPlanContainer(
+            [
+                self._plan("plan-a", "completed", created=None),
+                self._plan("plan-z", "in_progress", created=None),
+            ]
+        )
+
+        assert await client._latest_plan("session-1") == (
+            "in_progress",
+            "plan-z",
+            "etag-1",
+            True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_plan_the_ordering_cannot_place_never_outranks_one_it_can(
+        self, client
+    ):
+        # Undefined sorts below every value in Cosmos, so a Plan without a
+        # `timestamp` is last, not first — the store's rule and this read's are
+        # the same one. And because it cannot win, it is only asked for when
+        # the answer would otherwise be *no Plan*: the turn every Chat takes
+        # still costs a single query.
+        container = _CosmosPlanContainer(
+            [
+                self._plan("plan-new", "in_progress", self.NEWER),
+                self._plan("plan-stray", "completed", created=None),
+            ]
+        )
+        client.container = container
+
+        assert await client._latest_plan("session-1") == (
+            "in_progress",
+            "plan-new",
+            "etag-1",
+            True,
+        )
+        assert len(container.queries) == 1
+
+    @pytest.mark.asyncio
+    async def test_the_read_for_an_unplaceable_plan_keeps_the_user_scope(
+        self, client
+    ):
+        # A second read is a second place the authorization could be dropped.
+        container = _CosmosPlanContainer([])
+        client.container = container
+
+        await client._latest_plan("session-1")
+
+        probe = container.queries[1]
+        assert "NOT IS_DEFINED(c.timestamp)" in probe["query"]
+        assert "ORDER BY" not in probe["query"]
+        assert "c.user_id=@user_id" in probe["query"]
+        assert {"name": "@user_id", "value": "test_user"} in probe["parameters"]
+        assert {"name": "@session_id", "value": "session-1"} in probe["parameters"]
+        assert {"name": "@data_type", "value": DataType.plan} in probe["parameters"]
+
+    @pytest.mark.asyncio
+    async def test_a_chat_that_holds_no_plan_still_reads_as_no_plan(self, client):
+        # The other half of the case above: making the read unable to omit a
+        # Plan must not invent one. A session that holds none — or none of this
+        # user's — is still no chat at all to this caller.
+        client.container = _CosmosPlanContainer([])
+
+        assert await client._latest_plan("session-1") == (None, None, None, False)
+
+    @pytest.mark.asyncio
     async def test_index_build_uses_an_authorized_unordered_fallback(self, client):
-        rows = [
-            {
-                "id": "plan-new",
-                "timestamp": "2026-08-18T00:00:00+00:00",
-                "_ts": 100,
-                "overall_status": "in_progress",
-            },
-            {
-                "id": "plan-old",
-                "timestamp": "2026-08-17T00:00:00+00:00",
-                "_ts": 200,
-                "overall_status": "completed",
-            },
-        ]
+        # A push provisions the composite index and ships the query together.
+        # While that index builds Cosmos rejects the ordered query, and a read
+        # that raises takes Chat deletion and the settle-write down with it.
+        container = _CosmosPlanContainer(
+            [
+                self._plan("plan-new", "in_progress", self.NEWER, written=100),
+                self._plan("plan-old", "completed", self.OLDER, written=200),
+            ],
+            raises=_CompositeIndexUnavailable(),
+        )
+        client.container = container
 
-        def query_items(**kwargs):
-            if "ORDER BY" in kwargs["query"]:
-                raise _CompositeIndexUnavailable()
-
-            async def cursor():
-                for row in rows:
-                    yield row
-
-            return cursor()
-
-        client.container = Mock()
-        client.container.query_items = Mock(side_effect=query_items)
-
-        status, plan_id, _etag, found = await client._latest_plan("session-1")
-
-        assert (status, plan_id, found) == ("in_progress", "plan-new", True)
-        fallback = client.container.query_items.call_args_list[1].kwargs
+        assert await client._latest_plan("session-1") == (
+            "in_progress",
+            "plan-new",
+            "etag-1",
+            True,
+        )
+        fallback = container.queries[1]
         assert "ORDER BY" not in fallback["query"]
         assert "c.user_id=@user_id" in fallback["query"]
         assert {"name": "@user_id", "value": "test_user"} in fallback["parameters"]
+
+    @pytest.mark.asyncio
+    async def test_the_index_build_fallback_keeps_a_plan_it_cannot_place_too(
+        self, client
+    ):
+        # The unordered read carries no ordering property, so nothing can be
+        # dropped from it — but it is sorted here, by the same rule, and a
+        # Chat whose only Plan has no `timestamp` still has a Plan.
+        client.container = _CosmosPlanContainer(
+            [self._plan("plan-1", "in_progress", created=None, etag="e1")],
+            raises=_CompositeIndexUnavailable(),
+        )
+
+        assert await client._latest_plan("session-1") == (
+            "in_progress",
+            "plan-1",
+            "e1",
+            True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_store_failure_that_is_not_the_index_build_is_not_swallowed(
+        self, client
+    ):
+        # Only the known transient response falls back. An outage answered with
+        # an unordered read would be an outage answered with a guess.
+        client.container = _CosmosPlanContainer(
+            [self._plan("plan-1", "in_progress", self.NEWER)],
+            raises=RuntimeError("the store is unreachable"),
+        )
+
+        with pytest.raises(RuntimeError):
+            await client._latest_plan("session-1")
 
 
 class TestCosmosDBChatDeletion:
