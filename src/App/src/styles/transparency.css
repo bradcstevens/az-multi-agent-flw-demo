@@ -431,6 +431,26 @@
     font-family: var(--fontFamilyNumeric);
 }
 
+.agent-dossier__configuration {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+}
+
+.agent-dossier__configuration div {
+    display: flex;
+    gap: 8px;
+}
+
+.agent-dossier__configuration dt {
+    color: var(--colorNeutralForeground3);
+}
+
+.agent-dossier__configuration dd {
+    margin: 0;
+}
+
 .agent-dossier__description,
 .agent-dossier__preamble {
     margin: 0;

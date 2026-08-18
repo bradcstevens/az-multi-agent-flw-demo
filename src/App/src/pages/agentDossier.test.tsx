@@ -59,6 +59,9 @@ const TEAM = {
             deployment_name: 'gpt-5.4-mini',
             description: 'Answers routine store-procedure questions from the Store SOP Assistant.',
             system_message: VERBATIM_SYSTEM_MESSAGE,
+            knowledge_base_name: 'store-operations-kb',
+            user_responses: true,
+            temperature: 0.2,
         },
         { input_key: '', type: '', name: 'EscalationAgent' },
     ],
@@ -141,7 +144,7 @@ beforeEach(() => {
 });
 
 describe('the Agent dossier on the home surface', () => {
-    it('opens the selected specialist with its model, description, and verbatim system message', async () => {
+    it('opens the selected specialist with its configured facts and verbatim system message', async () => {
         renderHomeSurface();
 
         const opener = await screen.findByRole('button', { name: 'Shift Tasks Agent' });
@@ -157,6 +160,12 @@ describe('the Agent dossier on the home surface', () => {
         expect(within(dossier).getByTestId('agent-dossier-prompt').textContent).toBe(
             VERBATIM_SYSTEM_MESSAGE,
         );
+        expect(within(dossier).getByText('Knowledge base')).toBeInTheDocument();
+        expect(within(dossier).getByText('store-operations-kb')).toBeInTheDocument();
+        expect(within(dossier).getByText('Follow-up questions')).toBeInTheDocument();
+        expect(within(dossier).getByText('Can ask you follow-up questions')).toBeInTheDocument();
+        expect(within(dossier).getByText('Temperature')).toBeInTheDocument();
+        expect(within(dossier).getByText('0.2')).toBeInTheDocument();
     });
 
     it('returns focus to the name when Escape closes the dialog', async () => {
@@ -199,6 +208,9 @@ describe('the Agent dossier on the home surface', () => {
         expect(within(dossier).queryByText('Model')).not.toBeInTheDocument();
         expect(within(dossier).queryByText('System message, verbatim')).not.toBeInTheDocument();
         expect(within(dossier).queryByTestId('agent-dossier-prompt')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('Knowledge base')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('Follow-up questions')).not.toBeInTheDocument();
+        expect(within(dossier).queryByText('Temperature')).not.toBeInTheDocument();
         expect(within(dossier).queryByText('false')).not.toBeInTheDocument();
     });
 });

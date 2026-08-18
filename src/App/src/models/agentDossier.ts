@@ -10,4 +10,9 @@ export const AGENT_DOSSIER_COPY = {
     closeLabel: 'Close Agent dossier',
     modelLabel: 'Model',
     systemMessagePreamble: 'System message, verbatim',
+    knowledgeBaseLabel: 'Knowledge base',
+    followUpQuestionsLabel: 'Follow-up questions',
+    followUpQuestionsEnabled: 'Can ask you follow-up questions',
+    followUpQuestionsDisabled: 'Will not ask you follow-up questions',
+    temperatureLabel: 'Temperature',
 } as const;
