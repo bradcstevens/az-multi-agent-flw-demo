@@ -527,14 +527,32 @@ base and `search_store_procedures` chooses between them turn by turn, and the br
 take is the cross-platform hop the demonstration rests on. A hop that happens four runs in five is
 not a claim anybody can make on stage.
 
-**Silent agent skip** — `AgentFactory.get_agents` catches `UnsupportedModelError`, logs a warning
-and continues, so an agent whose `deployment_name` is not in the `SUPPORTED_MODELS` allowlist — or
-absent entirely — is dropped. The upload returned 200, the team is in Cosmos, the surface shows the
-assistant, and one member of the cast never speaks. There are **two** allowlists and they do not
-agree: `validate_team_models` at upload time hard-bypasses `gpt-5.4-mini`, `gpt-5.4`, `gpt-5` and
-`o3` by name and fails open on any exception, while `create_agent_from_config` at run time reads the
-environment variable. `python -m store_pack roster` closes the gap by reading the team back out of
-the deployment after upload; both post-deploy entry points run it.
+**Refused agent** — an agent whose `deployment_name` is outside the runtime allowlist, or absent
+entirely, so `AgentFactory.create_agent_from_config` cannot build it. It is **reported, never
+dropped**. `agents/model_allowlist.py` is the one place the question *is this model usable* is
+asked, and three callers read that one answer: the factory, `validate_team_models` at upload, and
+`/init_team`, whose roster now carries `available` and — only where there is one — an
+`unavailable_reason` per agent. Absence and a stated refusal are not interchangeable here: an agent
+silently missing from the roster is indistinguishable from an agent the pack never had, which is the
+roster's version of **Not reported vs measured**.
+
+This replaces the **Silent agent skip** (#113). `get_agents` caught `UnsupportedModelError`, logged a
+warning and continued, so the upload returned 200, the team sat in Cosmos, the surface showed the
+assistant, and one member of the cast never spoke. There were **two** allowlists and they did not
+agree: `validate_team_models` hard-bypassed `gpt-5.4-mini`, `gpt-5.4`, `gpt-5` and `o3` by name and
+returned *valid* from a blanket `except`, while `create_agent_from_config` read `SUPPORTED_MODELS`.
+That variable has no default, so unset it raised inside the factory's per-agent `try` and emptied the
+whole team one caught exception at a time; it is now a fatal `SupportedModelsNotConfigured` resolved
+once, before the loop. Guessing a default would be the same failure wearing a nicer face — which
+models a deployment supports is the deployment's decision.
+
+`validate_team_models` still asks the second, separate question — *is it deployed* — but only
+reports it as an observation. `FoundryService.list_model_deployments` returns `[]` for a permission
+failure, a non-matching endpoint and an empty project alike, so an empty listing is recorded as
+`deployments_observed=False` rather than rendered as a wall of missing models.
+
+`python -m store_pack roster` closes the remaining gap by reading the team back out of the deployment
+after upload; both post-deploy entry points run it.
 
 The pack, the roster and that check are recorded in
 [docs/store-content-pack.md](docs/store-content-pack.md).

@@ -12,8 +12,9 @@ Key changes:
 
 import asyncio
 import logging
+import os
 import sys
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -48,7 +49,16 @@ _mock_messages_mod.TeamConfiguration = Mock()
 mock_agent_template_cls = Mock()
 mock_mcp_config_cls = Mock()
 
-sys.modules.setdefault("agents", Mock())  # parent package stub
+# `agents` is a real package stub rather than a bare Mock: the factory imports
+# its sibling `agents.model_allowlist`, and the one allowlist (#113) is exactly
+# the thing these tests must exercise for real rather than through a stand-in.
+_agents_pkg = ModuleType("agents")
+_agents_pkg.__path__ = [
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "agents")
+    )
+]
+sys.modules["agents"] = _agents_pkg
 _mock_agent_template_mod = Mock()
 _mock_agent_template_mod.AgentTemplate = mock_agent_template_cls
 sys.modules["agents.agent_template"] = _mock_agent_template_mod
@@ -62,6 +72,11 @@ sys.modules["config.mcp_config"] = _mock_mcp_config_mod
 
 # Now import the module under test (full backend.* path as per project convention)
 from backend.agents.agent_factory import AgentFactory, UnsupportedModelError
+
+# The factory imports its allowlist by the flat name, so the exception type it
+# raises belongs to `agents.model_allowlist`. Importing it as
+# `backend.agents.model_allowlist` would be a second, unrelated class.
+from agents.model_allowlist import SupportedModelsNotConfigured
 
 # ---------------------------------------------------------------------------
 # Helper builder
@@ -302,6 +317,9 @@ class TestGetAgents:
         self.factory = AgentFactory(team_service=Mock())
         self.memory_store = Mock()
         mock_agent_template_cls.reset_mock()
+        # `reset_mock()` leaves `side_effect` alone, so a list one test set would
+        # otherwise be exhausted into `StopIteration` in the next.
+        mock_agent_template_cls.side_effect = None
 
     def _team_config(self, *agent_objs):
         cfg = Mock()
@@ -341,14 +359,70 @@ class TestGetAgents:
         assert result[1] is a2
 
     @pytest.mark.asyncio
-    async def test_unsupported_model_is_skipped(self):
-        """Agent with unsupported model is skipped; result is empty."""
+    async def test_unsupported_model_is_recorded_not_just_logged(self):
+        """A dropped agent is carried out of the loop, not left in a warning.
+
+        This was the defect (#113): ``UnsupportedModelError`` was caught, logged
+        at warning level and the loop continued, so the team ran one agent short
+        and every caller — including the roster — carried on as if it had not.
+        """
         result = await self.factory.get_agents(
             "user123",
-            self._team_config(_agent_obj(deployment_name="unsupported-model")),
+            self._team_config(
+                _agent_obj(name="Ghost", deployment_name="unsupported-model")
+            ),
             self.memory_store,
         )
         assert len(result) == 0
+        assert [a.name for a in self.factory.refused_agents] == ["Ghost"]
+        assert "unsupported-model" in self.factory.refused_agents[0].reason
+
+    @pytest.mark.asyncio
+    async def test_refusals_do_not_accumulate_across_calls(self):
+        """Each construction reports its own team, not the last one's."""
+        await self.factory.get_agents(
+            "user123",
+            self._team_config(_agent_obj(name="Ghost", deployment_name="nope")),
+            self.memory_store,
+        )
+        agent_instance = Mock()
+        agent_instance.open = AsyncMock()
+        mock_agent_template_cls.return_value = agent_instance
+
+        await self.factory.get_agents(
+            "user123", self._team_config(_agent_obj()), self.memory_store
+        )
+        assert self.factory.refused_agents == []
+
+    @pytest.mark.asyncio
+    async def test_unset_supported_models_does_not_empty_the_team_quietly(
+        self, monkeypatch
+    ):
+        """One missing environment variable used to produce a team of none.
+
+        ``SUPPORTED_MODELS`` is read as optional with no default, so unset it
+        reached ``json.loads`` **inside** the per-agent ``try``, raised once per
+        agent, was caught by the broad ``except`` exactly like a per-agent fault,
+        and left an empty roster behind four warnings. It is now resolved once,
+        before the loop, and a configuration error is fatal.
+        """
+        monkeypatch.setattr(mock_config, "SUPPORTED_MODELS", "")
+
+        with pytest.raises(SupportedModelsNotConfigured):
+            await self.factory.get_agents(
+                "user123",
+                self._team_config(_agent_obj(name="A1"), _agent_obj(name="A2")),
+                self.memory_store,
+            )
+
+    @pytest.mark.asyncio
+    async def test_unparseable_supported_models_is_fatal_too(self, monkeypatch):
+        monkeypatch.setattr(mock_config, "SUPPORTED_MODELS", "gpt-4,gpt-4-32k")
+
+        with pytest.raises(SupportedModelsNotConfigured):
+            await self.factory.get_agents(
+                "user123", self._team_config(_agent_obj()), self.memory_store
+            )
 
     @pytest.mark.asyncio
     async def test_unexpected_exception_skips_agent(self):
@@ -365,6 +439,7 @@ class TestGetAgents:
 
         assert len(result) == 1
         assert result[0] is good_instance
+        assert [a.name for a in self.factory.refused_agents] == ["Bad"]
 
     @pytest.mark.asyncio
     async def test_empty_team(self):

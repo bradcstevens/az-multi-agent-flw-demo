@@ -1,17 +1,60 @@
+import dataclasses
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from azure.core.exceptions import (ClientAuthenticationError,
                                    HttpResponseError, ResourceNotFoundError)
 from azure.search.documents.indexes import SearchIndexClient
+from agents.model_allowlist import (RefusedAgent, configured_supported_models,
+                                    refused_agents)
 from common.config.app_config import config
 from common.database.database_base import DatabaseBase
 from common.models.messages import (StartingTask, TeamAgent, TeamConfiguration,
                                     UserCurrentTeam)
 from models.plan_models import MStep
 from services.foundry_service import FoundryService
+
+
+@dataclass(frozen=True)
+class TeamModelValidation:
+    """What the upload-time model check found, with its two answers apart.
+
+    One tuple of ``(bool, list)`` could not carry this without lying about one
+    of them: a model the deployment does not support and a model the deployment
+    has not deployed need different sentences, and *"the check could not run"*
+    needs a third. Collapsing them is how ``(True, [])`` came to mean both
+    *everything is fine* and *listing the deployments threw*.
+    """
+
+    #: Agents whose ``deployment_name`` is outside the runtime allowlist. The
+    #: factory would refuse to build these, so admitting them puts an agent on
+    #: the roster that can never answer.
+    refused_agents: List[RefusedAgent] = dataclasses.field(default_factory=list)
+    #: Models the definition names that Foundry has no succeeded deployment
+    #: for. Empty when nothing could be observed — never a stand-in for it.
+    missing_models: List[str] = dataclasses.field(default_factory=list)
+    #: Whether any deployment could be read back at all. ``False`` means the
+    #: presence question was not answered, which is not the same as answered
+    #: yes.
+    deployments_observed: bool = True
+
+    @property
+    def is_valid(self) -> bool:
+        """Whether the definition may be admitted."""
+        return not self.refused_agents and not self.missing_models
+
+    @property
+    def unsupported_models(self) -> List[str]:
+        """The refused deployment names, in roster order and de-duplicated."""
+        names: List[str] = []
+        for agent in self.refused_agents:
+            name = agent.deployment_name or ""
+            if name not in names:
+                names.append(name)
+        return names
 
 
 class TeamService:
@@ -380,46 +423,93 @@ class TeamService:
 
     async def validate_team_models(
         self, team_config: Dict[str, Any]
-    ) -> Tuple[bool, List[str]]:
-        """Validate that all models required by agents in the team config are deployed."""
-        try:
-            foundry_service = FoundryService()
-            deployments = await foundry_service.list_model_deployments()
-            available_models = [
-                d.get("name", "").lower()
-                for d in deployments
-                if d.get("status") == "Succeeded"
-            ]
+    ) -> "TeamModelValidation":
+        """Check a team definition's models before the definition is admitted.
 
-            required_models: set = set()
-            agents = team_config.get("agents", [])
-            for agent in agents:
-                if isinstance(agent, dict):
-                    required_models.update(self.extract_models_from_agent(agent))
+        Two questions, kept apart because only one of them can be answered
+        without a network call and only one of them decides whether the team
+        will actually run (#113).
 
-            team_level_models = self.extract_team_level_models(team_config)
-            required_models.update(team_level_models)
+        **Is the model supported?** Decided against the same allowlist
+        ``create_agent_from_config`` reads, exactly, so an upload can no longer
+        pass on a model the factory would then refuse. This replaces a
+        hard-coded bypass of ``gpt-5.4-mini``, ``gpt-5.4``, ``gpt-5`` and
+        ``o3`` — four names waved through by a ``continue`` and therefore never
+        compared against anything at all.
 
-            if not required_models:
-                default_model = config.AZURE_OPENAI_DEPLOYMENT_NAME
-                required_models.add(default_model.lower())
+        **Is it deployed?** Observed from Foundry, and an observation is all it
+        is: ``list_model_deployments`` reports an empty list both when a project
+        has no deployments and when it could not read them, so an empty result
+        is recorded as *not observed* rather than rendered as a wall of missing
+        models. That is **Not reported vs measured** at the seam it belongs on.
 
-            missing_models: List[str] = []
-            for model in required_models:
-                # Temporary bypass for known deployed models
-                if model.lower() in ["gpt-5.4-mini", "gpt-5.4", "gpt-5", "o3"]:
-                    continue
-                if model not in available_models:
-                    missing_models.append(model)
+        What is gone is the fail-open: the body no longer sits inside an
+        ``except`` that returns *valid*. A check that could not run says so, and
+        the caller decides — it does not quietly become a pass.
+        """
+        supported_models = configured_supported_models()
 
-            is_valid = len(missing_models) == 0
-            if not is_valid:
-                self.logger.warning(f"Missing model deployments: {missing_models}")
-                self.logger.info(f"Available deployments: {available_models}")
-            return is_valid, missing_models
-        except Exception as e:
-            self.logger.error(f"Error validating team models: {e}")
-            return True, []
+        agents = [
+            agent for agent in team_config.get("agents", []) if isinstance(agent, dict)
+        ]
+        refused = refused_agents(agents, supported_models)
+
+        required_models: set = set()
+        for agent in agents:
+            required_models.update(self.extract_models_from_agent(agent))
+
+        required_models.update(self.extract_team_level_models(team_config))
+
+        if not required_models:
+            default_model = config.AZURE_OPENAI_DEPLOYMENT_NAME
+            required_models.add(default_model.lower())
+
+        deployments = await FoundryService().list_model_deployments()
+        available_models = [
+            d.get("name", "").lower()
+            for d in deployments
+            if d.get("status") == "Succeeded"
+        ]
+        deployments_observed = bool(available_models)
+
+        # A model the allowlist already refused needs no second complaint about
+        # its deployment: one cause, one sentence.
+        already_refused = {
+            agent.deployment_name.lower()
+            for agent in refused
+            if agent.deployment_name
+        }
+
+        missing_models: List[str] = (
+            sorted(
+                model
+                for model in required_models
+                if model not in available_models and model not in already_refused
+            )
+            if deployments_observed
+            else []
+        )
+
+        if refused:
+            self.logger.error(
+                "Team configuration names models outside the allowlist %s: %s",
+                supported_models,
+                [agent.name for agent in refused],
+            )
+        if missing_models:
+            self.logger.warning(f"Missing model deployments: {missing_models}")
+            self.logger.info(f"Available deployments: {available_models}")
+        if not deployments_observed:
+            self.logger.warning(
+                "No model deployments could be read back, so deployment presence "
+                "was not checked. The supported-models allowlist still applies."
+            )
+
+        return TeamModelValidation(
+            refused_agents=refused,
+            missing_models=missing_models,
+            deployments_observed=deployments_observed,
+        )
 
     async def get_deployment_status_summary(self) -> Dict[str, Any]:
         """Get a summary of deployment status for debugging/monitoring."""

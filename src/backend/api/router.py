@@ -8,6 +8,9 @@ from opentelemetry import trace
 
 import models.messages as messages
 from models.messages import WebsocketMessageType
+from agents.model_allowlist import (SupportedModelsNotConfigured,
+                                    configured_supported_models,
+                                    roster_availability)
 from auth.auth_utils import get_authenticated_user_details
 from common.config.app_config import config
 from common.database.database_factory import DatabaseFactory
@@ -163,6 +166,31 @@ async def start_comms(
             )
 
 
+def _init_team_roster(team_configuration) -> list:
+    """The roster ``/init_team`` hands back, each agent with its verdict (#113).
+
+    The client used to be given a team identifier and nothing else, and took
+    its roster from the stored team configuration — which is the *record* of
+    what was uploaded and says nothing about whether the orchestration can
+    build it. So the **Agent dossier** could render a full account of an agent
+    the factory refuses, model and verbatim prompt included, for an agent that
+    can answer nothing, ever (ADR-039).
+
+    A refused agent is reported **alongside** the roster rather than left out of
+    it. Absence would collapse *"nobody can build this"* into *"this was never
+    here"*, which is the roster's form of the mistake **Not reported vs
+    measured** exists to prevent, and it would leave the stored record and the
+    roster disagreeing about who is on the team with no way to tell why.
+
+    A configuration error is raised, not rendered: with no allowlist there is no
+    verdict to state, and stating one anyway is the failure this replaces.
+    """
+    supported_models = configured_supported_models()
+    return roster_availability(
+        getattr(team_configuration, "agents", None) or [], supported_models
+    )
+
+
 @app_router.get("/init_team")
 async def init_team(
     request: Request,
@@ -255,10 +283,18 @@ async def init_team(
             user_id=user_id, team_configuration=team_configuration
         )
 
-        return {"team_id": init_team_id}
+        return {"team_id": init_team_id, "agents": _init_team_roster(team_configuration)}
 
     except HTTPException:
         raise
+    except SupportedModelsNotConfigured as e:
+        # A deployment with no allowlist cannot say who is on the team, and a
+        # roster asserted anyway is exactly the false claim #113 removes.
+        logger.error("Team initialization refused — %s", e)
+        track_event_if_configured(
+            "Error_Init_Team_Supported_Models_Not_Configured", {"error": str(e)}
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         track_event_if_configured(
             "Error_Init_Team_Failed",
@@ -1690,24 +1726,57 @@ async def upload_team_config(
         team_service = TeamService(memory_store)
 
         # Validate model deployments
-        models_valid, missing_models = await team_service.validate_team_models(
+        model_validation = await team_service.validate_team_models(
             json_data
         )
-        if not models_valid:
-            error_message = (
-                f"The following required models are not deployed in your Azure AI project: {', '.join(missing_models)}. "
-                f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
-            )
+        if not model_validation.is_valid:
+            if model_validation.refused_agents:
+                # The allowlist disagreement, reported rather than dropped
+                # (#113). Distinct from the message below on purpose: these
+                # models may well be deployed, and telling an operator to
+                # deploy one they already have sends them somewhere there is
+                # nothing to find.
+                refused = ", ".join(
+                    f"{agent.name or 'agent'} ({agent.deployment_name or 'no model'})"
+                    for agent in model_validation.refused_agents
+                )
+                error_message = (
+                    f"These agents name a model this deployment does not support: {refused}. "
+                    f"The agent factory would refuse to build them, so the team would run "
+                    f"short with nothing on screen saying so. Supported models are set by "
+                    f"SUPPORTED_MODELS."
+                )
+            else:
+                error_message = (
+                    f"The following required models are not deployed in your Azure AI project: "
+                    f"{', '.join(model_validation.missing_models)}. "
+                    f"Please deploy these models in Azure AI Foundry before uploading this team configuration."
+                )
             track_event_if_configured(
                 "Error_Config_Model_Validation_Failed",
                 {
                     "status": "failed",
                     "user_id": user_id,
                     "filename": file.filename,
-                    "missing_models": missing_models,
+                    "missing_models": model_validation.missing_models,
+                    "unsupported_models": model_validation.unsupported_models,
                 },
             )
             raise HTTPException(status_code=400, detail=error_message)
+
+        if not model_validation.deployments_observed:
+            # Reported, never converted into a pass. The allowlist above is the
+            # check that decides whether the team can run; this one could not
+            # be answered, and saying so is the whole of #113's repair here.
+            logger.warning(
+                "Model deployments could not be read back for user %s; the team "
+                "configuration was admitted on the supported-models allowlist alone.",
+                user_id,
+            )
+            track_event_if_configured(
+                "Config_Model_Deployments_Not_Observed",
+                {"status": "not_observed", "user_id": user_id, "filename": file.filename},
+            )
 
         track_event_if_configured(
             "Config_Model_Validation_Passed",
@@ -1783,6 +1852,12 @@ async def upload_team_config(
 
     except HTTPException:
         raise
+    except SupportedModelsNotConfigured as e:
+        # The upload is refused rather than admitted: with no allowlist there
+        # is nothing to check a model against, and admitting a definition on an
+        # unanswered question is the fail-open #113 removes.
+        logging.error("Team configuration refused — %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         logging.error("Unexpected error uploading team configuration: %s", str(e))
         raise HTTPException(status_code=500, detail="Internal server error occurred")

@@ -7,12 +7,14 @@ FoundryAgentTemplate (AzureAIAgentClient + ChatAgent, deprecated).
 """
 
 import asyncio
-import json
 import logging
 from types import SimpleNamespace
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from agents.agent_template import AgentTemplate
+from agents.model_allowlist import (RefusedAgent, SupportedModelsNotConfigured,
+                                    configured_supported_models, is_supported,
+                                    unsupported_reason)
 from common.config.app_config import config
 from common.database.database_base import DatabaseBase
 from common.models.messages import TeamConfiguration
@@ -72,6 +74,10 @@ class AgentFactory:
         self.logger = logging.getLogger(__name__)
         self.team_service = team_service
         self._agent_list: List = []
+        #: Agents this factory was asked for and did not build (#113). Kept on
+        #: the factory rather than only logged, because a warning in a
+        #: container is not a thing any caller — or any surface — can read.
+        self.refused_agents: List[RefusedAgent] = []
 
     # ------------------------------------------------------------------
     # Single-agent creation
@@ -83,6 +89,7 @@ class AgentFactory:
         agent_obj: SimpleNamespace,
         team_config: TeamConfiguration,
         memory_store: DatabaseBase,
+        supported_models: Optional[Sequence[str]] = None,
     ) -> AgentTemplate:
         """Create and open a single agent from a SimpleNamespace config object.
 
@@ -91,21 +98,26 @@ class AgentFactory:
             agent_obj:    Per-agent config parsed from the team JSON.
             team_config:  The parent team configuration.
             memory_store: Cosmos DB store for agent persistence.
+            supported_models: The allowlist to check against. Resolved from app
+                config when omitted; ``get_agents`` resolves it **once** and
+                passes it in so a configuration error cannot be mistaken for a
+                per-agent fault.
 
         Returns:
             An initialized ``AgentTemplate``.
 
         Raises:
             UnsupportedModelError:      If the deployment name is not in SUPPORTED_MODELS.
+            SupportedModelsNotConfigured: If SUPPORTED_MODELS is unset or unparseable.
         """
         deployment_name = getattr(agent_obj, "deployment_name", None)
 
-        # Validate model
-        supported_models = json.loads(config.SUPPORTED_MODELS)
-        if deployment_name not in supported_models:
+        # Validate model against the one allowlist (agents/model_allowlist.py).
+        if supported_models is None:
+            supported_models = configured_supported_models()
+        if not is_supported(deployment_name, supported_models):
             raise UnsupportedModelError(
-                f"Model '{deployment_name}' is not supported. "
-                f"Supported models: {supported_models}"
+                unsupported_reason(deployment_name, supported_models)
             )
 
         # Foundry IQ (FileSearchTool + vector stores)
@@ -200,8 +212,19 @@ class AgentFactory:
 
         Returns:
             List of initialized ``AgentTemplate`` instances.
+
+        Raises:
+            SupportedModelsNotConfigured: If the deployment's allowlist is
+                unset or unparseable. Deliberately resolved **before** the loop
+                and outside the per-agent ``try``: read inside it, a missing
+                environment variable was caught by the broad ``except`` once per
+                agent and returned an empty team as if every agent had failed
+                on its own (#113).
         """
+        supported_models = configured_supported_models()
+
         initialized: List = []
+        self.refused_agents = []
 
         for i, agent_cfg in enumerate(team_config_input.agents, 1):
             try:
@@ -212,7 +235,11 @@ class AgentFactory:
                     agent_cfg.name,
                 )
                 agent = await self.create_agent_from_config(
-                    user_id, agent_cfg, team_config_input, memory_store
+                    user_id,
+                    agent_cfg,
+                    team_config_input,
+                    memory_store,
+                    supported_models=supported_models,
                 )
                 initialized.append(agent)
                 self._agent_list.append(agent)
@@ -222,15 +249,31 @@ class AgentFactory:
                     len(team_config_input.agents),
                     agent_cfg.name,
                 )
+            except SupportedModelsNotConfigured:
+                raise
             except UnsupportedModelError as exc:
-                self.logger.warning(
-                    "Skipping agent %d/%d '%s' — configuration error: %s",
+                self.refused_agents.append(
+                    RefusedAgent(
+                        name=getattr(agent_cfg, "name", "") or "",
+                        deployment_name=getattr(agent_cfg, "deployment_name", None),
+                        reason=str(exc),
+                    )
+                )
+                self.logger.error(
+                    "Agent %d/%d '%s' was not built — %s",
                     i,
                     len(team_config_input.agents),
                     agent_cfg.name,
                     exc,
                 )
             except Exception as exc:
+                self.refused_agents.append(
+                    RefusedAgent(
+                        name=getattr(agent_cfg, "name", "") or "",
+                        deployment_name=getattr(agent_cfg, "deployment_name", None),
+                        reason=str(exc),
+                    )
+                )
                 self.logger.error(
                     "Skipping agent %d/%d '%s' — unexpected error: %s.",
                     i,

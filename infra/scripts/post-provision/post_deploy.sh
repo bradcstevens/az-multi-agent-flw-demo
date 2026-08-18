@@ -640,11 +640,14 @@ upload_all_team_configs() {
 
 # The roster, read back out of the deployment (issue #19).
 #
-# `AgentFactory.get_agents` skips an agent whose `deployment_name` is not in
-# SUPPORTED_MODELS with a `logger.warning` and nothing else. The upload
-# returned 200, the team is in Cosmos, the surface shows the assistant, and one
-# member of the cast never arrives. Nobody reads a container's warnings during
-# a rehearsal, so this asks.
+# `AgentFactory.get_agents` used to skip an agent whose `deployment_name` is not
+# in SUPPORTED_MODELS with a `logger.warning` and nothing else. The upload
+# returned 200, the team was in Cosmos, the surface showed the assistant, and
+# one member of the cast never arrived. Issue #113 made that refusal reportable
+# — `/init_team` now marks an agent it cannot build — but this check still runs,
+# and still asks the deployment rather than the definition: it compares what was
+# authored against what was stored, which is a question no in-process check can
+# answer.
 verify_store_roster() {
   info ""
   info "Verifying the $STORE_PACK_LABEL agent roster..."

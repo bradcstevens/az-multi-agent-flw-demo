@@ -3,6 +3,7 @@
 
 import os
 import sys
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -50,6 +51,10 @@ mock_config = MagicMock()
 mock_config.AZURE_SEARCH_ENDPOINT = 'https://test-search.search.windows.net'
 mock_config.AZURE_OPENAI_DEPLOYMENT_NAME = 'gpt-4'
 mock_config.AZURE_OPENAI_ENDPOINT = 'https://test-openai.openai.azure.com/'
+# The runtime allowlist (#113). A MagicMock here would be a configuration
+# error in every test, because the upload check now asks the same question
+# `create_agent_from_config` asks rather than bypassing four names by hand.
+mock_config.SUPPORTED_MODELS = '["gpt-4", "custom-model"]'
 mock_config.get_azure_credentials = MagicMock(return_value=MagicMock())
 
 mock_config_module = MagicMock()
@@ -141,6 +146,11 @@ sys.modules['services.foundry_service'] = mock_foundry_service_module
 
 import backend.services.team_service as team_service_module
 from backend.services.team_service import TeamService
+
+# The one allowlist (#113). Imported under the flat name the backend modules
+# themselves use, so `pytest.raises` compares the class the code raises rather
+# than a second, identically-named one reached through `backend.`.
+from agents.model_allowlist import SupportedModelsNotConfigured  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -706,6 +716,30 @@ class TestExtractTeamLevelModels:
 
 
 class TestValidateTeamModels:
+    """The upload-time check, after #113 removed both of its fail-opens.
+
+    Two questions with two answers: *is this model supported* (the allowlist
+    the agent factory reads, exactly) and *is it deployed* (an observation that
+    may not be available). The old code answered neither for four hard-coded
+    names and answered *valid* for any exception at all.
+    """
+
+    ALLOWLIST = '["gpt-4", "custom-model"]'
+
+    @pytest.fixture(autouse=True)
+    def allowlist(self, monkeypatch):
+        """Pin the allowlist this suite validates against.
+
+        Patched through the function's own globals: `agents.model_allowlist` is
+        a module several test files import, and whichever ran first left its own
+        app-config stub bound there.
+        """
+        monkeypatch.setitem(
+            team_service_module.configured_supported_models.__globals__,
+            "config",
+            SimpleNamespace(SUPPORTED_MODELS=self.ALLOWLIST),
+        )
+
     @pytest.mark.asyncio
     async def test_all_models_available(self):
         service = TeamService()
@@ -715,50 +749,123 @@ class TestValidateTeamModels:
         )
         with patch.object(team_service_module, "FoundryService", return_value=foundry):
             cfg = {"agents": [{"deployment_name": "custom-model"}]}
-            is_valid, missing = await service.validate_team_models(cfg)
-        assert is_valid is True
-        assert missing == []
+            result = await service.validate_team_models(cfg)
+        assert result.is_valid is True
+        assert result.missing_models == []
+        assert result.refused_agents == []
+        assert result.deployments_observed is True
 
     @pytest.mark.asyncio
     async def test_missing_model_reported(self):
         service = TeamService()
         foundry = MagicMock()
-        foundry.list_model_deployments = AsyncMock(return_value=[])
+        foundry.list_model_deployments = AsyncMock(
+            return_value=[{"name": "gpt-4", "status": "Succeeded"}]
+        )
         with patch.object(team_service_module, "FoundryService", return_value=foundry):
-            cfg = {"agents": [{"deployment_name": "not-deployed"}]}
-            is_valid, missing = await service.validate_team_models(cfg)
-        assert is_valid is False
-        assert "not-deployed" in missing
+            cfg = {"agents": [{"deployment_name": "custom-model"}]}
+            result = await service.validate_team_models(cfg)
+        assert result.is_valid is False
+        assert "custom-model" in result.missing_models
 
     @pytest.mark.asyncio
-    async def test_bypassed_models_skipped(self):
+    async def test_previously_bypassed_model_is_now_checked(self):
+        """``gpt-5.4-mini`` was waved through by name and never compared.
+
+        Four names — ``gpt-5.4-mini``, ``gpt-5.4``, ``gpt-5``, ``o3`` — skipped
+        the comparison with a ``continue``, so an undeployed, unsupported model
+        passed the upload and was then refused by the factory with a warning
+        nobody reads.
+        """
         service = TeamService()
         foundry = MagicMock()
-        foundry.list_model_deployments = AsyncMock(return_value=[])
+        foundry.list_model_deployments = AsyncMock(
+            return_value=[{"name": "gpt-4", "status": "Succeeded"}]
+        )
         with patch.object(team_service_module, "FoundryService", return_value=foundry):
-            cfg = {"agents": [{"deployment_name": "gpt-5.4-mini"}]}
-            is_valid, missing = await service.validate_team_models(cfg)
-        assert is_valid is True
+            cfg = {"agents": [{"name": "Ghost", "deployment_name": "gpt-5.4-mini"}]}
+            result = await service.validate_team_models(cfg)
+        assert result.is_valid is False
+        assert [agent.name for agent in result.refused_agents] == ["Ghost"]
+        assert result.unsupported_models == ["gpt-5.4-mini"]
+
+    @pytest.mark.asyncio
+    async def test_unsupported_is_reported_apart_from_undeployed(self):
+        """The two answers stay apart, because they need different sentences."""
+        service = TeamService()
+        foundry = MagicMock()
+        foundry.list_model_deployments = AsyncMock(
+            return_value=[{"name": "custom-model", "status": "Succeeded"}]
+        )
+        with patch.object(team_service_module, "FoundryService", return_value=foundry):
+            cfg = {"agents": [{"name": "Ghost", "deployment_name": "o3"}]}
+            result = await service.validate_team_models(cfg)
+        assert result.refused_agents and result.refused_agents[0].deployment_name == "o3"
+        assert "o3" not in result.missing_models
+
+    @pytest.mark.asyncio
+    async def test_agent_without_a_model_is_refused(self):
+        service = TeamService()
+        foundry = MagicMock()
+        foundry.list_model_deployments = AsyncMock(
+            return_value=[{"name": "gpt-4", "status": "Succeeded"}]
+        )
+        with patch.object(team_service_module, "FoundryService", return_value=foundry):
+            result = await service.validate_team_models({"agents": [{"name": "Ghost"}]})
+        assert result.is_valid is False
+        assert result.refused_agents[0].name == "Ghost"
 
     @pytest.mark.asyncio
     async def test_default_model_when_no_agents(self):
         service = TeamService()
-        mock_config.AZURE_OPENAI_DEPLOYMENT_NAME = "gpt-5"
+        mock_config.AZURE_OPENAI_DEPLOYMENT_NAME = "gpt-4"
+        foundry = MagicMock()
+        foundry.list_model_deployments = AsyncMock(
+            return_value=[{"name": "gpt-4", "status": "Succeeded"}]
+        )
+        with patch.object(team_service_module, "FoundryService", return_value=foundry):
+            result = await service.validate_team_models({"agents": []})
+        assert result.is_valid is True
+
+    @pytest.mark.asyncio
+    async def test_unobserved_deployments_are_not_a_wall_of_missing_models(self):
+        """An empty listing means *not observed*, not *nothing is deployed*.
+
+        ``list_model_deployments`` returns ``[]`` for a 403, a bad endpoint and
+        an empty project alike, so reporting every model missing would be a
+        claim nobody made — **Not reported vs measured** at this seam.
+        """
+        service = TeamService()
         foundry = MagicMock()
         foundry.list_model_deployments = AsyncMock(return_value=[])
         with patch.object(team_service_module, "FoundryService", return_value=foundry):
-            is_valid, missing = await service.validate_team_models({"agents": []})
-        assert is_valid is True
+            cfg = {"agents": [{"deployment_name": "custom-model"}]}
+            result = await service.validate_team_models(cfg)
+        assert result.missing_models == []
+        assert result.deployments_observed is False
+        assert result.is_valid is True
 
     @pytest.mark.asyncio
-    async def test_exception_returns_valid(self):
+    async def test_an_error_is_no_longer_a_pass(self):
+        """The fail-open ``except`` returned ``(True, [])`` for any exception."""
         service = TeamService()
         with patch.object(
             team_service_module, "FoundryService", side_effect=Exception("boom")
         ):
-            is_valid, missing = await service.validate_team_models({"agents": []})
-        assert is_valid is True
-        assert missing == []
+            with pytest.raises(Exception, match="boom"):
+                await service.validate_team_models({"agents": []})
+
+    @pytest.mark.asyncio
+    async def test_unset_allowlist_is_a_configuration_error(self, monkeypatch):
+        """An unset allowlist stops the upload rather than admitting anything."""
+        monkeypatch.setitem(
+            team_service_module.configured_supported_models.__globals__,
+            "config",
+            SimpleNamespace(SUPPORTED_MODELS=""),
+        )
+        service = TeamService()
+        with pytest.raises(SupportedModelsNotConfigured):
+            await service.validate_team_models({"agents": []})
 
 
 class TestDeploymentStatusSummary:

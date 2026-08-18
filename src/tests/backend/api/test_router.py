@@ -218,7 +218,15 @@ def rt(monkeypatch):
     team_service.handle_team_selection = AsyncMock(return_value=MagicMock())
     team_service.get_all_team_configurations = AsyncMock(return_value=[])
     team_service.delete_team_configuration = AsyncMock(return_value=True)
-    team_service.validate_team_models = AsyncMock(return_value=(True, []))
+    team_service.validate_team_models = AsyncMock(
+        return_value=SimpleNamespace(
+            refused_agents=[],
+            missing_models=[],
+            deployments_observed=True,
+            is_valid=True,
+            unsupported_models=[],
+        )
+    )
     team_service.validate_team_search_indexes = AsyncMock(return_value=(True, []))
     team_service.validate_and_parse_team_config = AsyncMock(return_value=MagicMock())
     team_service.save_team_configuration = AsyncMock(return_value="team-123")
@@ -309,6 +317,17 @@ def rt(monkeypatch):
     monkeypatch.setattr(router_mod, "rai_success", rai_success)
     monkeypatch.setattr(router_mod, "rai_validate_team_config", rai_validate_team_config)
 
+    # The one allowlist (#113). `/init_team` states, per agent, whether the
+    # factory could build it, so these tests need a real list rather than the
+    # MagicMock the shared app-config stub hands out. Patched through the
+    # function's own globals rather than `sys.modules`, because `_import_router`
+    # restores the module table it borrowed.
+    monkeypatch.setitem(
+        router_mod.configured_supported_models.__globals__,
+        "config",
+        SimpleNamespace(SUPPORTED_MODELS='["gpt-5.4-mini", "gpt-5.4"]'),
+    )
+
     app = _app
     client = TestClient(app)
 
@@ -339,6 +358,36 @@ def _no_user(rt):
     rt.get_user.return_value = {"user_principal_id": None}
 
 
+def _refused_agent(name, deployment_name, reason):
+    """A stand-in for ``agents.model_allowlist.RefusedAgent``.
+
+    ``services.team_service`` is a MagicMock here, so the real dataclass cannot
+    be imported; the route reads three attributes and this carries them.
+    """
+    return SimpleNamespace(
+        name=name, deployment_name=deployment_name, reason=reason
+    )
+
+
+def _model_validation(
+    refused_agents=None, missing_models=None, deployments_observed=True
+):
+    """A stand-in for ``services.team_service.TeamModelValidation`` (#113).
+
+    Valid by default, so a test that is not about model validation says
+    nothing about it.
+    """
+    refused_agents = refused_agents or []
+    missing_models = missing_models or []
+    return SimpleNamespace(
+        refused_agents=refused_agents,
+        missing_models=missing_models,
+        deployments_observed=deployments_observed,
+        is_valid=not refused_agents and not missing_models,
+        unsupported_models=[agent.deployment_name for agent in refused_agents],
+    )
+
+
 # ---------------------------------------------------------------------------
 # /init_team
 # ---------------------------------------------------------------------------
@@ -359,7 +408,7 @@ class TestInitTeam:
         response = rt.client.get("/api/v4/init_team")
 
         assert response.status_code == 200
-        assert response.json() == {"team_id": "team-current"}
+        assert response.json() == {"team_id": "team-current", "agents": []}
         rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
 
     def test_no_user(self, rt):
@@ -384,7 +433,7 @@ class TestInitTeam:
         rt.team_service.get_team_configuration.return_value = team_conf
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
-        assert resp.json() == {"team_id": "team-abc"}
+        assert resp.json() == {"team_id": "team-abc", "agents": []}
 
     def test_explicit_team_attachment_overrides_the_current_team(self, rt):
         current = MagicMock()
@@ -398,7 +447,7 @@ class TestInitTeam:
         resp = rt.client.get("/api/v4/init_team?team_id=team-current")
 
         assert resp.status_code == 200
-        assert resp.json() == {"team_id": "team-current"}
+        assert resp.json() == {"team_id": "team-current", "agents": []}
         rt.find_first_available_team.assert_not_awaited()
         rt.team_service.handle_team_selection.assert_awaited_once_with(
             user_id="user-1", team_id="team-current"
@@ -447,6 +496,73 @@ class TestInitTeam:
         rt.database_factory.get_database = AsyncMock(side_effect=Exception("boom"))
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 400
+
+    def test_roster_reports_the_agent_the_factory_would_refuse(self, rt):
+        """A dropped agent is named, with a reason — never quietly omitted (#113).
+
+        The roster used to be handed over with no verdict at all, so the
+        **Agent dossier** could render a full account of an agent the factory
+        refuses. Leaving that agent out instead would collapse *"nobody can
+        build this"* into *"this was never here"*, which is the roster's form of
+        **Not reported vs measured** — so it is stated, in place.
+        """
+        current = MagicMock()
+        current.team_id = "team-current"
+        rt.store.get_current_team.return_value = current
+        team_configuration = MagicMock()
+        team_configuration.agents = [
+            SimpleNamespace(name="ShiftTasksAgent", deployment_name="gpt-5.4-mini"),
+            SimpleNamespace(name="GhostAgent", deployment_name="gpt-4o"),
+        ]
+        rt.team_service.get_team_configuration.return_value = team_configuration
+
+        resp = rt.client.get("/api/v4/init_team")
+
+        assert resp.status_code == 200
+        roster = resp.json()["agents"]
+        assert [agent["name"] for agent in roster] == ["ShiftTasksAgent", "GhostAgent"]
+        assert roster[0]["available"] is True
+        assert "unavailable_reason" not in roster[0]
+        assert roster[1]["available"] is False
+        assert "gpt-4o" in roster[1]["unavailable_reason"]
+
+    def test_agent_with_no_model_is_reported_the_same_way(self, rt):
+        """An absent ``deployment_name`` is refused like a misspelled one."""
+        current = MagicMock()
+        current.team_id = "team-current"
+        rt.store.get_current_team.return_value = current
+        team_configuration = MagicMock()
+        team_configuration.agents = [
+            SimpleNamespace(name="NamelessModelAgent", deployment_name=None)
+        ]
+        rt.team_service.get_team_configuration.return_value = team_configuration
+
+        resp = rt.client.get("/api/v4/init_team")
+
+        assert resp.status_code == 200
+        assert resp.json()["agents"][0]["available"] is False
+
+    def test_unset_supported_models_is_a_configuration_error(self, rt, monkeypatch):
+        """No allowlist means no verdict, so no roster is asserted (#113).
+
+        Read inside the factory's per-agent ``try`` this used to raise
+        ``TypeError`` once per agent, be caught by the broad ``except``, and
+        empty the whole team while the roster still advertised it.
+        """
+        monkeypatch.setitem(
+            router_mod.configured_supported_models.__globals__,
+            "config",
+            SimpleNamespace(SUPPORTED_MODELS=""),
+        )
+        current = MagicMock()
+        current.team_id = "team-current"
+        rt.store.get_current_team.return_value = current
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+
+        resp = rt.client.get("/api/v4/init_team")
+
+        assert resp.status_code == 500
+        assert "SUPPORTED_MODELS" in resp.json()["detail"]
 
 
 # ---------------------------------------------------------------------------
@@ -2299,20 +2415,42 @@ class TestUploadTeamConfig:
 
     def test_model_validation_failure(self, rt):
         rt.rai_validate_team_config.return_value = (True, None)
-        rt.team_service.validate_team_models.return_value = (False, ["gpt-4"])
+        rt.team_service.validate_team_models.return_value = _model_validation(
+            missing_models=["gpt-4"]
+        )
         resp = rt.client.post("/api/v4/upload_team_config", files=self._file())
         assert resp.status_code == 400
+        assert "not deployed" in resp.json()["detail"]
+
+    def test_unsupported_model_is_rejected_in_its_own_words(self, rt):
+        """A model outside the allowlist is not a model waiting to be deployed.
+
+        The two checks used to share one sentence, so an operator whose team
+        named an unsupported-but-deployed model was sent to Foundry to deploy
+        something already there (#113).
+        """
+        rt.rai_validate_team_config.return_value = (True, None)
+        rt.team_service.validate_team_models.return_value = _model_validation(
+            refused_agents=[
+                _refused_agent("GhostAgent", "gpt-4o", "Model 'gpt-4o' is not supported.")
+            ]
+        )
+        resp = rt.client.post("/api/v4/upload_team_config", files=self._file())
+        assert resp.status_code == 400
+        detail = resp.json()["detail"]
+        assert "GhostAgent" in detail and "gpt-4o" in detail
+        assert "not deployed" not in detail
 
     def test_search_validation_failure(self, rt):
         rt.rai_validate_team_config.return_value = (True, None)
-        rt.team_service.validate_team_models.return_value = (True, [])
+        rt.team_service.validate_team_models.return_value = _model_validation()
         rt.team_service.validate_team_search_indexes.return_value = (False, ["idx err"])
         resp = rt.client.post("/api/v4/upload_team_config", files=self._file())
         assert resp.status_code == 400
 
     def test_success(self, rt):
         rt.rai_validate_team_config.return_value = (True, None)
-        rt.team_service.validate_team_models.return_value = (True, [])
+        rt.team_service.validate_team_models.return_value = _model_validation()
         rt.team_service.validate_team_search_indexes.return_value = (True, [])
         team_conf = MagicMock()
         team_conf.agents = [1]
@@ -2325,8 +2463,37 @@ class TestUploadTeamConfig:
         assert resp.status_code == 200
         assert resp.json()["team_id"] == "team-999"
 
+    def test_unobserved_deployments_are_recorded_not_treated_as_verified(self, rt):
+        """The upload proceeds on the allowlist, and says the rest was unseen.
+
+        ``list_model_deployments`` reports an empty list both for a project with
+        no deployments and for one it could not read, so a pass here is not the
+        same claim as a checked pass — and the old ``except`` that returned
+        *valid* made them identical.
+        """
+        rt.rai_validate_team_config.return_value = (True, None)
+        rt.team_service.validate_team_models.return_value = _model_validation(
+            deployments_observed=False
+        )
+        rt.team_service.validate_team_search_indexes.return_value = (True, [])
+        team_conf = MagicMock()
+        team_conf.agents = [1]
+        team_conf.starting_tasks = [1]
+        team_conf.name = "MyTeam"
+        team_conf.model_dump.return_value = {"name": "MyTeam"}
+        rt.team_service.validate_and_parse_team_config.return_value = team_conf
+        rt.team_service.save_team_configuration.return_value = "team-999"
+
+        resp = rt.client.post("/api/v4/upload_team_config", files=self._file())
+
+        assert resp.status_code == 200
+        assert any(
+            call.args and call.args[0] == "Config_Model_Deployments_Not_Observed"
+            for call in rt.track_event.call_args_list
+        )
+
     def test_success_with_team_id(self, rt):
-        rt.team_service.validate_team_models.return_value = (True, [])
+        rt.team_service.validate_team_models.return_value = _model_validation()
         rt.team_service.validate_team_search_indexes.return_value = (True, [])
         team_conf = MagicMock()
         team_conf.agents = []
@@ -2341,7 +2508,7 @@ class TestUploadTeamConfig:
         assert resp.status_code == 200
 
     def test_parse_value_error(self, rt):
-        rt.team_service.validate_team_models.return_value = (True, [])
+        rt.team_service.validate_team_models.return_value = _model_validation()
         rt.team_service.validate_team_search_indexes.return_value = (True, [])
         rt.team_service.validate_and_parse_team_config = AsyncMock(
             side_effect=ValueError("bad config")
