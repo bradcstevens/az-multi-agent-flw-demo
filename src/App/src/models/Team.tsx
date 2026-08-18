@@ -51,10 +51,15 @@ export interface StartingTask {
      */
     ticket_status_reply?: TicketStatusReply;
     /**
-     * The Quick Task to offer inside this task's conversation (issue #61,
-     * ADR-024). A follow-on is not offered from the home grid.
+     * The Quick Tasks to offer inside this task's conversation (issue #132,
+     * ADR-033). A Follow-on task is not offered from the home grid.
      */
-    follow_on?: string;
+    follow_on?: string[];
+    /**
+     * Whether this Quick Task reads conversation state and therefore cannot
+     * start cold from the home grid (issue #132, ADR-033).
+     */
+    context_dependent?: boolean;
     /**
      * The approval must persist a Simulated ticket from this conversation's
      * record, regardless of whether the model drafted a preview.

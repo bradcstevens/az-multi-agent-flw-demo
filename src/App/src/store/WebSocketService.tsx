@@ -352,8 +352,6 @@ class WebSocketService {
             case WebsocketMessageType.REPLAN_APPROVAL_REQUEST:
             case WebsocketMessageType.REPLAN_APPROVAL_RESPONSE:
             case WebsocketMessageType.PLAN_APPROVAL_RESPONSE:
-            case WebsocketMessageType.AGENT_STREAM_START:
-            case WebsocketMessageType.AGENT_STREAM_END:
             case WebsocketMessageType.SYSTEM_MESSAGE: {
                 this.emit(message.type, message);
                 break;

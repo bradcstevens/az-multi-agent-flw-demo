@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { STACKING_BREAKPOINT_QUERY } from '@/models/panelDrawer';
+
 /**
  * Reading the surface's layout **out of its stylesheets**.
  *
@@ -28,7 +30,14 @@ export const STYLES = join(SRC, 'styles');
 export const SHELL_STYLESHEET = join(STYLES, 'storeSurface.css');
 export const RAIL_STYLESHEET = join(STYLES, 'transparency.css');
 export const PLAN_PANEL_STYLESHEET = join(STYLES, 'planpanelright.css');
-export const STACKING_BREAKPOINT = '@media (max-width: 900px)';
+/**
+ * The shared **Stacking breakpoint**, built from the one number that declares
+ * it rather than restated here. `TransparencyRail.test` reads `storeSurface.css`
+ * and fails if that number and the stylesheet's ever disagree — so a helper
+ * that quoted its own copy would be a third owner of a number this repository
+ * has already paid for owning twice (#58).
+ */
+export const STACKING_BREAKPOINT = `@media ${STACKING_BREAKPOINT_QUERY}`;
 
 export const withoutComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '');
 

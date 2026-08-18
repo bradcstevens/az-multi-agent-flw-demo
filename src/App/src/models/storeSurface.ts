@@ -37,6 +37,26 @@ export const STORE_ASSISTANT_TEAM_ID = '00000000-0000-0000-0000-000000000223';
 export const ANONYMOUS_IDENTITY_LABEL = 'No user signed in';
 
 /**
+ * The **Transparency rail**'s disclosure control, named (ADR-035).
+ *
+ * A **Panel drawer**'s toggle is a disclosure button: one static accessible
+ * name, plus `aria-expanded` and `aria-controls` for the state and the target.
+ * Never a label flipping between *Show* and *Hide* — a control that renames
+ * itself under a screen reader is a second control, and the associate has to
+ * relearn it every time they use it.
+ */
+export const TRANSPARENCY_PANELS_LABEL = 'Transparency panels';
+
+/** The chat-history Panel drawer's disclosure, which does not rename itself. */
+export const CHAT_HISTORY_LABEL = 'Chat history';
+
+/** The action that always stays in the content toolbar. */
+export const NEW_CHAT_LABEL = 'New chat';
+
+/** The rail's one state description when the presenter has pinned it closed. */
+export const TRANSPARENCY_RAIL_PINNED_CLOSED_DESCRIPTION = 'Pinned closed for this conversation.';
+
+/**
  * The one assistant, resolved out of whatever the backend returned.
  *
  * Recognition, not position. A store surface with **no** assistant is a demo

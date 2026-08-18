@@ -242,8 +242,6 @@ export enum HumanFeedbackStatus {
 export enum WebsocketMessageType {
     SYSTEM_MESSAGE = "system_message",
     AGENT_MESSAGE = "agent_message",
-    AGENT_STREAM_START = "agent_stream_start",
-    AGENT_STREAM_END = "agent_stream_end",
     AGENT_MESSAGE_STREAMING = "agent_message_streaming",
     AGENT_TOOL_MESSAGE = "agent_tool_message",
     PLAN_APPROVAL_REQUEST = "plan_approval_request",
@@ -279,4 +277,3 @@ export enum AgentMessageType {
     AI_AGENT = "AI_Agent",
     SYSTEM_AGENT = "SYSTEM_AGENT"
 }
-

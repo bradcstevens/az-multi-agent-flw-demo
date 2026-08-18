@@ -193,7 +193,7 @@ const PERSONAL_REPLY = {
     plan_id: null,
     personal_answer: {
         kind: PERSONAL_ANSWER_KIND,
-        display_name: 'Tanya Alvarez',
+        display_name: 'Clara Workman',
         role: 'Store associate, Store 223',
         facts: [{ label: 'PTO balance', value: '34.5 hours' }],
         provenance_line:
@@ -503,7 +503,7 @@ describe('a resumed turn that made no plan', () => {
         // A refusal *is* the gate stating that nobody is signed in. The header
         // reads the device's own record, so a refusal that left it standing
         // would have the surface naming somebody the gate will not serve.
-        rememberSignedInName('Tanya Alvarez');
+        rememberSignedInName('Clara Workman');
         vi.mocked(TaskService.createPlan).mockRejectedValue(REFUSAL);
         renderPlan();
         await screen.findByRole('textbox');
@@ -522,7 +522,7 @@ describe('a resumed turn that made no plan', () => {
         answer(PERSONAL);
 
         const card = await screen.findByTestId('personal-answer');
-        expect(card).toHaveTextContent('Tanya Alvarez');
+        expect(card).toHaveTextContent('Clara Workman');
         expect(card).toHaveTextContent('34.5 hours');
         expect(
             screen.queryByText(/Unable to create plan/i),
@@ -559,6 +559,117 @@ describe('a resumed turn that made no plan', () => {
 
         await waitFor(() =>
             expect(screen.queryByTestId('policy-block')).not.toBeInTheDocument(),
+        );
+    });
+});
+
+/**
+ * What a **Clarification** answer the Identity boundary gate refused does to
+ * the question it was refused against (#115, ADR-034).
+ *
+ * The gate used to run in `process_request` alone, so an answer typed into the
+ * box the agent opened reached the orchestration ungated. Now `/user_clarification`
+ * refuses one — and a refusal is a refusal of *those words*, not a verdict on
+ * the turn: the question is still pending, the box is still open, and the
+ * associate answers again. Reported through the error toast it would read as
+ * the surface breaking rather than as policy holding, which is the confusion
+ * ADR-014 exists to remove.
+ */
+describe('a refused clarification answer', () => {
+    beforeEach(() => {
+        FakeSocket.instances = [];
+        vi.stubGlobal('WebSocket', FakeSocket);
+        window.appConfig = { API_URL: 'https://backend.example/api' } as never;
+        vi.mocked(PlanDataService.fetchPlanData)
+            .mockReset()
+            .mockResolvedValue(PLAN_DATA);
+        vi.mocked(PlanDataService.submitClarification)
+            .mockReset()
+            .mockRejectedValue(REFUSAL);
+        vi.mocked(TaskService.createPlan).mockReset().mockResolvedValue(RESUMED);
+        forgetSignedInDevice();
+    });
+
+    const askAndAnswer = async (text: string) => {
+        renderPlan();
+        await screen.findByRole('textbox');
+        await ask({ request_id: 'req-1', question: 'What have you already tried?' });
+        answer(text);
+    };
+
+    it('renders a Policy block rather than a failed submission', async () => {
+        await askAndAnswer(PERSONAL);
+
+        const notice = await screen.findByTestId('policy-block');
+        expect(notice).toHaveTextContent(REFUSAL.policyBlock.message);
+        expect(notice).toHaveAttribute('data-policy-code', 'identity_boundary');
+        expect(
+            screen.queryByText(/Failed to submit clarification/i),
+        ).not.toBeInTheDocument();
+    });
+
+    it('leaves the question pending, with the box still inviting an answer', async () => {
+        // Nothing was consumed, so the agent is still waiting on an answer.
+        await askAndAnswer(PERSONAL);
+        await screen.findByTestId('policy-block');
+
+        expect(
+            screen.getByPlaceholderText(ANSWER_THE_QUESTION),
+        ).toBeInTheDocument();
+        expect(screen.getByRole('textbox')).not.toBeDisabled();
+    });
+
+    it('answers the same question again, against the same request id', async () => {
+        // The associate says something in scope, and it lands on the question
+        // the refusal did not settle.
+        await askAndAnswer(PERSONAL);
+        await screen.findByTestId('policy-block');
+        vi.mocked(PlanDataService.submitClarification).mockResolvedValue({} as never);
+
+        answer(ANSWER);
+
+        await waitFor(() =>
+            expect(PlanDataService.submitClarification).toHaveBeenLastCalledWith(
+                expect.objectContaining({ request_id: 'req-1', answer: ANSWER }),
+            ),
+        );
+        await waitFor(() =>
+            expect(screen.queryByTestId('policy-block')).not.toBeInTheDocument(),
+        );
+    });
+
+    it('stops naming an associate the gate has just declined to answer for', async () => {
+        // The same two side effects the home screen's refusal has, because
+        // they are claims about the conversation rather than about a surface.
+        rememberSignedInName('Clara Workman');
+
+        await askAndAnswer(PERSONAL);
+
+        await screen.findByTestId('policy-block');
+        expect(signedInName()).toBeNull();
+    });
+
+    it('records the refusal on the Token meter, as a measured zero', async () => {
+        // A refused answer adds nothing, and the row showing that zero is what
+        // makes "nothing" legible (#24, R7) — one claim about this
+        // conversation, whichever of its two seams the words went in through.
+        const { store } = renderPlan();
+        await screen.findByRole('textbox');
+        await ask({ request_id: 'req-1', question: 'What have you already tried?' });
+
+        answer(PERSONAL);
+
+        await screen.findByTestId('policy-block');
+        const { meter } = (store.getState() as never as {
+            transparency: { meter: { rows: Record<string, unknown>[] } };
+        }).transparency;
+        expect(meter.rows).toContainEqual(
+            expect.objectContaining({
+                key: GUARDRAIL_ROW_KEY,
+                billing: 'refused',
+                totalTokens: 0,
+                calls: 1,
+            }),
         );
     });
 });

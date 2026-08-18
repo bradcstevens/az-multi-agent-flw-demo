@@ -41,13 +41,37 @@ from store_pack import __main__ as main_mod  # noqa: E402
 from store_pack import content as content_mod  # noqa: E402
 from store_pack import pack as pack_mod  # noqa: E402
 from store_pack import roster as roster_mod  # noqa: E402
+from escalation.ticket import SITE  # noqa: E402
 
 STORE_SURFACE_TS = REPO_ROOT / "src" / "App" / "src" / "models" / "storeSurface.ts"
+_STORE_NAME = re.compile(
+    r"\b(?:[A-Z][A-Za-z]*(?:[ -][A-Z][A-Za-z]*)*) Store \d+\b"
+)
 
 
 @pytest.fixture(scope="module")
 def store_pack():
     return pack_mod.load_pack(REPO_ROOT)
+
+
+def _strings_in(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for nested in value.values():
+            yield from _strings_in(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from _strings_in(nested)
+
+
+def _foreign_store_names(authored, site):
+    return {
+        found
+        for text in authored
+        for found in _STORE_NAME.findall(text)
+        if found != site
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +387,33 @@ def test_given_the_troubleshooting_tools_when_named_then_the_container_registers
 # ---------------------------------------------------------------------------
 # The authored content
 # ---------------------------------------------------------------------------
+
+
+def test_given_the_shipped_store_strings_when_read_then_they_match_the_sop_manifest(
+    store_pack,
+):
+    """The ticket module and pack are separate carriers of the same store."""
+    manifest = pack_mod.sop_manifest(REPO_ROOT)
+    site = f"{manifest['banner']} {manifest['store']}"
+    authored = list(_strings_in(store_pack.team)) + list(_strings_in(store_pack.pack))
+    documents = store_pack.all_documents()
+    authored.extend(path.read_text(encoding="utf-8") for path in documents)
+
+    assert SITE == site
+    assert len(store_pack.agents) == 4
+    assert all(site in agent["system_message"] for agent in store_pack.agents)
+    assert len(documents) == 6
+    assert sum(
+        path.read_text(encoding="utf-8").count(site) for path in documents
+    ) == 9
+    assert _foreign_store_names(authored, site) == set()
+    assert "Brightpath" not in "\n".join(authored)
+
+
+def test_given_a_foreign_store_name_when_checked_then_it_is_rejected():
+    assert _foreign_store_names(
+        ["Circle K Store 223", "Acme Store 223"], "Circle K Store 223"
+    ) == {"Acme Store 223"}
 
 
 @pytest.fixture(scope="module")
@@ -1093,37 +1144,76 @@ def test_given_the_shift_swap_task_when_read_then_the_library_answers_it(
     assert procedure is workforce_library.SHIFT_SWAP
 
 
-def test_given_the_shift_swap_task_when_routed_then_it_takes_the_fast_lane(
+def test_given_the_shift_swap_transaction_when_routed_then_it_takes_the_deliberate_lane(
     store_pack, lane_mod
 ):
-    # Declared and typed, the way the other six are asserted. An HR process
-    # question that grows an approval step is a beat that got slower for no
-    # reason the audience can see, and the Deliberate lane is where the
-    # keyword fallback sends anything it does not recognise.
+    # The declaration, not the model, earns this Reviewable plan. The typed
+    # transaction is also deliberate: the one-way keyword fallback must never
+    # silently turn a confirmed swap into an unreviewed request.
     task = _shift_swap_task(store_pack)
 
-    assert lane_mod.select_lane(task["lane"], task["prompt"]) is lane_mod.Lane.FAST
-    assert lane_mod.select_lane(None, task["prompt"]) is lane_mod.Lane.FAST
+    assert lane_mod.select_lane(task["lane"], task["prompt"]) is lane_mod.Lane.DELIBERATE
+    assert lane_mod.select_lane(None, task["prompt"]) is lane_mod.Lane.DELIBERATE
 
 
-def test_given_the_shift_swap_task_when_read_then_it_is_the_measured_control(
+def test_given_the_shift_swap_transaction_when_read_then_its_people_and_order_are_authored(
+    store_pack,
+):
+    task = _shift_swap_task(store_pack)
+    steps = task["plan_steps"]
+
+    assert [(step["id"], step.get("waitsOn")) for step in steps] == [
+        (1, None),
+        (2, 1),
+        (3, 2),
+        (4, 3),
+        (5, 4),
+    ]
+    assert [
+        step["assignee"] for step in steps if step["assignee"]["kind"] == "person"
+    ] == [
+        {
+            "kind": "person",
+            "name": "You",
+            "relation": "associate",
+            "simulated": False,
+        },
+        {
+            "kind": "person",
+            "name": "Marcus Bell",
+            "relation": "peer",
+            "simulated": True,
+        },
+        {
+            "kind": "person",
+            "name": "Dana Reyes",
+            "relation": "manager",
+            "simulated": True,
+        },
+    ]
+
+
+def test_given_the_shift_swap_transaction_when_read_then_it_trips_no_personal_scope_keyword(
+    store_pack, gate_keywords
+):
+    task = _shift_swap_task(store_pack)
+
+    assert not gate_keywords.matches_personal_keyword(task["prompt"])
+
+
+def test_given_the_shift_swap_process_question_when_read_then_it_stays_a_measured_control(
     store_pack, guardrail_corpus, gate_keywords
 ):
-    # ADR-017's second negative consequence, closed. The gate's similarity tier
-    # is a live model call, and a process question phrased near the personal
-    # probes can be refused **on stage**. The Guardrail corpus is the only
-    # thing in this build that has ever run against the real embedding
-    # deployment, so the beat's question has to be one of the things it scores
-    # — otherwise its safety is an assumption.
+    # ADR-017's hardest negative control stays measured even though the live
+    # beat now starts a transaction with a named peer.
     task = _shift_swap_task(store_pack)
     measured = {
         gate_keywords.normalise(text) for text in guardrail_corpus.NEGATIVE_CONTROLS
     }
 
-    assert gate_keywords.normalise(task["prompt"]) in measured
-
-
-
+    retired_process_question = "How do I swap a shift with another associate?"
+    assert gate_keywords.normalise(retired_process_question) in measured
+    assert gate_keywords.normalise(task["prompt"]) not in measured
 
 
 def test_given_the_roster_when_read_then_there_are_seven_quick_tasks(store_pack):
@@ -1201,7 +1291,7 @@ def test_given_each_quick_task_when_read_then_its_declared_lane_parses(
         assert lane_mod.parse_lane(task.get("lane")) is not None, task["id"]
 
 
-def test_given_the_quick_tasks_when_read_then_exactly_one_declares_deliberate(
+def test_given_the_quick_tasks_when_read_then_only_the_two_transactions_deliberate(
     store_pack, lane_mod
 ):
     deliberate = [
@@ -1210,7 +1300,7 @@ def test_given_the_quick_tasks_when_read_then_exactly_one_declares_deliberate(
         if lane_mod.parse_lane(task.get("lane")) is lane_mod.Lane.DELIBERATE
     ]
 
-    assert len(deliberate) == 1, deliberate
+    assert deliberate == ["task-223-escalation", "task-223-shift-swap"]
 
 
 def test_given_the_deliberate_quick_task_when_routed_then_it_takes_that_lane(
@@ -1454,6 +1544,15 @@ def test_given_the_troubleshooting_task_when_read_then_it_carries_rehearsed_repl
     assert task["rehearsed_replies"]
 
 
+def _follow_on_edges(tasks):
+    """The authored Follow-on graph, retaining every outgoing edge."""
+    for task in tasks:
+        follow_on = task.get("follow_on", [])
+        assert isinstance(follow_on, list), task["id"]
+        for target_id in follow_on:
+            yield task["id"], target_id
+
+
 def test_given_the_troubleshooting_task_when_read_then_its_follow_on_is_the_escalation(
     store_pack,
 ):
@@ -1463,13 +1562,113 @@ def test_given_the_troubleshooting_task_when_read_then_its_follow_on_is_the_esca
         for task in store_pack.starting_tasks
         if task["id"] == "task-223-troubleshooting"
     )
+    assert troubleshooting["follow_on"] == ["task-223-escalation"]
     escalation = next(
         task
         for task in store_pack.starting_tasks
-        if task["id"] == troubleshooting["follow_on"]
+        if task["id"] == troubleshooting["follow_on"][0]
+    )
+    assert escalation["context_dependent"] is True
+
+
+def test_given_the_follow_on_graph_when_read_then_every_edge_resolves_and_is_acyclic(
+    store_pack,
+):
+    tasks = {task["id"]: task for task in store_pack.starting_tasks}
+    edges = list(_follow_on_edges(store_pack.starting_tasks))
+
+    for source_id, target_id in edges:
+        assert target_id in tasks, f"{source_id} names unknown task {target_id}"
+
+    visiting = set()
+    visited = set()
+
+    def visit(task_id):
+        assert task_id not in visiting, f"Follow-on graph cycles at {task_id}"
+        if task_id in visited:
+            return
+        visiting.add(task_id)
+        for _, target_id in filter(lambda edge: edge[0] == task_id, edges):
+            visit(target_id)
+        visiting.remove(task_id)
+        visited.add(task_id)
+
+    for task_id in tasks:
+        visit(task_id)
+
+
+def test_given_the_walkthrough_when_counted_then_its_home_grid_and_graph_are_independent(
+    store_pack,
+):
+    """The graph must not silently decide which Quick Tasks start cold.
+
+    Before `context_dependent`, subtracting Follow-on targets from the roster
+    happened to produce the six home cards. That calculation agrees with itself:
+    another outgoing edge could remove a walkthrough beat without changing any
+    graph assertion. Count the two authored declarations separately instead.
+    """
+    home_grid_count = sum(
+        task.get("context_dependent") is not True
+        for task in store_pack.starting_tasks
+    )
+    graph_edge_count = len(list(_follow_on_edges(store_pack.starting_tasks)))
+
+    assert (home_grid_count, graph_edge_count) == (6, 1)
+
+
+def test_given_the_home_grid_when_read_then_context_dependence_alone_decides_its_cards(
+    store_pack,
+):
+    context_dependent = [
+        task["id"]
+        for task in store_pack.starting_tasks
+        if task.get("context_dependent") is True
+    ]
+    home_cards = [
+        task["id"]
+        for task in store_pack.starting_tasks
+        if task.get("context_dependent") is not True
+    ]
+
+    assert context_dependent == ["task-223-escalation"]
+    assert home_cards == [
+        "task-223-procedure",
+        "task-223-honest-miss",
+        "task-223-troubleshooting",
+        "task-223-identity",
+        "task-223-shift-tasks",
+        "task-223-shift-swap",
+    ]
+
+
+def test_given_each_follow_on_task_when_read_then_it_keeps_its_lane_and_runbook_quote(
+    store_pack, lane_mod, gate_keywords
+):
+    tasks = {task["id"]: task for task in store_pack.starting_tasks}
+    runbook = re.sub(
+        r"\s+",
+        " ",
+        (REPO_ROOT / "docs" / "presenter-runbook.md").read_text(
+            encoding="utf-8"
+        ).lower(),
     )
 
-    assert escalation["id"] == "task-223-escalation"
+    for source_id, target_id in _follow_on_edges(store_pack.starting_tasks):
+        source = tasks[source_id]
+        task = tasks[target_id]
+        declared = lane_mod.parse_lane(task["lane"])
+
+        assert declared is not None, task["id"]
+        assert lane_mod.select_lane(task["lane"], task["prompt"]) is declared
+        assert lane_mod.select_lane(None, task["prompt"]) is declared
+        assert not gate_keywords.matches_personal_keyword(task["prompt"])
+        assert source["name"].lower() in runbook
+        assert source["prompt"].lower() in runbook
+        assert task["name"].lower() in runbook
+        assert task["prompt"].lower() in runbook
+        assert runbook.index(source["prompt"].lower()) < runbook.index(
+            task["prompt"].lower()
+        )
 
 
 def _rehearsed_replies(store_pack) -> List[str]:
@@ -1535,6 +1734,19 @@ def test_given_the_rehearsed_replies_when_read_then_none_of_them_trips_the_gate(
     # The same one-way requirement as the Quick Tasks themselves. A reply the
     # Identity boundary gate refuses is a tap that ends the troubleshooting beat
     # with copy about the assistant being store-scoped, mid-repair.
+    #
+    # This assertion is now about the **authored strings and nothing else**.
+    # Until #115 it was standing in for a runtime check that did not exist:
+    # `identity_boundary_gate` was called once, inside `process_request`, so an
+    # answer posted to `/v4/user_clarification` — tapped or typed — reached the
+    # orchestration ungated, and these three strings were the only thing anyone
+    # was checking. ADR-034 put the gate on that seam, and
+    # `TestTheIdentityBoundaryGateOnTheClarificationSeam` in
+    # `src/tests/backend/api/test_router.py` is where a refusal is asserted
+    # against the real router. What is left here is ADR-033's rule: a one-tap
+    # control's words are checked **before** the demo rather than judged on
+    # stage, so a chip that would be refused is caught in CI instead of in
+    # front of the room.
     for reply in _rehearsed_replies(store_pack):
         assert not gate_keywords.matches_personal_keyword(reply), reply
 

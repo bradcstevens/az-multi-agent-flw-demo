@@ -6,8 +6,8 @@ import reducer, {
     refusalRecorded,
     requestStarted,
     sourceUsedReceived,
+    transparencyRailToggled,
     tokenUsageReceived,
-    transparencyReset,
 } from './transparencySlice';
 import { COPILOT_CREDITS_PER_GENERATIVE_ANSWER, GUARDRAIL_ROW_KEY } from '../../models/meter';
 
@@ -111,16 +111,6 @@ describe('the transparency slice', () => {
         expect(state.alerts).toEqual([]);
     });
 
-    it('clears every panel when a new conversation starts', () => {
-        let state = reducer(initial(), sourceUsedReceived(sourceUsed));
-        state = reducer(state, tokenUsageReceived(tokenUsage));
-        state = reducer(state, presenterAlertReceived(alert));
-
-        state = reducer(state, transparencyReset());
-
-        expect(state).toEqual(initial());
-    });
-
     it('takes the Grounding panel dark when the next question is asked', () => {
         // The panel's claim is about *one answer*. A troubleshooting question
         // answered inside Foundry emits no source_used at all, so leaving the
@@ -149,7 +139,7 @@ describe('the transparency slice', () => {
         state = reducer(state, tokenUsageReceived(tokenUsage));
         state = reducer(state, presenterAlertReceived(alert));
 
-        state = reducer(state, conversationStarted());
+        state = reducer(state, conversationStarted('session-next'));
 
         expect(state.source).toBeNull();
         expect(state.alerts).toEqual([]);
@@ -167,5 +157,77 @@ describe('the transparency slice', () => {
         state = reducer(state, tokenUsageReceived(tokenUsage));
 
         expect(state.meter.rows).toHaveLength(2);
+    });
+
+    it('opens the transparency rail by default, and closes and reopens it on request', () => {
+        // Default expanded, because collapsed-by-default would silently reverse
+        // #79's roster-before-a-question-is-typed (ADR-035).
+        expect(initial().railExpanded).toBe(true);
+
+        const closed = reducer(initial(), transparencyRailToggled());
+        expect(closed.railExpanded).toBe(false);
+
+        expect(reducer(closed, transparencyRailToggled()).railExpanded).toBe(true);
+    });
+
+    it('opens a closed, unpinned rail on the first Source used of a conversation', () => {
+        const closed = reducer(initial(), transparencyRailToggled());
+        const nextConversation = reducer(closed, conversationStarted('session-next'));
+
+        const state = reducer(nextConversation, sourceUsedReceived(sourceUsed));
+
+        expect(state.source).not.toBeNull();
+        expect(state.railExpanded).toBe(true);
+    });
+
+    it('does not move the rail again on later Source used signals in the same conversation', () => {
+        const first = reducer(initial(), sourceUsedReceived(sourceUsed));
+        const second = reducer(
+            first,
+            sourceUsedReceived({
+                ...sourceUsed,
+                agent_name: 'Another specialist',
+            }),
+        );
+
+        expect(first.railExpanded).toBe(true);
+        expect(second.railExpanded).toBe(true);
+        expect(second.railSourceUsed).toBe(true);
+    });
+
+    it('pins the rail after a presenter touch, so Source used cannot change it', () => {
+        const closed = reducer(initial(), transparencyRailToggled());
+        const state = reducer(closed, sourceUsedReceived(sourceUsed));
+
+        expect(closed.railPinned).toBe(true);
+        expect(state.railExpanded).toBe(false);
+        expect(state.railSourceUsed).toBe(true);
+    });
+
+    it('clears the pin only when the next conversation starts', () => {
+        const pinned = reducer(initial(), transparencyRailToggled());
+        const duringRequest = reducer(pinned, requestStarted());
+        const nextConversation = reducer(duringRequest, conversationStarted('session-next'));
+
+        expect(duringRequest.railPinned).toBe(true);
+        expect(nextConversation.railPinned).toBe(false);
+        expect(nextConversation.railExpanded).toBe(false);
+        expect(nextConversation.railSourceUsed).toBe(false);
+    });
+
+    it('keeps the pin across another Plan in the same Chat', () => {
+        const pinned = reducer(initial(), transparencyRailToggled());
+        const state = {
+            ...pinned,
+            conversationId: 'session-223',
+        };
+
+        const nextPlan = reducer(state, {
+            type: conversationStarted.type,
+            payload: 'session-223',
+        });
+
+        expect(nextPlan.railPinned).toBe(true);
+        expect(nextPlan.railExpanded).toBe(false);
     });
 });

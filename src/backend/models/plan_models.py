@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -20,11 +20,36 @@ class PlanStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class MStep(BaseModel):
-    """Model of a step in a plan."""
+class AgentAssignee(BaseModel):
+    """An agent that can perform a Reviewable plan step."""
 
+    kind: Literal["agent"] = "agent"
+    name: str
+
+
+class PersonAssignee(BaseModel):
+    """A person the system can ask to complete a Reviewable plan step."""
+
+    kind: Literal["person"] = "person"
+    name: str
+    relation: Literal["associate", "peer", "manager"]
+    simulated: bool
+
+
+Assignee = Annotated[
+    Union[AgentAssignee, PersonAssignee],
+    Field(discriminator="kind"),
+]
+
+
+class MStep(BaseModel):
+    """Model of a step in a Reviewable plan."""
+
+    id: Optional[int] = None
     agent: str = ""
     action: str = ""
+    assignee: Optional[Assignee] = None
+    waitsOn: Optional[int] = None
 
 
 class MPlan(BaseModel):
@@ -39,6 +64,11 @@ class MPlan(BaseModel):
     team: List[str] = []
     facts: str = ""
     steps: List[MStep] = []
+    # Which revision of this Reviewable plan the associate is looking at, and
+    # what they asked to change to get it (#108). Carried on the approval frame
+    # so the surface can tell a fresh plan from one already sent back.
+    revision: int = 1
+    revision_feedback: List[str] = Field(default_factory=list)
 
 
 @dataclass(slots=True)

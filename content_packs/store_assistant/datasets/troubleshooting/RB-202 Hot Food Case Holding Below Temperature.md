@@ -1,7 +1,7 @@
 # RB-202 Hot Food Case Holding Below Temperature
 
 Document ID: RB-202
-Site: Brightpath Convenience Store 223
+Site: Circle K Store 223
 Equipment: Three-shelf heated grab-and-go case, food-service aisle
 Asset tag: BC-223-HFC-01
 Owner: Store Equipment Support

@@ -1,9 +1,13 @@
-import React, { useCallback, useEffect} from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Spinner, Text } from '@fluentui/react-components';
 
 /* ── Services / API ──────────────────────────────────────────── */
 import { APIService } from '../api/apiService';
+import {
+    isRuntimeBootstrapPending,
+    waitForRuntimeBootstrap,
+} from '../api/config';
 import { PlanDataService } from '../store/PlanDataService';
 import webSocketService from '../store/WebSocketService';
 
@@ -12,6 +16,11 @@ import {
     AgentMessageData,
     AgentMessageType,
 } from '../models';
+import {
+    PlanVerdictState,
+    applyPlanVerdict,
+    pendingVerdictFor,
+} from '../models/reviewablePlan';
 
 /* ── Redux ───────────────────────────────────────────────────── */
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -23,19 +32,15 @@ import {
     selectProcessingApproval,
     selectShowApprovalButtons,
     selectShowProcessingPlanSpinner,
-    selectShowCancellationDialog,
-    selectCancellingPlan,
     selectReloadLeftList,
     selectShowTimeoutDialog,
     selectTimeoutMessage,
     setReloadLeftList,
     setProcessingApproval,
     setShowProcessingPlanSpinner,
-    setShowCancellationDialog,
-    setCancellingPlan,
     setErrorLoading,
     planApprovalAccepted,
-    planApprovalRejected,
+    planSentBack,
 } from '../store/slices/planSlice';
 import {
     selectInput,
@@ -49,13 +54,13 @@ import {
 } from '../store/slices/chatSlice';
 import {
     selectStreamingMessages,
-    selectStreamingMessageBuffer,
-    selectShowBufferingText,
+    selectStreamedReply,
+    selectSettledReply,
 } from '../store/slices/streamingSlice';
 import { selectWsConnected } from '../store/slices/appSlice';
 import { selectSelectedTeam } from '../store/slices/teamSlice';
 import {
-    followOnTaskFor,
+    followOnTasksForStartingTask,
     rehearsedRepliesFor,
     ticketStatusReplyFor,
 } from '../models/rehearsedReply';
@@ -71,10 +76,9 @@ import { TaskService } from '../store/TaskService';
 import { usePlanWebSocket } from '../hooks/usePlanWebSocket';
 import { usePlanActions } from '../hooks/usePlanActions';
 import { useAutoScroll } from '../hooks/useAutoScroll';
-import { usePlanCancellationAlert } from '../hooks/usePlanCancellationAlert';
 import { useTransparencySignals } from '../hooks/useTransparencySignals';
 import {
-    conversationStarted,
+    startConversation,
     refusalRecorded,
     requestStarted,
 } from '../store/slices/transparencySlice';
@@ -84,11 +88,14 @@ import { usePresenterChord } from '../hooks/usePresenterChord';
 import PlanChat from '../components/content/PlanChat';
 import PlanPanelRight from '../components/content/PlanPanelRight';
 import ChatPanelLeft from '../components/content/ChatPanelLeft';
+import ChatHistoryDrawerToggle from '../components/content/ChatHistoryDrawerToggle';
+import NewChatButton from '../components/content/NewChatButton';
 import CoralShellColumn from '../commonComponents/components/Layout/CoralShellColumn';
 import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import ContentToolbar from '../commonComponents/components/Content/ContentToolbar';
 import StoreIdentity from '../components/branding/StoreIdentity';
+import TransparencyRailToggle from '../components/transparency/TransparencyRailToggle';
 import { ASSISTANT_NAME } from '../models/storeSurface';
 import LaneBadge from '../components/lane/LaneBadge';
 import { isLane, LANE_LABELS } from '../models/lane';
@@ -103,7 +110,6 @@ import {
 import { useInlineToaster } from '../components/toast/InlineToaster';
 import Octo from '../commonComponents/imports/Octopus.png';
 import LoadingMessage from '../commonComponents/components/LoadingMessage';
-import PlanCancellationDialog from '../components/common/PlanCancellationDialog';
 import TimeoutDialog from '../components/common/TimeoutDialog';
 import '../styles/ChatPage.css';
 
@@ -143,8 +149,6 @@ const ChatPage: React.FC = () => {
     const processingApproval = useAppSelector(selectProcessingApproval);
     const showApprovalButtons = useAppSelector(selectShowApprovalButtons);
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
-    const showCancellationDialog = useAppSelector(selectShowCancellationDialog);
-    const cancellingPlan = useAppSelector(selectCancellingPlan);
     const reloadLeftList = useAppSelector(selectReloadLeftList);
     /* What the surface says while this request is in flight (#64, ADR-023). */
     const narration = useAppSelector(selectProgressNarration);
@@ -153,15 +157,13 @@ const ChatPage: React.FC = () => {
     const clarificationRequestId = useAppSelector(selectPendingClarificationRequestId);
     const agentMessages = useAppSelector(selectAgentMessages);
     const streamingMessages = useAppSelector(selectStreamingMessages);
-    const streamingMessageBuffer = useAppSelector(selectStreamingMessageBuffer);
-    const showBufferingText = useAppSelector(selectShowBufferingText);
+    const streamedReply = useAppSelector(selectStreamedReply);
+    const settledReply = useAppSelector(selectSettledReply);
     const wsConnected = useAppSelector(selectWsConnected);
     const selectedTeam = useAppSelector(selectSelectedTeam);
     const showTimeoutDialog = useAppSelector(selectShowTimeoutDialog);
     const timeoutMessage = useAppSelector(selectTimeoutMessage);
 
-    /* ── Cancellation alert hook ────────────────────────────── */
-    const [pendingNavigation, setPendingNavigation] = React.useState<(() => void) | null>(null);
     const [processingElapsedSeconds, setProcessingElapsedSeconds] = React.useState<number>(0);
     /*
       **One** in-flight lock for both continuation paths (#77). The follow-on
@@ -212,9 +214,9 @@ const ChatPage: React.FC = () => {
         () => rehearsedRepliesFor(planTeam, planData?.plan?.initial_goal),
         [planTeam, planData?.plan?.initial_goal],
     );
-    const followOnTask = React.useMemo(
-        () => followOnTaskFor(planTeam, planData?.plan?.initial_goal),
-        [planTeam, planData?.plan?.initial_goal],
+    const followOnTasks = React.useMemo(
+        () => followOnTasksForStartingTask(planTeam, planData?.plan?.starting_task_id),
+        [planTeam, planData?.plan?.starting_task_id],
     );
     const ticketStatusReply = React.useMemo(
         () => ticketStatusReplyFor(planTeam, planData?.plan?.initial_goal),
@@ -270,12 +272,6 @@ const ChatPage: React.FC = () => {
 
     const laneTaken = laneFromRouterState ?? laneFromSessionState;
 
-    const { isPlanActive } = usePlanCancellationAlert({
-        planData,
-        planApprovalRequest,
-        onNavigate: pendingNavigation || (() => {}),
-    });
-
     /* ── Memoized formatErrorMessage ────────────────────────── */
     const formatErrorMessage = useCallback((content: string): string => {
         const lines = content.split('\n');
@@ -298,54 +294,94 @@ const ChatPage: React.FC = () => {
     useTransparencySignals();
     usePresenterChord();
 
-    /* ── Navigation with cancellation check ─────────────────── */
-    const handleNavigationWithAlert = useCallback(
-        (navigationFn: () => void) => {
-            if (!isPlanActive()) {
+    /*
+      **Leaving a Chat** has one declaration (ADR-031): each explicit gesture
+      supplies where to go, while this seam names and ends the Chat it leaves.
+      A socket closure never reaches here, so a network drop remains only a
+      transport event rather than an associate's stated intent.
+    */
+    const leavingChatRef = React.useRef(false);
+    const leavingChatDecisionRef = React.useRef<Promise<boolean> | null>(null);
+    const chatGenerationRef = React.useRef(0);
+    const handleLeavingChat = useCallback(
+        async (navigationFn: () => void) => {
+            if (leavingChatRef.current) return;
+            leavingChatRef.current = true;
+            let resolveLeavingChat: (ended: boolean) => void = () => undefined;
+            const leavingChatDecision = new Promise<boolean>((resolve) => {
+                resolveLeavingChat = resolve;
+            });
+            leavingChatDecisionRef.current = leavingChatDecision;
+
+            let sessionId = planData?.plan?.session_id;
+            let turnEnded = false;
+            try {
+                /*
+                  On a direct link, an associate can leave before the initial
+                  Plan read returns. Resolve the same record here rather than
+                  navigating without a session and creating an Abandoned turn.
+                */
+                if (!sessionId && planId) {
+                    if (isRuntimeBootstrapPending()) {
+                        await waitForRuntimeBootstrap();
+                    }
+                    const currentPlan = await PlanDataService.fetchPlanData(planId, false);
+                    sessionId = currentPlan?.plan?.session_id;
+                }
+                if (!sessionId) {
+                    showToast('Unable to end this chat. Please try again.', 'error');
+                    return;
+                }
+                await apiService.endChatTurn(sessionId);
+                turnEnded = true;
+                chatGenerationRef.current += 1;
+                webSocketService.disconnect();
                 navigationFn();
-                return;
+            } catch (error: unknown) {
+                if (error instanceof Error) {
+                    showToast('Unable to end this chat. Please try again.', 'error');
+                    return;
+                }
+                throw error;
+            } finally {
+                leavingChatRef.current = false;
+                resolveLeavingChat(turnEnded);
+                if (!turnEnded && leavingChatDecisionRef.current === leavingChatDecision) {
+                    leavingChatDecisionRef.current = null;
+                }
             }
-            setPendingNavigation(() => navigationFn);
-            dispatch(setShowCancellationDialog(true));
         },
-        [isPlanActive, dispatch],
+        [planData?.plan?.session_id, planId, showToast],
     );
-
-    const handleConfirmCancellation = useCallback(async () => {
-        dispatch(setCancellingPlan(true));
-        try {
-            if (planApprovalRequest?.id) {
-                await apiService.approvePlan({
-                    m_plan_id: planApprovalRequest.id,
-                    plan_id: planData?.plan?.id ?? '',
-                    approved: false,
-                    feedback: 'Plan cancelled by user navigation',
-                });
-            }
-            pendingNavigation?.();
-            webSocketService.disconnect();
-        } catch {
-            showToast('Failed to cancel the plan properly, but navigation will continue.', 'error');
-            pendingNavigation?.();
-        } finally {
-            dispatch(setCancellingPlan(false));
-            dispatch(setShowCancellationDialog(false));
-            setPendingNavigation(null);
-        }
-    }, [planApprovalRequest, planData, pendingNavigation, showToast, dispatch]);
-
-    const handleCancelDialog = useCallback(() => {
-        dispatch(setShowCancellationDialog(false));
-        setPendingNavigation(null);
-    }, [dispatch]);
 
     const handleTimeoutGoHome = useCallback(() => {
         navigate('/');
     }, [navigate]);
 
-    /* ── Plan Approval / Rejection ──────────────────────────── */
+    /* ── The Verdict on a Reviewable plan ───────────────────── */
+    /**
+     * Approve, or send it back saying what to change. There is no third
+     * verdict (#108, ADR-028): leaving the conversation is navigation, and the
+     * path that destroyed the plan is gone.
+     *
+     * The reducer beside this is what makes approval terminal — it returns the
+     * state it was given when there is nothing to say, and that identity is
+     * what tells the surface not to send.
+     */
+    const [verdict, setVerdict] = useState<PlanVerdictState>(() =>
+        pendingVerdictFor(planApprovalRequest ?? {}),
+    );
+    const verdictSubmissionRef = React.useRef(false);
+
+    useEffect(() => {
+        setVerdict(pendingVerdictFor(planApprovalRequest ?? {}));
+    }, [planApprovalRequest?.id, planApprovalRequest?.revision]);
+
     const handleApprovePlan = useCallback(async () => {
-        if (!planApprovalRequest) return;
+        if (!planApprovalRequest || verdictSubmissionRef.current) return;
+        const next = applyPlanVerdict(verdict, { kind: 'approve' });
+        if (next === verdict) return;
+        verdictSubmissionRef.current = true;
         dispatch(setProcessingApproval(true));
         const id = showToast('Submitting Approval', 'progress');
         try {
@@ -356,38 +392,47 @@ const ChatPage: React.FC = () => {
                 feedback: 'Plan approved by user',
             });
             dismissToast(id);
+            setVerdict(next);
             /* P0: single compound action replaces 3 separate dispatches */
             dispatch(planApprovalAccepted());
         } catch {
             dismissToast(id);
             showToast('Failed to submit approval', 'error');
         } finally {
+            verdictSubmissionRef.current = false;
             dispatch(setProcessingApproval(false));
         }
-    }, [planApprovalRequest, planData, showToast, dismissToast, dispatch]);
+    }, [planApprovalRequest, planData, verdict, showToast, dismissToast, dispatch]);
 
-    const handleRejectPlan = useCallback(async () => {
-        if (!planApprovalRequest) return;
-        dispatch(setProcessingApproval(true));
-        const id = showToast('Submitting cancellation', 'progress');
-        try {
-            await apiService.approvePlan({
-                m_plan_id: planApprovalRequest.id,
-                plan_id: planData?.plan?.id ?? '',
-                approved: false,
-                feedback: 'Plan rejected by user',
-            });
-            dismissToast(id);
-            navigate('/');
-        } catch {
-            dismissToast(id);
-            showToast('Failed to submit cancellation', 'error');
-            navigate('/');
-        } finally {
-            /* P0: single compound action replaces multiple state resets */
-            dispatch(planApprovalRejected());
-        }
-    }, [planApprovalRequest, planData, navigate, showToast, dismissToast, dispatch]);
+    const handleRejectPlan = useCallback(
+        async (feedback: string) => {
+            if (!planApprovalRequest || verdictSubmissionRef.current) return;
+            const next = applyPlanVerdict(verdict, { kind: 'revise', feedback });
+            if (next === verdict) return;
+            verdictSubmissionRef.current = true;
+            dispatch(setProcessingApproval(true));
+            const id = showToast('Sending the plan back', 'progress');
+            try {
+                await apiService.approvePlan({
+                    m_plan_id: planApprovalRequest.id,
+                    plan_id: planData?.plan?.id ?? '',
+                    approved: false,
+                    feedback: feedback.trim(),
+                });
+                dismissToast(id);
+                setVerdict(next);
+                /* The revised plan arrives in this same conversation. */
+                dispatch(planSentBack());
+            } catch {
+                dismissToast(id);
+                showToast('Failed to send the plan back', 'error');
+            } finally {
+                verdictSubmissionRef.current = false;
+                dispatch(setProcessingApproval(false));
+            }
+        },
+        [planApprovalRequest, planData, verdict, showToast, dismissToast, dispatch],
+    );
 
     /**
      * One new turn in **this Chat's Session** (ADR-027).
@@ -412,6 +457,7 @@ const ChatPage: React.FC = () => {
             prompt: string,
             options: { lane?: string; startingTaskId?: string } = {},
         ) => {
+            const chatGeneration = chatGenerationRef.current;
             const sessionId = planData?.plan?.session_id;
             if (!sessionId) {
                 showToast(CANNOT_CONTINUE, 'error');
@@ -444,6 +490,13 @@ const ChatPage: React.FC = () => {
                     sessionId,
                     options.startingTaskId,
                 );
+                const leavingChatDecision = leavingChatDecisionRef.current;
+                if (leavingChatDecision && await leavingChatDecision) {
+                    return;
+                }
+                if (chatGeneration !== chatGenerationRef.current) {
+                    return;
+                }
                 /*
                   The **Mocked unlock**'s answer (#27): a *successful* request
                   with no plan, because it cost no agent and no tokens.
@@ -469,6 +522,7 @@ const ChatPage: React.FC = () => {
                         planId: response.plan_id,
                     }),
                 );
+                dispatch(startConversation(response.session_id));
                 webSocketService.connect(response.plan_id).catch(() => {
                     // The chat page retries, and the surface degrades to polling.
                 });
@@ -481,6 +535,13 @@ const ChatPage: React.FC = () => {
                 );
                 navigate(`/chat/${response.plan_id}`, { state: { lane: response.lane } });
             } catch (error: unknown) {
+                const leavingChatDecision = leavingChatDecisionRef.current;
+                if (leavingChatDecision && await leavingChatDecision) {
+                    return;
+                }
+                if (chatGeneration !== chatGenerationRef.current) {
+                    return;
+                }
                 dispatch(requestSettled());
                 dismissToast(id);
                 /*
@@ -611,6 +672,10 @@ const ChatPage: React.FC = () => {
 
             dispatch(setInput(''));
             if (!planData?.plan) return;
+            // The previous turn's refusal is about the previous turn. Left up
+            // beside the answer that replaced it, it reads as though it were
+            // still in force.
+            setContinuationRefusal(null);
             // A clarification produces a new answer, so the previous answer's
             // provenance goes dark (#24). A Foundry-only follow-up emits no
             // replacement `source_used`, and a panel left up would attribute it
@@ -657,11 +722,36 @@ const ChatPage: React.FC = () => {
                     dispatch(requestSent(planData.plan.id));
                 }
                 scrollToBottom();
-            } catch {
+            } catch (error: unknown) {
                 dispatch(requestSettled());
                 dispatch(setShowProcessingPlanSpinner(false));
                 dismissToast(id);
                 dispatch(setSubmittingChatDisableInput(false));
+                /*
+                  A **Policy block** here is the **Identity boundary** gate
+                  working on the clarification seam (ADR-034, #115), so it gets
+                  the surface a refusal already has rather than the error
+                  toast — a governed refusal reported as a failed submission
+                  reads as a bug, which is the confusion ADR-014 exists to
+                  remove.
+
+                  Nothing is settled: `clarificationAnswered` is only on the
+                  success path, so the question stays pending and the box stays
+                  open — the refusal is of *those words*, not of the turn, and
+                  the associate answers again.
+                */
+                const refusal = parsePolicyBlock(error);
+                if (refusal) {
+                    setContinuationRefusal(refusal);
+                    // The refusal *is* the gate stating that nobody is signed
+                    // in, and the meter carries the measured zero — both are
+                    // claims about this conversation rather than about the
+                    // surface the words were typed into.
+                    forgetSignedInDevice();
+                    dispatch(refusalRecorded(refusal));
+                    scrollToBottom();
+                    return;
+                }
                 showToast('Failed to submit clarification', 'error');
             }
         },
@@ -680,12 +770,27 @@ const ChatPage: React.FC = () => {
 
     /* ── Left-panel handlers ────────────────────────────────── */
     const handleNewChatButton = useCallback(() => {
-        handleNavigationWithAlert(() => navigate('/', { state: { focusInput: true } }));
-    }, [navigate, handleNavigationWithAlert]);
+        void handleLeavingChat(() => navigate('/', { state: { focusInput: true } }));
+    }, [navigate, handleLeavingChat]);
 
     const resetReload = useCallback(() => {
         dispatch(setReloadLeftList(false));
     }, [dispatch]);
+
+    const contentToolbar = (
+        <ContentToolbar panelTitle={ASSISTANT_NAME}>
+            <NewChatButton onClick={handleNewChatButton} />
+            <ChatHistoryDrawerToggle />
+            <TransparencyRailToggle />
+            <StoreIdentity />
+            {/*
+              The Lane this plan was routed into (ADR-013). It is the lane
+              taken, which is why a reload reads it from session state rather
+              than re-deriving it here.
+            */}
+            {isLane(laneTaken) && <LaneBadge lane={laneTaken} variant="taken" />}
+        </ContentToolbar>
+    );
 
     /* ── Plan execution elapsed timer ───────────────────────── */
     useEffect(() => {
@@ -704,14 +809,9 @@ const ChatPage: React.FC = () => {
 
     /* ── Initial plan load ──────────────────────────────────── */
     useEffect(() => {
-        // A different plan is a different conversation, so the provenance and
-        // the alerts pushed into the previous one go (#24). Dispatched here
-        // rather than only inside `resetPlanVariables`, which runs on the
-        // no-planId error path alone and so would leave a stale Grounding
-        // panel and old alerts on screen for every ordinary navigation. It is
-        // safe at this point: any signal for *this* plan arrives later, over a
-        // socket that has not connected yet.
-        dispatch(conversationStarted());
+        // `/chat/:id` reuses this page instance. A leave outcome belongs to
+        // the previous Chat, while the generation keeps its late responses stale.
+        leavingChatDecisionRef.current = null;
         /*
           The narration follows the request that made this navigation and
           nothing else (#64, ADR-023). Opening an earlier task from the left
@@ -739,11 +839,11 @@ const ChatPage: React.FC = () => {
                 <CoralShellRow>
                     <ChatPanelLeft
                         reloadChats={reloadLeftList}
-                        onNewChatButton={handleNewChatButton}
                         restReload={resetReload}
-                        onNavigationWithAlert={handleNavigationWithAlert}
+                        onLeavingChat={handleLeavingChat}
                     />
                     <Content>
+                        {contentToolbar}
                         <div className="plan-error-message">
                             <Text size={500}>An error occurred while loading the plan</Text>
                         </div>
@@ -759,12 +859,12 @@ const ChatPage: React.FC = () => {
             <CoralShellRow>
                 <ChatPanelLeft
                     reloadChats={reloadLeftList}
-                    onNewChatButton={handleNewChatButton}
                     restReload={resetReload}
-                    onNavigationWithAlert={handleNavigationWithAlert}
+                    onLeavingChat={handleLeavingChat}
                 />
 
                 <Content>
+                    {contentToolbar}
                     {loading || !planData ? (
                         <>
                             <div className="plan-loading-spinner">
@@ -782,20 +882,6 @@ const ChatPage: React.FC = () => {
                         </>
                     ) : (
                         <>
-                            <ContentToolbar panelTitle={ASSISTANT_NAME}>
-                                <StoreIdentity />
-                                {/*
-                                  The Lane this plan was routed into (ADR-013).
-                                  It is the lane *taken*, which is why it sits
-                                  beside the plan rather than beside the Quick
-                                  Task that declared one — and why a reload
-                                  reads it back from server-side session state
-                                  rather than re-deriving it here.
-                                */}
-                                {isLane(laneTaken) && (
-                                    <LaneBadge lane={laneTaken} variant="taken" />
-                                )}
-                            </ContentToolbar>
                             <PlanChat
                                 planData={planData}
                                 OnChatSubmit={handleOnchatSubmit}
@@ -808,8 +894,8 @@ const ChatPage: React.FC = () => {
                                 planApprovalRequest={planApprovalRequest}
                                 messagesContainerRef={messagesContainerRef}
                                 finalResultRef={finalResultRef}
-                                streamingMessageBuffer={streamingMessageBuffer}
-                                showBufferingText={showBufferingText}
+                                streamedReply={streamedReply}
+                                settledReply={settledReply}
                                 agentMessages={agentMessages}
                                 showProcessingPlanSpinner={showProcessingPlanSpinner}
                                 processingElapsedSeconds={processingElapsedSeconds}
@@ -818,7 +904,7 @@ const ChatPage: React.FC = () => {
                                 handleApprovePlan={handleApprovePlan}
                                 handleRejectPlan={handleRejectPlan}
                                 rehearsedReplies={rehearsedReplies}
-                                followOnTask={followOnTask}
+                                followOnTasks={followOnTasks}
                                 onFollowOnTask={handleFollowOnTask}
                                 ticketStatusReply={ticketStatusReply}
                                 onTicketStatusReply={handleTicketStatusReply}
@@ -838,13 +924,6 @@ const ChatPage: React.FC = () => {
                     planApprovalRequest={planApprovalRequest}
                 />
             </CoralShellRow>
-
-            <PlanCancellationDialog
-                isOpen={showCancellationDialog}
-                onConfirm={handleConfirmCancellation}
-                onCancel={handleCancelDialog}
-                loading={cancellingPlan}
-            />
 
             <TimeoutDialog
                 isOpen={showTimeoutDialog}

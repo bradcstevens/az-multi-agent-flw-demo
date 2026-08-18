@@ -8,6 +8,8 @@ import { useAppSelector } from "../../store/hooks";
 import { selectRaisedTicket } from "../../store/slices/ticketSlice";
 import { selectSelectedTeam, selectTeamAgentCount } from "../../store/slices/teamSlice";
 import { selectParticipatingExecutors } from "../../store/slices/progressSlice";
+import { useTransparencyRailOpen } from '@/hooks/usePanelDrawer';
+import { PLAN_PANEL_RIGHT_COLLAPSED_CLASS } from '@/models/panelDrawer';
 import "../../styles/planpanelright.css";
 import "../../styles/simulatedTicket.css";
 
@@ -40,6 +42,13 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
   const availableCount = useAppSelector(selectTeamAgentCount);
   const participatingExecutors = useAppSelector(selectParticipatingExecutors);
 
+  // The **Panel drawer**, and the rail's own answer to it rather than a second
+  // one (#127). This wrapper is where the column's width is declared on the
+  // chat surface, so a collapse that named only the rail would leave an empty
+  // 320px column with a left border down it — the width the conversation was
+  // supposed to get back.
+  const railOpen = useTransparencyRailOpen();
+
   if (!planData && !loading) {
     return <ContentNotFound subtitle="The requested page could not be found." />;
   }
@@ -69,7 +78,10 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
 
   // Main render
   return (
-    <div className="plan-panel-right" data-testid="plan-panel-right">
+    <div
+      className={railOpen ? 'plan-panel-right' : `plan-panel-right ${PLAN_PANEL_RIGHT_COLLAPSED_CLASS}`}
+      data-testid="plan-panel-right"
+    >
       {/*
         The ticket the approval raised, above the plan it was raised from.
         This panel rather than the reply stream, and deliberately: it is the
@@ -82,8 +94,13 @@ const PlanPanelRight: React.FC<PlanDetailsProps> = ({
         the rail this panel contains. Nothing here may pin a width, a height or
         a side border inline — an inline declaration beats a media query, and
         the breakpoint would be inert for the whole chat surface.
+
+        It closes with the drawer (#127), on the rail's own rule rather than
+        beside it: a zero-width column with `overflow: hidden` would leave this
+        card invisible to the room and fully present to a screen reader, which
+        is the defect the rail's panels unmount to avoid.
       */}
-      {raisedTicket && <SimulatedTicketCard ticket={raisedTicket} />}
+      {railOpen && raisedTicket && <SimulatedTicketCard ticket={raisedTicket} />}
 
       {/* The rail is evidence only; the reviewable plan lives in the conversation. */}
       <TransparencyRail team={planData?.team ?? null}>

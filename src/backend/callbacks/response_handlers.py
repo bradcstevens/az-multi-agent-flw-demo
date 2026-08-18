@@ -141,7 +141,7 @@ def agent_response_callback(
 
 async def streaming_agent_response_callback(
     agent_id: str,
-    update: AgentResponseUpdate,
+    update: "AgentResponseUpdate | None",
     is_final: bool,
     user_id: str | None = None,
 ) -> None:
@@ -178,17 +178,24 @@ async def streaming_agent_response_callback(
             )
             logger.info("Tool calls streamed from %s: %d", agent_id, len(tool_calls))
 
-        if cleaned:
+        if cleaned or is_final:
             streaming_payload = AgentMessageStreaming(
                 agent_name=display_name,
                 content=cleaned,
                 is_final=is_final,
             )
-            await connection_config.send_status_update_async(
+            delivered = await connection_config.send_status_update_async(
                 streaming_payload,
                 user_id,
                 message_type=WebsocketMessageType.AGENT_MESSAGE_STREAMING,
             )
+            if not delivered:
+                logger.warning(
+                    "Streaming chunk was not delivered (agent=%s final=%s len=%d)",
+                    agent_id,
+                    is_final,
+                    len(cleaned),
+                )
             logger.debug("Streaming chunk (agent=%s final=%s len=%d)", agent_id, is_final, len(cleaned))
     except Exception as e:
         logger.error("streaming_agent_response_callback error: %s", e)

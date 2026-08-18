@@ -65,15 +65,12 @@ describe('the ticket slice', () => {
         // looking at, quoting a number somebody could repeat.
         const held = reducer(undefined, ticketRaised(raised()));
 
-        expect(reducer(held, conversationStarted()).ticket).toBeNull();
+        expect(reducer(held, conversationStarted('session-223')).ticket).toBeNull();
     });
 
     it('honours the transparency slice\'s boundary rather than declaring its own', () => {
-        // The boundary is already dispatched from more than one place — the
-        // `planId` effect and `resetPlanVariables`. A second action to
-        // dispatch beside it is a second thing to forget at one of them, and
-        // the symptom would be one conversation's ticket on the next
-        // conversation's screen.
+        // The transparency slice owns the boundary, so the ticket cannot drift
+        // from the Session transition that clears the rail pin.
         const held = reducer(undefined, ticketRaised(raised()));
 
         expect(reducer(held, { type: conversationStarted.type }).ticket).toBeNull();

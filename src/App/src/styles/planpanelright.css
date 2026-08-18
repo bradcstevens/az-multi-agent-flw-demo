@@ -31,6 +31,13 @@
   border-left: 1px solid var(--colorNeutralStroke1);
 }
 
+.plan-panel-right--collapsed {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-left: none;
+}
+
 /*
  * Inside the panel the rail is not its own scroll region: the panel scrolls, and
  * a flex child with a non-visible overflow has an automatic minimum size of

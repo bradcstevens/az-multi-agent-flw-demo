@@ -109,17 +109,29 @@ The environment's provisioning inputs live in `infra/environments/macae-flw-v1.e
 Run the loops your change touches before committing. Each command is self-contained: it
 bootstraps a virtualenv from `.github/requirements.txt` on first use and is a no-op
 re-install afterwards, so it can be run from a clean checkout with nothing but `python3`
-on `PATH`. Set `DEV_VENV` to share one virtualenv across git worktrees.
+on `PATH`. That virtualenv is keyed by a hash of its pinned inputs and shared across git
+worktrees ([ADR-045](docs/ADR/045-the-feedback-loops-virtualenv-is-shared-across-worktrees.md)),
+so only the first worktree to want a given dependency set needs the network — which is what
+stops a package index that blinks from turning a merged lane red. `DEV_VENV` still overrides
+the location outright. If a loop exits **3** it did not run: the environment could not be
+provisioned, and nothing was concluded about the code.
 
 | Loop | Command | Covers |
 | --- | --- | --- |
 | Backend lint | `bash scripts/backend-lint.sh` | flake8 over `src/backend`, same config as `.github/workflows/pylint.yml`. |
 | Backend tests | `bash scripts/backend-tests.sh` | The Two-phase test invocation over `src/tests/backend` with an advisory 80% coverage report. |
 | MCP server tests | `bash scripts/mcp-tests.sh` | pytest over `src/tests/mcp_server` with MCP coverage; CI appends this coverage to the backend report. |
-| CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the repo's own tooling: the helpers the loops and `test.yml` share (the advisory coverage report and the `scripts/preflight/` checks) plus the durable record's invariants (ADR index, corrections record, documentation links), the presenter runbook's (every string it quotes is the repository's own), the deploy path's stock-pack suppression, and the worktree sweep's collection ladder. |
+| CI-tooling tests | `bash scripts/ci-tests.sh` | pytest over `src/tests/ci` — the repo's own tooling: the helpers the loops and `test.yml` share (the advisory coverage report and the `scripts/preflight/` checks), this table's own invariants (that it parses, and that no row observes a deployment), plus the durable record's invariants (ADR index, corrections record, documentation links), the presenter runbook's (every string it quotes is the repository's own), the deploy path's stock-pack suppression, and the worktree sweep's collection ladder. |
 | Frontend tests | `bash scripts/frontend-tests.sh` | vitest over `src/App/src` — the transparency panels and the WebSocket message contract they render. `npm ci` on first use, a no-op afterwards; runs in `.github/workflows/frontend-tests.yml`. |
 | SOP corpus | `python3 -m pytest tools/tests -q` | `content/sop/` and its builder `tools/sop_corpus/`. After editing a source, rebuild with `PYTHONPATH=tools python3 -m sop_corpus build`. |
-| Demo validator | `bash scripts/e2e-tests.sh` | TypeScript `@playwright/test` over `e2e/` — the walkthrough asserted through a real browser against a **running deployment**. The only loop here that observes one; every other loop runs against fakes. `--target local` runs the same specs against a local surface. Not in any workflow, deliberately (see below). |
+
+**This table is a runnable list, not a reading list.** The integration gate merges each lane
+into a *fresh* worktree, parses these rows out of this file, and runs them there — unattended,
+with no `az login` and on a branch nothing has deployed
+([ADR-046](docs/ADR/046-the-feedback-loops-table-is-what-the-gate-runs.md)). Every row above
+therefore holds against fakes and stubs. A tool that observes a deployment goes in the notes
+below and is run deliberately; `src/tests/ci/test_feedback_loops.py` fails if one is added as a
+row.
 
 Notes:
 
@@ -129,14 +141,21 @@ Notes:
   with `--cov-append`. Preserve both phases.
 - A bare `pytest` from the repo root is **not** a loop: it collects `test_mcp_tools.py`,
   which dials a live MCP server. Scope runs to `src/tests/backend`.
-- The **Demo validator** is not in any workflow and must not be added to one. It drives a
-  real browser against a running deployment and holds a live conversation with the agent
-  pool, so a pull request cannot run it and a scheduled run would spend Copilot Credits on
-  nobody's behalf. What *can* be asserted without a tenant — that the loop exists, that the
-  recording is unconditional, that the expectation is read out of the repository — is
-  asserted by `src/tests/ci/test_e2e_wiring.py` in the CI-tooling loop. Run the validator
-  deliberately, after `az login`, and read `e2e/artifacts/report`. Its record is
-  `docs/demo-validator.md`.
+- The **Demo validator** is the walkthrough asserted through a real browser against a
+  **running deployment** — `bash scripts/e2e-tests.sh`, TypeScript `@playwright/test` over
+  `e2e/`, with `--target local` running the same specs against a local surface. It is the one
+  thing here that observes a deployment; everything in the table above runs against fakes. It
+  is not a loop and is not in the table, and it is in no workflow: it holds a live conversation
+  with the agent pool, so a pull request cannot run it and a scheduled run would spend Copilot
+  Credits on nobody's behalf. Its **first** assertion is that the Container Apps serve `HEAD`
+  ([ADR-018](docs/ADR/018-deployed-build-provenance-check.md)) and deployment happens on a push
+  to `main` ([ADR-020](docs/ADR/020-deploy-main-on-every-commit.md)), so run at the integration
+  gate — on a branch that by definition has not merged — it is red before a browser opens, and
+  no diff can turn it green ([ADR-046](docs/ADR/046-the-feedback-loops-table-is-what-the-gate-runs.md)).
+  What *can* be asserted without a tenant — that the loop exists, that the recording is
+  unconditional, that the expectation is read out of the repository — is asserted by
+  `src/tests/ci/test_e2e_wiring.py` in the CI-tooling loop. Run the validator deliberately,
+  after `az login`, and read `e2e/artifacts/report`. Its record is `docs/demo-validator.md`.
 - The **Stage driver** is the same specs run headed and paced — `bash scripts/e2e-tests.sh
   --stage`, composing with `--target`. It is not a loop and is not in the table: it is
   presenter-facing, for rehearsal and for presenting the walkthrough when clicking through

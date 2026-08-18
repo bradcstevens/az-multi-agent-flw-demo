@@ -8,8 +8,7 @@
  */
 export interface ChatPanelLeftProps {
     reloadChats: boolean;
-    onNewChatButton: () => void;
     restReload?: () => void;
-    onNavigationWithAlert?: (navigationFn: () => void) => void;
+    onLeavingChat?: (navigationFn: () => void) => void;
     isLoadingTeam?: boolean;
 }

@@ -83,6 +83,12 @@ mock_orchestration_module.orchestration_config = mock_orchestration_config
 sys.modules['orchestration'] = MagicMock()
 sys.modules['orchestration.connection_config'] = mock_orchestration_module
 
+# The revision lineage is pure — no I/O, no framework — so plan_service reads
+# the real one. Mocking it would leave the send-back path asserting a MagicMock
+# instead of the numbers the Plan record ends up carrying.
+import backend.orchestration.plan_revision as plan_revision_module  # noqa: E402
+sys.modules['orchestration.plan_revision'] = plan_revision_module
+
 import backend.services.plan_service as plan_service_module
 from backend.services.plan_service import (
     PlanService, build_agent_message_from_agent_message_response,
@@ -250,17 +256,25 @@ class TestPlanService:
         mock_db.update_plan.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_handle_plan_approval_rejection(self):
+    async def test_handle_plan_send_back_records_the_revision_lineage(self):
+        # Sending a plan back is not a rejection: the Plan record survives and
+        # carries which revision was asked for and what asked for it (#108).
         mock_approval = MockPlanApprovalResponse(
             plan_id="test-plan-123",
             m_plan_id="test-m-plan-456",
-            approved=False
+            approved=False,
+            feedback="Ask Marcus instead.",
         )
         mock_mplan = MagicMock()
         mock_mplan.plan_id = "existing-plan-id"
         mock_orchestration_config.plans = {"test-m-plan-456": mock_mplan}
 
         mock_db = MagicMock()
+        mock_plan = MagicMock()
+        mock_plan.revision = 1
+        mock_plan.revision_feedback = []
+        mock_db.get_plan = AsyncMock(return_value=mock_plan)
+        mock_db.update_plan = AsyncMock()
         mock_db.delete_plan_by_plan_id = AsyncMock()
         mock_database_factory.DatabaseFactory.get_database = AsyncMock(return_value=mock_db)
 
@@ -268,7 +282,38 @@ class TestPlanService:
             result = await PlanService.handle_plan_approval(mock_approval, "test-user")
 
         assert result is True
-        mock_db.delete_plan_by_plan_id.assert_called_once_with("test-plan-123")
+        assert mock_plan.revision == 2
+        assert mock_plan.revision_feedback == ["Ask Marcus instead."]
+        mock_db.update_plan.assert_called_once_with(mock_plan)
+        mock_db.delete_plan_by_plan_id.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_second_send_back_appends_rather_than_replaces(self):
+        mock_approval = MockPlanApprovalResponse(
+            plan_id="test-plan-123",
+            m_plan_id="test-m-plan-456",
+            approved=False,
+            feedback="Actually, ask Dana.",
+        )
+        mock_orchestration_config.plans = {"test-m-plan-456": MagicMock()}
+
+        mock_db = MagicMock()
+        mock_plan = MagicMock()
+        mock_plan.revision = 2
+        mock_plan.revision_feedback = ["Ask Marcus instead."]
+        mock_db.get_plan = AsyncMock(return_value=mock_plan)
+        mock_db.update_plan = AsyncMock()
+        mock_database_factory.DatabaseFactory.get_database = AsyncMock(return_value=mock_db)
+
+        with patch.object(plan_service_module, 'orchestration_config', mock_orchestration_config):
+            result = await PlanService.handle_plan_approval(mock_approval, "test-user")
+
+        assert result is True
+        assert mock_plan.revision == 3
+        assert mock_plan.revision_feedback == [
+            "Ask Marcus instead.",
+            "Actually, ask Dana.",
+        ]
 
     @pytest.mark.asyncio
     async def test_handle_plan_approval_no_orchestration_config(self):

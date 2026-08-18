@@ -6,6 +6,10 @@ import { createSlice, createAsyncThunk, createSelector, PayloadAction } from '@r
 import type { RootState } from '../store';
 import { ProcessedPlanData, MPlanData, PlanStatus } from '@/models';
 import { PlanDataService } from '@/store/PlanDataService';
+import {
+    isRuntimeBootstrapPending,
+    waitForRuntimeBootstrap,
+} from '@/api/config';
 
 /* ── Async Thunks (Point 9 — createAsyncThunk for API‑driven state) ── */
 
@@ -22,6 +26,9 @@ export const fetchPlanData = createAsyncThunk<
     'plan/fetchPlanData',
     async ({ planId, useCache = true }, { rejectWithValue }) => {
         try {
+            if (isRuntimeBootstrapPending()) {
+                await waitForRuntimeBootstrap();
+            }
             return await PlanDataService.fetchPlanData(planId, useCache);
         } catch {
             return rejectWithValue('Failed to load plan data');
@@ -50,10 +57,6 @@ export interface PlanState {
     planApproved: boolean;
     /** Trigger to reload the left-panel chat list */
     reloadLeftList: boolean;
-    /** Cancellation dialog state */
-    showCancellationDialog: boolean;
-    /** Is a cancellation API call in progress? */
-    cancellingPlan: boolean;
     /** Loading message for spinners */
     loadingMessage: string;
     /** Show timeout dialog when backend sends timeout notification */
@@ -73,8 +76,6 @@ const initialState: PlanState = {
     continueWithWebsocketFlow: false,
     planApproved: false,
     reloadLeftList: true,
-    showCancellationDialog: false,
-    cancellingPlan: false,
     loadingMessage: '',
     showTimeoutDialog: false,
     timeoutMessage: '',
@@ -114,12 +115,6 @@ const planSlice = createSlice({
         setReloadLeftList(state, action: PayloadAction<boolean>) {
             state.reloadLeftList = action.payload;
         },
-        setShowCancellationDialog(state, action: PayloadAction<boolean>) {
-            state.showCancellationDialog = action.payload;
-        },
-        setCancellingPlan(state, action: PayloadAction<boolean>) {
-            state.cancellingPlan = action.payload;
-        },
         setLoadingMessage(state, action: PayloadAction<string>) {
             state.loadingMessage = action.payload;
         },
@@ -145,8 +140,14 @@ const planSlice = createSlice({
             state.showProcessingPlanSpinner = true;
             state.processingApproval = false;
         },
-        /** Single dispatch after user rejects a plan (replaces 3 separate dispatches) */
-        planApprovalRejected(state) {
+        /**
+         * Single dispatch after the associate sends a plan back (#108).
+         *
+         * The verdict has been given, so the controls come down — but nothing
+         * claims progress: a revised plan is not an approved one, and the
+         * spinner that narrates a running plan stays off until it is.
+         */
+        planSentBack(state) {
             state.planApproved = false;
             state.showApprovalButtons = false;
             state.showProcessingPlanSpinner = false;
@@ -232,14 +233,12 @@ export const {
     setContinueWithWebsocketFlow,
     setPlanApproved,
     setReloadLeftList,
-    setShowCancellationDialog,
-    setCancellingPlan,
     setLoadingMessage,
     setShowTimeoutDialog,
     setTimeoutMessage,
     markPlanCompleted,
     planApprovalAccepted,
-    planApprovalRejected,
+    planSentBack,
     approvalRequestReceived,
     planCompletedFinal,
     planFailedFinal,
@@ -256,8 +255,6 @@ export const selectShowApprovalButtons = (s: RootState) => s.plan.showApprovalBu
 export const selectShowProcessingPlanSpinner = (s: RootState) => s.plan.showProcessingPlanSpinner;
 export const selectContinueWithWebsocketFlow = (s: RootState) => s.plan.continueWithWebsocketFlow;
 export const selectReloadLeftList = (s: RootState) => s.plan.reloadLeftList;
-export const selectShowCancellationDialog = (s: RootState) => s.plan.showCancellationDialog;
-export const selectCancellingPlan = (s: RootState) => s.plan.cancellingPlan;
 export const selectLoadingMessage = (s: RootState) => s.plan.loadingMessage;
 export const selectShowTimeoutDialog = (s: RootState) => s.plan.showTimeoutDialog;
 export const selectTimeoutMessage = (s: RootState) => s.plan.timeoutMessage;

@@ -1,6 +1,6 @@
 # The Mocked unlock
 
-The demo's closing beat (issue #27). An associate asks *"my name is Tanya, how much PTO do I
+The demo's closing beat (issue #27). An associate asks *"my name is Clara, how much PTO do I
 have?"* and is refused. They tap **Sign in to continue**, the header gains a named identity, and
 the same question — unedited, through the same gate — answers out of a mocked associate record.
 
@@ -65,7 +65,7 @@ other way round renders the demo's payoff as an error toast.
 `src/backend/associate/records.py`. Authored demo content, and the demo's most sensitive: every
 other invented thing here is about a store, and this is about a person's pay and time off.
 
-* **Looked up by whole name**, or whole first name — never by substring. `Tan` is not Tanya. A
+* **Looked up by whole name**, or whole first name — never by substring. `Clar` is not Clara. A
   loose match answers one associate's question out of another associate's record, which is the
   identity form of the claim the gate exists to refuse, made by the code that was supposed to be
   the reward for passing it.

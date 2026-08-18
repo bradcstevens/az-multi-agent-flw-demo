@@ -597,6 +597,47 @@ class TestStreamingAgentResponseCallback:
             )
 
     @pytest.mark.asyncio
+    async def test_streaming_chunk_that_reaches_no_socket_is_recorded(self):
+        """A lost streamed chunk remains observable during the Connection window."""
+        mock_update = Mock()
+        mock_update.text = "Opening streamed text"
+        mock_update.contents = []
+        connection_config.send_status_update_async.reset_mock()
+        connection_config.send_status_update_async.return_value = False
+
+        with patch('backend.callbacks.response_handlers.logger') as mock_logger:
+            await streaming_agent_response_callback(
+                "agent_123", mock_update, False, user_id="user_456"
+            )
+
+        mock_logger.warning.assert_called_once_with(
+            "Streaming chunk was not delivered (agent=%s final=%s len=%d)",
+            "agent_123",
+            False,
+            len("Opening streamed text"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_streaming_callback_emits_empty_final_frame_when_stream_ends(self):
+        """The explicit stream completion reaches the socket without a final token."""
+        with patch('backend.callbacks.response_handlers.AgentMessageStreaming') as mock_streaming:
+            mock_streaming_obj = Mock()
+            mock_streaming.return_value = mock_streaming_obj
+
+            await streaming_agent_response_callback("agent_123", None, True, user_id="user_456")
+
+            mock_streaming.assert_called_once_with(
+                agent_name="Agent 123",
+                content="",
+                is_final=True,
+            )
+            connection_config.send_status_update_async.assert_called_with(
+                mock_streaming_obj,
+                "user_456",
+                message_type=WebsocketMessageType.AGENT_MESSAGE_STREAMING,
+            )
+
+    @pytest.mark.asyncio
     async def test_streaming_callback_no_text_with_contents(self):
         """Test streaming callback when update has no text but has contents with text.
 

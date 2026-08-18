@@ -15,14 +15,13 @@ if _backend_path not in sys.path:
     sys.path.insert(0, _backend_path)
 
 from backend.models.messages import (AgentMessage, AgentMessageStreaming,
-                                     AgentStreamEnd, AgentStreamStart,
                                      AgentToolCall, AgentToolMessage,
                                      PlanApprovalRequest, PlanApprovalResponse,
                                      ReplanApprovalRequest,
                                      ReplanApprovalResponse,
                                      UserClarificationRequest,
                                      UserClarificationResponse)
-from backend.models.plan_models import MPlan, PlanStatus
+from backend.models.plan_models import MPlan, MStep, PlanStatus
 
 
 class TestAgentMessage:
@@ -39,24 +38,6 @@ class TestAgentMessage:
 
     def test_is_dataclass(self):
         assert dataclasses.is_dataclass(AgentMessage)
-
-
-class TestAgentStreamStart:
-    def test_construction(self):
-        obj = AgentStreamStart(agent_name="A")
-        assert obj.agent_name == "A"
-
-    def test_is_dataclass(self):
-        assert dataclasses.is_dataclass(AgentStreamStart)
-
-
-class TestAgentStreamEnd:
-    def test_construction(self):
-        obj = AgentStreamEnd(agent_name="A")
-        assert obj.agent_name == "A"
-
-    def test_is_dataclass(self):
-        assert dataclasses.is_dataclass(AgentStreamEnd)
 
 
 class TestAgentMessageStreaming:
@@ -116,6 +97,30 @@ class TestPlanApprovalRequest:
         plan = MPlan()
         req = PlanApprovalRequest(plan=plan, status=PlanStatus.RUNNING, context={"key": "val"})
         assert req.context == {"key": "val"}
+
+    def test_to_dict_preserves_person_steps_for_the_browser(self):
+        req = PlanApprovalRequest(
+            plan=MPlan(
+                steps=[
+                    MStep.model_validate(
+                        {
+                            "id": 3,
+                            "action": "Ask Marcus Bell to confirm the agreed swap",
+                            "assignee": {
+                                "kind": "person",
+                                "name": "Marcus Bell",
+                                "relation": "peer",
+                                "simulated": True,
+                            },
+                            "waitsOn": 2,
+                        }
+                    )
+                ]
+            ),
+            status=PlanStatus.CREATED,
+        )
+
+        assert req.to_dict()["plan"]["steps"][0]["assignee"]["name"] == "Marcus Bell"
 
 
 class TestPlanApprovalResponse:

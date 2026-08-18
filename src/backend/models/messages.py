@@ -25,18 +25,6 @@ class AgentMessage:
 
 
 @dataclass(slots=True)
-class AgentStreamStart:
-    """Start of a streaming message."""
-    agent_name: str
-
-
-@dataclass(slots=True)
-class AgentStreamEnd:
-    """End of a streaming message."""
-    agent_name: str
-
-
-@dataclass(slots=True)
 class AgentMessageStreaming:
     """Streaming chunk from an agent."""
     agent_name: str
@@ -73,6 +61,14 @@ class PlanApprovalRequest:
     plan: MPlan
     status: PlanStatus
     context: dict | None = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the Reviewable plan as structured data for the browser."""
+        return {
+            "plan": self.plan.model_dump(mode="json"),
+            "status": getattr(self.status, "value", self.status),
+            "context": self.context,
+        }
 
 
 @dataclass(slots=True)
@@ -146,8 +142,6 @@ class WebsocketMessageType(str, Enum):
     """Types of WebSocket messages sent over the WebSocket connection."""
     SYSTEM_MESSAGE = "system_message"
     AGENT_MESSAGE = "agent_message"
-    AGENT_STREAM_START = "agent_stream_start"
-    AGENT_STREAM_END = "agent_stream_end"
     AGENT_MESSAGE_STREAMING = "agent_message_streaming"
     AGENT_TOOL_MESSAGE = "agent_tool_message"
     PLAN_APPROVAL_REQUEST = "plan_approval_request"

@@ -2,13 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 import {
+    allRules,
     allRulesIncludingMediaQueries,
     classesIn,
     classTokensIn,
     isRendered,
+    SHELL_STYLESHEET,
     sourceFiles,
     stackedBody,
 } from '@/testing/stylesheets';
+import {
+    DESKTOP_DRAWER_QUERY,
+    STACKING_BREAKPOINT_PX,
+    TRANSPARENCY_RAIL_TOGGLE_CLASS,
+} from '@/models/panelDrawer';
 
 /**
  * The transparency rail's own box (issue #60).
@@ -49,6 +56,16 @@ const railColumnClasses = (): string[] => {
         ),
     );
 };
+
+const collapsedRailContainers = (): string[] =>
+    Array.from(
+        new Set(
+            allRulesIncludingMediaQueries()
+                .flatMap((rule) => classesIn(rule.selector))
+                .filter((className) => className.endsWith('--collapsed'))
+                .filter(isRendered),
+        ),
+    );
 
 describe('the transparency rail fits its own box', () => {
     it('renders the width it declares, padding included', () => {
@@ -156,5 +173,96 @@ describe('the transparency rail fits its own box', () => {
             nested,
             'still a scroll region of its own inside the stacked, already-scrolling page',
         ).toEqual([]);
+    });
+
+    it('collapses every rendered rail container on desktop and releases it when the shell stacks', () => {
+        const containers = collapsedRailContainers();
+        expect(containers, 'no rendered rail container has a collapsed state').not.toEqual([]);
+
+        for (const className of containers) {
+            // `allRules`, not `allRulesIncludingMediaQueries`: the collapse has
+            // to hold at **every** desktop width. Flattened, a `width: 0` inside
+            // some other query — a wide-screen rule, a print block — would
+            // satisfy this while the rail stayed 320px wide across the band the
+            // demonstration is actually given.
+            const closesOnDesktop = allRules().some(
+                (rule) =>
+                    classesIn(rule.selector).includes(className) &&
+                    /(?:^|[;\s])width:\s*0/.test(rule.body) &&
+                    /min-width:\s*0/.test(rule.body),
+            );
+            expect(closesOnDesktop, `.${className} does not give its width back on desktop`).toBe(true);
+
+            const stacked = stackedBody(className);
+            expect(
+                stacked,
+                `.${className} keeps its collapsed desktop width below the stacking breakpoint`,
+            ).toMatch(/(?:^|[;\s])width:\s*100%/);
+
+            const compactsGap = allRules().some(
+                (rule) =>
+                    classesIn(rule.selector).includes(className) &&
+                    /(?:^|[;\s])gap:\s*0/.test(rule.body),
+            );
+            if (compactsGap) {
+                expect(
+                    stacked,
+                    `.${className} keeps its collapsed spacing below the stacking breakpoint`,
+                ).toMatch(/(?:^|[;\s])gap:\s*12px/);
+            }
+        }
+    });
+});
+
+/**
+ * The rail as a **Panel drawer** (issue #127, ADR-035).
+ *
+ * The rail is read *beside* the answer it explains, so closing it returns its
+ * width to the conversation rather than covering it. Which makes the drawer a
+ * side-column rule like every other one, released at the **Stacking
+ * breakpoint** — and below it the rail is always open, so the control that
+ * closes it is *absent* rather than disabled.
+ *
+ * Read out of the stylesheets for #58's reason: the number that releases the
+ * drawer is declared in `storeSurface.css`, and a component that unmounts the
+ * rail's panels has to be released by the same number or the band between the
+ * two is a rail with room and no headings.
+ */
+describe('the transparency rail is a Panel drawer', () => {
+    it('closes at the breakpoint the stylesheet declares, rather than at a second one', () => {
+        // The drawer is the first rule about this column that a *component*
+        // has to obey as well as a stylesheet, so it is the first chance for
+        // the surface to own the number twice.
+        //
+        // The drawer's query is the stylesheet's, negated, rather than a second
+        // query one pixel above it. A viewport is not obliged to be a whole
+        // number of pixels — zoom, a fractional device pixel ratio and a
+        // scrollbar all produce halves — and at 900.5 both `(max-width: 900px)`
+        // and `(min-width: 901px)` are false: three columns of shell around a
+        // rail the component had decided could not be closed, with the control
+        // that closes it already gone.
+        const declared = Array.from(
+            readFileSync(SHELL_STYLESHEET, 'utf8').matchAll(/@media\s*\(max-width:\s*(\d+)px\)/g),
+            (match) => Number(match[1]),
+        );
+
+        expect(
+            Array.from(new Set(declared)),
+            'the shell stylesheet declares no single stacking breakpoint',
+        ).toEqual([STACKING_BREAKPOINT_PX]);
+        expect(
+            DESKTOP_DRAWER_QUERY,
+            'the drawer opens on a band the stacking breakpoint does not release',
+        ).toBe(`not all and (max-width: ${STACKING_BREAKPOINT_PX}px)`);
+    });
+
+    it("takes the drawer's control away below the breakpoint rather than disabling it", () => {
+        // A control for a state that cannot exist is worse than no control: the
+        // stacked rail is always open, so a toggle there either lies about what
+        // it does or sits inert under the associate's thumb.
+        expect(
+            stackedBody(TRANSPARENCY_RAIL_TOGGLE_CLASS),
+            'the drawer keeps its control on a surface that cannot close the drawer',
+        ).toMatch(/display:\s*none/);
     });
 });

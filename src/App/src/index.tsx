@@ -7,28 +7,38 @@ import '@fontsource-variable/geist-mono';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { FluentProvider, Spinner } from "@fluentui/react-components";
+import { FluentProvider } from "@fluentui/react-components";
 import { storeLightTheme, storeDarkTheme } from './theme/storeTheme';
-import { setEnvData, setApiUrl, config as defaultConfig, toBoolean, getUserInfo, setUserInfoGlobal } from './api/config';
+import {
+  beginRuntimeBootstrap,
+  runtimeBootstrapLoaded,
+  setEnvData,
+  setApiUrl,
+  config as defaultConfig,
+  toBoolean,
+  getUserInfo,
+  setUserInfoGlobal,
+} from './api/config';
 import { apiService } from './api';
 import { Provider as ReduxProvider } from 'react-redux';
 import { store } from './store/store';
+import { hydrateCurrentUser } from './store/slices/appSlice';
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
 const AppWrapper = () => {
   // State to store the current theme
-  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
-  const [isUserInfoLoaded, setIsUserInfoLoaded] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
-  type ConfigType = typeof defaultConfig;
-  const [config, setConfig] = useState<ConfigType>(defaultConfig);
   useEffect(() => {
     const initConfig = async () => {
-      window.appConfig = config;
-      setEnvData(config);
-      setApiUrl(config.API_URL);
+      window.appConfig = defaultConfig;
+      setEnvData(defaultConfig);
+      setApiUrl(defaultConfig.API_URL);
+
+      // The user record shares no dependency with runtime configuration.
+      const userInfo = getUserInfo();
+
       try {
         const response = await fetch('/config');
         let config = defaultConfig;
@@ -37,19 +47,20 @@ const AppWrapper = () => {
           config.ENABLE_AUTH = toBoolean(config.ENABLE_AUTH);
         }
 
-        window.appConfig = config;
-        setEnvData(config);
-        setApiUrl(config.API_URL);
-        setConfig(config);
-        let defaultUserInfo = await getUserInfo();
-        window.userInfo = defaultUserInfo;
-        setUserInfoGlobal(defaultUserInfo);
-        await apiService.sendUserBrowserLanguage();
+          window.appConfig = config;
+          setEnvData(config);
+          setApiUrl(config.API_URL);
       } catch (error) {
           console.info("frontend config did not load from python", error);
       } finally {
-        setIsConfigLoaded(true);
-        setIsUserInfoLoaded(true);
+          const resolvedUserInfo = await userInfo;
+          window.userInfo = resolvedUserInfo;
+          setUserInfoGlobal(resolvedUserInfo);
+          store.dispatch(hydrateCurrentUser(resolvedUserInfo));
+          runtimeBootstrapLoaded();
+          void apiService.sendUserBrowserLanguage().catch((error) => {
+            console.info("browser language did not reach the backend", error);
+          });
       }
     };
     
@@ -70,39 +81,6 @@ const AppWrapper = () => {
     mediaQuery.addEventListener("change", handleThemeChange);
     return () => mediaQuery.removeEventListener("change", handleThemeChange);
   }, []);
-  /*
-   * The bootstrap state, which the audience does see: it is on screen for as
-   * long as `/config` takes to answer, at the top of the walkthrough, on a
-   * projector. It used to be an unstyled `Loading...` in the browser's default
-   * serif — outside the FluentProvider, so it inherited none of the theme — and
-   * it read as a page that had failed to start.
-   *
-   * Inside the provider now, so it is the surface's own type and palette, and
-   * it says what is being waited for rather than that something is happening.
-   */
-  if (!isConfigLoaded || !isUserInfoLoaded) {
-    return (
-      <FluentProvider
-        theme={isDarkMode ? storeDarkTheme : storeLightTheme}
-        style={{ height: "100dvh" }}
-      >
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            display: "flex",
-            height: "100%",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "var(--colorNeutralBackground3)",
-          }}
-        >
-          <Spinner size="large" label="Starting the store assistant" />
-        </div>
-      </FluentProvider>
-    );
-  }
-
   return (
     <StrictMode>
       <ReduxProvider store={store}>
@@ -120,5 +98,6 @@ const AppWrapper = () => {
     </StrictMode>
   );
 };
+beginRuntimeBootstrap();
 root.render(<AppWrapper />);
 reportWebVitals();

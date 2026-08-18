@@ -102,11 +102,10 @@ describe('the store surface on a phone-sized screen', () => {
         }
     });
 
-    it('drops the chat-history panel rather than squeezing it', () => {
+    it('does not leave chat history as a shell column', () => {
         const css = readFileSync(STYLESHEET, 'utf8');
-        const block = css.slice(css.indexOf(STACKING_BREAKPOINT));
 
-        expect(block).toMatch(/\.panel-left-container\s*\{\s*display:\s*none/);
+        expect(css).not.toContain('.panel-left-container');
     });
 
     it('outranks every unconditional rule it has to overrule', () => {
@@ -117,9 +116,9 @@ describe('the store surface on a phone-sized screen', () => {
         // breakpoint ties with a single-class rule for the same property
         // outside it, and the tie goes to whichever stylesheet the bundler
         // imported second — which is decided by an import order in a component,
-        // nowhere near either stylesheet. `.panel-left-container` was declared
-        // `display: none` here and `display: flex` in `ChatPanelLeft.css`, and
-        // the phone kept a 240px chat-history panel it was supposed to drop.
+        // nowhere near either stylesheet. The chat-history Panel drawer is no
+        // longer a shell column, while every remaining stacked rule must still
+        // outrank the unconditional declaration it changes.
         //
         // Read out of the stylesheets rather than listed, for #58's reason: a
         // list agrees with itself forever.

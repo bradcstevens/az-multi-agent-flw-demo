@@ -15,6 +15,39 @@ export let API_URL: string | null = null;
 export let USER_ID: string | null = null;
 export let USER_INFO: UserInfo | null = null;
 
+let resolveRuntimeBootstrap: (() => void) | null = null;
+let runtimeBootstrapReady = Promise.resolve();
+
+/**
+ * Hold user-scoped startup work until runtime configuration and identity settle.
+ *
+ * The home surface owns the one visible startup wait: its roster cannot load
+ * until the deployment has named its API and the request has its associate
+ * identity. Direct component consumers retain an already-resolved promise.
+ */
+export function beginRuntimeBootstrap(): void {
+    if (resolveRuntimeBootstrap) {
+        return;
+    }
+
+    runtimeBootstrapReady = new Promise((resolve) => {
+        resolveRuntimeBootstrap = resolve;
+    });
+}
+
+export function runtimeBootstrapLoaded(): void {
+    resolveRuntimeBootstrap?.();
+    resolveRuntimeBootstrap = null;
+}
+
+export function isRuntimeBootstrapPending(): boolean {
+    return resolveRuntimeBootstrap !== null;
+}
+
+export function waitForRuntimeBootstrap(): Promise<void> {
+    return runtimeBootstrapReady;
+}
+
 export let config = {
     API_URL: "http://localhost:8000/api",
     ENABLE_AUTH: false,

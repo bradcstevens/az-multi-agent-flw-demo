@@ -221,9 +221,17 @@ class Plan(BaseDataModel):
     m_plan: Optional[Dict[str, Any]] = None
     summary: Optional[str] = None
     team_id: Optional[str] = None
+    # The Quick Task tapped to create this record. Absent means free-typed
+    # input, which must not re-enter the authored Follow-on graph.
+    starting_task_id: Optional[str] = None
     streaming_message: Optional[str] = None
     human_clarification_request: Optional[str] = None
     human_clarification_response: Optional[str] = None
+    # The Reviewable plan's lineage (#108). A plan the associate sent back is
+    # revised, never destroyed, so the row records which revision is on screen
+    # and what was asked to get there.
+    revision: int = 1
+    revision_feedback: List[str] = Field(default_factory=list)
 
 
 class Step(BaseDataModel):
@@ -295,15 +303,24 @@ class StartingTask(BaseModel):
     # conversation may offer the reply.
     ticket_status_reply: Optional[Dict[str, str]] = None
 
-    # The next Quick Task in this conversation (issue #61, ADR-024). Like
-    # ``lane``, the pointer is authored configuration: a missing or unknown
-    # task simply produces no follow-on affordance in the surface.
-    follow_on: Optional[str] = None
+    # The Quick Tasks this conversation can lead to (issue #132, ADR-033).
+    # Like ``lane``, these edges are authored configuration: a missing or
+    # unknown task simply produces no Follow-on task affordance in the surface.
+    follow_on: List[str] = Field(default_factory=list)
+
+    # Whether this Quick Task reads state this conversation wrote and therefore
+    # cannot be offered cold from the home grid.
+    context_dependent: bool = False
 
     # The escalation task's explicit completion behavior (issue #62). This is
     # authored on the task rather than inferred from its wording so a content
     # edit cannot silently stop the approval seam from storing its ticket.
     ticket_on_approval: bool = False
+
+    # An authored Reviewable plan. A person step names who the system will ask
+    # and the step it waits for, so a rehearsal never invents a colleague or an
+    # approval order.
+    plan_steps: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class TeamConfiguration(BaseDataModel):
@@ -374,6 +391,9 @@ class InputTask(BaseModel):
     """Message representing the initial input task from the user."""
     session_id: str
     description: str
+    # The team the surface has already resolved. It lets the first question
+    # attach to that team while `/init_team` is still recording the selection.
+    team_id: Optional[str] = None
     # The Lane the request declares (issue #16, ADR-013), carried through from
     # the Quick Task the presenter tapped. Absent for free-typed input, which
     # the lane router then routes by its keyword fallback. It is deliberately

@@ -180,6 +180,11 @@ def rt(monkeypatch):
     store.settle_turn = AsyncMock(
         return_value=TurnSettled(SettleOutcome.settled, status="completed")
     )
+    # The Chat's latest Plan record and the write **Ending a turn** makes onto
+    # it (#120). No chat by default, so a route that reached this without a
+    # session behind it answers 404 rather than settling something.
+    store.get_plan_by_session = AsyncMock(return_value=None)
+    store.update_plan = AsyncMock()
 
     # The generic CRUD the memory container exposes, faked well enough that a
     # session-state record genuinely round-trips (issue #20). Keyed by
@@ -239,7 +244,11 @@ def rt(monkeypatch):
     orchestration_config.approvals = {}
     orchestration_config.clarifications = {}
     orchestration_config.plans = {}
-    orchestration_config.active_tasks = {}
+    # The turn-in-flight registry. It is storage: it hands back the record of
+    # the turn this user has running, and *which Chat that turn belongs to* is
+    # decided by the end-of-turn primitive (#120, ADR-031 §6), which is real
+    # here.
+    orchestration_config.active_turn = MagicMock(return_value=None)
     orchestration_config.get_current_orchestration = MagicMock(return_value=None)
     orchestration_config.set_approval_result = MagicMock()
     orchestration_config.set_clarification_result = MagicMock()
@@ -323,6 +332,25 @@ def _no_user(rt):
 # /init_team
 # ---------------------------------------------------------------------------
 class TestInitTeam:
+    def test_returns_team_attachment_without_building_a_workflow(self, rt):
+        """The question box needs a team, not a precommitted Lane.
+
+        The first question is the first place a Lane is declared.  Building a
+        Workflow here would therefore choose a Plan review value the request
+        never made, and make a Fast-lane first question rebuild it.
+        """
+        team = MagicMock()
+        team.team_id = "team-current"
+        rt.store.get_current_team.return_value = team
+        team_configuration = MagicMock()
+        rt.team_service.get_team_configuration.return_value = team_configuration
+
+        response = rt.client.get("/api/v4/init_team")
+
+        assert response.status_code == 200
+        assert response.json() == {"team_id": "team-current"}
+        rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
+
     def test_no_user(self, rt):
         _no_user(rt)
         resp = rt.client.get("/api/v4/init_team")
@@ -333,8 +361,7 @@ class TestInitTeam:
         rt.store.get_current_team.return_value = None
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["requires_team_upload"] is True
+        assert resp.json() == {"team_id": None, "requires_team_upload": True}
 
     def test_first_available_team_used(self, rt):
         rt.find_first_available_team.return_value = "team-abc"
@@ -346,7 +373,45 @@ class TestInitTeam:
         rt.team_service.get_team_configuration.return_value = team_conf
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
-        assert resp.json()["status"] == "Request started successfully"
+        assert resp.json() == {"team_id": "team-abc"}
+
+    def test_explicit_team_attachment_overrides_the_current_team(self, rt):
+        current = MagicMock()
+        current.team_id = "stock-team"
+        rt.store.get_current_team.return_value = current
+        selected = MagicMock()
+        selected.team_id = "team-current"
+        rt.team_service.handle_team_selection.return_value = selected
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+
+        resp = rt.client.get("/api/v4/init_team?team_id=team-current")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"team_id": "team-current"}
+        rt.find_first_available_team.assert_not_awaited()
+        rt.team_service.handle_team_selection.assert_awaited_once_with(
+            user_id="user-1", team_id="team-current"
+        )
+
+    def test_invalid_explicit_team_does_not_replace_the_current_team(self, rt):
+        current = MagicMock()
+        current.team_id = "team-current"
+        rt.store.get_current_team.return_value = current
+        rt.team_service.get_team_configuration.return_value = None
+
+        resp = rt.client.get("/api/v4/init_team?team_id=not-a-team")
+
+        assert resp.status_code == 404
+        rt.team_service.handle_team_selection.assert_not_awaited()
+        rt.store.delete_current_team.assert_not_awaited()
+
+    def test_failed_explicit_team_persistence_is_not_reported_as_success(self, rt):
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+        rt.team_service.handle_team_selection.return_value = None
+
+        resp = rt.client.get("/api/v4/init_team?team_id=team-current")
+
+        assert resp.status_code == 500
 
     def test_current_team_used(self, rt):
         current = MagicMock()
@@ -364,7 +429,7 @@ class TestInitTeam:
         rt.team_service.get_team_configuration.return_value = None
         resp = rt.client.get("/api/v4/init_team")
         assert resp.status_code == 200
-        assert resp.json()["requires_team_upload"] is True
+        assert resp.json() == {"team_id": None, "requires_team_upload": True}
         rt.store.delete_current_team.assert_awaited()
 
     def test_exception_returns_400(self, rt):
@@ -379,6 +444,27 @@ class TestInitTeam:
 class TestProcessRequest:
     def _payload(self):
         return {"session_id": "sess-1", "description": "do the thing"}
+
+    def test_uses_the_attached_team_over_a_stale_current_team(self, rt):
+        """The question's resolved team remains authoritative during initialization."""
+        stale_team = MagicMock()
+        stale_team.team_id = "stock-team"
+        rt.store.get_current_team.return_value = stale_team
+        attached_team = MagicMock()
+        rt.store.get_team_by_id.return_value = attached_team
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                "session_id": "sess-1",
+                "description": "how do I close the store?",
+                "team_id": "team-abc",
+                "lane": "fast",
+            },
+        )
+
+        assert response.status_code == 200
+        rt.store.get_team_by_id.assert_awaited_once_with(team_id="team-abc")
 
     def test_no_user(self, rt):
         _no_user(rt)
@@ -409,6 +495,23 @@ class TestProcessRequest:
         body = resp.json()
         assert body["status"] == "Request started successfully"
         assert body["plan_id"]
+
+    def test_a_tapped_quick_task_is_recorded_on_its_plan(self, rt):
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+
+        response = rt.client.post(
+            "/api/v4/process_request",
+            json={
+                **self._payload(),
+                "starting_task_id": "task-223-troubleshooting",
+            },
+        )
+
+        assert response.status_code == 200
+        assert rt.store.add_plan.await_args.args[0].starting_task_id == (
+            "task-223-troubleshooting"
+        )
 
     def test_success_generates_session_id(self, rt):
         rt.store.get_team_by_id.return_value = MagicMock()
@@ -453,6 +556,58 @@ class TestProcessRequest:
         persisted = rt.store.add_plan.await_args.args[0]
         assert persisted.session_id == "sess-troubleshooting"
         turn["forget_turns"]()
+
+    def test_the_turn_in_flight_records_the_chat_it_belongs_to(self, rt):
+        """ADR-031 §6, at the only place the registry is written.
+
+        The registry was keyed by `user_id` alone, so nothing could tell which
+        conversation the task it held was answering. **Ending a turn** reads
+        that to scope itself; a turn registered without its session would make
+        the primitive either cancel nothing or cancel whatever was running.
+
+        The Plan is recorded for the same reason one step down. This route
+        writes the new Plan *before* it reaches this line, so a turn that named
+        only its session would leave **Ending a turn** to find its record by
+        asking for the session's latest — and in that window the latest belongs
+        to the turn about to start, not the one being cancelled.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+
+        response = rt.client.post(
+            "/api/v4/process_request", json=self._payload()
+        )
+
+        assert response.status_code == 200
+        registered = rt.orchestration_config.register_active_turn.call_args.args
+        assert registered[0] == "user-1"
+        assert registered[1] == "sess-1"
+        assert registered[2] == response.json()["plan_id"]
+
+    def test_a_prior_turn_is_replaced_rather_than_run_beside(self, rt):
+        """Not session-scoped, and deliberately so.
+
+        The Workflow is cached per user, so a second turn *replaces* the first
+        rather than running beside it — including one begun in another Chat.
+        **Ending a turn** is the session-scoped operation (ADR-031 §6); this
+        one is not, and it writes no status, so it can never mislabel the
+        conversation it displaced.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        prior = MagicMock()
+        prior.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="another-chat", task=prior
+        )
+
+        response = rt.client.post(
+            "/api/v4/process_request", json=self._payload()
+        )
+
+        assert response.status_code == 200
+        prior.cancel.assert_called_once_with()
+        rt.store.update_plan.assert_not_awaited()
 
     def test_the_rehearsed_closing_task_arms_its_sop_lookup(self, rt, monkeypatch):
         rt.store.get_team_by_id.return_value = MagicMock()
@@ -818,7 +973,7 @@ class TestTheIdentityBoundaryGate:
     Two-class margin and the fail-closed rule are all the production code.
     """
 
-    PERSONAL = "my name is Tanya, how much PTO do I have?"
+    PERSONAL = "my name is Clara, how much PTO do I have?"
     STORE = "How do I close the store?"
 
     def _post(self, rt, description):
@@ -908,7 +1063,7 @@ class TestTheIdentityBoundaryGate:
         """
         rt.client.patch(
             "/api/v4/session_state/sess-1",
-            json={"identity": {"display_name": "Tanya Reyes"}},
+            json={"identity": {"display_name": "Clara Reyes"}},
         )
 
         resp = self._post(rt, self.PERSONAL)
@@ -938,7 +1093,7 @@ class TestTheMockedUnlock:
     anybody is signed in, which is the whole of the closing beat.
     """
 
-    PERSONAL = "my name is Tanya, how much PTO do I have?"
+    PERSONAL = "my name is Clara, how much PTO do I have?"
     STORE = "How do I close the store?"
 
     def _sign_in(self, rt, display_name=None):
@@ -1158,8 +1313,8 @@ class TestPerRequestPlanReview:
             .call_args.kwargs["plan_review"]
         )
 
-    def _eagerly_built_workflow(self, rt, plan_review=True):
-        """What /init_team leaves in the Workflow cache before any task.
+    def _cached_workflow(self, rt, plan_review=True):
+        """A Workflow left in the cache by an earlier request.
 
         The manager is mocked, so it is wired here to do what the real one does
         on a rebuild — install the new Workflow in the cache — otherwise the
@@ -1196,6 +1351,25 @@ class TestPerRequestPlanReview:
 
     def test_a_fast_lane_request_turns_the_approval_gate_off(self, rt):
         assert self._post(rt, lane="fast").status_code == 200
+        assert self._plan_review_passed(rt) is False
+
+    def test_a_fast_lane_first_request_builds_once_for_its_declared_lane(self, rt):
+        """Team attachment does not pre-build a Deliberate Workflow.
+
+        This crosses both HTTP routes through the real router: the initialization
+        response must not build anything, and the first Fast-lane question then
+        makes the one Workflow build with Plan review off.
+        """
+        current_team = MagicMock()
+        current_team.team_id = "team-abc"
+        rt.store.get_current_team.return_value = current_team
+        rt.team_service.get_team_configuration.return_value = MagicMock()
+
+        assert rt.client.get("/api/v4/init_team").status_code == 200
+        rt.orchestration_manager.get_current_or_new_orchestration.assert_not_awaited()
+
+        assert self._post(rt, lane="fast").status_code == 200
+        assert rt.orchestration_manager.get_current_or_new_orchestration.await_count == 1
         assert self._plan_review_passed(rt) is False
 
     def test_an_authored_ticket_status_inquiry_turns_the_approval_gate_off(self, rt):
@@ -1257,24 +1431,23 @@ class TestPerRequestPlanReview:
         assert self._post(rt).json()["lane"] == "fast"
         assert self._post(rt, lane="deliberate").json()["lane"] == "deliberate"
 
-    def test_the_first_request_after_a_page_load_is_not_served_the_eager_workflow(
+    def test_a_fast_lane_request_replaces_a_cached_deliberate_workflow(
         self, rt
     ):
         """The Workflow cache fix, at the endpoint.
 
-        /init_team eagerly builds a Workflow with Plan review on before any
-        task is submitted. Without the fix the very first Fast lane request
-        reuses it and silently runs in the Deliberate lane.
+        A Workflow from an earlier Deliberate request cannot be reused for a
+        Fast-lane request: its Plan review value is part of the cache predicate.
         """
-        cache = self._eagerly_built_workflow(rt, plan_review=True)
-        eager = cache["current"]
+        cache = self._cached_workflow(rt, plan_review=True)
+        cached = cache["current"]
 
         assert self._post(rt, lane="fast").status_code == 200
 
         rt.orchestration_manager.get_current_or_new_orchestration.assert_awaited()
         assert self._plan_review_passed(rt) is False
         # The stale Workflow is gone from the cache, replaced by a Fast lane one
-        assert cache["current"] is not eager
+        assert cache["current"] is not cached
         assert cache["current"]._plan_review is False
 
     def test_a_workflow_already_built_for_this_lane_is_reused(self, rt):
@@ -1283,7 +1456,7 @@ class TestPerRequestPlanReview:
         Together with the test above this isolates the Plan review term — the
         two differ in nothing but the lane the cached Workflow was built for.
         """
-        cache = self._eagerly_built_workflow(rt, plan_review=False)
+        cache = self._cached_workflow(rt, plan_review=False)
         cached = cache["current"]
 
         assert self._post(rt, lane="fast").status_code == 200
@@ -1328,9 +1501,9 @@ class TestSessionState:
         assert body["lane"] is None
 
     def test_a_written_identity_survives_the_reload(self, rt):
-        assert self._patch(rt, {"identity": {"display_name": "Tanya"}}).status_code == 200
+        assert self._patch(rt, {"identity": {"display_name": "Clara"}}).status_code == 200
 
-        assert self._get(rt).json()["identity"]["display_name"] == "Tanya"
+        assert self._get(rt).json()["identity"]["display_name"] == "Clara"
 
     def test_a_written_lane_survives_the_reload(self, rt):
         self._patch(rt, {"lane": "fast"})
@@ -1339,23 +1512,23 @@ class TestSessionState:
 
     def test_writing_one_field_leaves_the_other_alone(self, rt):
         """Two surfaces write this record and neither may erase the other."""
-        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": {"display_name": "Clara"}})
         self._patch(rt, {"lane": "fast"})
 
         body = self._get(rt).json()
-        assert body["identity"]["display_name"] == "Tanya"
+        assert body["identity"]["display_name"] == "Clara"
         assert body["lane"] == "fast"
 
     def test_signing_out_returns_to_the_anonymous_state(self, rt):
         """An explicit null clears; it is a write, not the absence of one."""
-        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": {"display_name": "Clara"}})
         self._patch(rt, {"identity": None})
 
         assert self._get(rt).json()["identity"]["display_name"] is None
 
     def test_one_session_cannot_read_another_sessions_state(self, rt):
         """The record is partitioned by session, observed through the route."""
-        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": {"display_name": "Clara"}})
 
         other = self._get(rt, session_id="sess-2").json()
         assert other["identity"]["display_name"] is None
@@ -1364,7 +1537,7 @@ class TestSessionState:
         """Records in this container carry their owner and reads are scoped by
         it, so a session identifier alone does not unlock somebody else's
         session — the gate would otherwise admit on a borrowed record."""
-        self._patch(rt, {"identity": {"display_name": "Tanya"}})
+        self._patch(rt, {"identity": {"display_name": "Clara"}})
         rt.get_user.return_value = {"user_principal_id": "user-2"}
 
         assert self._get(rt).json()["identity"]["display_name"] is None
@@ -1387,7 +1560,7 @@ class TestSessionState:
 # /process_request — reading and writing session state (issue #20)
 # ---------------------------------------------------------------------------
 class TestProcessRequestUsesSessionState:
-    PERSONAL = "my name is Tanya, how much PTO do I have?"
+    PERSONAL = "my name is Clara, how much PTO do I have?"
 
     def _post(self, rt, description="how do I close the store?", **body):
         rt.store.get_team_by_id.return_value = MagicMock()
@@ -1413,7 +1586,7 @@ class TestProcessRequestUsesSessionState:
         """Signing in on one device is not signing in on the shared one."""
         rt.client.patch(
             "/api/v4/session_state/sess-other",
-            json={"identity": {"display_name": "Tanya Reyes"}},
+            json={"identity": {"display_name": "Clara Reyes"}},
         )
 
         assert self._post(rt, description=self.PERSONAL).status_code == 403
@@ -1427,7 +1600,7 @@ class TestProcessRequestUsesSessionState:
         """
         rt.client.patch(
             "/api/v4/session_state/sess-1",
-            json={"identity": {"display_name": "Tanya Reyes"}},
+            json={"identity": {"display_name": "Clara Reyes"}},
         )
         rt.store.get_item_by_id = AsyncMock(side_effect=Exception("cosmos is down"))
 
@@ -1456,7 +1629,7 @@ class TestPlanApproval:
         assert resp.status_code == 401
 
     def test_approved_recorded(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
         plan = MagicMock()
         plan.session_id = "sess-1"
         rt.store.get_plan_by_plan_id.return_value = plan
@@ -1466,12 +1639,63 @@ class TestPlanApproval:
         rt.orchestration_config.set_approval_result.assert_called_once()
 
     def test_rejected_recorded(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+        rt.orchestration_config.approvals = {"m-1": None}
         rt.store.get_plan_by_plan_id.return_value = None
         resp = rt.client.post(
-            "/api/v4/plan_approval", json=self._payload(approved=False)
+            "/api/v4/plan_approval",
+            json=self._payload(approved=False, feedback="Ask Marcus instead."),
         )
         assert resp.status_code == 200
+
+    def test_send_back_carries_the_feedback_to_the_waiting_review(self, rt):
+        # The verdict the orchestration is blocked on is "revise with this",
+        # not "reject" — so the feedback travels with it (#108).
+        rt.orchestration_config.approvals = {"m-1": None}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval",
+            json=self._payload(approved=False, feedback="Ask Marcus instead."),
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "revision requested"
+        rt.orchestration_config.set_approval_result.assert_called_once_with(
+            "m-1", False, feedback="Ask Marcus instead."
+        )
+
+    def test_send_back_requires_the_associate_to_say_what_they_would_change(self, rt):
+        rt.orchestration_config.approvals = {"m-1": None}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval",
+            json=self._payload(approved=False, feedback="  "),
+        )
+
+        assert resp.status_code == 422
+        rt.orchestration_config.set_approval_result.assert_not_called()
+
+    def test_approval_needs_no_feedback(self, rt):
+        rt.orchestration_config.approvals = {"m-1": None}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval", json=self._payload(approved=True, feedback=None)
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "approval recorded"
+
+    def test_a_second_verdict_on_an_approved_plan_changes_nothing(self, rt):
+        rt.orchestration_config.approvals = {"m-1": True}
+
+        resp = rt.client.post(
+            "/api/v4/plan_approval",
+            json=self._payload(approved=False, feedback="Ask Marcus instead."),
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "verdict already recorded"
+        rt.orchestration_config.set_approval_result.assert_not_called()
+        rt.plan_service.handle_plan_approval.assert_not_called()
 
     def test_no_active_plan(self, rt):
         # The 404 raised in the else-branch is caught by the surrounding
@@ -1480,17 +1704,28 @@ class TestPlanApproval:
         resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
         assert resp.status_code == 500
 
-    def test_plan_service_value_error(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+    def test_plan_service_value_error_leaves_the_verdict_pending(self, rt):
+        rt.orchestration_config.approvals = {"m-1": None}
         rt.plan_service.handle_plan_approval = AsyncMock(side_effect=ValueError("bad"))
         resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
-        assert resp.status_code == 200
+        assert resp.status_code == 500
+        rt.orchestration_config.set_approval_result.assert_not_called()
 
-    def test_plan_service_generic_error(self, rt):
-        rt.orchestration_config.approvals = {"m-1": True}
+    def test_plan_service_generic_error_leaves_the_verdict_pending(self, rt):
+        rt.orchestration_config.approvals = {"m-1": None}
         rt.plan_service.handle_plan_approval = AsyncMock(side_effect=Exception("boom"))
         resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
-        assert resp.status_code == 200
+        assert resp.status_code == 500
+        rt.orchestration_config.set_approval_result.assert_not_called()
+
+    def test_a_persistence_failure_leaves_the_verdict_pending(self, rt):
+        rt.orchestration_config.approvals = {"m-1": None}
+        rt.plan_service.handle_plan_approval = AsyncMock(return_value=False)
+
+        resp = rt.client.post("/api/v4/plan_approval", json=self._payload())
+
+        assert resp.status_code == 500
+        rt.orchestration_config.set_approval_result.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1574,6 +1809,217 @@ class TestUserClarification:
         rt.orchestration_config.clarifications = {}
         resp = rt.client.post("/api/v4/user_clarification", json=self._payload())
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# /user_clarification — the Identity boundary gate (issue #115, ADR-034)
+# ---------------------------------------------------------------------------
+class TestTheIdentityBoundaryGateOnTheClarificationSeam:
+    """The gate on the second route an associate's words take in.
+
+    Same real gate as ``TestTheIdentityBoundaryGate`` — the real keyword fast
+    path, the real Two-class margin, the real fail-closed rule, with only the
+    embedding deployment stood in for — driven through the route the message
+    box posts an answer to. Until ADR-034 the gate was called once, inside
+    ``process_request``, so a personal question typed into the box the agent
+    opened reached the orchestration ungated.
+    """
+
+    PERSONAL = "actually, while you're there, how much PTO do I have?"
+    IN_SCOPE = "I reset the brewer and checked the water line"
+
+    def _pending(self, rt, session_id="sess-1"):
+        """A **Clarification** the orchestration is waiting on.
+
+        The plan carries the session, because that is where the gate's
+        **Session identity** comes from on this seam — the answer's payload
+        names a `request_id` and a `plan_id`, never a session.
+        """
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        rt.orchestration_config.clarifications = {"r-1": True}
+        rt.store.get_plan_by_plan_id = AsyncMock(
+            return_value=SimpleNamespace(session_id=session_id, id="p-1")
+        )
+
+    def _answer(self, rt, answer):
+        return rt.client.post(
+            "/api/v4/user_clarification",
+            json={"request_id": "r-1", "answer": answer, "plan_id": "p-1"},
+        )
+
+    def test_a_personal_answer_is_refused_as_a_policy_block(self, rt):
+        """The defect ADR-034 records, at the seam it was found on."""
+        self._pending(rt)
+
+        resp = self._answer(rt, self.PERSONAL)
+
+        assert resp.status_code == 403
+        detail = resp.json()["detail"]
+        assert detail["kind"] == "policy_block"
+        assert detail["code"] == "identity_boundary"
+        assert detail["message"] == IDENTITY_BOUNDARY_REFUSAL
+
+    def test_the_refusal_settles_nothing(self, rt):
+        """A refused answer is not an answer.
+
+        Everything that consumes the **Clarification** is below the gate, so
+        the orchestration is still waiting — which is what keeps a refusal out
+        of the 300-second timeout (#87) instead of ending the turn.
+        """
+        self._pending(rt)
+
+        self._answer(rt, self.PERSONAL)
+
+        rt.orchestration_config.set_clarification_result.assert_not_called()
+        rt.plan_service.handle_human_clarification.assert_not_awaited()
+
+    def test_the_refusal_consumes_no_part_of_the_questions_lifetime(self, rt):
+        """It neither answers the question nor ends it.
+
+        Asserted as the *absence* of any call into the orchestration rather
+        than as the absence of one particular call, because "nothing about the
+        pending clarification is touched" is the property — a refusal that
+        reset the question's clock would be as wrong as one that answered it.
+        """
+        self._pending(rt)
+        rt.orchestration_config.reset_mock()
+
+        self._answer(rt, self.PERSONAL)
+
+        assert rt.orchestration_config.method_calls == []
+
+    def test_the_clarification_is_still_pending_and_still_answerable(self, rt):
+        """The box stays open, so the next answer lands on the same question.
+
+        The refusal is a refusal of *those words*, not a verdict on the turn,
+        so the associate answers again against the same `request_id`.
+        """
+        self._pending(rt)
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+        resp = self._answer(rt, self.IN_SCOPE)
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "clarification recorded"
+        rt.orchestration_config.set_clarification_result.assert_called_once_with(
+            "r-1", self.IN_SCOPE
+        )
+
+    def test_the_safety_check_agent_is_never_created_for_a_refused_answer(self, rt):
+        """`rai_success` instantiates an agent, so the gate runs above it —
+        the same ordering the request path holds, for the same reason."""
+        self._pending(rt)
+
+        self._answer(rt, self.PERSONAL)
+
+        rt.rai_success.assert_not_awaited()
+
+    def test_it_refuses_before_the_team_is_even_resolved(self, rt):
+        """Ordering, asserted through a failure that would otherwise win: a
+        team this route cannot resolve is a 400, so a 403 here means the gate
+        genuinely ran first."""
+        self._pending(rt)
+        rt.store.get_current_team = AsyncMock(return_value=None)
+        rt.store.get_team_by_id = AsyncMock(return_value=None)
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+    def test_a_paraphrase_with_no_personal_vocabulary_is_still_refused(self, rt):
+        """The similarity tier, through the seam the chips and the box share."""
+        self._pending(rt)
+        paraphrase = "am I working tomorrow evening?"
+        rt.embedder.personal_texts.add(paraphrase)
+
+        assert self._answer(rt, paraphrase).status_code == 403
+
+    def test_a_gate_that_cannot_score_refuses(self, rt, monkeypatch):
+        """Fail closed on this seam too, all the way out to the response."""
+        self._pending(rt)
+
+        async def broken(_texts):
+            raise RuntimeError("the embedding deployment is unreachable")
+
+        monkeypatch.setattr(rt.gate, "_embed", broken)
+
+        assert self._answer(rt, self.IN_SCOPE).status_code == 403
+
+    def test_an_in_scope_answer_is_unaffected(self, rt):
+        """The guardrail must not make the troubleshooting beat unanswerable."""
+        self._pending(rt)
+
+        resp = self._answer(rt, self.IN_SCOPE)
+
+        assert resp.status_code == 200
+        rt.orchestration_config.set_clarification_result.assert_called_once_with(
+            "r-1", self.IN_SCOPE
+        )
+
+    def test_the_mocked_unlock_admits_a_previously_refused_answer(self, rt):
+        """The **Mocked unlock** is a parameter of the gate, not a second gate,
+        so it reaches this seam by reaching the gate — and the identity comes
+        from the session the *plan* names, because the answer names none."""
+        self._pending(rt)
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+        rt.client.post("/api/v4/session_state/sess-1/sign_in", json={})
+        resp = self._answer(rt, self.PERSONAL)
+
+        assert resp.status_code == 200
+        rt.orchestration_config.set_clarification_result.assert_called_once_with(
+            "r-1", self.PERSONAL
+        )
+
+    def test_a_name_in_another_session_does_not_unlock_this_one(self, rt):
+        """Signing in on one device is not signing in on the shared one, and
+        the plan's session is the only one this answer can be read against."""
+        self._pending(rt, session_id="sess-1")
+        rt.client.post("/api/v4/session_state/sess-other/sign_in", json={})
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+    def test_a_plan_that_names_no_session_is_anonymous(self, rt):
+        """Anonymous is the refusing state, so an answer the route cannot
+        resolve a session for refuses rather than admits."""
+        self._pending(rt)
+        rt.store.get_plan_by_plan_id = AsyncMock(return_value=None)
+        rt.client.post("/api/v4/session_state/sess-1/sign_in", json={})
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+    def test_an_unreadable_session_record_refuses_rather_than_admits(self, rt):
+        """An infrastructure failure is not a reason to admit a personal
+        question — the same fail-closed rule the request path holds."""
+        self._pending(rt)
+        rt.client.post("/api/v4/session_state/sess-1/sign_in", json={})
+        rt.store.get_item_by_id = AsyncMock(side_effect=Exception("cosmos is down"))
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
+
+    def test_a_blank_answer_is_not_put_to_the_gate(self, rt):
+        """There are no words in it to refuse, and the content-safety check
+        directly below skips a blank answer for the same reason."""
+        self._pending(rt)
+
+        resp = self._answer(rt, "   ")
+
+        assert resp.status_code == 200
+        rt.orchestration_config.set_clarification_result.assert_called_once_with(
+            "r-1", "   "
+        )
+
+    def test_a_personal_answer_to_a_question_nobody_asked_is_still_refused(self, rt):
+        """The gate refuses the *words*, so it runs before the route decides
+        whether there is a question for them to answer.
+
+        A 404 here would say "no active plan found" about a request the
+        boundary had already declined, and would put the cheapest refusal in
+        the route behind a lookup it does not need.
+        """
+        self._pending(rt)
+        rt.orchestration_config.clarifications = {}
+
+        assert self._answer(rt, self.PERSONAL).status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -1949,6 +2395,164 @@ class TestDeleteChat:
         self._reports(rt, ChatDeletion.swept(deleted=1, failed=0))
 
         rt.store.delete_plan_by_plan_id.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# POST /chats/{session_id}/end_turn
+# ---------------------------------------------------------------------------
+class TestEndingATurn:
+    """The end-of-turn primitive, at the route (#120, ADR-031).
+
+    The net-new endpoint ADR-031 names as a cost of its decisions 1, 3 and 6:
+    nothing session-scoped could say *"end this Chat's turn"*, only the
+    destructive `/plan_approval` rejection and the implicit per-user cancel
+    inside `process_request`. **Leaving a Chat** reaches the primitive through
+    here.
+    """
+
+    def _plan(self, status=None, session_id="sess-1"):
+        return SimpleNamespace(
+            id="plan-1",
+            plan_id="plan-1",
+            session_id=session_id,
+            overall_status=status or "in_progress",
+        )
+
+    def _end(self, rt, session_id="sess-1"):
+        return rt.client.post(f"/api/v4/chats/{session_id}/end_turn")
+
+    def test_no_user(self, rt):
+        _no_user(rt)
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 400
+        rt.store.update_plan.assert_not_awaited()
+
+    def test_the_chats_record_is_written_canceled(self, rt):
+        # `PlanStatus.canceled` made producible for the first time (ADR-031
+        # §1). It sat in the settled-status set, its frontend mirror and the
+        # chat state label while nothing in `src/backend` could write it.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ended"
+        written = rt.store.update_plan.await_args.args[0]
+        assert written.overall_status == "canceled"
+
+    def test_the_chats_orchestration_is_cancelled(self, rt):
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        task = MagicMock()
+        task.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="sess-1", task=task
+        )
+
+        resp = self._end(rt)
+
+        task.cancel.assert_called_once_with()
+        assert resp.json()["cancelled"] is True
+
+    def test_a_turn_running_for_another_chat_is_left_running(self, rt):
+        # ADR-031 §6. The registry is keyed by `user_id` and `process_request`
+        # deliberately cancels across sessions on that key; ending a turn is
+        # the case where that would be wrong. One associate, one tab, one live
+        # turn is true in rehearsal, which is why this would surface once, in
+        # front of an audience.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        task = MagicMock()
+        task.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="sess-2", task=task
+        )
+
+        resp = self._end(rt)
+
+        task.cancel.assert_not_called()
+        assert resp.json()["cancelled"] is False
+
+    def test_only_the_named_chat_is_read(self, rt):
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+
+        self._end(rt, session_id="sess-9")
+
+        rt.store.get_plan_by_session.assert_awaited_once_with("sess-9", plan_id=None)
+
+    def test_a_store_that_cannot_answer_is_not_a_chat_that_is_not_there(self, rt):
+        # An outage arriving as 404 would be a lie with a cost: the surface
+        # would tell the associate the Chat is gone while its record sits at
+        # `in_progress`, unclearable — the **Abandoned turn** this route exists
+        # to end. 500 says what happened, and the turn is left exactly as it
+        # was found for the caller to try again.
+        rt.store.get_plan_by_session = AsyncMock(
+            side_effect=RuntimeError("Cosmos is unavailable")
+        )
+        task = MagicMock()
+        task.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="sess-1", plan_id="plan-1", task=task
+        )
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 500
+        task.cancel.assert_not_called()
+        rt.store.update_plan.assert_not_awaited()
+
+    @pytest.mark.parametrize("settled", ["completed", "failed", "canceled"])
+    def test_a_chat_that_already_settled_keeps_the_status_it_reached(
+        self, rt, settled
+    ):
+        # A turn that finished a moment before the associate left keeps saying
+        # `Completed`. Replacing a status that lied in one direction with one
+        # that lies in the other is not a fix.
+        rt.store.get_plan_by_session = AsyncMock(
+            return_value=self._plan(status=settled)
+        )
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "already_settled"
+        rt.store.update_plan.assert_not_awaited()
+
+    def test_a_session_with_no_chat_is_not_found(self, rt):
+        rt.store.get_plan_by_session = AsyncMock(return_value=None)
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 404
+        rt.store.update_plan.assert_not_awaited()
+
+    def test_ending_a_turn_is_never_a_verdict_on_a_plan(self, rt):
+        # ADR-031 §2. #108 gave `approved: false` the meaning *"send it
+        # back"*, so an end-of-turn that reached the approval path would file a
+        # revision request nobody wrote — and before #108 it deleted the Plan
+        # record outright, taking the conversation out of the history.
+        rt.store.get_plan_by_session = AsyncMock(
+            return_value=self._plan(status="approved")
+        )
+        rt.store.delete_plan_by_plan_id = AsyncMock()
+        rt.orchestration_config.approvals = {"m-1": None}
+
+        resp = self._end(rt)
+
+        assert resp.status_code == 200
+        rt.plan_service.handle_plan_approval.assert_not_awaited()
+        rt.orchestration_config.set_approval_result.assert_not_called()
+        rt.store.delete_plan_by_plan_id.assert_not_awaited()
+
+    def test_the_store_is_reached_as_this_user(self, rt):
+        # The `user_id` predicate lives in the store and is taken from the
+        # client it was built for. A session id is not a secret, and this route
+        # takes one from the caller.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+
+        self._end(rt)
+
+        rt.database_factory.get_database.assert_awaited_with(user_id="user-1")
 
 
 # ---------------------------------------------------------------------------

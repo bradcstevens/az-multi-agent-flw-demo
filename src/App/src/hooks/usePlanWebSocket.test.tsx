@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import React, { StrictMode } from 'react';
-import { render, waitFor, act, screen } from '@testing-library/react';
+import { render, waitFor, act, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 
@@ -22,6 +22,11 @@ import streamingReducer from '@/store/slices/streamingSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
 import { useAppSelector } from '@/store/hooks';
+import {
+    selectSettledReply,
+    selectStreamedReply,
+} from '@/store/slices/streamingSlice';
+import { selectAgentMessages } from '@/store/slices/chatSlice';
 import PlanChat from '@/components/content/PlanChat';
 
 /**
@@ -56,6 +61,9 @@ const Host = ({
     });
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const planApprovalRequest = useAppSelector(selectPlanApprovalRequest);
+    const streamedReply = useAppSelector(selectStreamedReply);
+    const settledReply = useAppSelector(selectSettledReply);
+    const agentMessages = useAppSelector(selectAgentMessages);
     const ref = React.useRef<HTMLDivElement>(null);
     return (
         <PlanChat
@@ -68,9 +76,9 @@ const Host = ({
             planApprovalRequest={planApprovalRequest}
             messagesContainerRef={ref as never}
             finalResultRef={ref as never}
-            streamingMessageBuffer=""
-            showBufferingText={false}
-            agentMessages={[]}
+            streamedReply={streamedReply}
+            settledReply={settledReply}
+            agentMessages={agentMessages}
             showProcessingPlanSpinner={showProcessingPlanSpinner}
             processingElapsedSeconds={0}
             showApprovalButtons={false}
@@ -293,6 +301,89 @@ describe('the agent that is responding, named from the frame that names it', () 
     });
 });
 
+describe('a streamed specialist reply in the conversation', () => {
+    it('renders each chunk in the reply, then lets the complete result replace it and announce once', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Store SOP Agent',
+                    content: 'Begin by cashing up the tills.',
+                    is_final: false,
+                }),
+            );
+        });
+
+        await screen.findByText('Begin by cashing up the tills.');
+        expect(inFlightIndicators()).toHaveLength(0);
+        expect(screen.queryByText('AI Thinking Process')).not.toBeInTheDocument();
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Store SOP Agent',
+                    content: '',
+                    is_final: true,
+                }),
+            );
+        });
+
+        expect(store.getState().streaming.isReplyComplete).toBe(true);
+
+        act(() => {
+            socket.deliver(
+                frame('final_result_message', {
+                    content: 'Follow the complete store closing checklist.',
+                    status: 'completed',
+                }),
+            );
+        });
+
+        await waitFor(() =>
+            expect(screen.getAllByText('Follow the complete store closing checklist.')).not.toHaveLength(0),
+        );
+        expect(screen.queryByText('Begin by cashing up the tills.')).not.toBeInTheDocument();
+        expect(
+            screen.getAllByRole('status').filter(
+                (element) => element.textContent === 'Follow the complete store closing checklist.',
+            ),
+        ).toHaveLength(1);
+    });
+
+    it('starts a new preview when the same specialist begins another completed stream', async () => {
+        const { store } = renderHost('plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Store SOP Agent',
+                    content: 'The first answer.',
+                    is_final: true,
+                }),
+            );
+        });
+        await screen.findByText('The first answer.');
+
+        act(() => {
+            socket.deliver(
+                frame('agent_message_streaming', {
+                    agent_name: 'Store SOP Agent',
+                    content: 'The next answer.',
+                    is_final: false,
+                }),
+            );
+        });
+
+        await screen.findByText('The next answer.');
+        expect(screen.queryByText('The first answer.')).not.toBeInTheDocument();
+        expect(store.getState().streaming.isReplyComplete).toBe(false);
+    });
+});
+
 describe('a final result arriving on the socket', () => {
     const deliverFinalResult = (socket: FakeSocket, status: string) => {
         act(() => {
@@ -412,5 +503,151 @@ describe('a plan approval arriving on the wire', () => {
             expect(screen.getAllByText('Read the closing checklist')).toHaveLength(1);
         });
         expect(screen.getAllByRole('heading', { name: 'Plan Overview' })).toHaveLength(1);
+    });
+
+    it('shows person steps as requests in their declared order', async () => {
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('plan_approval_request', {
+                    plan: {
+                        user_request: 'Swap my Saturday shift with Marcus Bell',
+                        steps: [
+                            {
+                                id: 1,
+                                action: 'Check the swap procedure',
+                                assignee: { kind: 'agent', name: 'Workforce Agent' },
+                                waitsOn: null,
+                            },
+                            {
+                                id: 2,
+                                action: 'Confirm the request',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'You',
+                                    relation: 'associate',
+                                    simulated: false,
+                                },
+                                waitsOn: 1,
+                            },
+                            {
+                                id: 3,
+                                action: 'Ask Marcus Bell to take the shift',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Marcus Bell',
+                                    relation: 'peer',
+                                    simulated: true,
+                                },
+                                waitsOn: 2,
+                            },
+                            {
+                                id: 4,
+                                action: 'Ask Dana Reyes to approve the swap',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Dana Reyes',
+                                    relation: 'manager',
+                                    simulated: true,
+                                },
+                                waitsOn: 3,
+                            },
+                        ],
+                    },
+                }),
+            );
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('Person step')).toHaveLength(3);
+            expect(screen.getByText('You are asked to confirm this request.')).toBeInTheDocument();
+            expect(
+                screen.getByText('Marcus Bell gets a message. Marcus Bell can say no.'),
+            ).toBeInTheDocument();
+            expect(
+                screen.getByText('Dana Reyes gets a message. Dana Reyes can say no.'),
+            ).toBeInTheDocument();
+        });
+
+        expect(screen.getAllByText(/is asked next/).map((element) => element.textContent)).toEqual([
+            'Marcus Bell, the associate you named, is asked next.',
+            'Dana Reyes, your shift lead, is asked next.',
+        ]);
+        expect(inFlightIndicators()).toHaveLength(0);
+    });
+
+    it('names every person the plan reaches inside the plan step list itself', async () => {
+        // The **Demo validator** grades this beat by looking for the invented
+        // colleagues by name, and the only honest place to look is the plan's
+        // own steps. Searching the conversation column instead matches the
+        // request line, the prose and every ancestor of each — a beat that goes
+        // red for a reason that is not the beat.
+        const { store } = renderHost('plan-1');
+        askAQuestion(store, 'plan-1');
+        const socket = await openedOnTheResponse('plan-1');
+
+        act(() => {
+            socket.deliver(
+                frame('plan_approval_request', {
+                    plan: {
+                        user_request:
+                            'Marcus Bell and I have agreed to swap our Saturday shifts. Start the swap.',
+                        steps: [
+                            {
+                                id: 1,
+                                action: 'Check the swap procedure for this store',
+                                assignee: { kind: 'agent', name: 'Workforce Agent' },
+                                waitsOn: null,
+                            },
+                            {
+                                id: 2,
+                                action: 'Confirm you want the agreed Saturday swap to proceed',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'You',
+                                    relation: 'associate',
+                                    simulated: false,
+                                },
+                                waitsOn: 1,
+                            },
+                            {
+                                id: 3,
+                                action: 'Ask Marcus Bell to confirm the agreed swap',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Marcus Bell',
+                                    relation: 'peer',
+                                    simulated: true,
+                                },
+                                waitsOn: 2,
+                            },
+                            {
+                                id: 4,
+                                action: 'Ask Dana Reyes to approve the swap',
+                                assignee: {
+                                    kind: 'person',
+                                    name: 'Dana Reyes',
+                                    relation: 'manager',
+                                    simulated: true,
+                                },
+                                waitsOn: 3,
+                            },
+                        ],
+                    },
+                }),
+            );
+        });
+
+        const steps = await screen.findByTestId('reviewable-plan-steps');
+
+        for (const person of ['You', 'Marcus Bell', 'Dana Reyes']) {
+            expect(
+                within(steps).getAllByText(new RegExp(person)),
+                `the plan step list never names ${person}`,
+            ).not.toHaveLength(0);
+        }
     });
 });

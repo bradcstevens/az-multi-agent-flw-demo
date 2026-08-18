@@ -151,6 +151,19 @@ caller is known — above the team lookup, above `rai_success` and above the orc
 because the content-safety check instantiates an agent and a refusal that paid for one would
 falsify the cost claim. See [ADR-014](docs/ADR/014-deterministic-identity-boundary-gate.md) and
 [ADR-015](docs/ADR/015-two-class-margin-for-the-identity-boundary-gate.md).
+
+**It covers both routes an associate's words take in** ([ADR-034](docs/ADR/034-the-identity-boundary-gate-covers-the-clarification-seam.md),
+#115). `/v4/user_clarification` evaluates it too, on the answer, against the identity resolved for
+the session the *plan* names — the answer names a `request_id` and a `plan_id` and never a session.
+It sits in the same place on that route and for the same reasons: above the team lookup, above
+`rai_success`, and above everything that settles the question. Until #115 the gate was called once,
+inside `process_request`, so **every** answer typed into the box the agent opened reached the
+orchestration ungated, and the store pack's authored-strings assertion was standing in for a
+runtime check that did not exist. A refusal there consumes **nothing** — the **Clarification**
+stays *pending* with the box *open*, because a refused answer is not an answer and the agent is
+still waiting on one, which is also what keeps a refusal out of the 300-second timeout instead of
+resuming on *"No response received from user (timeout)."* A blank answer is not put to the gate,
+exactly as it is not put to the content-safety check: there are no words in it to refuse.
 _Avoid_: guardrail prompt, scope prompt, content filter
 
 **Keyword fast path** — the gate's first tier (`src/backend/guardrail/keywords.py`): pure HR and
@@ -233,13 +246,48 @@ an accurate label rather than under a claim to still be working. Not a turn that
 whose loss the surface went on denying.
 _Avoid_: orphaned plan, stuck plan, stale chat
 
+**Ending a turn** — the one primitive behind every end-of-turn behaviour, with one declaration in
+`src/backend/chat/turn.py` and one route, `POST /api/v4/chats/{session_id}/end_turn` (#120,
+[ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md)). It cancels the in-flight orchestration for
+**one session** and writes `canceled` onto that session's **Plan record**. **Leaving a Chat**,
+deleting a running Chat and an expired **Clarification** all reach it, and they reach *it* rather
+than each growing a copy of the cancellation flow.
+
+Three properties are the whole of it. It is **session-scoped**: the turn registry records which Chat
+its task belongs to, so a turn running for another conversation is left running — the registry is
+keyed by `user_id`, and the request path deliberately cancels across sessions on that key, because
+the Workflow is cached per user. It **never overwrites a Settled status**, deciding by the same
+fail-closed `is_running` **Chat deletion** refuses on, so a Chat that reached `completed` a moment
+earlier keeps saying so. And it is **never a verdict on a plan**: nothing here reaches the approval
+path, including for a **Reviewable plan** awaiting one, because ending is not rejecting and
+`approved: false` means *"send it back"*. A cancelled task raises out of its own approval wait,
+which is how the waiting review learns the turn is over.
+
+It **names what already happens** rather than adding behaviour, which is the discipline **Not
+reported vs measured** holds everywhere else: the turn was already destroyed, silently. A turn that
+ends *itself* — an expired **Clarification**, inside the orchestration task — is not cancelled, only
+recorded; cancelling there would raise before the write and leave the Chat at `in_progress`, which
+is the state the primitive exists to leave.
+
+The record is read **before** anything is cancelled, and it is *this turn's* record. Both are
+failures rather than preferences. Cancel first and a store outage — which the shared read reports as
+an empty result, identical to a session with no plan — destroys the orchestration, writes nothing,
+and manufactures the **Abandoned turn** the primitive exists to end; so this read goes to Cosmos raw
+and a store that cannot answer is a 500, not a 404. And a Chat holds more than one **Plan record**,
+so the turn registry records which one its task is answering: `process_request` writes a new Plan
+*before* it replaces the registry entry, and settling "the session's latest" in that window would
+cancel one turn and label another.
+_Avoid_: cancel the plan, plan cancellation, abort the request
+
 **Policy block** — a refusal by the Identity boundary gate. Rendered distinctly from a
 **retrieval miss** — an honest "that procedure is not in the library" — because conflating the two
 makes a governed refusal look like a bug. On the wire it is HTTP **403** with
 `detail.kind == "policy_block"` (`src/backend/guardrail/refusal.py`), which is what lets the
 frontend give it its own neutral surface instead of the error toast
 (`src/App/src/api/policyBlock.ts`). A retrieval miss is not a failed request at all — it arrives
-as an answer.
+as an answer. It comes back from **both** gated routes (ADR-034): a refused **Clarification**
+answer is the same 403 and the same `PolicyBlockNotice`, never the *"Failed to submit
+clarification"* toast, and it leaves the question pending and the box open.
 
 **Mocked unlock** — the post-"sign-in" state in which the Identity boundary gate admits the
 previously refused question and answers it from mocked data (#27). A parameter of the gate, not a
@@ -895,6 +943,15 @@ screen: it is Microsoft's published rate, not a measured bill.
 taking props so it can sit on **both** surfaces. It has to: the refusal happens on the home surface
 and the answers happen on the chat surface, while the meter's total spans both.
 
+Closed, it is a zero-width **Panel drawer** and its three panels **unmount** — hiding them would
+leave three section headings in the **Heading outline** with nothing behind them, which is #78's
+defect restated. Both containers obey one rule, `useTransparencyRailOpen`, because the home surface
+renders the rail bare and the chat surface wraps it in `.plan-panel-right`, which is where that
+column's width is declared: two readings of *is the drawer open* would leave the wrapper holding the
+width the rail had just given up. `models/panelDrawer.ts` carries the number, and the frontend loop
+reads `storeSurface.css` and fails if the component and the stylesheet ever release the drawer at
+different widths.
+
 **Presenter alert** — the R8 proactive shift-task message, triggered by a hidden backend route plus
 a keyboard chord and pushed over the existing WebSocket. No wall-clock timer. The route is
 `POST /api/v4/presenter/alert` with `include_in_schema=False` (#23) — hidden rather than
@@ -1009,13 +1066,22 @@ fail **closed**, mid-beat. It sits above the chat box and below the **Rehearsed 
 slot, not in the rail, which stacks *beneath* the conversation below the **Stacking breakpoint**.
 
 **A suggestion hides while a Clarification is pending**, and the chips take the slot — one control
-at a time, so the card yields, the tap answers, the chips go and the card returns. Today it does
-not: `FollowOnTask` reads no clarification state and `handleFollowOnTask` calls
-`submitTurnIntoSession` unconditionally, so a tap while the orchestration waits on an answer
-strands the turn that asked — the failure `turnModeFor` exists to prevent, one component over
+at a time, so the card yields, the tap answers, the chips go and the card returns (#131). The gate
+is `FollowOnTask`'s own, beside the chips' in `RehearsedReplies`, because a gate the caller owns is
+a gate the second caller forgets — and it is **one condition, not a second gating regime**: the card
+is otherwise ungated, as above. It used to read no clarification state at all, so a tap while the
+orchestration waited on an answer started a turn `process_request` cancelled the question with, and
+stranded the turn that asked — the failure `turnModeFor` exists to prevent, one component over
 (ADR-033). It follows that **a suggestion always submits a new turn and a Rehearsed reply always
 submits an answer**: neither is ever tappable at a moment when the other is what is wanted, so
-source, visibility and payload cannot disagree.
+source, visibility and payload cannot disagree. Asserted at the wire seam,
+`src/App/src/pages/oneControlAtATime.test.tsx` — a `user_clarification_request` frame driven through
+the socket service into the real conversation, over a plan payload driven through the real
+conversion, because whether the agent is waiting on an answer is a claim about what the backend
+asked and which controls a Chat was authored is a claim about the team it came back with. That
+second half is what found `convertTeamConfiguration` carrying `follow_on` and dropping
+`rehearsed_replies`: on the chat surface the chips had nothing to render, so the slot the card
+yielded would have been handed to nothing.
 
 The card is **unchanged** by **Resume** (#77, ADR-027) and is still the rehearsed path: it carries
 authored wording and a declared **Lane** and needs no keyboard. Both now go through one seam,
@@ -1038,10 +1104,13 @@ least one step (a denial records nothing, and a tap that records nothing looks e
 that worked), together they must reach `ESCALATION_AFTER` (or nobody is ever offered the ticket R4
 raises), each must be anchored in a runbook (or the memory changes no behaviour), and none may trip
 the **Identity boundary gate** — which, until
-[ADR-034](docs/ADR/034-the-identity-boundary-gate-covers-the-clarification-seam.md), nothing here
-enforced: the gate runs inside `process_request` alone, so an answer posted to
+[ADR-034](docs/ADR/034-the-identity-boundary-gate-covers-the-clarification-seam.md) and #115,
+nothing here enforced: the gate ran inside `process_request` alone, so an answer posted to
 `/v4/user_clarification` reached the orchestration ungated and that assertion stood in for a check
-that did not exist, over the authored strings and nothing typed. Resolved from the plan's own `initial_goal` rather than router
+that did not exist, over the authored strings and nothing typed. The runtime check exists now, on
+that route, for a typed answer and a tapped one alike; what the store pack still asserts is
+ADR-033's own rule, that a one-tap control's words are checked before the demo rather than judged
+on stage. Resolved from the plan's own `initial_goal` rather than router
 state, which does not survive a reload; a goal matching no prompt resolves to none, exactly as an
 edit gives up the declared **Lane**. The pending-clarification gate belongs to the component, not
 its caller, for the reason the approval seam owns submission in #22.
@@ -1341,9 +1410,10 @@ affordance entirely)
 be deleted. The rule is **total and fail-closed** — any other answer, including none, means running.
 It is held twice, in `src/backend/chat/deletion.py` and `src/App/src/models/chatDeletion.ts`, and
 the two copies are kept in agreement by `src/tests/ci/test_chat_deletion_contract.py`. `canceled`
-was unreachable until [ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md) gave **Leaving a
-Chat** the write, which is why the way out of `in_progress` is to end the turn and never to loosen
-this rule.
+was unreachable until [ADR-031](docs/ADR/031-leaving-a-chat-ends-its-turn.md) gave **Ending a turn**
+the write (#120), which is why the way out of `in_progress` is to end the turn and never to loosen
+this rule. That the status has a writer at all is asserted, in the same file: three places permitted
+and rendered a state the system could not produce, and one of them was this one.
 
 **It is written by the server that ended the turn, at the moment the turn ends**
 ([ADR-043](docs/ADR/043-the-server-settles-the-turn-it-ended.md)) — off the orchestration's own
@@ -1672,7 +1742,12 @@ behind `bash scripts/e2e-tests.sh`, and runs against **either** target — the d
 local one — from one set of specs, because two descriptions of the walkthrough will disagree. Its
 expectation is read out of the repository (the corpus manifest, the store pack, `storeSurface.ts`),
 never pinned in the spec, for the reason [ADR-019](docs/ADR/019-rebrand-the-sop-corpus-to-circle-k.md) taught one
-layer out: a check carrying its own copy passes a rebrand it never saw. See
+layer out: a check carrying its own copy passes a rebrand it never saw. It is **not** a declared
+loop and is not in `AGENTS.md`'s Feedback loops table
+([ADR-046](docs/ADR/046-the-feedback-loops-table-is-what-the-gate-runs.md)): the integration gate
+runs that table in a fresh worktree on a branch nothing has deployed, and the validator's first
+assertion is that the deployment *is* this commit, so gated there it is red before a browser opens.
+Run it deliberately, after deploying. See
 [docs/demo-validator.md](docs/demo-validator.md).
 _Avoid_: e2e test (the accelerator's own suite lived at `tests/e2e-test/`, drove an Entra login
 against the pre-rebrand surface, was wired into no workflow, and was deleted in #47)

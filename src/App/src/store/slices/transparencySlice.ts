@@ -11,7 +11,7 @@
  * things the backend refused to send.
  */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { RootState } from '../store';
+import type { AppDispatch, RootState } from '../store';
 
 import { PolicyBlock } from '@/api/policyBlock';
 import {
@@ -36,12 +36,33 @@ export interface TransparencyState {
     meter: MeterState;
     /** Proactive alerts, which are never replies. */
     alerts: PresenterAlert[];
+    /**
+     * Whether the **Transparency rail** is open (ADR-035).
+     *
+     * Redux only, and deliberately: a stored open state would make the Demo
+     * validator and the Stage driver order-dependent, and server-side **Session
+     * state** carries only what the client cannot re-derive.
+     *
+     * Default open, because closed-by-default would silently reverse #79 — the
+     * roster is on screen before a question is typed.
+     */
+    railExpanded: boolean;
+    /** The presenter's choice, which outranks automatic expansion for this conversation. */
+    railPinned: boolean;
+    /** Whether this conversation has already received its first valid `source_used` signal. */
+    railSourceUsed: boolean;
+    /** The Chat's Session that owns the conversation-scoped rail state. */
+    conversationId: string | null;
 }
 
 const initialState: TransparencyState = {
     source: null,
     meter: emptyMeter(),
     alerts: [],
+    railExpanded: true,
+    railPinned: false,
+    railSourceUsed: false,
+    conversationId: null,
 };
 
 const transparencySlice = createSlice({
@@ -54,6 +75,10 @@ const transparencySlice = createSlice({
             if (!source) return;
             state.source = source;
             state.meter = recordSourceUsed(state.meter, source);
+            if (!state.railPinned && !state.railSourceUsed) {
+                state.railExpanded = true;
+            }
+            state.railSourceUsed = true;
         },
         /** `WebsocketMessageType.TOKEN_USAGE` — one executor's reported cost. */
         tokenUsageReceived(state, action: PayloadAction<unknown>) {
@@ -103,13 +128,23 @@ const transparencySlice = createSlice({
          * surface, so a meter cleared at the conversation boundary would never
          * show the guardrail's zero beside a row that cost something.
          */
-        conversationStarted(state) {
+        conversationStarted(state, action: PayloadAction<string>) {
+            if (state.conversationId === action.payload) return;
             state.source = null;
             state.alerts = [];
+            state.railPinned = false;
+            state.railSourceUsed = false;
+            state.conversationId = action.payload;
         },
-        /** A new conversation, and every panel back to claiming nothing. */
-        transparencyReset() {
-            return { source: null, meter: emptyMeter(), alerts: [] };
+        /**
+         * The associate opens or closes the **Transparency rail**.
+         *
+         * The presenter's choice pins the panel for this conversation, so the
+         * first Source used cannot re-open it mid-sentence.
+         */
+        transparencyRailToggled(state) {
+            state.railExpanded = !state.railExpanded;
+            state.railPinned = true;
         },
     },
 });
@@ -121,13 +156,32 @@ export const {
     refusalRecorded,
     requestStarted,
     conversationStarted,
-    transparencyReset,
+    transparencyRailToggled,
 } = transparencySlice.actions;
+
+/**
+ * Start a Chat's conversation-scoped state exactly once per Session.
+ *
+ * A Chat can hold several Plans, so plan navigation must not clear the
+ * presenter's pinned panel between its turns.
+ */
+export const startConversation =
+    (conversationId: string) =>
+    (dispatch: AppDispatch, getState: () => RootState): void => {
+        if (selectTransparencyConversationId(getState()) === conversationId) return;
+        dispatch(conversationStarted(conversationId));
+    };
 
 export const selectGroundingSource = (state: RootState): SourceUsed | null =>
     state.transparency.source;
 export const selectMeter = (state: RootState): MeterState => state.transparency.meter;
 export const selectPresenterAlerts = (state: RootState): PresenterAlert[] =>
     state.transparency.alerts;
+export const selectTransparencyRailExpanded = (state: RootState): boolean =>
+    state.transparency.railExpanded;
+export const selectTransparencyRailPinned = (state: RootState): boolean =>
+    state.transparency.railPinned;
+export const selectTransparencyConversationId = (state: RootState): string | null =>
+    state.transparency.conversationId;
 
 export default transparencySlice.reducer;

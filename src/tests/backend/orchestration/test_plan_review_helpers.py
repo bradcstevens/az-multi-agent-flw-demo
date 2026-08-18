@@ -73,9 +73,10 @@ class MockWebsocketMessageType:
 
 
 class MockPlanApprovalResponse:
-    def __init__(self, approved=True, m_plan_id=None):
+    def __init__(self, approved=True, m_plan_id=None, feedback=None):
         self.approved = approved
         self.m_plan_id = m_plan_id
+        self.feedback = feedback
 
 
 class MockTimeoutNotification:
@@ -115,9 +116,24 @@ sys.modules['orchestration.connection_config'] = Mock(
 
 # ---- Mock models.plan_models ----
 class MockMStep:
-    def __init__(self, agent="", action=""):
+    def __init__(self, agent="", action="", **kwargs):
         self.agent = agent
         self.action = action
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @classmethod
+    def model_validate(cls, value):
+        return cls(**value)
+
+    def model_dump(self, **_kwargs):
+        return {
+            "id": getattr(self, "id", None),
+            "agent": self.agent,
+            "action": self.action,
+            "assignee": getattr(self, "assignee", None),
+            "waitsOn": getattr(self, "waitsOn", None),
+        }
 
 
 class MockMPlan:
@@ -514,6 +530,8 @@ class TestWaitForPlanApproval:
         orchestration_config.wait_for_approval.reset_mock()
         orchestration_config.wait_for_approval.return_value = True
         orchestration_config.cleanup_approval.reset_mock()
+        orchestration_config.get_plan_feedback.reset_mock()
+        orchestration_config.get_plan_feedback.return_value = None
 
     @pytest.mark.asyncio
     async def test_given_approved_when_waiting_then_returns_approved_response(self):
@@ -541,6 +559,18 @@ class TestWaitForPlanApproval:
         # Assert
         assert result is not None
         assert result.approved is False
+
+    @pytest.mark.asyncio
+    async def test_a_plan_sent_back_carries_what_the_associate_would_change(self):
+        # The verdict and the feedback arrive together, because the waiting
+        # review needs both to call the framework's revise path (#108).
+        orchestration_config.wait_for_approval.return_value = False
+        orchestration_config.get_plan_feedback.return_value = "Ask Marcus instead."
+
+        result = await wait_for_plan_approval("plan-1", "user-1")
+
+        assert result.approved is False
+        assert result.feedback == "Ask Marcus instead."
 
     @pytest.mark.asyncio
     async def test_given_no_plan_id_when_waiting_then_returns_rejected_response(self):

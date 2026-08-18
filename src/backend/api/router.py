@@ -22,6 +22,7 @@ from associate.answer import personal_answer_detail
 from associate.records import DEMO_ASSOCIATE, lookup_associate
 from chat.deletion import STILL_RUNNING_DETAIL, DeletionOutcome
 from chat.settle import SettleOutcome
+from chat.turn import TurnOutcome, end_turn
 from guardrail.gate import identity_boundary_gate
 from guardrail.identity import ANONYMOUS
 from guardrail.refusal import policy_block_detail
@@ -164,6 +165,7 @@ async def start_comms(
 @app_router.get("/init_team")
 async def init_team(
     request: Request,
+    team_id: str | None = Query(None),
     team_switched: bool = Query(False),
 ):  # add team_switched: bool parameter
     """Initialize the user's current team of agents"""
@@ -186,7 +188,9 @@ async def init_team(
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
         team_service = TeamService(memory_store)
 
-        init_team_id = await find_first_available_team(team_service, user_id)
+        init_team_id = team_id or await find_first_available_team(
+            team_service, user_id
+        )
 
         # Get current team if user has one
         user_current_team = await memory_store.get_current_team(user_id=user_id)
@@ -195,14 +199,32 @@ async def init_team(
         if not init_team_id and not user_current_team:
             logger.info("No teams found in database. System ready for custom team upload.")
             return {
-                "status": "No teams configured. Please upload a team configuration to get started.",
                 "team_id": None,
-                "team": None,
                 "requires_team_upload": True,
             }
 
         # Use current team if available, otherwise use found team
-        if user_current_team:
+        team_configuration = None
+        if team_id:
+            logger.debug("Using requested team: %s", init_team_id)
+            team_configuration = await team_service.get_team_configuration(
+                init_team_id, user_id
+            )
+            if team_configuration is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Team configuration '{init_team_id}' not found or access denied",
+                )
+            user_current_team = await team_service.handle_team_selection(
+                user_id=user_id, team_id=init_team_id
+            )
+            if not user_current_team:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Team configuration '{init_team_id}' failed to set",
+                )
+            init_team_id = user_current_team.team_id
+        elif user_current_team:
             init_team_id = user_current_team.team_id
             logger.debug("Using user's current team: %s", init_team_id)
         elif init_team_id:
@@ -214,17 +236,16 @@ async def init_team(
                 init_team_id = user_current_team.team_id
 
         # Verify the team exists and user has access to it
-        team_configuration = await team_service.get_team_configuration(
-            init_team_id, user_id
-        )
+        if team_configuration is None:
+            team_configuration = await team_service.get_team_configuration(
+                init_team_id, user_id
+            )
         if team_configuration is None:
             # If team doesn't exist, clear current team and return empty state
             await memory_store.delete_current_team(user_id)
             logger.warning("Team configuration '%s' not found. Cleared current team.", init_team_id)
             return {
-                "status": "Current team configuration not found. Please select or upload a team configuration.",
                 "team_id": None,
-                "team": None,
                 "requires_team_upload": True,
             }
 
@@ -233,20 +254,10 @@ async def init_team(
             user_id=user_id, team_configuration=team_configuration
         )
 
-        # Initialize agent team for this user session
-        await OrchestrationManager.get_current_or_new_orchestration(
-            user_id=user_id,
-            team_config=team_configuration,
-            team_switched=team_switched,
-            team_service=team_service,
-        )
+        return {"team_id": init_team_id}
 
-        return {
-            "status": "Request started successfully",
-            "team_id": init_team_id,
-            "team": team_configuration,
-        }
-
+    except HTTPException:
+        raise
     except Exception as e:
         track_event_if_configured(
             "Error_Init_Team_Failed",
@@ -476,10 +487,11 @@ async def process_request(
     try:
         if memory_store is None:
             memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        user_current_team = await memory_store.get_current_team(user_id=user_id)
-        team_id = None
-        if user_current_team:
-            team_id = user_current_team.team_id
+        team_id = input_task.team_id
+        if not team_id:
+            user_current_team = await memory_store.get_current_team(user_id=user_id)
+            if user_current_team:
+                team_id = user_current_team.team_id
         team = await memory_store.get_team_by_id(team_id=team_id)
         if not team:
             raise HTTPException(
@@ -544,6 +556,7 @@ async def process_request(
             session_id=input_task.session_id,
             team_id=team_id,
             initial_goal=input_task.description,
+            starting_task_id=input_task.starting_task_id,
             overall_status=PlanStatus.in_progress,
         )
         await memory_store.add_plan(plan)
@@ -604,10 +617,8 @@ async def process_request(
                 exc_info=True,
             )
 
-    # The cache-invalidation predicate's lane term (ADR-013). /init_team eagerly
-    # builds a workflow before any task is submitted, so without this the first
-    # request after a page load reuses that workflow and silently ignores the
-    # lane this request was routed into.
+    # The cache-invalidation predicate's lane term (ADR-013). A Workflow from
+    # an earlier request cannot silently cross into the Lane this request took.
     cached_plan_review = getattr(current_workflow, "_plan_review", None)
     plan_review_mismatch = (
         current_workflow is not None
@@ -703,23 +714,28 @@ async def process_request(
                 # asynchronously and could otherwise outlive its successor's
                 # arming — the presenter asking the rehearsed question twice.
                 end_rehearsal_turn(input_task.session_id, rehearsal_token)
-                # Clear our slot if we're still the registered active task
-                current = orchestration_config.active_tasks.get(user_id)
-                if current is not None and current.done():
-                    orchestration_config.active_tasks.pop(user_id, None)
+                # Give up our slot, by identity: a cancelled turn's cleanup
+                # runs after its successor has already registered, and a
+                # release keyed on the user alone would take that successor
+                # with it.
+                orchestration_config.release_active_turn(user_id, asyncio.current_task())
 
-        # Cancel any in-flight orchestration for this user before starting a new one
-        prior_task = orchestration_config.active_tasks.get(user_id)
-        if prior_task is not None and not prior_task.done():
+        # Cancel any turn this user already has in flight, whichever Chat it
+        # belongs to, before starting a new one — the Workflow is cached per
+        # user, so a second turn replaces the first rather than running beside
+        # it. **Ending a turn** is the session-scoped operation (ADR-031 §6);
+        # this one is not, deliberately, and does not write a status.
+        prior = orchestration_config.active_turn(user_id)
+        if prior is not None:
             try:
-                prior_task.cancel()
+                prior.task.cancel()
                 # Give the cancelled task a chance to clean up
                 await asyncio.sleep(0)
             except Exception:
                 logger.exception(
                     "Failed to cancel prior orchestration task for user '%s'", user_id
                 )
-            orchestration_config.active_tasks.pop(user_id, None)
+            orchestration_config.release_active_turn(user_id, prior.task)
 
         # Schedule new task and register it so subsequent requests can cancel it
         # The marker is armed here, after the prior turn's cancellation has had
@@ -729,7 +745,9 @@ async def process_request(
                 note_rehearsal(input_task.session_id) if is_rehearsal else None
             )
         )
-        orchestration_config.active_tasks[user_id] = new_task
+        orchestration_config.register_active_turn(
+            user_id, input_task.session_id, plan_id, new_task
+        )
 
         return {
             "status": "Request started successfully",
@@ -761,7 +779,7 @@ async def plan_approval(
     human_feedback: messages.PlanApprovalResponse, request: Request
 ):
     """
-    Endpoint to receive plan approval or rejection from the user.
+    Endpoint to receive the associate's verdict on a Reviewable plan.
     ---
     tags:
       - Plans
@@ -772,7 +790,7 @@ async def plan_approval(
         required: true
         description: User ID extracted from the authentication header
     requestBody:
-      description: Plan approval payload
+      description: Plan verdict payload
       required: true
       content:
         application/json:
@@ -784,16 +802,21 @@ async def plan_approval(
                 description: The internal m_plan id for the plan (required)
               approved:
                 type: boolean
-                description: Whether the plan is approved (true) or rejected (false)
+                description: >-
+                  Whether the plan is approved (true) or sent back for revision
+                  (false). There is no third verdict: leaving the conversation
+                  is navigation, not a verdict.
               feedback:
                 type: string
-                description: Optional feedback or comment from the user
+                description: >-
+                  What the associate would change. Required when the plan is
+                  sent back.
               plan_id:
                 type: string
                 description: Optional user-facing plan_id
     responses:
       200:
-        description: Approval recorded successfully
+        description: Verdict recorded successfully
         content:
           application/json:
             schema:
@@ -805,6 +828,8 @@ async def plan_approval(
         description: Missing or invalid user information
       404:
         description: No active plan found for approval
+      422:
+        description: A plan sent back with nothing asked
       500:
         description: Internal server error
     """
@@ -813,6 +838,19 @@ async def plan_approval(
     if not user_id:
         raise HTTPException(
             status_code=401, detail="Missing or invalid user information"
+        )
+
+    # The verdict on a **Reviewable plan** is binary: approve it, or send it
+    # back saying what you would change (#108). There is no reject, so a
+    # send-back with nothing asked is refused here rather than replanned into
+    # an identical plan the associate has no way to read differently. Refused
+    # *before* the try block below, whose `except Exception` would otherwise
+    # turn this into an opaque 500.
+    feedback = (human_feedback.feedback or "").strip()
+    if not human_feedback.approved and not feedback:
+        raise HTTPException(
+            status_code=422,
+            detail="Sending a plan back requires saying what you would change",
         )
 
     # Attach session_id to span if plan_id is available and capture for events
@@ -836,49 +874,40 @@ async def plan_approval(
                 orchestration_config
                 and human_feedback.m_plan_id in orchestration_config.approvals
             ):
+                if (
+                    orchestration_config.approvals[human_feedback.m_plan_id]
+                    is not None
+                ):
+                    # A verdict resumes the waiting review exactly once. A
+                    # duplicate HTTP request must not turn an approved plan
+                    # into a revision request (or vice versa).
+                    logger.info(
+                        "Ignoring duplicate verdict for plan %s",
+                        human_feedback.m_plan_id,
+                    )
+                    return {"status": "verdict already recorded"}
+
+                result = await PlanService.handle_plan_approval(
+                    human_feedback, user_id
+                )
+                if not result:
+                    raise RuntimeError("Plan verdict could not be persisted")
+                logger.debug("Plan approval processed: %s", result)
+
+                # Waking the review makes this verdict terminal, so it happens
+                # only after the Plan record durably carries its status or
+                # revision lineage.
                 orchestration_config.set_approval_result(
-                    human_feedback.m_plan_id, human_feedback.approved
+                    human_feedback.m_plan_id,
+                    human_feedback.approved,
+                    feedback=feedback or None,
                 )
                 logger.debug("Plan approval received: %s", human_feedback)
 
-                try:
-                    result = await PlanService.handle_plan_approval(
-                        human_feedback, user_id
-                    )
-                    logger.debug("Plan approval processed: %s", result)
-
-                except ValueError as ve:
-                    logger.error(f"ValueError processing plan approval: {ve}")
-                    await connection_config.send_status_update_async(
-                        {
-                            "type": WebsocketMessageType.ERROR_MESSAGE,
-                            "data": {
-                                "content": "Approval failed due to invalid input.",
-                                "status": "error",
-                                "timestamp": asyncio.get_event_loop().time(),
-                            },
-                        },
-                        user_id,
-                        message_type=WebsocketMessageType.ERROR_MESSAGE,
-                    )
-
-                except Exception:
-                    logger.error("Error processing plan approval", exc_info=True)
-                    await connection_config.send_status_update_async(
-                        {
-                            "type": WebsocketMessageType.ERROR_MESSAGE,
-                            "data": {
-                                "content": "An unexpected error occurred while processing the approval.",
-                                "status": "error",
-                                "timestamp": asyncio.get_event_loop().time(),
-                            },
-                        },
-                        user_id,
-                        message_type=WebsocketMessageType.ERROR_MESSAGE,
-                    )
-
-                # Use dynamic event name based on approval status
-                approval_status = "Approved" if human_feedback.approved else "Rejected"
+                # Use dynamic event name based on the verdict given
+                approval_status = (
+                    "Approved" if human_feedback.approved else "SentBack"
+                )
                 event_name = f"Plan_{approval_status}"
                 event_props = {
                     "plan_id": human_feedback.plan_id,
@@ -891,7 +920,9 @@ async def plan_approval(
                     event_props["session_id"] = session_id
                 track_event_if_configured(event_name, event_props)
 
-                return {"status": "approval recorded"}
+                if human_feedback.approved:
+                    return {"status": "approval recorded"}
+                return {"status": "revision requested"}
             else:
                 logging.warning(
                     "No orchestration or plan found for plan_id: %s",
@@ -1211,6 +1242,34 @@ async def presenter_alert(request: Request):
     return {"status": "alerted"}
 
 
+async def _clarification_answer_identity(
+    memory_store, session_id: Optional[str], user_id: str
+):
+    """The **Session identity** the Identity boundary gate reads on an answer.
+
+    A **Clarification** answer names a `request_id` and a `plan_id` and never a
+    session, so the identity comes from the plan the question was asked
+    against — the server's own record, read through a container scoped to this
+    user, rather than a session the caller names. Fails closed at every step it
+    can: an unreachable container, a plan that named no session and an
+    unreadable session record all resolve to `ANONYMOUS`, which is the refusing
+    state.
+    """
+    if memory_store is None or not session_id:
+        return ANONYMOUS
+    try:
+        session_state = SessionStateStore(memory_store, user_id=user_id)
+    except Exception:
+        logger.warning(
+            "Session state unavailable for session '%s' — the Identity "
+            "boundary gate resolves the anonymous identity, which refuses",
+            session_id,
+            exc_info=True,
+        )
+        return ANONYMOUS
+    return await session_state.resolve_identity(session_id)
+
+
 @app_router.post("/user_clarification")
 async def user_clarification(
     human_feedback: messages.UserClarificationResponse, request: Request
@@ -1269,19 +1328,75 @@ async def user_clarification(
 
     # Attach session_id to span if plan_id is available and capture for events
     session_id = None
+    memory_store = None
 
+    # The container is acquired above the Identity boundary gate for the reason
+    # it is in `process_request`: the gate's identity is its *input*, and a
+    # Cosmos read instantiates no agent. A container that cannot be reached
+    # leaves the identity anonymous, which is the refusing state — and the team
+    # lookup below re-raises the failure as the 400 it has always been.
     try:
         memory_store = await DatabaseFactory.get_database(user_id=user_id)
-        if human_feedback.plan_id:
-            try:
-                plan = await memory_store.get_plan_by_plan_id(plan_id=human_feedback.plan_id)
-                if plan and plan.session_id:
-                    session_id = plan.session_id
-                    span = trace.get_current_span()
-                    if span:
-                        span.set_attribute("session_id", session_id)
-            except Exception:
-                pass  # Don't fail request if span attribute fails
+    except Exception:
+        logger.warning(
+            "Session state unavailable for the clarification answer to "
+            "request '%s' — the Identity boundary gate resolves the anonymous "
+            "identity, which refuses",
+            human_feedback.request_id,
+            exc_info=True,
+        )
+
+    if memory_store is not None and human_feedback.plan_id:
+        try:
+            plan = await memory_store.get_plan_by_plan_id(plan_id=human_feedback.plan_id)
+            if plan and plan.session_id:
+                session_id = plan.session_id
+                span = trace.get_current_span()
+                if span:
+                    span.set_attribute("session_id", session_id)
+        except Exception:
+            pass  # Don't fail request if span attribute fails
+
+    # The Identity boundary gate on the clarification seam (ADR-034). It used
+    # to be called once, inside `process_request`, so **every** answer typed
+    # into the box the agent opened reached the orchestration ungated — a
+    # personal question walked in through the door a **Clarification** holds
+    # open. It sits where it sits in the request path and for the same reasons:
+    # above `rai_success`, which instantiates an agent, and above the team
+    # lookup, so a refusal costs nothing.
+    #
+    # A refusal consumes **nothing**. Everything that settles the question —
+    # `set_clarification_result`, the plan service, the recorded **Attempted
+    # steps** — is below this, so the Clarification stays *pending* with its
+    # box *open* and the associate answers again. That is what keeps a refusal
+    # out of the 300-second timeout (#87): nothing was consumed, so nothing
+    # ends the turn.
+    #
+    # A blank answer is not put to the gate, exactly as it is not put to the
+    # content-safety check below: there are no words in it to refuse, and
+    # fail-closed on an empty string would be the gate refusing silence.
+    if human_feedback.answer is not None and str(human_feedback.answer).strip():
+        identity = await _clarification_answer_identity(
+            memory_store, session_id, user_id
+        )
+        verdict = await identity_boundary_gate().evaluate(
+            str(human_feedback.answer), identity
+        )
+        if verdict.refused:
+            track_event_if_configured(
+                "Identity_Boundary_Refusal",
+                {
+                    "status": "Clarification answer refused - identity boundary",
+                    "reason": verdict.reason.value,
+                    "request_id": human_feedback.request_id,
+                    "session_id": session_id,
+                },
+            )
+            raise HTTPException(status_code=403, detail=policy_block_detail())
+
+    try:
+        if memory_store is None:
+            memory_store = await DatabaseFactory.get_database(user_id=user_id)
         user_current_team = await memory_store.get_current_team(user_id=user_id)
         team_id = None
         if user_current_team:
@@ -2266,6 +2381,82 @@ async def get_plans(request: Request):
     )
 
     return all_plans
+
+
+@app_router.post("/chats/{session_id}/end_turn")
+async def end_chat_turn(session_id: str, request: Request):
+    """End one Chat's turn — the primitive, at the wire (#120, ADR-031).
+
+    ---
+    tags:
+      - Chats
+
+    **Leaving a Chat** reaches it through here. So will deleting a running
+    Chat (#122) and a **Clarification** that expires (#123), and all three are
+    the same act: the in-flight orchestration for *this session* is cancelled
+    and this session's **Plan record** is written `canceled`. That is not new
+    behaviour dressed as a fix — the turn is already destroyed today, silently,
+    leaving an **Abandoned turn** and a record stuck at `in_progress` for ever
+    that no delete route will take.
+
+    ADR-031 names this endpoint as a cost of its own decisions: nothing
+    session-scoped could say *"end this Chat's turn"*, only the destructive
+    `/plan_approval` rejection and the implicit per-user cancel inside
+    `process_request`. It is deliberately **not** the approval route: ending is
+    not rejecting, and #108 made `approved: false` mean *"send it back"*.
+
+    A Chat that has already reached a **Settled status** answers 200 saying so
+    and is left exactly as it is, and a session this user has no Plan record in
+    is 404 — the same reading ``delete_chat`` takes of a session id, which is
+    not a secret. A store that could not answer at all is 500 and neither: an
+    outage reported as "no chat" would end the turn, write nothing and tell the
+    associate the conversation is gone while its record sits at `in_progress`,
+    which is the **Abandoned turn** this route exists to clear.
+    """
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+    if not user_id:
+        track_event_if_configured(
+            "Error_User_Not_Found", {"status_code": 400, "detail": "no user"}
+        )
+        raise HTTPException(status_code=400, detail="no user")
+
+    memory_store = await DatabaseFactory.get_database(user_id=user_id)
+    try:
+        result = await end_turn(
+            user_id=user_id,
+            session_id=session_id,
+            memory_store=memory_store,
+            orchestration=orchestration_config,
+        )
+    except Exception as e:
+        logger.exception("Failed to end the turn for session '%s'", session_id)
+        track_event_if_configured(
+            "Error_Turn_End_Failed",
+            {"session_id": session_id, "user_id": user_id, "error": str(e)},
+        )
+        raise HTTPException(
+            status_code=500, detail="Could not read this chat, so its turn was not ended"
+        ) from e
+
+    if result.outcome is TurnOutcome.no_such_chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    track_event_if_configured(
+        "Turn_Ended",
+        {
+            "status": result.outcome.value,
+            "cancelled": result.cancelled,
+            "session_id": session_id,
+            "user_id": user_id,
+        },
+    )
+
+    return {
+        "status": result.outcome.value,
+        "session_id": session_id,
+        "cancelled": result.cancelled,
+    }
 
 
 @app_router.delete("/chats")

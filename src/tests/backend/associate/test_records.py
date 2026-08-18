@@ -22,12 +22,12 @@ class TestTheDemoAssociate:
         assert DEMO_ASSOCIATE.display_name.strip()
 
     def test_the_demo_associate_has_an_authored_address_name(self):
-        assert DEMO_ASSOCIATE.address_name == "Tanya"
+        assert DEMO_ASSOCIATE.address_name == "Clara"
 
     def test_the_demo_associate_is_the_one_the_boundary_probe_names(self):
-        """The Quick Task says "My name is Tanya" — signing in as anybody else
+        """The Quick Task says "My name is Clara" — signing in as anybody else
         makes the beat a non sequitur on stage."""
-        assert "tanya" in DEMO_ASSOCIATE.display_name.lower()
+        assert DEMO_ASSOCIATE.display_name == "Clara Workman"
 
     def test_the_demo_associate_carries_facts_to_answer_with(self):
         assert DEMO_ASSOCIATE.facts, "a record with no facts answers nothing"
@@ -37,16 +37,19 @@ class TestLookingUpAnAssociate:
     """Resolving the record from the name held in Session state."""
 
     def test_the_demo_associates_own_name_resolves(self):
-        assert lookup_associate(DEMO_ASSOCIATE.display_name) is DEMO_ASSOCIATE
+        assert lookup_associate("Clara Workman") is DEMO_ASSOCIATE
 
     def test_a_first_name_alone_resolves(self):
         """The Session identity is a display name and the demo's is a full one,
-        but a presenter improvising a sign-in may type only "Tanya"."""
+        but a presenter improvising a sign-in may type only "Clara"."""
         first_name = DEMO_ASSOCIATE.display_name.split()[0]
         assert lookup_associate(first_name) is DEMO_ASSOCIATE
 
     def test_the_name_is_matched_case_and_space_insensitively(self):
-        assert lookup_associate("  tANYa  ") is DEMO_ASSOCIATE
+        assert lookup_associate("  cLArA  ") is DEMO_ASSOCIATE
+
+    def test_the_previous_associate_name_resolves_to_no_record(self):
+        assert lookup_associate("Tanya Alvarez") is None
 
     @pytest.mark.parametrize("name", [None, "", "   ", "Someone Else", 17])
     def test_an_unknown_or_unusable_name_resolves_to_no_record(self, name):
@@ -55,9 +58,9 @@ class TestLookingUpAnAssociate:
         assert lookup_associate(name) is None
 
     def test_a_substring_of_a_name_is_not_a_match(self):
-        """"Tan" is not Tanya. A loose match would answer one associate's
+        """"Clar" is not Clara. A loose match would answer one associate's
         question out of another associate's record."""
-        assert lookup_associate("Tan") is None
+        assert lookup_associate("Clar") is None
 
 
 class TestTheRecordIsSimulated:

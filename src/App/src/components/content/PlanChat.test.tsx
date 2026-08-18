@@ -19,6 +19,15 @@ const FOLLOW_ON = {
     logo: 'Document',
     lane: 'deliberate',
 };
+const SECOND_FOLLOW_ON = {
+    id: 'task-223-ticket-status',
+    name: 'Check ticket status',
+    prompt: 'What is happening with my ticket?',
+    created: '',
+    creator: '',
+    logo: 'Document',
+    lane: 'fast',
+};
 
 /**
  * The wiring, not the component (issue #26).
@@ -62,8 +71,8 @@ const renderChat = (
                 planApprovalRequest={null}
                 messagesContainerRef={ref as never}
                 finalResultRef={ref as never}
-                streamingMessageBuffer=""
-                showBufferingText={false}
+                streamedReply={null}
+                settledReply={null}
                 agentMessages={[]}
                 showProcessingPlanSpinner={false}
                 processingElapsedSeconds={0}
@@ -86,6 +95,35 @@ describe('the conversation offers the rehearsed replies', () => {
     });
 
     describe('the conversation offers its follow-on task', () => {
+        it('yields every offered turn to the pending Clarification', () => {
+            renderChat(
+                {
+                    followOnTasks: [FOLLOW_ON, SECOND_FOLLOW_ON],
+                    onFollowOnTask: vi.fn(),
+                } as never,
+            );
+
+            expect(screen.queryByRole('button', { name: FOLLOW_ON.name })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: SECOND_FOLLOW_ON.name })).not.toBeInTheDocument();
+        });
+
+        it('renders every outgoing Quick Task from the current turn', () => {
+            const onFollowOnTask = vi.fn();
+            renderChat(
+                {
+                    followOnTasks: [FOLLOW_ON, SECOND_FOLLOW_ON],
+                    onFollowOnTask,
+                } as never,
+                { pending: false },
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: FOLLOW_ON.name }));
+            fireEvent.click(screen.getByRole('button', { name: SECOND_FOLLOW_ON.name }));
+
+            expect(onFollowOnTask).toHaveBeenCalledWith(FOLLOW_ON);
+            expect(onFollowOnTask).toHaveBeenCalledWith(SECOND_FOLLOW_ON);
+        });
+
         it('renders the follow-on without waiting for a clarification and submits it on tap', () => {
             const onFollowOnTask = vi.fn();
             renderChat({ followOnTask: FOLLOW_ON, onFollowOnTask }, { pending: false });
@@ -93,6 +131,15 @@ describe('the conversation offers the rehearsed replies', () => {
             fireEvent.click(screen.getByRole('button', { name: FOLLOW_ON.name }));
 
             expect(onFollowOnTask).toHaveBeenCalledWith(FOLLOW_ON);
+        });
+
+        it('yields the slot to the chips while a clarification is pending', () => {
+            // One control at a time (#131, ADR-033). The card owns this gate,
+            // so every conversation caller gets the same protection.
+            renderChat({ followOnTask: FOLLOW_ON, onFollowOnTask: vi.fn() });
+
+            expect(screen.queryByTestId('follow-on-task')).not.toBeInTheDocument();
+            expect(screen.getByTestId('rehearsed-replies')).toBeInTheDocument();
         });
     });
 
@@ -127,5 +174,87 @@ describe('the conversation offers the rehearsed replies', () => {
         );
 
         expect(screen.queryByTestId('ticket-status-reply')).not.toBeInTheDocument();
+    });
+
+    it('sends a derived starter back with the Reviewable plan', () => {
+        const handleRejectPlan = vi.fn();
+        renderChat(
+            {
+                showApprovalButtons: true,
+                handleRejectPlan,
+                planApprovalRequest: {
+                    id: 'review-1',
+                    user_request: 'Swap Saturday',
+                    facts: '',
+                    steps: [
+                        {
+                            id: 1,
+                            action: 'Ask Marcus Bell to take the shift',
+                            assignee: {
+                                kind: 'person',
+                                name: 'Marcus Bell',
+                                relation: 'peer',
+                                simulated: true,
+                            },
+                        },
+                    ],
+                },
+            } as never,
+            { pending: false },
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Ask somebody other than Marcus Bell.' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Send back with changes' }));
+
+        expect(handleRejectPlan).toHaveBeenCalledWith('Ask somebody other than Marcus Bell.');
+    });
+
+    it('offers no verdict the associate has not written, and no third one', () => {
+        // The box is empty, so there is nothing to send back yet — and there is
+        // no control between approving and sending back (#108).
+        renderChat(
+            {
+                showApprovalButtons: true,
+                planApprovalRequest: {
+                    id: 'review-1',
+                    user_request: 'Swap Saturday',
+                    facts: '',
+                    steps: [{ id: 1, action: 'Check the rota', agent: 'Rota_Agent' }],
+                },
+            } as never,
+            { pending: false },
+        );
+
+        expect(screen.getByRole('button', { name: 'Send back with changes' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Approve Task Plan' })).toBeEnabled();
+        expect(screen.queryByRole('button', { name: /reject|cancel/i })).not.toBeInTheDocument();
+    });
+
+    it('says which revision this is and every change that produced it', () => {
+        renderChat(
+            {
+                showApprovalButtons: true,
+                planApprovalRequest: {
+                    id: 'review-1',
+                    user_request: 'Swap Saturday',
+                    facts: '',
+                    revision: 3,
+                    revision_feedback: [
+                        'Ask somebody other than Marcus Bell.',
+                        'Ask Dana Reyes next.',
+                    ],
+                    steps: [{ id: 1, action: 'Check the rota', agent: 'Rota_Agent' }],
+                },
+            } as never,
+            { pending: false },
+        );
+
+        expect(screen.getByTestId('plan-revision')).toHaveTextContent('Revision 3');
+        expect(screen.getAllByTestId('plan-revision-feedback').map((item) => item.textContent)).toEqual([
+            'You asked to change: Ask somebody other than Marcus Bell.',
+            'You asked to change: Ask Dana Reyes next.',
+        ]);
     });
 });

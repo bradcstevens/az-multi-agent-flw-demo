@@ -5,6 +5,7 @@ import json
 import logging
 import uuid
 import re
+from dataclasses import dataclass
 from typing import List, Optional
 
 import models.messages as messages
@@ -32,6 +33,7 @@ from orchestration.plan_review_helpers import (convert_plan_review_to_mplan,
                                                mandatory_participants,
                                                plans_minimally,
                                                wait_for_plan_approval)
+from orchestration.plan_revision import PlanRevision
 from patches.tool_history_leak import apply_tool_history_leak_patch
 from services.team_service import TeamService
 from transparency.tokens import token_usage
@@ -66,6 +68,22 @@ def _embed_bare_image_urls(text: str) -> str:
     if not text:
         return text
     return _BARE_IMAGE_URL_RE.sub(r"![Generated image](\1)", text)
+
+
+@dataclass(frozen=True, slots=True)
+class PlanReviewOutcome:
+    """What the associate said about the plans this pause put in front of them.
+
+    ``responses`` is what the workflow resumes with — an approval or a revise
+    request per review — or ``None`` when no verdict arrived at all, which is
+    the only way a plan review ends the run now that there is no reject (#108).
+    ``approved`` is true only when every review was approved, so a run that has
+    been sent back once does not auto-approve the plan that comes back.
+    """
+
+    responses: Optional[dict]
+    revision: PlanRevision
+    approved: bool
 
 
 class OrchestrationManager:
@@ -272,10 +290,9 @@ class OrchestrationManager:
             current is not None and current_team_id != team_config.team_id
         )
 
-        # Detect a cached orchestration built for the other lane. The
-        # team-initialisation endpoint eagerly builds a workflow before any task
-        # is submitted, so without this the first request after a page load
-        # reuses that workflow and silently ignores the per-request value.
+        # Detect a cached orchestration built for the other lane. A Workflow
+        # created for an earlier request must not silently ignore this request's
+        # per-request value.
         current_plan_review = getattr(current, "_plan_review", None)
         plan_review_changed = (
             current is not None and current_plan_review != plan_review
@@ -422,6 +439,7 @@ class OrchestrationManager:
         ticket_on_approval = self._task_requires_ticket_on_approval(
             workflow, input_task
         )
+        plan_steps = self._task_plan_steps(workflow, input_task)
         self.logger.debug("Task: %s", task_text)
         # The associate's words feed every record and decision. Only the
         # manager's initial view receives the per-turn address.
@@ -465,6 +483,10 @@ class OrchestrationManager:
 
             self.logger.info("Starting workflow execution...")
             plan_already_approved = False
+            # The Reviewable plan's lineage for this run. It survives each turn
+            # of the resume loop, because a plan sent back twice is revision 3
+            # and says so (#108).
+            revision = PlanRevision()
 
             # Initial run — stream events, collect any pending requests
             pending = await self._process_event_stream(
@@ -482,7 +504,7 @@ class OrchestrationManager:
 
                 responses = {}
 
-                # Handle plan reviews (present to user, wait for approval)
+                # Handle plan reviews (present to user, wait for the verdict)
                 if plan_requests:
                     if plan_already_approved:
                         self.logger.info(
@@ -497,17 +519,33 @@ class OrchestrationManager:
                             "Workflow paused with %d plan review request(s)",
                             len(plan_requests),
                         )
-                        plan_responses = await self._handle_plan_reviews(
+                        outcome = await self._handle_plan_reviews(
                             plan_requests,
                             participant_names=participant_names,
                             task_text=task_text,
                             user_id=user_id,
                             ticket_on_approval=ticket_on_approval,
+                            plan_steps=plan_steps,
+                            revision=revision,
                         )
-                        if plan_responses is None:
-                            raise RuntimeError("Plan execution cancelled by user")
+                        revision = outcome.revision
+                        if outcome.responses is None:
+                            # No verdict arrived — a timeout or a socket that
+                            # went away. The associate has already been told,
+                            # and there is nothing to resume the workflow with,
+                            # so the run stops here. It is not an error and it
+                            # destroys nothing: a plan sent back would have
+                            # carried a revise response instead.
+                            self.logger.info(
+                                "No verdict on the plan — ending the run "
+                                "(job='%s')", job_id,
+                            )
+                            return
 
-                        plan_already_approved = True
+                        # Only a real approval turns the gate off. A revised
+                        # plan is a plan the associate has not seen yet.
+                        plan_already_approved = outcome.approved
+                        plan_responses = outcome.responses
 
                     responses.update(plan_responses)
 
@@ -525,6 +563,9 @@ class OrchestrationManager:
                         # (#62): read once, carried, never derived twice.
                         asks_the_associate_nothing=ticket_on_approval,
                     )
+                    if approval_responses is None:
+                        await self._end_turn_after_expired_clarification(user_id)
+                        return
                     responses.update(approval_responses)
 
                 self.logger.info(
@@ -907,18 +948,34 @@ class OrchestrationManager:
         task_text: str,
         user_id: str,
         ticket_on_approval: bool = False,
-    ) -> dict | None:
-        """Present collected plan review requests to the user and gather responses.
+        plan_steps: list | None = None,
+        revision: PlanRevision | None = None,
+    ) -> PlanReviewOutcome:
+        """Present collected plan review requests and gather the verdicts.
+
+        The verdict is binary (#108). An approval settles the plan; anything
+        else is a **send-back**, which folds the associate's feedback into the
+        framework's ``revise`` path so the orchestrator replans and re-issues
+        the review **on the same run**. There is no reject: the plan document
+        is never removed and the conversation never ends on a disagreement.
+
+        Args:
+            revision: the lineage carried from earlier verdicts on this run, so
+                the plan the associate sees says which revision it is.
 
         Returns:
-            A ``{request_id: MagenticPlanReviewResponse}`` dict if at least one
-            plan was approved, or ``None`` if all were rejected/timed out.
+            A ``PlanReviewOutcome``. ``responses`` is ``None`` only when no
+            verdict arrived at all — a timeout or a dropped socket, which is
+            not a verdict and leaves the run nothing to resume with.
         """
-        responses = {}
+        revision = revision or PlanRevision()
+        responses: dict = {}
+        approved_all = True
 
         for request_id, plan_review in plan_requests.items():
             self.logger.info(
-                "[PLAN_REVIEW] Presenting plan to user (request_id=%s)", request_id
+                "[PLAN_REVIEW] Presenting plan to user (request_id=%s, revision=%d)",
+                request_id, revision.number,
             )
 
             # Convert to MPlan for frontend display
@@ -928,6 +985,18 @@ class OrchestrationManager:
                 task_text=task_text,
                 user_id=user_id,
             )
+            # The lineage travels with the plan, so the surface can tell a
+            # fresh plan from one the associate already sent back, and show
+            # what they asked to change.
+            mplan.revision = revision.number
+            mplan.revision_feedback = list(revision.feedback)
+            if plan_steps:
+                from models.plan_models import MStep
+
+                mplan.steps = [
+                    step if isinstance(step, MStep) else MStep.model_validate(step)
+                    for step in plan_steps
+                ]
 
             # Store plan
             try:
@@ -947,10 +1016,19 @@ class OrchestrationManager:
                 message_type=WebsocketMessageType.PLAN_APPROVAL_REQUEST,
             )
 
-            # Wait for user response
+            # Wait for the associate's verdict
             approval_response = await wait_for_plan_approval(mplan.id, user_id)
 
-            if approval_response and approval_response.approved:
+            if approval_response is None:
+                self.logger.info(
+                    "No verdict on the plan (request_id=%s) — nothing to resume with",
+                    request_id,
+                )
+                return PlanReviewOutcome(
+                    responses=None, revision=revision, approved=False
+                )
+
+            if approval_response.approved:
                 self.logger.info("Plan approved (request_id=%s)", request_id)
                 responses[request_id] = plan_review.approve()
                 # The approval step **is** the ticket confirmation (issue #22,
@@ -964,19 +1042,43 @@ class OrchestrationManager:
                     user_id,
                     draft_from_record=ticket_on_approval,
                 )
-            else:
-                self.logger.info("Plan rejected (request_id=%s)", request_id)
-                await connection_config.send_status_update_async(
-                    {
-                        "type": WebsocketMessageType.PLAN_APPROVAL_RESPONSE,
-                        "data": approval_response,
-                    },
-                    user_id=user_id,
-                    message_type=WebsocketMessageType.PLAN_APPROVAL_RESPONSE,
-                )
-                return None
+                continue
 
-        return responses if responses else None
+            feedback = getattr(approval_response, "feedback", None) or ""
+            try:
+                revision = revision.sent_back(feedback)
+            except ValueError:
+                # The endpoint refuses a send-back with nothing asked, so this
+                # is a verdict no client of ours can produce. Ask for the plan
+                # again rather than resuming with a response the framework
+                # would read as an approval.
+                self.logger.warning(
+                    "Plan sent back with nothing asked (request_id=%s)", request_id
+                )
+                return PlanReviewOutcome(
+                    responses=None, revision=revision, approved=False
+                )
+
+            self.logger.info(
+                "Plan sent back for revision %d (request_id=%s)",
+                revision.number, request_id,
+            )
+            approved_all = False
+            responses[request_id] = plan_review.revise(feedback)
+            await connection_config.send_status_update_async(
+                {
+                    "type": WebsocketMessageType.PLAN_APPROVAL_RESPONSE,
+                    "data": approval_response,
+                },
+                user_id=user_id,
+                message_type=WebsocketMessageType.PLAN_APPROVAL_RESPONSE,
+            )
+
+        return PlanReviewOutcome(
+            responses=responses or None,
+            revision=revision,
+            approved=bool(responses) and approved_all,
+        )
 
     def _task_requires_ticket_on_approval(self, workflow, input_task) -> bool:
         """Whether this request names the active team's ticketing task.
@@ -1002,13 +1104,36 @@ class OrchestrationManager:
         )
         return False
 
+    def _task_plan_steps(self, workflow, input_task) -> list:
+        """Return the active Quick Task's authored Reviewable plan steps.
+
+        The browser can name a Quick Task but cannot choose its people or
+        ordering. Those facts belong to the active team's content pack.
+        """
+        task_id = getattr(input_task, "starting_task_id", None)
+        team_config = getattr(workflow, "_team_config", None)
+        tasks = getattr(team_config, "starting_tasks", None)
+        if not isinstance(task_id, str) or not task_id or not isinstance(tasks, list):
+            return []
+
+        for task in tasks:
+            if getattr(task, "id", None) == task_id:
+                plan_steps = getattr(task, "plan_steps", None)
+                if not isinstance(plan_steps, list):
+                    return []
+                from models.plan_models import MStep
+
+                return [MStep.model_validate(step) for step in plan_steps]
+
+        return []
+
     async def _handle_tool_approvals(
         self,
         tool_approvals: dict[str, object],
         *,
         user_id: str,
         asks_the_associate_nothing: bool = False,
-    ) -> dict:
+    ) -> dict | None:
         """Handle pending tool approval requests (HITL clarification).
 
         For each approval request:
@@ -1035,7 +1160,8 @@ class OrchestrationManager:
                 it, and on stage it is an interview nobody can rehearse.
 
         Returns:
-            A ``{request_id: approval_response}`` dict.
+            A ``{request_id: approval_response}`` dict, or ``None`` when a
+            **Clarification** expired and the turn must end rather than resume.
         """
         import threading
 
@@ -1128,7 +1254,7 @@ class OrchestrationManager:
                     "[TOOL_APPROVAL] Timeout waiting for user answer (request_id=%s)",
                     request_id,
                 )
-                answer = "No response received from user (timeout)."
+                return None
             except Exception as e:
                 self.logger.error(
                     "[TOOL_APPROVAL] Error waiting for answer (request_id=%s): %s",
@@ -1159,6 +1285,29 @@ class OrchestrationManager:
             responses[request_id] = approval
 
         return responses
+
+    async def _end_turn_after_expired_clarification(self, user_id: str) -> None:
+        """End the active turn when its **Clarification** expires.
+
+        The expiry occurs inside the orchestration task, so ``end_turn`` keeps
+        that task running long enough to write `canceled` onto its Plan record.
+        """
+        from chat.turn import end_turn
+        from common.database.database_factory import DatabaseFactory
+
+        turn = orchestration_config.active_turn(user_id)
+        if turn is None:
+            raise RuntimeError(
+                "An expired clarification requires an active turn to settle."
+            )
+
+        memory_store = await DatabaseFactory.get_database(user_id=user_id)
+        await end_turn(
+            user_id=user_id,
+            session_id=turn.session_id,
+            memory_store=memory_store,
+            orchestration=orchestration_config,
+        )
 
     async def _ticket_store(self, user_id: str):
         """The ticket store for the session this user has in flight.
@@ -1444,23 +1593,15 @@ class OrchestrationManager:
                             and executor != current_streaming_agent_ref[0]
                         ):
                             current_streaming_agent_ref[0] = executor
-                            display_name = format_agent_display_name(executor)
-                            header_text = f"\n\n---\n### {display_name}\n\n"
-                            try:
-                                await connection_config.send_status_update_async(
-                                    AgentMessageStreaming(
-                                        agent_name=display_name,
-                                        content=header_text,
-                                        is_final=False,
-                                    ),
-                                    user_id,
-                                    message_type=WebsocketMessageType.AGENT_MESSAGE_STREAMING,
-                                )
-                            except Exception as cb_err:
-                                self.logger.error(
-                                    "Error sending agent header for %s: %s",
-                                    executor, cb_err,
-                                )
+                            await connection_config.send_status_update_async(
+                                AgentMessageStreaming(
+                                    agent_name=format_agent_display_name(executor),
+                                    content="",
+                                    is_final=False,
+                                ),
+                                user_id,
+                                message_type=WebsocketMessageType.AGENT_MESSAGE_STREAMING,
+                            )
 
                         if executor != "magentic_orchestrator":
                             try:
@@ -1490,6 +1631,17 @@ class OrchestrationManager:
                             if isinstance(msg, Message) and msg.text:
                                 final_output_ref[0] = msg.text
                     else:
+                        try:
+                            # ``executor_completed`` is the framework signal
+                            # that this specialist's output stream is over.
+                            await streaming_agent_response_callback(
+                                agent_id, None, True, user_id,
+                            )
+                        except Exception as cb_err:
+                            self.logger.error(
+                                "Error completing stream for %s: %s",
+                                agent_id, cb_err,
+                            )
                         for msg in event.data:
                             if isinstance(msg, Message) and msg.text:
                                 try:
@@ -1501,6 +1653,8 @@ class OrchestrationManager:
                                         "Error in agent callback for %s: %s",
                                         agent_id, cb_err,
                                     )
+                        if agent_id == current_streaming_agent_ref[0]:
+                            current_streaming_agent_ref[0] = None
 
             except Exception as e:
                 if "cancelled by user" in str(e):

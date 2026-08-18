@@ -7,11 +7,12 @@ Tests OrchestrationManager:
 - _process_event_stream() — event dispatch
 """
 
+import asyncio
 import json
 import logging
 import os
 import sys
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
 
@@ -79,12 +80,14 @@ class MockMagenticPlanReviewRequest:
     def __init__(self):
         self.plan = Mock()  # _MagenticTaskLedger
         self._approved_response = Mock()
+        self.revised = []
 
     def approve(self):
         return self._approved_response
 
     def revise(self, feedback):
-        return Mock()
+        self.revised.append(feedback)
+        return Mock(feedback=feedback)
 
 
 class MockMagenticOrchestratorEvent:
@@ -299,9 +302,10 @@ class MockPlanApprovalRequest:
 
 
 class MockPlanApprovalResponse:
-    def __init__(self, approved=True, m_plan_id=None):
+    def __init__(self, approved=True, m_plan_id=None, feedback=None):
         self.approved = approved
         self.m_plan_id = m_plan_id
+        self.feedback = feedback
 
 
 mock_messages_module = Mock()
@@ -317,6 +321,8 @@ class MockMPlan:
     def __init__(self):
         self.id = "test-plan-id"
         self.user_id = None
+        self.revision = 1
+        self.revision_feedback = []
 
 
 mock_convert = Mock(return_value=MockMPlan())
@@ -350,6 +356,7 @@ sys.modules['agents.agent_factory'] = Mock(AgentFactory=MockAgentFactory)
 
 # ---- Import module under test ----
 from backend.orchestration.orchestration_manager import OrchestrationManager
+from backend.orchestration.plan_revision import PlanRevision
 
 # Re-bind mocked singletons for convenient assertions
 connection_config = sys.modules['orchestration.connection_config'].connection_config
@@ -543,9 +550,8 @@ class TestGetCurrentOrNewOrchestration:
     async def test_given_lane_change_when_called_then_rebuilds(self):
         """A Workflow built for the other lane must not be reused.
 
-        The team-initialisation endpoint eagerly builds a Workflow before any
-        task is submitted, so without this the *first* request after a page
-        load silently runs in whichever lane that eager build chose.
+        A Workflow from an earlier request can have the other Lane's Plan
+        review value and must not be reused for this request.
         """
         # Arrange — cached Workflow built with Plan review on
         cached = await OrchestrationManager.init_orchestration(
@@ -808,6 +814,25 @@ class TestRunOrchestration:
         agent_response_callback.assert_called_once_with("hr_agent", agent_msg, "user-1")
 
     @pytest.mark.asyncio
+    async def test_given_specialist_stream_completion_when_run_then_sends_an_explicit_final_frame(self):
+        agent_msg = MockMessage(text="Agent output")
+        events = [
+            _make_event("executor_completed", data=[agent_msg], executor_id="hr_agent"),
+        ]
+        mock_workflow = Mock()
+        mock_workflow.run = Mock(return_value=_async_iter(events))
+        mock_workflow._executors = {}
+        mock_workflow.executors = {}
+        mock_workflow.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = mock_workflow
+
+        await OrchestrationManager().run_orchestration(user_id="user-1", input_task="task")
+
+        streaming_agent_response_callback.assert_awaited_once_with(
+            "hr_agent", None, True, "user-1",
+        )
+
+    @pytest.mark.asyncio
     async def test_given_streaming_output_when_run_then_calls_streaming_callback(self):
         # Arrange
         update = MockAgentResponseUpdate(text="chunk")
@@ -854,11 +879,16 @@ class TestRunOrchestration:
         assert sent_message["data"]["content"] == "Hello world"
 
     @pytest.mark.asyncio
-    async def test_given_new_agent_when_streaming_then_sends_header(self):
+    async def test_given_stream_finished_when_executor_completes_then_sends_completion_frame(self):
         # Arrange
         update = MockAgentResponseUpdate(text="chunk")
         events = [
             _make_event("output", data=update, executor_id="hr_agent"),
+            _make_event(
+                "executor_completed",
+                data=[MockMessage(text="complete")],
+                executor_id="hr_agent",
+            ),
         ]
         mock_workflow = Mock()
         mock_workflow.run = Mock(return_value=_async_iter(events))
@@ -871,12 +901,18 @@ class TestRunOrchestration:
         # Act
         await manager.run_orchestration(user_id="user-1", input_task="task")
 
-        # Assert — header sent for agent switch
-        header_calls = [
+        # Completion is owned by the callback, not duplicated by the event loop.
+        completion_calls = [
             c for c in connection_config.send_status_update_async.call_args_list
-            if len(c[0]) > 0 and isinstance(c[0][0], MockAgentMessageStreaming)
+            if len(c[0]) > 0
+            and isinstance(c[0][0], MockAgentMessageStreaming)
+            and c[0][0].is_final
         ]
-        assert len(header_calls) >= 1
+        assert completion_calls == []
+        streaming_agent_response_callback.assert_has_awaits([
+            call("hr_agent", update, False, "user-1"),
+            call("hr_agent", None, True, "user-1"),
+        ])
 
     @pytest.mark.asyncio
     async def test_given_orchestrator_event_when_run_then_no_error(self):
@@ -1150,6 +1186,106 @@ class TestRunOrchestrationResumeLoop:
         assert call_count[0] == 2
 
     @pytest.mark.asyncio
+    async def test_a_plan_sent_back_is_asked_again_in_the_same_conversation(self):
+        """Disagreeing with a plan is not the end of the conversation (#108).
+
+        The framework replans on the same run, the associate is asked again,
+        and nothing about it reaches the surface as an error.
+        """
+        plan_review = MockMagenticPlanReviewRequest()
+        review_event = _make_event("request_info", data=plan_review, request_id="req-1")
+        completion_event = _make_event(
+            "executor_completed",
+            data=[MockMessage(text="Done")],
+            executor_id="magentic_orchestrator",
+        )
+
+        call_count = [0]
+
+        def mock_run(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 2:
+                return _async_iter([review_event])
+            return _async_iter([completion_event])
+
+        verdicts = [
+            MockPlanApprovalResponse(
+                approved=False,
+                m_plan_id="test-plan-id",
+                feedback="Ask Marcus instead.",
+            ),
+            MockPlanApprovalResponse(approved=True, m_plan_id="test-plan-id"),
+        ]
+        mock_wait_approval.side_effect = verdicts
+
+        mock_workflow = Mock()
+        mock_workflow.run = mock_run
+        mock_workflow._executors = {}
+        mock_workflow.executors = {}
+        mock_workflow.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = mock_workflow
+
+        try:
+            await OrchestrationManager().run_orchestration(
+                user_id="user-1", input_task="swap my Saturday"
+            )
+        finally:
+            mock_wait_approval.side_effect = None
+
+        assert plan_review.revised == ["Ask Marcus instead."]
+        assert call_count[0] == 3
+        finals = [
+            call.args[0]["data"]
+            for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "final_result_message"
+        ]
+        assert [final["status"] for final in finals] == ["completed"]
+
+    @pytest.mark.asyncio
+    async def test_a_revised_plan_is_put_up_for_review_rather_than_auto_approved(self):
+        """Only an approval turns the gate off. A plan the associate has not
+        seen must not be approved on their behalf because an earlier one in
+        the same run was sent back."""
+        plan_review = MockMagenticPlanReviewRequest()
+        review_event = _make_event("request_info", data=plan_review, request_id="req-1")
+        completion_event = _make_event(
+            "executor_completed",
+            data=[MockMessage(text="Done")],
+            executor_id="magentic_orchestrator",
+        )
+
+        call_count = [0]
+
+        def mock_run(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 2:
+                return _async_iter([review_event])
+            return _async_iter([completion_event])
+
+        mock_wait_approval.side_effect = [
+            MockPlanApprovalResponse(
+                approved=False, m_plan_id="test-plan-id", feedback="Ask Marcus."
+            ),
+            MockPlanApprovalResponse(approved=True, m_plan_id="test-plan-id"),
+        ]
+
+        mock_workflow = Mock()
+        mock_workflow.run = mock_run
+        mock_workflow._executors = {}
+        mock_workflow.executors = {}
+        mock_workflow.get_executors_list.return_value = []
+        orchestration_config.get_current_orchestration.return_value = mock_workflow
+
+        try:
+            await OrchestrationManager().run_orchestration(
+                user_id="user-1", input_task="swap my Saturday"
+            )
+        finally:
+            mock_wait_approval.side_effect = None
+
+        assert mock_wait_approval.await_count == 2
+
+    @pytest.mark.asyncio
     async def test_given_approval_pending_when_run_then_sets_pending(self):
         # Arrange
         mock_workflow = Mock()
@@ -1384,7 +1520,7 @@ class TestAttributionWithoutAPlan:
             if isinstance(call[0][0], MockAgentMessageStreaming)
         ]
         assert headers, "no agent header was sent"
-        assert "Shift Tasks Agent" in headers[0].content
+        assert headers[0].agent_name == "Shift Tasks Agent"
 
 
 # ---------------------------------------------------------------------------
@@ -1867,6 +2003,70 @@ class TestTheBoundReachesTheTurnItIsAbout:
         assert self._questions_put_to_the_associate() == ["What is failing?"]
 
 
+class TestAnExpiredClarification:
+    """An expired **Clarification** ends the current turn, rather than replying
+    for the associate and re-entering the Workflow."""
+
+    def setup_method(self):
+        orchestration_config.plans.clear()
+        orchestration_config.set_approval_pending.reset_mock()
+        connection_config.send_status_update_async.reset_mock()
+        connection_config.send_status_update_async.side_effect = None
+        orchestration_config.wait_for_clarification = AsyncMock(
+            side_effect=asyncio.TimeoutError
+        )
+
+    @pytest.mark.asyncio
+    async def test_an_expired_clarification_ends_the_turn_without_resuming_the_workflow(
+        self,
+    ):
+        approval = MockToolApproval("What have you already tried?")
+        workflow = Mock()
+        workflow.run = Mock(
+            return_value=_async_iter(
+                [
+                    _make_event(
+                        "request_info",
+                        data=approval,
+                        request_id="clarification-1",
+                    ),
+                ]
+            )
+        )
+        workflow._executors = {}
+        workflow.executors = {}
+        workflow.get_executors_list.return_value = []
+        workflow._team_config = Mock(starting_tasks=[])
+        orchestration_config.get_current_orchestration.return_value = workflow
+        record = FakeTroubleshootingStore()
+        manager = OrchestrationManager()
+
+        with patch.object(
+            OrchestrationManager,
+            "_troubleshooting_store",
+            AsyncMock(return_value=(record, "session-1")),
+        ), patch.object(
+            manager,
+            "_end_turn_after_expired_clarification",
+            AsyncMock(),
+        ) as end_turn:
+            await manager.run_orchestration(
+                user_id="user-1",
+                input_task=Mock(
+                    description="The brewer is showing FILL.",
+                    starting_task_id="troubleshoot-brewer",
+                ),
+            )
+
+        orchestration_config.wait_for_clarification.assert_awaited_once_with(
+            "clarification-1", timeout=300.0
+        )
+        end_turn.assert_awaited_once_with("user-1")
+        assert workflow.run.call_count == 1
+        assert approval.approved is None
+        assert record.recorded == []
+
+
 # ---------------------------------------------------------------------------
 # The approval step IS the ticket confirmation (issue #22)
 # ---------------------------------------------------------------------------
@@ -1875,10 +2075,15 @@ class MockPlanReview:
 
     def __init__(self):
         self.approved = False
+        self.revised = []
 
     def approve(self):
         self.approved = True
         return Mock(approved=True)
+
+    def revise(self, feedback):
+        self.revised.append(feedback)
+        return Mock(feedback=feedback)
 
 
 class FakeTicketStore:
@@ -1970,17 +2175,47 @@ class TestTheApprovalIsTheTicketConfirmation:
             is False
         )
 
+    def test_an_authored_transaction_not_the_browser_names_the_plan_people(self):
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
+        workflow = Mock()
+        workflow._team_config = Mock(
+            starting_tasks=[Mock(id="task-223-shift-swap", plan_steps=steps)]
+        )
+
+        actual = OrchestrationManager()._task_plan_steps(
+            workflow, Mock(starting_task_id="task-223-shift-swap")
+        )
+
+        assert [step.model_dump(mode="json") for step in actual] == [
+            {**steps[0], "agent": ""}
+        ]
+
     async def _review(
         self,
         store,
         *,
         approved=True,
+        feedback=None,
         session="s-1",
         ticket_on_approval=False,
         record=None,
+        revision=None,
+        plan_steps=None,
     ):
         mock_wait_approval.return_value = MockPlanApprovalResponse(
-            approved=approved, m_plan_id="test-plan-id"
+            approved=approved, m_plan_id="test-plan-id", feedback=feedback
         )
         review = MockPlanReview()
         manager = OrchestrationManager()
@@ -1992,14 +2227,38 @@ class TestTheApprovalIsTheTicketConfirmation:
             "_troubleshooting_store",
             AsyncMock(return_value=(record, session) if record else (None, None)),
         ):
-            responses = await manager._handle_plan_reviews(
+            outcome = await manager._handle_plan_reviews(
                 {"req-1": review},
                 participant_names=["EscalationAgent"],
                 task_text="I can't fix it, raise a ticket",
                 user_id="user-1",
                 ticket_on_approval=ticket_on_approval,
+                plan_steps=plan_steps,
+                **({} if revision is None else {"revision": revision}),
             )
-        return review, responses
+        return review, outcome
+
+    @pytest.mark.asyncio
+    async def test_authored_transaction_steps_replace_the_generated_review_plan(self):
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
+
+        await self._review(None, plan_steps=steps)
+
+        assert [
+            step.model_dump(mode="json") for step in mock_convert.return_value.steps
+        ] == [{**steps[0], "agent": ""}]
 
     @pytest.mark.asyncio
     async def test_approving_an_escalation_drafts_from_the_carried_record(self):
@@ -2050,15 +2309,79 @@ class TestTheApprovalIsTheTicketConfirmation:
         assert store.submitted == ["s-1"]
 
     @pytest.mark.asyncio
-    async def test_rejecting_the_plan_submits_nothing(self):
-        """The rejection is the associate correcting the ticket. A ticket
-        raised from a rejected plan is the one thing the approval gate exists
-        to prevent."""
+    async def test_sending_the_plan_back_submits_nothing(self):
+        """Sending a plan back is the associate correcting the ticket. A ticket
+        raised from a plan that was not approved is the one thing the approval
+        gate exists to prevent."""
         store = FakeTicketStore(ticket=_submitted_ticket())
 
-        await self._review(store, approved=False)
+        await self._review(store, approved=False, feedback="Ask Marcus instead.")
 
         assert store.submitted == []
+
+    @pytest.mark.asyncio
+    async def test_sending_the_plan_back_asks_the_framework_to_revise_it(self):
+        """The framework's binary is approve versus revise-with-feedback, and
+        this is the call this repository declined to make until #108. The plan
+        is handed back to the orchestrator with what the associate said, on the
+        same run."""
+        review, outcome = await self._review(
+            FakeTicketStore(), approved=False, feedback="Ask Marcus instead."
+        )
+
+        assert review.revised == ["Ask Marcus instead."]
+        assert review.approved is False
+        assert outcome.approved is False
+        assert set(outcome.responses) == {"req-1"}
+
+    @pytest.mark.asyncio
+    async def test_sending_the_plan_back_counts_the_next_revision(self):
+        _review, outcome = await self._review(
+            FakeTicketStore(), approved=False, feedback="Ask Marcus instead."
+        )
+
+        assert outcome.revision.number == 2
+        assert outcome.revision.feedback == ("Ask Marcus instead.",)
+
+    @pytest.mark.asyncio
+    async def test_the_plan_on_screen_says_which_revision_it_is(self):
+        """The associate can tell a fresh plan from one they already sent back."""
+        _review, _outcome = await self._review(
+            FakeTicketStore(),
+            approved=False,
+            feedback="Actually, ask Dana.",
+            revision=PlanRevision(number=2, feedback=("Ask Marcus instead.",)),
+        )
+
+        presented = mock_convert.return_value
+        assert presented.revision == 2
+        assert presented.revision_feedback == ["Ask Marcus instead."]
+
+    @pytest.mark.asyncio
+    async def test_an_approved_plan_is_never_revised(self):
+        review, outcome = await self._review(FakeTicketStore())
+
+        assert review.revised == []
+        assert outcome.approved is True
+
+    @pytest.mark.asyncio
+    async def test_a_review_nobody_answered_leaves_nothing_to_resume(self):
+        """A timeout is not a verdict. The run has no response to resume with,
+        which ends it — and, unlike the removed reject path, destroys nothing."""
+        mock_wait_approval.return_value = None
+        manager = OrchestrationManager()
+        with patch.object(
+            OrchestrationManager, "_ticket_store", AsyncMock(return_value=(None, None))
+        ):
+            outcome = await manager._handle_plan_reviews(
+                {"req-1": MockPlanReview()},
+                participant_names=["EscalationAgent"],
+                task_text="I can't fix it, raise a ticket",
+                user_id="user-1",
+            )
+
+        assert outcome.responses is None
+        assert outcome.approved is False
 
     @pytest.mark.asyncio
     async def test_a_plan_with_no_drafted_ticket_raises_none(self):
@@ -2066,9 +2389,9 @@ class TestTheApprovalIsTheTicketConfirmation:
         most of them are not escalations."""
         store = FakeTicketStore(ticket=None)
 
-        _review, responses = await self._review(store)
+        _review, outcome = await self._review(store)
 
-        assert responses is not None
+        assert outcome.responses is not None
         pushed = [
             call for call in connection_config.send_status_update_async.call_args_list
             if call.kwargs.get("message_type") == "ticket_raised"
@@ -2133,9 +2456,9 @@ class TestTheApprovalIsTheTicketConfirmation:
 
     @pytest.mark.asyncio
     async def test_an_unresolvable_session_raises_nothing_and_says_nothing(self):
-        _review, responses = await self._review(None)
+        _review, outcome = await self._review(None)
 
-        assert responses is not None
+        assert outcome.responses is not None
         assert not [
             call for call in connection_config.send_status_update_async.call_args_list
             if call.kwargs.get("message_type") == "ticket_raised"
@@ -2149,16 +2472,16 @@ class TestTheApprovalIsTheTicketConfirmation:
         store = FakeTicketStore()
         store.submit = AsyncMock(side_effect=RuntimeError("container unreachable"))
 
-        review, responses = await self._review(store)
+        review, outcome = await self._review(store)
 
         assert review.approved is True
-        assert responses is not None
+        assert outcome.responses is not None
 
     @pytest.mark.asyncio
     async def test_the_plan_is_still_approved(self):
         """All of this rides an existing seam and none of it may change what
         that seam was for."""
-        review, responses = await self._review(FakeTicketStore(_submitted_ticket()))
+        review, outcome = await self._review(FakeTicketStore(_submitted_ticket()))
 
         assert review.approved is True
-        assert set(responses) == {"req-1"}
+        assert set(outcome.responses) == {"req-1"}

@@ -5,9 +5,16 @@ Issue #47, decided in [ADR-016](ADR/016-typescript-playwright-for-the-demo-valid
 through a real browser and asserts what the demonstration *claims*.
 
 It is the only thing in this repository that observes a deployment through the surface a customer
-will see. Every other declared loop runs against fakes — which is how a deployment 42 commits behind
+will see. Every **declared loop** runs against fakes — which is how a deployment 42 commits behind
 stayed green for weeks, and how all four out-of-band signals came to be dropped in the browser while
 223 frontend tests passed. See *Confirmed findings* in `CONTEXT.md` for both.
+
+That is also why the validator is **not** one of them. `AGENTS.md`'s Feedback loops table is the
+list the integration gate executes, unattended, in a fresh worktree on a branch nothing has
+deployed; the validator's first assertion is that the deployment *is* this commit, so gated there it
+is red before a browser opens and no diff can turn it green. It is run deliberately, after
+deploying — [ADR-046](ADR/046-the-feedback-loops-table-is-what-the-gate-runs.md), and
+`src/tests/ci/test_feedback_loops.py` keeps the row out.
 
 ## Running it
 
@@ -196,8 +203,9 @@ these same specs, chosen with `--stage`. See [docs/stage-driver.md](stage-driver
 
 ## The seam that stays runnable in CI
 
-The browser suite needs a deployment, so it is declared as a loop and wired into **no workflow**.
-What runs in CI is `src/tests/ci/test_e2e_wiring.py`, which reads the harness off disk as text and
+The browser suite needs a deployment, so it is neither a declared loop nor wired into any workflow
+([ADR-046](ADR/046-the-feedback-loops-table-is-what-the-gate-runs.md)). What runs in CI is
+`src/tests/ci/test_e2e_wiring.py`, which reads the harness off disk as text and
 asserts the wiring the suite's usefulness depends on: that the script exists and is executable, that
 artefacts are unconditional, that there is exactly one `testDir`, that the target parameter selects
 between the two surfaces, that the expectation is read from the repository, that page objects carry

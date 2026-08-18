@@ -111,12 +111,17 @@ def test_the_browser_deletes_a_chat_by_its_session():
     assert "planId" not in call.group(1)
 
 
-def test_the_single_plan_primitive_still_has_exactly_one_caller():
-    # ADR-026 leaves `delete_plan_by_plan_id` alone: it takes one document, is
+def test_the_single_plan_primitive_has_no_caller_left():
+    # ADR-026 left `delete_plan_by_plan_id` alone: it takes one document, is
     # not scoped by `user_id`, and returns `True` even when it deleted nothing.
     # Reached as Chat deletion it would leave a partial chat behind — the
     # transcript, the troubleshooting record and the ticket all outliving the
     # plan — and would let anyone who knows an id delete another user's record.
+    #
+    # Its one caller was the verdict path, where disagreeing with a plan
+    # destroyed it. #108 replaced that with the framework's revise path, so the
+    # primitive now has no caller at all and the destroying path is unreachable
+    # rather than merely unused.
     #
     # Counted as calls, not as mentions: `router.py` names it in prose,
     # explaining why it is *not* what the delete route reaches for.
@@ -127,7 +132,31 @@ def test_the_single_plan_primitive_still_has_exactly_one_caller():
         if re.search(r"\.delete_plan_by_plan_id\(", source.read_text(encoding="utf-8"))
     ]
 
-    assert callers == ["src/backend/services/plan_service.py"]
+    assert callers == []
+
+
+def test_the_canceled_status_is_one_something_writes():
+    # ADR-031: `canceled` sat in the settled-status set above, in its frontend
+    # mirror and in `chatStateLabel` while **nothing in `src/backend` could
+    # produce it** — three places permitting and rendering a state the system
+    # could not reach. #120 gave it a writer, which is what makes the way out
+    # of `in_progress` a door: end the turn, never loosen the guard.
+    #
+    # Counted as an assignment onto a record, not as a mention: the member is
+    # named in prose, in this file, and in the enum that declares it.
+    backend = REPO_ROOT / "src" / "backend"
+    declaration = backend / "common" / "models" / "messages.py"
+    writers = [
+        source.relative_to(REPO_ROOT).as_posix()
+        for source in backend.rglob("*.py")
+        if source != declaration
+        and re.search(
+            r"overall_status\s*=\s*PlanStatus\.canceled",
+            source.read_text(encoding="utf-8"),
+        )
+    ]
+
+    assert writers, "nothing in src/backend writes PlanStatus.canceled"
 
 
 def test_the_hide_feature_is_gone_rather_than_standing_beside_the_delete():

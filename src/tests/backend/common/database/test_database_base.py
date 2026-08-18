@@ -88,6 +88,9 @@ class TestDatabaseBaseImplementationRequirements:
             async def get_plan(self, plan_id: str) -> Optional[Plan]:
                 return None
             
+            async def get_plan_by_session(self, session_id: str) -> Optional[Plan]:
+                return None
+            
             async def get_all_plans(self) -> List[Plan]:
                 return []
             
@@ -244,6 +247,7 @@ class TestDatabaseBaseContextManager:
             async def update_plan(self, plan): pass
             async def get_plan_by_plan_id(self, plan_id): return None
             async def get_plan(self, plan_id): return None
+            async def get_plan_by_session(self, session_id): return None
             async def get_all_plans(self): return []
             async def get_all_plans_by_team_id(self, team_id): return []
             async def get_all_plans_by_team_id_status(self, user_id, team_id, status): return []
@@ -312,6 +316,7 @@ class TestDatabaseBaseContextManager:
             async def update_plan(self, plan): pass
             async def get_plan_by_plan_id(self, plan_id): return None
             async def get_plan(self, plan_id): return None
+            async def get_plan_by_session(self, session_id): return None
             async def get_all_plans(self): return []
             async def get_all_plans_by_team_id(self, team_id): return []
             async def get_all_plans_by_team_id_status(self, user_id, team_id, status): return []
@@ -487,6 +492,7 @@ class TestConcreteImplementation:
             async def update_plan(self, plan): pass
             async def get_plan_by_plan_id(self, plan_id): return None
             async def get_plan(self, plan_id): return None
+            async def get_plan_by_session(self, session_id): return None
             async def get_all_plans(self): return []
             async def get_all_plans_by_team_id(self, team_id): return []
             async def get_all_plans_by_team_id_status(self, team_id, status): return []
@@ -559,6 +565,7 @@ class TestDatabaseBaseAbstractMethodCoverage:
             async def update_plan(self, plan): await super().update_plan(plan)
             async def get_plan_by_plan_id(self, plan_id): return await super().get_plan_by_plan_id(plan_id)
             async def get_plan(self, plan_id): return await super().get_plan(plan_id)
+            async def get_plan_by_session(self, session_id): return await super().get_plan_by_session(session_id)
             async def get_all_plans(self): return await super().get_all_plans()
             async def get_all_plans_by_team_id(self, team_id): return await super().get_all_plans_by_team_id(team_id)
             async def get_all_plans_by_team_id_status(self, user_id, team_id, status): return await super().get_all_plans_by_team_id_status(user_id, team_id, status)

@@ -90,6 +90,14 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
+    async def get_plan_by_session(
+        self, session_id: str, plan_id: Optional[str] = None
+    ) -> Optional[Plan]:
+        """The Plan record **Ending a turn** settles — the session's latest, or
+        the named one within that session."""
+        pass
+
+    @abstractmethod
     async def get_all_plans(self) -> List[Plan]:
         """Retrieve all plans for the user."""
         pass

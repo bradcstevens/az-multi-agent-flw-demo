@@ -98,8 +98,10 @@ class MockStartingTask:
     lane: str = None
     rehearsed_replies: List[str] = field(default_factory=list)
     ticket_status_reply: Optional[dict] = None
-    follow_on: str = None
+    follow_on: List[str] = field(default_factory=list)
+    context_dependent: bool = False
     ticket_on_approval: bool = False
+    plan_steps: List[dict] = field(default_factory=list)
 
 @dataclass
 class MockTeamConfiguration:
@@ -371,15 +373,27 @@ class TestTeamConfigurationValidation:
 
         assert service._validate_and_parse_task(task_data).lane == "fast"
 
-    def test_a_declared_follow_on_survives_the_upload(self):
-        """The task that continues this conversation (issue #61, ADR-024)."""
+    def test_declared_follow_on_tasks_survive_the_upload(self):
+        """The Quick Tasks that continue this conversation (issue #132, ADR-033)."""
         service = TeamService()
 
         assert (
             service._validate_and_parse_task(
-                _valid_task_data(follow_on="task-223-escalation")
+                _valid_task_data(
+                    follow_on=["task-223-escalation", "task-223-honest-miss"]
+                )
             ).follow_on
-            == "task-223-escalation"
+            == ["task-223-escalation", "task-223-honest-miss"]
+        )
+
+    def test_context_dependence_survives_the_upload(self):
+        service = TeamService()
+
+        assert (
+            service._validate_and_parse_task(
+                _valid_task_data(context_dependent=True)
+            ).context_dependent
+            is True
         )
 
     def test_a_ticket_on_approval_task_survives_the_upload(self):
@@ -393,6 +407,26 @@ class TestTeamConfigurationValidation:
             ).ticket_on_approval
             is True
         )
+
+    def test_authored_plan_steps_survive_the_upload(self):
+        service = TeamService()
+        steps = [
+            {
+                "id": 3,
+                "action": "Ask Marcus Bell to confirm the agreed swap",
+                "assignee": {
+                    "kind": "person",
+                    "name": "Marcus Bell",
+                    "relation": "peer",
+                    "simulated": True,
+                },
+                "waitsOn": 2,
+            }
+        ]
+
+        assert service._validate_and_parse_task(
+            _valid_task_data(plan_steps=steps)
+        ).plan_steps == [{**steps[0], "agent": ""}]
 
     def test_a_ticket_status_reply_survives_the_upload(self):
         """The ticketing task owns the Fast-lane reply it offers after approval."""
@@ -999,8 +1033,8 @@ class TestStoreAssistantPackUploads:
         # the upload is most likely to drop silently: ``StartingTask.lane`` is
         # an optional, unvalidated ``str``, so a lane that never arrives parses
         # as no declaration at all and the lane router falls back to the
-        # keywords. The escalation task is the one that matters — its approval
-        # step is the associate confirming the ticket (#22, #26).
+        # keywords. The two transaction tasks are the ones that matter — each
+        # must carry its approval gate through the upload.
         service = TeamService()
         team = await service.validate_and_parse_team_config(self._pack(), "user-1")
 
@@ -1008,7 +1042,7 @@ class TestStoreAssistantPackUploads:
         assert all(lane in ("fast", "deliberate") for lane in lanes.values()), lanes
         assert [
             task_id for task_id, lane in lanes.items() if lane == "deliberate"
-        ] == ["task-223-escalation"]
+        ] == ["task-223-escalation", "task-223-shift-swap"]
 
     @pytest.mark.asyncio
     async def test_authored_pack_keeps_its_rehearsed_replies(self):

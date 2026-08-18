@@ -6,11 +6,15 @@ import CoralShellRow from '../commonComponents/components/Layout/CoralShellRow';
 import Content from '../commonComponents/components/Content/Content';
 import HomeInput from '@/components/content/HomeInput';
 import TransparencyRail from '@/components/transparency/TransparencyRail';
+import TransparencyRailToggle from '@/components/transparency/TransparencyRailToggle';
 import AgentTeamPanel from '@/components/transparency/AgentTeamPanel';
 import { NewChatService } from '../store/NewChatService';
 import ChatPanelLeft from '@/components/content/ChatPanelLeft';
+import ChatHistoryDrawerToggle from '@/components/content/ChatHistoryDrawerToggle';
+import NewChatButton from '@/components/content/NewChatButton';
 import ContentToolbar from '@/commonComponents/components/Content/ContentToolbar';
 import { TeamService } from '../store/TeamService';
+import { waitForRuntimeBootstrap } from '../api/config';
 import StoreIdentity from '../components/branding/StoreIdentity';
 import { ASSISTANT_NAME, selectStoreAssistant } from '../models/storeSurface';
 import InlineToaster, { useInlineToaster } from '../components/toast/InlineToaster';
@@ -59,8 +63,14 @@ const HomePage: React.FC = () => {
      */
     useEffect(() => {
         const initTeam = async () => {
+            if (selectedTeam) {
+                dispatch(setIsLoadingTeam(false));
+                return;
+            }
+
             dispatch(setIsLoadingTeam(true));
             try {
+                await waitForRuntimeBootstrap();
                 const teams = await TeamService.getUserTeams();
                 const storeAssistant = selectStoreAssistant(teams);
 
@@ -77,13 +87,19 @@ const HomePage: React.FC = () => {
                 dispatch(setSelectedTeam(storeAssistant));
                 TeamService.storageTeam(storeAssistant);
 
-                // The backend still has to build the workflow for it; the
-                // response is only interesting when it fails.
-                const initResponse = await TeamService.initializeTeam();
-                if (!initResponse.success) {
-                    console.error('Store assistant init failed:', initResponse.error);
-                    showToast('The store assistant could not be started. Please try again.', 'warning');
-                }
+                // Team attachment is enough to accept a question. The first
+                // request declares the Lane that configures its Workflow.
+                void TeamService.initializeTeam(storeAssistant.team_id)
+                    .then((initResponse) => {
+                        if (!initResponse.success) {
+                            console.error('Store assistant init failed:', initResponse.error);
+                            showToast('The store assistant could not be started. Please try again.', 'warning');
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Store assistant initialization error:', error);
+                        showToast('The store assistant could not be reached.', 'warning');
+                    });
             } catch (error) {
                 console.error('Store assistant initialization error:', error);
                 dispatch(setSelectedTeam(null));
@@ -94,7 +110,7 @@ const HomePage: React.FC = () => {
         };
 
         initTeam();
-    }, [dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [dispatch, selectedTeam]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleNewChatButton = useCallback(() => {
         NewChatService.handleNewChatFromHome();
@@ -107,11 +123,13 @@ const HomePage: React.FC = () => {
                 <CoralShellRow>
                     <ChatPanelLeft
                         reloadChats={reloadLeftList}
-                        onNewChatButton={handleNewChatButton}
                         isLoadingTeam={isLoadingTeam}
                     />
                     <Content>
                         <ContentToolbar panelTitle={ASSISTANT_NAME}>
+                            <NewChatButton onClick={handleNewChatButton} />
+                            <ChatHistoryDrawerToggle />
+                            <TransparencyRailToggle />
                             <StoreIdentity />
                         </ContentToolbar>
                         {!isLoadingTeam ? (

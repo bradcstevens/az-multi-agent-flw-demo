@@ -40,6 +40,10 @@ Read the two boxes below before anything else. They are the only two things you 
 | **Do not reload the page** mid-demonstration | The cost meter on the right accumulates across the whole walkthrough and is the only thing that does. A reload empties it, and the comparison in beat 5 is gone. |
 | **Between beats** | Use **New chat** between beats 1, 2 and 3. Beat 4 continues beat 3 from its follow-on card. Beats 5 and 6 never leave the home screen: the refusal and the answer appear directly under the message box, which is what makes them a before-and-after. If you leave a conversation by mistake, you can reopen it and carry on — see [If you lose your place](#if-you-lose-your-place--reopen-the-chat-and-keep-going). |
 
+**The chat list is closed at beat 0.** It opens over the conversation only when you choose **Chat
+history** in the content toolbar. **New chat** stays beside that control, so it is always available
+without opening the list.
+
 **Ask an engineer to clear the deployment before a customer session.** One command does it:
 `bash scripts/sop-rehearsal.sh` ([sop-rehearsal.md](sop-rehearsal.md)) — ten Demo validator runs
 against the deployed surface, and it stops at the first red one and names the layer to fix. Ten
@@ -133,6 +137,9 @@ until it offers to escalate.
 **Tap:** `I can't fix it` — the follow-on card above the message box — *"I have tried everything
 and I can't fix it. I need someone to come out."*
 
+**Rehearsed Follow-on edge:** `The coffee brewer is down. It is not brewing on the left head.` ->
+`I have tried everything and I can't fix it. I need someone to come out.`
+
 **What happens:** this one takes the **deliberate lane** — a plan appears and waits for you. Press
 **Approve Task Plan**. A service ticket card appears with its `SIM-223-…` number.
 
@@ -158,7 +165,10 @@ nothing outside this demonstration.
 
 ### 5. How much PTO do I have? — the boundary
 
-**Tap:** `How much PTO do I have?` — *"My name is Tanya, how much PTO do I have?"*
+**Tap:** `How much PTO do I have?` — *"My name is Clara, how much PTO do I have?"*
+
+**Context:** this is Clara Workman's personal question, but the shared device has not identified
+the person asking it.
 
 **What lands:** it is refused, immediately, under the heading **Store-scoped assistant**. The
 refusal explains that the assistant is set up for the store rather than for individuals, that on a
@@ -179,12 +189,17 @@ It is the answer to *"you just hardcoded that"*, and it is worth more than the s
 **Tap:** the **Sign in to continue** button **inside the refusal**. It is deliberately not a
 separate login screen.
 
-**What happens:** the header gains a name, and the *same question, unedited* is asked again — and
-answered out of an authored associate record. The record carries a Provenance line that no payroll
-system was queried. The next manager reply can address the associate by the authored address name:
-before sign-in it cannot know your name; after it, the manager does. Do not promise an exact
-greeting or browser-test its wording — that is model prose. The backend tests the structure instead:
-the name reaches only the manager after sign-in, never the associate's task or plan record.
+**Say, before you tap:** *"Simulated sign-in — no identity provider is involved."* Say it out
+loud, unprompted. A stakeholder who works this out for themselves afterwards stops believing
+everything else you showed them.
+
+**What happens:** the header gains **Clara Workman**, and the *same question, unedited* is asked
+again — and answered out of Clara Workman's authored associate record. The record carries a
+Provenance line that no payroll system was queried. The next manager reply can address the associate
+by the authored address name: before sign-in it cannot know your name; after it, the manager does.
+Do not promise an exact greeting or browser-test its wording — that is model prose. The backend
+tests the structure instead: the name reaches only the manager after sign-in, never the associate's
+task or plan record.
 
 **They should be looking at:** the header changing, and the same words getting a different
 outcome.
@@ -218,23 +233,33 @@ that was going to explain it.
 
 ### 8. Swap a shift — the fourth specialist
 
-**Tap:** `Swap a shift` — *"How do I swap a shift with another associate?"*
+**Tap:** `Swap a shift` — *"Marcus Bell and I have agreed to swap our Saturday shifts. Start the
+swap."*
 
-**Say:** *"This one is not about the store at all. It is about employment — the thing an associate
-would otherwise take to a manager, or to a portal they have to be at a desk to use."*
+**Say:** *"This is not a procedure recital. Clara Workman and Marcus already agreed the swap, and
+this request starts the approval chain."*
 
-**What lands:** an answer about offering the swap, the other associate accepting it and the shift
-lead approving it, quoting `WF-401`, and saying out loud that the procedure library is simulated.
-On the right, the **Agent Team** panel shows **four** specialists and the cost table bills the
+**What lands:** a **Reviewable plan**, with the **Deliberate** lane badge and its approval control.
+It starts with the **Workforce Agent** checking the procedure, then reaches **Clara Workman**
+(**You**), **Marcus Bell** and **Dana Reyes** in that declared `waitsOn` order. Each person's step
+says, in the plan's own words, that they get a message and can say no — the plan is where the
+approval chain is declared, and nobody in it was discovered from a roster. Approve it to let the
+fourth specialist answer.
+On the right, the **Agent Team** panel still shows **four** specialists and the cost table bills the
 **Workforce Agent** for the turn — a different specialist from the one that answered beat 1.
 
-**Say:** *"Four specialists, and the orchestrator picked the right one. Nobody wrote a rule that
-said 'shift swap goes here' — it chose from what each one says it does."*
+**Say:** *"Four specialists, and the orchestrator picked the right one. The plan does not invent a
+roster: it names the colleague the associate already agreed this with, then makes the approvals
+visible."*
 
-**The claim:** the routing story, made legible. And the boundary: this specialist answers **how a
-thing is done**, never **what somebody is owed**. Beat 5 is the other half of that sentence, and
-this beat is what makes it a boundary rather than a limitation — *"it will tell you how to swap a
-shift; it will not tell you Tanya's leave balance on a shared device."*
+**The claim:** the routing story, made legible, now acting on a real decision. And the boundary:
+this specialist follows the shift-swap process but never reads **what somebody is owed**. Beat 5 is
+the other half of that sentence, and this beat is what makes it a boundary rather than a limitation.
+
+**Do not say the colleagues were asked.** What is on screen is the plan naming who the swap has to
+reach and in what order. Read the steps out as the plan's own promise — *"this is what it would
+take"* — rather than as two people who have been messaged, because nothing on the screen reports
+that they were.
 
 **Do not claim an HR integration.** There is no employment system behind this. The procedure
 library is mocked and says so on every answer. If somebody asks, *"this is where Workday or UKG
@@ -249,10 +274,11 @@ screen imply it.
 the room took you off the screen and back to the list. Beat 3 into beat 4 is the sequence this
 protects: the ticket's whole claim is that nothing had to be repeated.
 
-**What to do:** open the conversation again from **Chat history** on the left — every chat is listed
-there, in whatever state it is in, and the one you want is usually the one at the top that did not
-finish — then type into the message box at the bottom. It invites you with *"Ask another question in
-this chat..."*, and what you send continues **that** conversation rather than starting a new one.
+**What to do:** choose **Chat history** in the content toolbar, then open the conversation from the
+drawer — every chat is listed there, in whatever state it is in, and the one you want is usually the
+one at the top that did not finish. The drawer closes and returns you to the conversation. Type into
+the message box at the bottom; it invites you with *"Ask another question in this chat..."*, and what
+you send continues **that** conversation rather than starting a new one.
 
 **Say nothing about it.** It is a repair, not a beat. Use it and carry on.
 

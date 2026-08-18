@@ -566,6 +566,120 @@ class TestCosmosDBPlanOperations:
         client.query_items.assert_called_once_with(expected_query, expected_params, Plan)
 
 
+class TestTheChatsLatestPlan:
+    """The read **Ending a turn** settles onto (#120, ADR-031).
+
+    A Chat's state is its **latest** Plan's (#71) and every turn mints a new
+    one, so the primitive has to be handed the newest and nothing else. An
+    older plan reached by mistake would be written ``canceled`` while the turn
+    that is actually running went on running.
+
+    Read **raw**, for the reason `delete_chat` records beside it: the shared
+    ``query_items`` maps every failure to an empty list, so an outage would be
+    indistinguishable from a session with no plan in it — and this caller kills
+    an orchestration on the strength of the answer.
+    """
+
+    @pytest.fixture
+    def client(self):
+        client = CosmosDBClient(
+            endpoint="https://test.documents.azure.com:443/",
+            credential="test_credential",
+            database_name="test_db",
+            container_name="test_container",
+            session_id="test_session",
+            user_id="test_user",
+        )
+        client._initialized = True
+        client.container = AsyncMock()
+        return client
+
+    @staticmethod
+    def _cosmos(client, rows=None, raises=None):
+        def query_items(**kwargs):
+            async def cursor():
+                if raises is not None:
+                    raise raises
+                for row in rows or []:
+                    yield row
+
+            return cursor()
+
+        client.container.query_items = Mock(side_effect=query_items)
+
+    @staticmethod
+    def _plan(plan_id="plan-1", **overrides):
+        document = {
+            "id": plan_id,
+            "plan_id": plan_id,
+            "session_id": "session-1",
+            "user_id": "test_user",
+            "data_type": DataType.plan,
+            "initial_goal": "close the store",
+            "overall_status": PlanStatus.in_progress.value,
+        }
+        document.update(overrides)
+        return document
+
+    @pytest.mark.asyncio
+    async def test_the_newest_plan_in_the_session_is_the_one_returned(self, client):
+        self._cosmos(client, rows=[self._plan("plan-newest")])
+
+        result = await client.get_plan_by_session("session-1")
+
+        assert result.plan_id == "plan-newest"
+        query = client.container.query_items.call_args.kwargs["query"]
+        parameters = client.container.query_items.call_args.kwargs["parameters"]
+        # `TOP 1` is the whole guard, not a tidiness: a query that asked for the
+        # session's plans and took the first would silently promote an *older*
+        # settled plan whenever the newest one failed to parse — and write
+        # `canceled` onto the wrong turn.
+        assert "SELECT TOP 1 *" in query
+        assert "ORDER BY c._ts DESC" in query
+        assert {"name": "@session_id", "value": "session-1"} in parameters
+        assert {"name": "@user_id", "value": "test_user"} in parameters
+        assert {"name": "@data_type", "value": DataType.plan} in parameters
+
+    @pytest.mark.asyncio
+    async def test_a_session_this_user_has_no_plan_in_is_no_chat(self, client):
+        # Scoped by `user_id` in the query, which is the whole of the
+        # authorization here for the reason `delete_chat` records: a session id
+        # is not a secret, and `process_request` takes one from the caller.
+        self._cosmos(client, rows=[])
+
+        assert await client.get_plan_by_session("session-1") is None
+
+    @pytest.mark.asyncio
+    async def test_a_store_failure_is_not_reported_as_a_missing_chat(self, client):
+        # The failure this read exists in its own right to avoid. Through the
+        # shared `query_items`, a Cosmos outage comes back as `[]` — identical
+        # to a session that holds no plan — and **Ending a turn** reads that as
+        # "no chat here", answers 404 and writes nothing. The turn is left for
+        # the caller to decide about rather than settled on a guess.
+        self._cosmos(client, raises=RuntimeError("Cosmos is unavailable"))
+
+        with pytest.raises(RuntimeError):
+            await client.get_plan_by_session("session-1")
+
+    @pytest.mark.asyncio
+    async def test_a_named_plan_is_read_within_its_own_session(self, client):
+        # The turn registry knows exactly which Plan the turn it is cancelling
+        # was answering, and that is the record to settle — "the session's
+        # latest" is only right while no newer turn has started. Still scoped by
+        # session and user: a plan id is no more a secret than a session id.
+        self._cosmos(client, rows=[self._plan("plan-7")])
+
+        result = await client.get_plan_by_session("session-1", plan_id="plan-7")
+
+        assert result.plan_id == "plan-7"
+        query = client.container.query_items.call_args.kwargs["query"]
+        parameters = client.container.query_items.call_args.kwargs["parameters"]
+        assert "c.id=@plan_id" in query
+        assert "c.session_id=@session_id" in query
+        assert "c.user_id=@user_id" in query
+        assert {"name": "@plan_id", "value": "plan-7"} in parameters
+
+
 class TestCosmosDBStepOperations:
     """Test CosmosDB step-related operations."""
     

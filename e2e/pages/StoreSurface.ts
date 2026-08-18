@@ -53,6 +53,26 @@ export class StoreSurface {
         return this.page.locator('.home-input-quick-tasks');
     }
 
+    /** The static-label disclosure that reveals chat history over the home surface. */
+    get chatHistoryToggle(): Locator {
+        return this.page.getByRole('button', { name: 'Chat history' });
+    }
+
+    /** New chat remains outside chat history so it is always available. */
+    get newChatButton(): Locator {
+        return this.page.getByRole('button', { name: 'New chat' });
+    }
+
+    /** Chat history is a modal Panel drawer, not a left shell column. */
+    get chatHistoryDrawer(): Locator {
+        return this.page.getByRole('dialog');
+    }
+
+    async openChatHistory(): Promise<void> {
+        await this.chatHistoryToggle.click();
+        await expect(this.chatHistoryDrawer).toBeVisible();
+    }
+
     /** The Quick Task card carrying a given title, by its authored name. */
     quickTask(name: string): Locator {
         return this.quickTasks.getByRole('button', { name });
