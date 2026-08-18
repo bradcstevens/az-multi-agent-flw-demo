@@ -10,6 +10,7 @@ from azure.cosmos.aio import CosmosClient
 from azure.cosmos.aio._database import DatabaseProxy
 
 from chat.deletion import ChatDeletion, ChatsDeletion, DeletionOutcome, is_running
+from chat.settle import SettleOutcome, TurnSettled, settled_status
 
 from ..models.messages import (
     AgentMessage,
@@ -504,6 +505,139 @@ class CosmosDBClient(DatabaseBase):
                     )
 
         return True
+
+    async def settle_turn(
+        self, session_id: str, status, plan_id: Optional[str] = None
+    ) -> TurnSettled:
+        """The **settle-write** — one terminal status, written once (#157).
+
+        ADR-043: *the server settles the turn it ended*, so this is how a
+        **Settled status** reaches a **Plan record** from now on — off the
+        orchestration's own terminal branch, and not conditional on a socket, a
+        tab or a browser that came back. It is deliberately callable by every
+        writer of that fact, because #120's end-of-turn primitive, #122's
+        delete-door and #159's startup reconciliation all want exactly this
+        operation and a second copy would be a second place to forget its rules.
+
+        Three things it does, and each of them is a rule rather than a step:
+
+        * **It targets the Chat's latest Plan, scoped to its owner.** A Chat
+          holds more than one Plan (#71) and its state is the latest one's, so
+          ``_latest_plan``'s newest-first read — whose ``user_id`` predicate is
+          the whole of the authorization — is what names the document. A session
+          id is not a secret, and settling another associate's turn would be
+          writing a verdict onto a conversation this caller cannot see.
+        * **It never overwrites a Settled status** (ADR-043 decision 6). A turn
+          that failed after a partial success, a late echo and an end-of-turn
+          cancel all converge on one document, and the first true answer is the
+          one that stands: a record corrected into being wrong is worse than one
+          left alone. Reported as ``already_settled`` rather than raised —
+          arriving second is the ordinary case, not a fault.
+        * **A caller that knows which Plan its turn ran says so**, and the write
+          is refused when the latest Plan is a different one. ``process_request``
+          writes the next turn's Plan *before* it cancels the one in flight, so a
+          turn that finishes inside that window would otherwise settle its
+          successor's Plan — stamping a terminal status onto an answer that has
+          not started, which is the one direction of error this decision exists
+          to prevent, and which would make a live Chat deletable with it.
+          ``plan_id`` is optional because #120's end-of-turn primitive and #159's
+          reconciliation are session-scoped and have no plan to name; a caller
+          that *does* have one is held to it.
+        * **It is conditional, not read-then-clobber.** The write carries the
+          ``_etag`` the read observed, so a settle that landed in between refuses
+          this one (412) instead of silently losing to a stale read. A Plan the
+          store did not describe an ``_etag`` for cannot be written safely and is
+          left alone, for the reason ``delete_chat`` keeps a chat it cannot
+          guard.
+
+        Patched rather than replaced: ``_latest_plan`` reads three fields, and
+        writing back a whole ``Plan`` rebuilt from them would take the rest of
+        the document with it.
+
+        Reports what actually happened. A refusal comes back as ``refused`` and
+        is logged, because a status the store did not accept is not a turn that
+        ended — and this operation exists precisely so that nothing reports a
+        write that did not land as one.
+        """
+        await self._ensure_initialized()
+
+        # Refused before the store is touched: a settle-write is the one route
+        # to a Settled status, and a caller handing it `in_progress` — or the
+        # orchestration's wire word `error` — is a bug in the caller.
+        terminal = settled_status(status)
+
+        current, latest_plan_id, etag, found = await self._latest_plan(session_id)
+
+        if not found:
+            self.logger.info(
+                "Not settling session %s as %s: it holds no plan of this "
+                "user's",
+                session_id,
+                terminal,
+            )
+            return TurnSettled(SettleOutcome.no_such_chat)
+
+        # The turn that ended is not the turn this Chat is running. Refused
+        # rather than written, and fail-closed like every other "cannot tell"
+        # here: settling somebody else's plan is the one error that ends a live
+        # answer.
+        if plan_id is not None and latest_plan_id != plan_id:
+            self.logger.info(
+                "Not settling chat %s as %s: plan %s ended, but the chat's "
+                "latest plan is %s — a newer turn owns this chat now",
+                session_id,
+                terminal,
+                plan_id,
+                latest_plan_id,
+            )
+            return TurnSettled(SettleOutcome.superseded, status=current)
+
+        if not is_running(current):
+            self.logger.info(
+                "Keeping chat %s at %s: a settled status is never overwritten "
+                "(asked for %s)",
+                session_id,
+                current,
+                terminal,
+            )
+            return TurnSettled(SettleOutcome.already_settled, status=current)
+
+        if not etag:
+            self.logger.warning(
+                "Not settling chat %s as %s: its latest plan %s carries no "
+                "_etag, so the write cannot be made conditional",
+                session_id,
+                terminal,
+                latest_plan_id,
+            )
+            return TurnSettled(SettleOutcome.refused)
+
+        try:
+            await self.container.patch_item(
+                latest_plan_id,
+                partition_key=session_id,
+                patch_operations=[
+                    {"op": "set", "path": "/overall_status", "value": terminal}
+                ],
+                etag=etag,
+                match_condition=MatchConditions.IfNotModified,
+            )
+        except Exception as e:
+            if getattr(e, "status_code", None) == PRECONDITION_FAILED:
+                self.logger.info(
+                    "Chat %s settled under this write: plan %s moved, so its "
+                    "status stands rather than %s",
+                    session_id,
+                    latest_plan_id,
+                    terminal,
+                )
+                return TurnSettled(SettleOutcome.lost_race)
+            self.logger.warning(
+                "Failed settling chat %s as %s: %s", session_id, terminal, e
+            )
+            return TurnSettled(SettleOutcome.refused)
+
+        return TurnSettled(SettleOutcome.settled, status=terminal)
 
     async def delete_chat(self, session_id: str) -> ChatDeletion:
         """**Chat deletion** — every document in one Chat's session partition.

@@ -40,6 +40,7 @@ from backend.common.models.messages import (
     UserCurrentTeam,
 )
 from chat.deletion import ChatDeletion, DeletionOutcome
+from chat.settle import SettleOutcome
 from models.plan_models import MPlan
 
 
@@ -1401,6 +1402,326 @@ class TestChatDeletionRaces:
 
         assert result.outcome is DeletionOutcome.deleted
         assert result.deleted == 1
+
+
+class TestTheSettleWrite:
+    """The server settles the turn it ended (#157, ADR-043).
+
+    One operation, and every writer of a **Settled status** goes through it:
+    write this terminal status onto the session's latest **Plan record**, unless
+    that Plan already reached a Settled status. Before this, the only writer
+    anywhere was the browser echoing `is_final` back through
+    `POST /v4/agent_message` — so a finished turn's record was contingent on a
+    socket, a tab and a fetch, and `failed` was written by nothing at all.
+
+    The container is what these tests stub, for the reason `delete_chat`'s do:
+    the status is read raw, because a plan this build cannot validate must not
+    vanish from the read and promote an older one.
+    """
+
+    @pytest.fixture
+    def client(self):
+        client = CosmosDBClient(
+            endpoint="https://test.documents.azure.com:443/",
+            credential="test_credential",
+            database_name="test_db",
+            container_name="test_container",
+            session_id="test_session",
+            user_id="test_user",
+        )
+        client._initialized = True
+        client.container = AsyncMock()
+        return client
+
+    @staticmethod
+    def _cosmos(client, latest=None, raises=None, refuses=None):
+        """Stand in for the one read and the one write.
+
+        ``raises`` is raised while iterating the status read, which is where the
+        Azure SDK surfaces a store failure; ``refuses`` is what the conditional
+        write raises.
+        """
+
+        def query_items(**kwargs):
+            async def cursor():
+                if raises is not None:
+                    raise raises
+                for row in latest or []:
+                    yield row
+
+            return cursor()
+
+        client.container.query_items = Mock(side_effect=query_items)
+        client.container.patch_item = AsyncMock(side_effect=refuses)
+
+    @staticmethod
+    def _running_plan(status=None, plan_id="plan-1", etag="etag-1"):
+        row = {"id": plan_id}
+        if status is not None:
+            row["overall_status"] = status
+        if etag is not None:
+            row["_etag"] = etag
+        return [row]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [PlanStatus.completed, PlanStatus.failed, PlanStatus.canceled],
+    )
+    async def test_a_turn_that_ended_reaches_its_terminal_status(
+        self, client, status
+    ):
+        # `failed` and `canceled` among them: two statuses this system renders
+        # and permits, and until ADR-043 and ADR-031 could not produce.
+        self._cosmos(client, latest=self._running_plan(PlanStatus.in_progress.value))
+
+        result = await client.settle_turn("session-1", status)
+
+        assert result.outcome is SettleOutcome.settled
+        assert result.status == status.value
+        assert result.persisted is True
+        written = client.container.patch_item.call_args
+        assert written.kwargs["patch_operations"] == [
+            {"op": "set", "path": "/overall_status", "value": status.value}
+        ]
+
+    @pytest.mark.asyncio
+    async def test_the_write_targets_the_latest_plan_of_this_users(self, client):
+        # The `user_id` predicate is the whole of the authorization, exactly as
+        # it is for the delete: a session id is not a secret, and settling
+        # somebody else's turn is writing a verdict onto a conversation this
+        # caller cannot see. Newest-first because a Chat holds more than one
+        # Plan (#71) and its state is the latest one's.
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.in_progress.value, plan_id="plan-9"),
+        )
+
+        await client.settle_turn("session-1", PlanStatus.completed)
+
+        read = client.container.query_items.call_args.kwargs
+        assert "c.session_id=@session_id" in read["query"]
+        assert "c.user_id=@user_id" in read["query"]
+        assert "ORDER BY c._ts DESC" in read["query"]
+        assert {"name": "@user_id", "value": "test_user"} in read["parameters"]
+        written = client.container.patch_item.call_args
+        assert written.args[0] == "plan-9"
+        assert written.kwargs["partition_key"] == "session-1"
+
+    @pytest.mark.asyncio
+    async def test_the_write_is_conditional_on_what_was_read(self, client):
+        # Not read-then-clobber (ADR-043 decision 6). The `_etag` the status
+        # read observed rides on the write, so a settle that landed in between
+        # refuses this one instead of silently losing to a stale read.
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.in_progress.value, etag="e1"),
+        )
+
+        await client.settle_turn("session-1", PlanStatus.completed)
+
+        written = client.container.patch_item.call_args
+        assert written.kwargs["etag"] == "e1"
+        assert written.kwargs["match_condition"] is MatchConditions.IfNotModified
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "already", [PlanStatus.completed, PlanStatus.failed, PlanStatus.canceled]
+    )
+    @pytest.mark.parametrize(
+        "asked", [PlanStatus.completed, PlanStatus.failed, PlanStatus.canceled]
+    )
+    async def test_a_settled_status_is_never_overwritten(
+        self, client, already, asked
+    ):
+        # Every terminal status against every other. A turn that failed after a
+        # partial success, a late echo and #120's end-of-turn primitive all
+        # converge on this one document, and the first true answer is the one
+        # that stands: a record corrected into being wrong is worse than one
+        # left alone.
+        self._cosmos(client, latest=self._running_plan(already.value))
+
+        result = await client.settle_turn("session-1", asked)
+
+        assert result.outcome is SettleOutcome.already_settled
+        assert result.status == already.value
+        assert result.persisted is True
+        client.container.patch_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_chat_this_user_does_not_own_is_no_chat_at_all(self, client):
+        # The read comes back empty for a session that does not exist and for
+        # one belonging to somebody else alike.
+        self._cosmos(client, latest=[])
+
+        result = await client.settle_turn("session-someone-else", PlanStatus.completed)
+
+        assert result.outcome is SettleOutcome.no_such_chat
+        assert result.persisted is False
+        client.container.patch_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_plan_that_moved_under_the_write_keeps_what_it_moved_to(
+        self, client
+    ):
+        # The 412 is the guard doing its job: another writer settled this turn
+        # between the read and the write, and by the rule above theirs is the
+        # answer that stands.
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.in_progress.value),
+            refuses=_PreconditionFailed(),
+        )
+
+        result = await client.settle_turn("session-1", PlanStatus.completed)
+
+        assert result.outcome is SettleOutcome.lost_race
+        assert result.persisted is False
+
+    @pytest.mark.asyncio
+    async def test_a_store_failure_is_not_reported_as_a_settled_turn(self, client):
+        # The defect ADR-043 names, at the layer that could reintroduce it: a
+        # write that did not land must not come back as one that did.
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.in_progress.value),
+            refuses=RuntimeError("Cosmos is unavailable"),
+        )
+
+        result = await client.settle_turn("session-1", PlanStatus.completed)
+
+        assert result.outcome is SettleOutcome.refused
+        assert result.persisted is False
+
+    @pytest.mark.asyncio
+    async def test_a_failed_read_is_not_reported_as_a_settled_turn_either(
+        self, client
+    ):
+        self._cosmos(client, raises=RuntimeError("Cosmos is unavailable"))
+
+        with pytest.raises(RuntimeError):
+            await client.settle_turn("session-1", PlanStatus.completed)
+
+        client.container.patch_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_plan_the_store_did_not_describe_is_left_alone(self, client):
+        # No `_etag` means no conditional write, which means no guard. A turn
+        # this build cannot settle safely is left running, for the reason
+        # `delete_chat` keeps a chat whose latest plan it cannot guard.
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.in_progress.value, etag=None),
+        )
+
+        result = await client.settle_turn("session-1", PlanStatus.completed)
+
+        assert result.outcome is SettleOutcome.refused
+        client.container.patch_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_status_this_build_cannot_read_is_a_turn_still_running(
+        self, client
+    ):
+        # `is_running` is fail-closed and this is the direction that makes it
+        # so: a status the settled set does not recognise is not a turn that
+        # ended, so settling it overwrites nothing the rule protects.
+        self._cosmos(client, latest=self._running_plan("quiescing"))
+
+        result = await client.settle_turn("session-1", PlanStatus.completed)
+
+        assert result.outcome is SettleOutcome.settled
+
+    @pytest.mark.asyncio
+    async def test_a_plan_reporting_no_status_at_all_is_settled(self, client):
+        self._cosmos(client, latest=self._running_plan(None))
+
+        result = await client.settle_turn("session-1", PlanStatus.failed)
+
+        assert result.outcome is SettleOutcome.settled
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status", [PlanStatus.in_progress, PlanStatus.approved, "error", None]
+    )
+    async def test_only_a_settled_status_settles_a_turn(self, client, status):
+        # Refused before the store is touched. `error` is the orchestration's
+        # wire word and not a fourth member of the settled set (ADR-043
+        # decision 4); `in_progress` would be a way of un-ending a turn.
+        self._cosmos(client, latest=self._running_plan(PlanStatus.in_progress.value))
+
+        with pytest.raises(ValueError):
+            await client.settle_turn("session-1", status)
+
+        client.container.query_items.assert_not_called()
+        client.container.patch_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_turn_settles_the_plan_it_ran(self, client):
+        # The caller names the Plan its turn ran, and the latest Plan is that
+        # one: the ordinary case, and the write goes ahead.
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.in_progress.value, plan_id="plan-1"),
+        )
+
+        result = await client.settle_turn(
+            "session-1", PlanStatus.completed, "plan-1"
+        )
+
+        assert result.outcome is SettleOutcome.settled
+
+    @pytest.mark.asyncio
+    async def test_a_turn_that_ended_late_never_settles_its_successor(self, client):
+        # `process_request` writes the next turn's Plan *before* it cancels the
+        # orchestration in flight, so a turn finishing inside that window finds
+        # a Plan at the top of the session that belongs to an answer which has
+        # not started. Settling it would stamp a terminal status onto a live
+        # turn — the one direction of error ADR-043 exists to prevent — and
+        # would make a running Chat deletable on the way past.
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.in_progress.value, plan_id="plan-2"),
+        )
+
+        result = await client.settle_turn(
+            "session-1", PlanStatus.completed, "plan-1"
+        )
+
+        assert result.outcome is SettleOutcome.superseded
+        assert result.persisted is False
+        client.container.patch_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_a_superseded_turn_is_refused_even_by_a_settled_latest_plan(
+        self, client
+    ):
+        # Checked before the never-overwrite rule, so the outcome names the
+        # reason a reader needs: this turn had nothing of its own to settle,
+        # rather than "somebody settled it first".
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.completed.value, plan_id="plan-2"),
+        )
+
+        result = await client.settle_turn("session-1", PlanStatus.failed, "plan-1")
+
+        assert result.outcome is SettleOutcome.superseded
+
+    @pytest.mark.asyncio
+    async def test_a_session_scoped_caller_names_no_plan(self, client):
+        # #120's end-of-turn primitive and #159's reconciliation settle a
+        # *session*, and have no plan id to be held to. Naming none is not
+        # naming the wrong one.
+        self._cosmos(
+            client,
+            latest=self._running_plan(PlanStatus.in_progress.value, plan_id="plan-7"),
+        )
+
+        result = await client.settle_turn("session-1", PlanStatus.canceled)
+
+        assert result.outcome is SettleOutcome.settled
+        assert client.container.patch_item.call_args.args[0] == "plan-7"
 
 
 class TestDeleteAllChats:

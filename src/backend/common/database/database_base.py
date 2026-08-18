@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Type
 from models.plan_models import MPlan
 
 from chat.deletion import ChatDeletion, ChatsDeletion
+from chat.settle import TurnSettled
 
 from ..models.messages import (
     AgentMessageData,
@@ -206,6 +207,25 @@ class DatabaseBase(ABC):
     @abstractmethod
     async def delete_plan_by_plan_id(self, plan_id: str) -> bool:
         """Delete a plan by plan_id and return True if deleted."""
+        pass
+
+    @abstractmethod
+    async def settle_turn(
+        self, session_id: str, status, plan_id: Optional[str] = None
+    ) -> TurnSettled:
+        """Write a **Settled status** onto this session's latest Plan (#157).
+
+        ADR-043's settle-write, and the one route to a terminal status: scoped
+        to the client's own ``user_id``, conditional on the ``_etag`` it read,
+        and refusing to overwrite a Settled status the Plan already reached.
+        Every writer of that fact — the turn that just ended, #120's
+        end-of-turn primitive, #159's reconciliation — goes through here, so the
+        never-overwrite rule has one home rather than one per caller.
+
+        ``plan_id``, when the caller knows which Plan its turn ran, binds the
+        write to it: a turn that ended after its successor's Plan was written
+        settles nothing rather than settling the successor.
+        """
         pass
 
     @abstractmethod

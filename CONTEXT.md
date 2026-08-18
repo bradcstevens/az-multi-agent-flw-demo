@@ -1356,6 +1356,22 @@ alone, which is why the write is made conditional on the `_etag` it read rather 
 read-then-clobber. The first true answer stands, because a record corrected into being wrong is worse
 than one left alone. The set itself does not move for either decision — three members, fail-closed,
 and more Chats become deletable only by more turns actually ending.
+
+**The settle-write** is that operation, and there is one of it (#157): `settle_turn`
+(`src/backend/common/database/cosmosdb.py`), whose pure half — what may be written, and which of its
+outcomes mean the record now says the turn ended — is `src/backend/chat/settle.py`. It names the
+Chat's latest **Plan record** through the same owner-scoped, newest-first read **Chat deletion**
+uses, and patches `overall_status` on the `_etag` that read observed: a Plan that already settled is
+left alone and reported as such, a Plan that moved is reported as a lost race, and neither is
+reported as a write. A caller that knows which Plan its turn ran is **held to it**, because
+`process_request` writes the next turn's Plan *before* it cancels the orchestration in flight — so a
+turn finishing inside that window settles nothing rather than stamping its successor's live answer
+`completed`. The turn's own terminal branches call it from `run_orchestration_task`
+(`src/backend/api/router.py`) — `completed` when the orchestration returns, `failed` when it raises,
+and **neither when it is cancelled**, because a cancelled turn is `canceled` through **Leaving a
+Chat**'s writer rather than a failure through this one. `error`, the word the orchestration
+broadcasts, is not a status: it maps onto `failed` here and is refused by the settle-write before
+the store is touched, so no fourth member is coined by accident.
 _Avoid_: terminal state, final status, deletable status
 
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that
