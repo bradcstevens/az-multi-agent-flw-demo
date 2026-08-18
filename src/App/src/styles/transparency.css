@@ -431,7 +431,8 @@
     font-family: var(--fontFamilyNumeric);
 }
 
-.agent-dossier__configuration {
+.agent-dossier__configuration,
+.agent-dossier__tools {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -443,17 +444,20 @@
     gap: 8px;
 }
 
-.agent-dossier__configuration dt {
+.agent-dossier__configuration dt,
+.agent-dossier__tools dt {
     color: var(--colorNeutralForeground3);
 }
 
-.agent-dossier__configuration dd {
+.agent-dossier__configuration dd,
+.agent-dossier__tools dd {
     margin: 0;
 }
 
 .agent-dossier__description,
 .agent-dossier__participation,
-.agent-dossier__preamble {
+.agent-dossier__preamble,
+.agent-dossier__tools-label {
     margin: 0;
 }
 
@@ -462,7 +466,8 @@
     font-weight: var(--fontWeightSemibold);
 }
 
-.agent-dossier__preamble {
+.agent-dossier__preamble,
+.agent-dossier__tools-label {
     color: var(--colorNeutralForeground2);
     font-weight: var(--fontWeightSemibold);
 }

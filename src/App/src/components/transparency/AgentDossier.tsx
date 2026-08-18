@@ -10,7 +10,7 @@ import {
 import { Dismiss20Regular } from '@fluentui/react-icons';
 
 import { Agent } from '../../models/Team';
-import { AGENT_DOSSIER_COPY } from '../../models/agentDossier';
+import { AGENT_DOSSIER_COPY, AGENT_DOSSIER_TOOLS } from '../../models/agentDossier';
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
 
 export interface AgentDossierProps {
@@ -37,6 +37,13 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, participation, onClo
     /** A configured `false` is a choice the pack made; an omitted field is not. */
     const followUpQuestions = agent.user_responses ?? null;
     const temperature = agent.temperature ?? null;
+    const domain = agent.toolbox_filter;
+    const tools =
+        agent.use_toolbox &&
+        domain &&
+        Object.prototype.hasOwnProperty.call(AGENT_DOSSIER_TOOLS, domain)
+            ? AGENT_DOSSIER_TOOLS[domain]
+            : [];
     const hasConfiguredFacts =
         knowledgeBase !== null || followUpQuestions !== null || temperature !== null;
 
@@ -78,6 +85,22 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, participation, onClo
                                 <pre className="agent-dossier__prompt" data-testid="agent-dossier-prompt">
                                     {agent.system_message}
                                 </pre>
+                            </>
+                        )}
+                        {tools.length > 0 && (
+                            <>
+                                <p className="agent-dossier__tools-label">
+                                    {AGENT_DOSSIER_COPY.mcpToolsLabel}
+                                </p>
+                                <dl className="agent-dossier__tools" data-testid="agent-dossier-tools">
+                                    {tools.map((tool) => (
+                                        <ConfiguredFact
+                                            key={tool.name}
+                                            label={tool.name}
+                                            value={tool.gloss}
+                                        />
+                                    ))}
+                                </dl>
                             </>
                         )}
                         {hasConfiguredFacts && (
