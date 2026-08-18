@@ -36,7 +36,10 @@ const PresenterAlertCard: React.FC<PresenterAlertCardProps> = ({ alert }) => (
         </div>
         <Body1 className="presenter-alert__content">{alert.content}</Body1>
         {alert.provenanceLine && (
-            <Caption1 data-testid="presenter-alert-provenance">
+            <Caption1
+                className="presenter-alert__provenance"
+                data-testid="presenter-alert-provenance"
+            >
                 {alert.provenanceLine}
             </Caption1>
         )}

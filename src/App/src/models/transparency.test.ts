@@ -171,19 +171,19 @@ describe('parseTokenUsage', () => {
 
 describe('parsePresenterAlert', () => {
     it('reads the title and the content the server chose', () => {
+        const provenance = 'A Provenance line received from the backend.';
         const alert = parsePresenterAlert({
             title: 'Shift task due',
             content: 'The coffee station deep clean is due before the 15:00 handover.',
             timestamp: '2026-08-13T09:00:00+00:00',
-            provenance_line:
-                'No shift-task system pushed this alert — it was authored for this walkthrough.',
+            provenance_line: provenance,
         });
 
         expect(alert).not.toBeNull();
         expect(alert!.title).toBe('Shift task due');
         expect(alert!.content).toContain('coffee station');
         expect(alert!.timestamp).toBe('2026-08-13T09:00:00+00:00');
-        expect(alert!.provenanceLine).toContain('No shift-task system pushed this alert');
+        expect(alert!.provenanceLine).toBe(provenance);
     });
 
     it('refuses an alert with nothing to say', () => {

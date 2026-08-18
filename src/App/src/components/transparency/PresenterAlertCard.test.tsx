@@ -4,12 +4,13 @@ import { render, screen } from '@testing-library/react';
 import PresenterAlertCard from './PresenterAlertCard';
 import { parsePresenterAlert } from '../../models/transparency';
 
+const provenance = 'A Provenance line received from the backend.';
+
 const alert = parsePresenterAlert({
     title: 'Shift task due',
     content: 'The coffee station deep clean is due before the 15:00 handover at Store 223.',
     timestamp: '2026-08-13T09:00:00+00:00',
-    provenance_line:
-        'No shift-task system pushed this alert — it was authored for this walkthrough.',
+    provenance_line: provenance,
 })!;
 
 describe('the Presenter alert', () => {
@@ -40,9 +41,7 @@ describe('the Presenter alert', () => {
     it('renders the provenance line the server delivered', () => {
         render(<PresenterAlertCard alert={alert} />);
 
-        expect(screen.getByTestId('presenter-alert-provenance')).toHaveTextContent(
-            /No shift-task system pushed this alert/i,
-        );
+        expect(screen.getByTestId('presenter-alert-provenance')).toHaveTextContent(provenance);
     });
 
     it('renders no provenance line when the payload carries none', () => {

@@ -4,6 +4,8 @@ import { render, screen } from '@testing-library/react';
 import PersonalAnswerCard from './PersonalAnswerCard';
 import { parsePersonalAnswer, PERSONAL_ANSWER_KIND } from '../../models/personalAnswer';
 
+const provenance = 'A Provenance line received from the backend.';
+
 const answer = parsePersonalAnswer({
     personal_answer: {
         kind: PERSONAL_ANSWER_KIND,
@@ -13,8 +15,7 @@ const answer = parsePersonalAnswer({
             { label: 'PTO balance', value: '34.5 hours' },
             { label: 'Hours scheduled this week', value: '32' },
         ],
-        provenance_line:
-            'No payroll system was queried — these figures were authored for this walkthrough.',
+        provenance_line: provenance,
     },
 })!;
 
@@ -43,9 +44,7 @@ describe('the personal answer card', () => {
     it('renders the provenance line the associate record carried', () => {
         render(<PersonalAnswerCard answer={answer} />);
 
-        expect(screen.getByTestId('personal-answer')).toHaveTextContent(
-            /No payroll system was queried/i,
-        );
+        expect(screen.getByTestId('personal-answer')).toHaveTextContent(provenance);
     });
 
     it('renders a record that holds nothing but a name', () => {
