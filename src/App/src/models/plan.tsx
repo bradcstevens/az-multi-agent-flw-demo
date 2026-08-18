@@ -214,6 +214,8 @@ export interface MPlanBE {
     facts: string;
     /** List of steps in the plan */
     steps: MStepBE[];
+    /** Record-owned provenance shown before the associate decides. */
+    provenance_line?: string | null;
 }
 export interface AgentMessageBE extends BaseModel {
     /** The type of data model */
@@ -280,6 +282,8 @@ export interface MPlanData {
     revision?: number;
     /** Associate feedback that produced the current revision, oldest first. */
     revision_feedback?: string[];
+    /** Record-owned provenance shown before the associate decides. */
+    provenance_line?: string;
     context: {
         task: string;
         participant_descriptions: Record<string, string>;

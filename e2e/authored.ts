@@ -116,16 +116,26 @@ export function postApprovalPeople(task: QuickTask): PlanAssignee[] {
     return planPeople(task).filter((person) => person.relation !== 'associate');
 }
 
-/** The Verdict record's own Provenance line, read from its backend author. */
-export function verdictProvenanceLine(): string {
+/** One record-owned Provenance line, read from its backend author. */
+function provenanceLine(name: 'PLAN_PROVENANCE' | 'VERDICT_PROVENANCE'): string {
     const source = readFileSync(PROVENANCE_MODULE, 'utf-8');
     const match = source.match(
-        /VERDICT_PROVENANCE\s*=\s*\(\s*"([^"]*)"\s*"([^"]*)"\s*\)/m,
+        new RegExp(`${name}\\s*=\\s*\\(\\s*"([^"]*)"\\s*"([^"]*)"\\s*\\)`, 'm'),
     );
     if (!match) {
-        throw new Error('VERDICT_PROVENANCE is not declared as a two-part source string');
+        throw new Error(`${name} is not declared as a two-part source string`);
     }
     return `${match[1]}${match[2]}`;
+}
+
+/** The Reviewable plan's own Provenance line, read from its backend author. */
+export function planProvenanceLine(): string {
+    return provenanceLine('PLAN_PROVENANCE');
+}
+
+/** The Verdict record's own Provenance line, read from its backend author. */
+export function verdictProvenanceLine(): string {
+    return provenanceLine('VERDICT_PROVENANCE');
 }
 
 /** One member of the **Store assistant roster**, as the pack authors it. */

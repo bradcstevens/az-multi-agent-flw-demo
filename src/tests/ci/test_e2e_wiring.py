@@ -967,6 +967,26 @@ def test_the_beat_names_the_invented_colleagues_inside_the_plan_itself():
     )
 
 
+def test_the_beat_reads_the_plans_disclosure_before_approval():
+    """The disclosure must be visible while it can change the decision."""
+    spec = _flat(WORKFORCE_SPEC)
+
+    assert "planProvenanceLine" in spec, (
+        "the workforce beat does not read the Reviewable plan's Provenance line "
+        "from its backend author"
+    )
+    assert "planProvenanceLine).toHaveText(" in spec, (
+        "the workforce beat does not assert the Reviewable plan's record-owned "
+        "Provenance line on the surface"
+    )
+    assert spec.index("planProvenanceLine).toHaveText(") < spec.index(
+        "approveButton.click()"
+    ), (
+        "the workforce beat checks the plan's disclosure after approval, when "
+        "the associate can no longer act on it"
+    )
+
+
 def test_the_beat_pins_no_invented_colleague_of_its_own():
     """The people are the content pack's, exactly as the roster names are.
 

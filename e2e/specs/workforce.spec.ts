@@ -4,6 +4,7 @@ import {
     agentHoldingToolbox,
     agentKey,
     planPeople,
+    planProvenanceLine,
     postApprovalPeople,
     quickTasks,
     verdictProvenanceLine,
@@ -144,6 +145,8 @@ test.describe('the fourth specialist', () => {
                     'chain with nobody in it.',
             ).toBeVisible();
         }
+
+        await expect(plan.planProvenanceLine).toHaveText(planProvenanceLine());
 
         await plan.approveButton.click();
 

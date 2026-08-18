@@ -164,6 +164,11 @@ export class ChatSurface {
         return this.page.getByTestId('reviewable-plan-steps');
     }
 
+    /** The Reviewable plan's record-owned disclosure before the associate decides. */
+    get planProvenanceLine(): Locator {
+        return this.page.getByTestId('plan-provenance-line');
+    }
+
     /** The other half of the approval gate. */
     get rejectButton(): Locator {
         return this.page.getByRole('button', { name: 'Cancel', exact: true });

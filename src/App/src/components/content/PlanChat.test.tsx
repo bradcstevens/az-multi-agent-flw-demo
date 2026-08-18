@@ -257,4 +257,35 @@ describe('the conversation offers the rehearsed replies', () => {
             'You asked to change: Ask Dana Reyes next.',
         ]);
     });
+
+    it('renders the Reviewable plan provenance the approval record carries', () => {
+        renderChat(
+            {
+                showApprovalButtons: true,
+                planApprovalRequest: {
+                    id: 'review-1',
+                    user_request: 'Swap Saturday',
+                    facts: '',
+                    provenance_line: 'This disclosure came from the Reviewable plan record.',
+                    steps: [
+                        {
+                            id: 1,
+                            action: 'Ask Marcus Bell to take the shift',
+                            assignee: {
+                                kind: 'person',
+                                name: 'Marcus Bell',
+                                relation: 'peer',
+                                simulated: true,
+                            },
+                        },
+                    ],
+                },
+            } as never,
+            { pending: false },
+        );
+
+        expect(screen.getByText(
+            'This disclosure came from the Reviewable plan record.',
+        )).toBeInTheDocument();
+    });
 });

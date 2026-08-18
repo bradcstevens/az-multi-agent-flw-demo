@@ -209,6 +209,9 @@ export class PlanDataService {
       team_id: mplanBE.team_id,
       plan_id: mplanBE.plan_id,
       overall_status: mplanBE.overall_status.toString(),
+      ...(typeof mplanBE.provenance_line === 'string'
+        ? { provenance_line: mplanBE.provenance_line }
+        : {}),
       raw_data: mplanBE // Store the original object as raw_data
     };
   }
@@ -346,6 +349,9 @@ export class PlanDataService {
             overall_status: mplan.overall_status,
             ...(revision === undefined ? {} : { revision }),
             ...(revisionFeedback === undefined ? {} : { revision_feedback: revisionFeedback }),
+            ...(typeof mplan.provenance_line === 'string'
+              ? { provenance_line: mplan.provenance_line }
+              : {}),
             raw_data: rawData
           };
           return result;

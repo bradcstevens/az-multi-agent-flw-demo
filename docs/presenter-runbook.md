@@ -246,6 +246,10 @@ its authored actions — `Confirm you want the agreed Saturday swap to proceed`,
 to confirm the agreed swap`, then `Ask Dana Reyes to approve the swap` — so the approval chain is
 declared by the pack, not discovered from a roster.
 
+Before the associate decides, the **Reviewable plan** carries this Provenance line: *"No workforce
+management system was consulted — the people named in this plan are stand-ins for this
+walkthrough."* It covers every named stand-in once; it is not a label beside each person.
+
 **Approve it:** the **Progress narration** says it is waiting on Marcus Bell. Marcus's Verdict
 then lands as its own conversation record, in his generated words and with its Provenance line.
 The narration moves to Dana Reyes; her Verdict lands next, with the same record-borne disclosure.
@@ -337,6 +341,7 @@ invented person's action is disclosed in the record that carries it, never only 
 | Simulated sign-in | No identity provider signed the associate in; the name is authored session state for this walkthrough. |
 | Associate record | No payroll system was queried — these figures were authored for this walkthrough. |
 | Presenter alert | No shift-task system pushed this alert — it was authored for this walkthrough. |
+| Shift-swap plan | No workforce management system was consulted — the people named in this plan are stand-ins for this walkthrough. |
 | Shift-swap verdict | No workforce management system was consulted — this verdict was authored for this walkthrough. |
 | Workforce procedure library | No employment system supplied the procedure; the Workforce agent describes authored process content. |
 

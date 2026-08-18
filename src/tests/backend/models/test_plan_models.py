@@ -8,7 +8,7 @@ from backend.models.plan_models import (AgentDefinition, MPlan, MStep,
                                         PlannerResponsePlan,
                                         PlannerResponseStep, PlanStatus,
                                         Verdict)
-from provenance import VERDICT_PROVENANCE
+from provenance import PLAN_PROVENANCE, VERDICT_PROVENANCE
 
 
 class TestPlanStatus:
@@ -132,6 +132,40 @@ class TestTheVerdictCarriesItsProvenance:
 
         assert "No workforce management system was consulted" in line
         assert "authored for this walkthrough" in line
+
+
+class TestReviewablePlanProvenance:
+    def test_one_line_covers_every_simulated_person_in_the_plan(self):
+        plan = MPlan(
+            steps=[
+                MStep.model_validate(
+                    {
+                        "id": 1,
+                        "action": "Ask Marcus Bell to confirm the agreed swap",
+                        "assignee": {
+                            "kind": "person",
+                            "name": "Marcus Bell",
+                            "relation": "peer",
+                            "simulated": True,
+                        },
+                    }
+                ),
+                MStep.model_validate(
+                    {
+                        "id": 2,
+                        "action": "Ask Dana Reyes to approve the swap",
+                        "assignee": {
+                            "kind": "person",
+                            "name": "Dana Reyes",
+                            "relation": "manager",
+                            "simulated": True,
+                        },
+                    }
+                ),
+            ]
+        )
+
+        assert plan.model_dump(mode="json")["provenance_line"] == PLAN_PROVENANCE
 
 
 class TestMPlan:

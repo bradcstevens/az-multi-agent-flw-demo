@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
-from provenance import VERDICT_PROVENANCE
+from provenance import PLAN_PROVENANCE, VERDICT_PROVENANCE
 
 
 class PlanStatus(str, Enum):
@@ -90,6 +90,17 @@ class MPlan(BaseModel):
     # so the surface can tell a fresh plan from one already sent back.
     revision: int = 1
     revision_feedback: List[str] = Field(default_factory=list)
+
+    @computed_field(return_type=Optional[str])
+    @property
+    def provenance_line(self) -> Optional[str]:
+        """Disclose the plan's simulated people before the associate approves."""
+        if any(
+            isinstance(step.assignee, PersonAssignee) and step.assignee.simulated
+            for step in self.steps
+        ):
+            return PLAN_PROVENANCE
+        return None
 
 
 @dataclass(slots=True)

@@ -363,6 +363,15 @@ const renderPlanResponse = (
                     </div>
                 )}
 
+                {planApprovalRequest.provenance_line && (
+                    <Text
+                        className={styles.instructionText}
+                        data-testid="plan-provenance-line"
+                    >
+                        {planApprovalRequest.provenance_line}
+                    </Text>
+                )}
+
                 {/* Plan Steps */}
                 {planSteps.length > 0 && (
                     <ol

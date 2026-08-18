@@ -122,6 +122,55 @@ class TestPlanApprovalRequest:
 
         assert req.to_dict()["plan"]["steps"][0]["assignee"]["name"] == "Marcus Bell"
 
+    def test_approval_frame_discloses_simulated_people_before_the_associate_answers(self):
+        req = PlanApprovalRequest(
+            plan=MPlan(
+                steps=[
+                    MStep.model_validate(
+                        {
+                            "id": 3,
+                            "action": "Ask Marcus Bell to confirm the agreed swap",
+                            "assignee": {
+                                "kind": "person",
+                                "name": "Marcus Bell",
+                                "relation": "peer",
+                                "simulated": True,
+                            },
+                        }
+                    )
+                ]
+            ),
+            status=PlanStatus.CREATED,
+        )
+
+        assert req.to_dict()["plan"]["provenance_line"] == (
+            "No workforce management system was consulted — the people named in "
+            "this plan are stand-ins for this walkthrough."
+        )
+
+    def test_approval_frame_carries_no_line_without_a_simulated_person(self):
+        req = PlanApprovalRequest(
+            plan=MPlan(
+                steps=[
+                    MStep.model_validate(
+                        {
+                            "id": 1,
+                            "action": "Confirm the agreed swap",
+                            "assignee": {
+                                "kind": "person",
+                                "name": "You",
+                                "relation": "associate",
+                                "simulated": False,
+                            },
+                        }
+                    )
+                ]
+            ),
+            status=PlanStatus.CREATED,
+        )
+
+        assert req.to_dict()["plan"]["provenance_line"] is None
+
 
 class TestPlanApprovalResponse:
     def test_defaults(self):

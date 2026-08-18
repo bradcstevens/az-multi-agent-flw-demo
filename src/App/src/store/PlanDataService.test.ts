@@ -67,6 +67,24 @@ describe('Reviewable plan approval frames', () => {
         });
     });
 
+    it('keeps the plan provenance the approval frame carries', () => {
+        const parsed = PlanDataService.parsePlanApprovalRequest({
+            status: 'PENDING_APPROVAL',
+            plan: {
+                id: 'mplan-1',
+                user_request: 'Swap Saturday with Marcus.',
+                team: [],
+                facts: '',
+                steps: [],
+                provenance_line: 'This disclosure came from the approval frame.',
+            },
+        });
+
+        expect(parsed?.provenance_line).toBe(
+            'This disclosure came from the approval frame.',
+        );
+    });
+
     it('keeps revision lineage from legacy string frames', () => {
         const parsed = PlanDataService.parsePlanApprovalRequest(
             "PlanApprovalRequest(plan=MPlan(id='mplan-1', user_request='Swap Saturday with Marcus.', team=[], facts='', steps=[], revision=3, revision_feedback=['Ask somebody other than Marcus.', 'Ask Dana.']), status='PENDING_APPROVAL')",

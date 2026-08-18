@@ -18,3 +18,7 @@ VERDICT_PROVENANCE = (
     "No workforce management system was consulted — this verdict was authored "
     "for this walkthrough."
 )
+PLAN_PROVENANCE = (
+    "No workforce management system was consulted — the people named in this "
+    "plan are stand-ins for this walkthrough."
+)
