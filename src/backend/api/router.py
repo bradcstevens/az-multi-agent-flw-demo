@@ -21,6 +21,7 @@ from fastapi import (APIRouter, BackgroundTasks, File, HTTPException, Query,
 from associate.answer import personal_answer_detail
 from associate.records import DEMO_ASSOCIATE, lookup_associate
 from chat.deletion import STILL_RUNNING_DETAIL, DeletionOutcome
+from chat.settle import SettleOutcome
 from guardrail.gate import identity_boundary_gate
 from guardrail.identity import ANONYMOUS
 from guardrail.refusal import policy_block_detail
@@ -256,6 +257,85 @@ async def init_team(
         raise HTTPException(
             status_code=400, detail=f"Error starting request: {e}"
         ) from e
+
+
+async def settle_the_turn(
+    memory_store, session_id: str, status: PlanStatus, plan_id: str
+) -> None:
+    """Write this turn's terminal status onto its **Plan record** (#157).
+
+    ADR-043: *the server settles the turn it ended*. The write goes through the
+    store's settle-write, which targets the session's latest Plan, is scoped to
+    its owner, is conditional on the ``_etag`` it read, and never overwrites a
+    **Settled status** the Plan already reached.
+
+    ``plan_id`` is this turn's own, and it is why a slow turn cannot settle a
+    fast one's Plan: this route writes the next Plan *before* it cancels the
+    orchestration in flight, so a turn finishing inside that window would find a
+    successor's Plan at the top of the session.
+
+    **Never raises**, and that is the point twice over. It is called from the
+    orchestration task's own terminal branches: a settle-write that threw on the
+    failure branch would replace the orchestration's exception with Cosmos's,
+    and one that threw on the success branch would turn an answered turn into a
+    task that crashed after answering. Cancellation is the one thing it does
+    re-raise, because swallowing it would leave a cancelled task looking as if
+    it ran to the end.
+
+    Silence is what it must not do instead. A write that did not land is logged
+    as a failure — the defect ADR-043 names in the browser's plumbing is exactly
+    a store write reported as success by the layer above it, and this is the
+    layer above it.
+
+    Two outcomes are told apart from that, because neither is a store failure:
+    a turn whose **Plan record** is *gone* (rejecting a plan deletes the
+    document outright — #108's path, which ADR-043 leaves alone — and the
+    rejection then ends the orchestration through the failure branch), and one
+    whose Chat has moved on to a newer turn. Both are ordinary ways for this
+    turn to end with nothing of its own to settle, and logging them as failed
+    writes would put a false alarm in front of the presenter.
+    """
+    reported = getattr(status, "value", status)
+
+    try:
+        settled = await memory_store.settle_turn(session_id, status, plan_id)
+    except asyncio.CancelledError:
+        logger.warning(
+            "The settle-write for session '%s' was cancelled before it could "
+            "record %s, so the chat still reads as running",
+            session_id,
+            reported,
+        )
+        raise
+    except Exception:
+        logger.error(
+            "Could not settle session '%s' as %s: the settle-write raised, so "
+            "the chat still reads as running",
+            session_id,
+            reported,
+            exc_info=True,
+        )
+        return
+
+    if settled.persisted:
+        return
+
+    if settled.outcome in (SettleOutcome.no_such_chat, SettleOutcome.superseded):
+        logger.warning(
+            "Session '%s' ended with no record of its own to settle as %s: %s",
+            session_id,
+            reported,
+            settled.outcome.value,
+        )
+        return
+
+    logger.error(
+        "Session '%s' was not settled as %s: %s. The turn ended; the "
+        "record does not say so",
+        session_id,
+        reported,
+        settled.outcome.value,
+    )
 
 
 @app_router.post("/process_request")
@@ -576,11 +656,43 @@ async def process_request(
     try:
 
         async def run_orchestration_task(rehearsal_token):
+            # The two terminal branches of the turn, each written down as well
+            # as broadcast (#157, ADR-043). Cancellation is neither of them and
+            # deliberately falls through both: `asyncio.CancelledError` is a
+            # `BaseException`, so a turn the next request cancelled — or that
+            # #120's end-of-turn primitive ends — settles `canceled` through its
+            # own writer, and never `failed` through this one.
             try:
-                await OrchestrationManager().run_orchestration(
-                    user_id,
-                    input_task,
-                    address_name=address_name,
+                try:
+                    await OrchestrationManager().run_orchestration(
+                        user_id,
+                        input_task,
+                        address_name=address_name,
+                    )
+                except Exception:
+                    # ADR-043: the failure branch settles `failed`, which
+                    # nothing in this repository has ever written. An
+                    # orchestration that fell over now leaves a record saying so
+                    # instead of one claiming to still be working. Settled
+                    # first, then re-raised unchanged, so the task's own
+                    # accounting of the failure is untouched.
+                    await settle_the_turn(
+                        memory_store,
+                        input_task.session_id,
+                        PlanStatus.failed,
+                        plan_id,
+                    )
+                    raise
+
+                # The success branch, written down rather than only broadcast.
+                # It is *not* conditional on a live socket, an open tab, or a
+                # client that came back: the durability of "this turn ended"
+                # stops being a function of who was watching when it did.
+                await settle_the_turn(
+                    memory_store,
+                    input_task.session_id,
+                    PlanStatus.completed,
+                    plan_id,
                 )
             finally:
                 # The rehearsal marker's bound (#54). It stands for every SOP

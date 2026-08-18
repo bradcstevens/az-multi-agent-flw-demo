@@ -6,6 +6,7 @@ module level (never via sys.modules), so they do not pollute the shared
 interpreter state for other test files that import the same real modules.
 """
 
+import asyncio
 import contextlib
 import json
 import logging
@@ -102,6 +103,7 @@ from chat.deletion import (  # noqa: E402
     ChatsDeletion,
     DeletionOutcome,
 )
+from chat.settle import SettleOutcome, TurnSettled  # noqa: E402
 from provenance import ASSOCIATE_RECORD_PROVENANCE  # noqa: E402
 from guardrail.corpus import (  # noqa: E402
     PERSONAL_INTENT_ANCHORS,
@@ -172,6 +174,12 @@ def rt(monkeypatch):
     store.get_all_plans_by_team_id_status = AsyncMock(return_value=[])
     store.delete_current_team = AsyncMock()
     store.add_plan = AsyncMock()
+    # The settle-write (#157, ADR-043): the server writes the turn's terminal
+    # status onto its own Plan record, so every request that starts an
+    # orchestration ends by calling this.
+    store.settle_turn = AsyncMock(
+        return_value=TurnSettled(SettleOutcome.settled, status="completed")
+    )
 
     # The generic CRUD the memory container exposes, faked well enough that a
     # session-state record genuinely round-trips (issue #20). Keyed by
@@ -586,6 +594,218 @@ class TestProcessRequest:
 
         assert response.status_code == 500
         note_rehearsal.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# /process_request — the server settles the turn it ended (#157, ADR-043)
+# ---------------------------------------------------------------------------
+class TestTheServerSettlesTheTurnItEnded:
+    """A finished turn says so on the record, and a failed one says `failed`.
+
+    The spine of #155. Every **Chat** in the panel read **In progress** for
+    ever, so both deletion controls were dead — not because ADR-026's guard was
+    wrong, but because nothing on the server ever told the record that the turn
+    had ended. The only writer of a **Settled status** anywhere was the browser
+    echoing `is_final` back through `POST /v4/agent_message`, off one branch of
+    one handler, fire-and-forget.
+
+    So these tests are written with **nothing echoing back**: no socket, no
+    `agent_message`, no client at all. What they assert is that the record is
+    not a function of who was watching.
+    """
+
+    def _ask(self, rt, session_id="sess-1", description="do the thing"):
+        rt.store.get_team_by_id.return_value = MagicMock()
+        rt.rai_success.return_value = True
+        return rt.client.post(
+            "/api/v4/process_request",
+            json={"session_id": session_id, "description": description},
+        )
+
+    def _orchestration(self, rt, **kwargs):
+        rt.orchestration_manager.return_value.run_orchestration = AsyncMock(**kwargs)
+
+    def test_a_turn_that_completes_settles_completed(self, rt):
+        response = self._ask(rt)
+
+        assert response.status_code == 200
+        rt.store.settle_turn.assert_awaited_once_with(
+            "sess-1", router_mod.PlanStatus.completed, response.json()["plan_id"]
+        )
+
+    def test_a_turn_whose_orchestration_raises_settles_failed(self, rt):
+        # `failed` has never been written by anything in this repository — the
+        # same dead enum ADR-031 found in `canceled`. This is the first time an
+        # orchestration that fell over leaves a record saying it fell over
+        # instead of one claiming to still be working.
+        self._orchestration(rt, side_effect=RuntimeError("the workflow fell over"))
+
+        response = self._ask(rt)
+
+        assert response.status_code == 200
+        rt.store.settle_turn.assert_awaited_once_with(
+            "sess-1", router_mod.PlanStatus.failed, response.json()["plan_id"]
+        )
+
+    def test_the_write_happens_with_the_browser_absent_entirely(self, rt):
+        # The entire point of the decision. Nothing echoed `is_final` back,
+        # nothing was pushed down a socket, and the record still settled.
+        response = self._ask(rt)
+
+        assert response.status_code == 200
+        rt.plan_service.handle_agent_messages.assert_not_awaited()
+        rt.connection_config.send_status_update_async.assert_not_awaited()
+        assert rt.store.settle_turn.await_count == 1
+
+    def test_the_turn_settles_the_session_it_ran_in(self, rt):
+        # Scoped to this Chat, and to this user by the store's own read: a
+        # settle-write that could name another session would stamp a terminal
+        # status onto somebody else's live answer.
+        response = self._ask(rt, session_id="sess-troubleshooting")
+
+        assert response.status_code == 200
+        settled_session = rt.store.settle_turn.await_args.args[0]
+        assert settled_session == "sess-troubleshooting"
+
+    def test_a_cancelled_turn_is_not_settled_failed(self, rt):
+        # Cancellation is neither terminal branch. A turn the next request
+        # cancels — or that #120's end-of-turn primitive ends — settles
+        # `canceled` through its own writer, and calling it `failed` here would
+        # be this decision overwriting that one.
+        self._orchestration(rt, side_effect=asyncio.CancelledError())
+
+        response = self._ask(rt)
+
+        assert response.status_code == 200
+        rt.store.settle_turn.assert_not_awaited()
+
+    def test_the_write_is_bound_to_the_plan_this_turn_ran(self, rt):
+        # The store is handed this turn's own plan id, so a turn that finishes
+        # after the next request has written *its* Plan settles nothing rather
+        # than stamping a terminal status onto a turn that has not started.
+        # This route writes the successor's Plan before it cancels the
+        # orchestration in flight, so that window is real.
+        response = self._ask(rt)
+
+        assert response.status_code == 200
+        assert rt.store.settle_turn.await_args.args[2] == response.json()["plan_id"]
+
+    def test_a_turn_whose_chat_moved_on_is_not_a_failed_write(self, rt, caplog):
+        # Refusing to settle a successor's Plan is the guard working, not a
+        # store failure, and an error log here would report a false alarm every
+        # time a presenter re-asks mid-turn.
+        rt.store.settle_turn.return_value = TurnSettled(
+            SettleOutcome.superseded, status="in_progress"
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=router_mod.logger.name):
+            response = self._ask(rt)
+
+        assert response.status_code == 200
+        assert not [
+            record for record in caplog.records if record.levelno >= logging.ERROR
+        ]
+
+    def test_a_settle_write_cancelled_mid_flight_is_not_swallowed(self, rt, caplog):
+        # The turn can be cancelled *while* it is settling — the next request
+        # cancels this task, and `asyncio.CancelledError` is a `BaseException`
+        # that `except Exception` does not see. Logged rather than silent, and
+        # re-raised rather than swallowed: a cancelled task must not be left
+        # looking as if it ran to the end, so the helper is called directly and
+        # the cancellation is asserted to come back out of it.
+        rt.store.settle_turn.side_effect = asyncio.CancelledError()
+
+        with caplog.at_level(logging.DEBUG, logger=router_mod.logger.name):
+            with pytest.raises(asyncio.CancelledError):
+                asyncio.run(
+                    router_mod.settle_the_turn(
+                        rt.store, "sess-1", router_mod.PlanStatus.completed, "plan-1"
+                    )
+                )
+
+        assert any(
+            record.levelno == logging.WARNING and "sess-1" in record.getMessage()
+            for record in caplog.records
+        )
+
+    def test_a_turn_cancelled_while_settling_still_answers(self, rt):
+        # And the route itself does not fall over when that happens: the
+        # cancellation ends the background task, not the answer already sent.
+        rt.store.settle_turn.side_effect = asyncio.CancelledError()
+
+        response = self._ask(rt)
+
+        assert response.status_code == 200
+
+    def test_a_settle_write_that_did_not_land_is_logged_as_a_failure(
+        self, rt, caplog
+    ):
+        # The shape ADR-043 names in the browser's plumbing: a store write
+        # reported as success by the layer above it. The route may not do the
+        # same thing one layer down.
+        rt.store.settle_turn.return_value = TurnSettled(SettleOutcome.refused)
+
+        with caplog.at_level(logging.ERROR, logger=router_mod.logger.name):
+            response = self._ask(rt)
+
+        assert response.status_code == 200
+        assert any(
+            record.levelno == logging.ERROR and "sess-1" in record.getMessage()
+            for record in caplog.records
+        )
+
+    def test_a_settle_write_that_raised_does_not_break_the_turn(self, rt, caplog):
+        # Logged as a failure, and never raised out: on the failure branch it
+        # would replace the orchestration's exception with Cosmos's, and on the
+        # success branch it would turn an answered turn into a task that
+        # crashed after answering.
+        rt.store.settle_turn.side_effect = RuntimeError("Cosmos is unavailable")
+
+        with caplog.at_level(logging.ERROR, logger=router_mod.logger.name):
+            response = self._ask(rt)
+
+        assert response.status_code == 200
+        assert any(record.levelno == logging.ERROR for record in caplog.records)
+
+    def test_a_chat_that_already_settled_is_reported_as_settled(self, rt, caplog):
+        # A Settled status is never overwritten (ADR-043 decision 6), and the
+        # refusal is the ordinary case rather than a fault: the fact this write
+        # exists to make durable is durable either way, so it is not logged as
+        # a failure.
+        rt.store.settle_turn.return_value = TurnSettled(
+            SettleOutcome.already_settled, status="canceled"
+        )
+
+        with caplog.at_level(logging.ERROR, logger=router_mod.logger.name):
+            response = self._ask(rt)
+
+        assert response.status_code == 200
+        assert not [
+            record for record in caplog.records if record.levelno >= logging.ERROR
+        ]
+
+    def test_a_rejected_plans_deleted_record_is_not_a_failed_write(self, rt, caplog):
+        # Rejecting a plan deletes the Plan document outright (#108's path,
+        # which ADR-043 leaves alone) and then ends the orchestration through
+        # the failure branch. There is nothing to settle, and calling that a
+        # store failure would put a false alarm in front of the presenter on a
+        # control that worked.
+        rt.store.settle_turn.return_value = TurnSettled(SettleOutcome.no_such_chat)
+        self._orchestration(
+            rt, side_effect=RuntimeError("Plan execution cancelled by user")
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=router_mod.logger.name):
+            response = self._ask(rt)
+
+        assert response.status_code == 200
+        assert not [
+            record for record in caplog.records if record.levelno >= logging.ERROR
+        ]
+        assert any(
+            record.levelno == logging.WARNING and "sess-1" in record.getMessage()
+            for record in caplog.records
+        )
 
 
 # ---------------------------------------------------------------------------
