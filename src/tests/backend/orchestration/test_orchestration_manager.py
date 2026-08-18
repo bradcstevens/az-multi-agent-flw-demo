@@ -2319,6 +2319,60 @@ class TestTheApprovalIsTheTicketConfirmation:
 
         assert store.submitted == []
 
+    def test_ticket_raising_has_one_call_site_in_the_approved_plan_review_branch(self):
+        """Fast-lane work cannot commit without the Plan review confirmation.
+
+        The approval seam is a deliberate structural boundary: one direct call
+        to the ticket raiser, beneath the approved response branch. A second
+        caller would create a route that could commit independently of the
+        associate's visible approval.
+        """
+        import ast
+
+        path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "backend",
+            "orchestration",
+            "orchestration_manager.py",
+        )
+        with open(path, "r", encoding="utf-8") as handle:
+            tree = ast.parse(handle.read())
+
+        ticket_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "_raise_confirmed_ticket"
+        ]
+        assert len(ticket_calls) == 1
+
+        handler = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "_handle_plan_reviews"
+        )
+        approved_branch = next(
+            node
+            for node in ast.walk(handler)
+            if isinstance(node, ast.If)
+            and isinstance(node.test, ast.BoolOp)
+            and any(
+                isinstance(term, ast.Attribute) and term.attr == "approved"
+                for term in node.test.values
+            )
+        )
+        approved_body = (
+            descendant
+            for statement in approved_branch.body
+            for descendant in ast.walk(statement)
+        )
+        assert ticket_calls[0] in approved_body
+
     @pytest.mark.asyncio
     async def test_sending_the_plan_back_asks_the_framework_to_revise_it(self):
         """The framework's binary is approve versus revise-with-feedback, and

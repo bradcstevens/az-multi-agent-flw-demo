@@ -20,11 +20,15 @@ from lane.lane import Lane
 
 FAST_PHRASINGS = (
     "How do I close the store?",
+    "How does swapping shifts work?",
     "What are the steps for the coffee machine cleaning procedure?",
+    "What's the process for reporting a fuel spill?",
+    "What is the process for reporting a fuel spill?",
     "Show me the SOP for a fuel spill",
     "The coffee machine is down",
     "The slush machine stopped working",
     "What tasks are due on this shift?",
+    "What needs doing before the end of the shift?",
     "What's on the checklist tonight?",
 )
 
@@ -72,6 +76,19 @@ class TestTheHardRequirement:
         optional — "cant" has to be the same word as "can't", or the escalation
         that is missing one loses its approval step.
         """
+        assert keyword_lane(phrasing) is Lane.DELIBERATE
+
+    @pytest.mark.parametrize(
+        "phrasing",
+        [
+            "Start the process for swapping my shift with Alex",
+            "Please replace the faulty card reader",
+            "The card reader is faulty; please replace it",
+            "This needs doing: swap my Friday shift with Alex",
+            "Please do what needs doing to swap my Friday shift with Alex",
+        ],
+    )
+    def test_a_transaction_does_not_match_lookup_language(self, phrasing):
         assert keyword_lane(phrasing) is Lane.DELIBERATE
 
 

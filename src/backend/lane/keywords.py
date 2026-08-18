@@ -110,6 +110,15 @@ FAST_LANE_TERMS: Tuple[str, ...] = (
     "tonight",
 )
 
+# These phrases identify lookup questions only at the beginning of free text.
+# A substring match could turn "Please do what needs doing" into a Fast request.
+FAST_LANE_QUESTION_PREFIXES: Tuple[str, ...] = (
+    "how does",
+    "what s the process for",
+    "what is the process for",
+    "what needs doing",
+)
+
 
 def _normalise(text: Any) -> str:
     """Lowercase, collapse punctuation to single spaces, pad with spaces.
@@ -135,5 +144,7 @@ def keyword_lane(description: Any) -> Lane:
     if any(f" {term} " in haystack for term in DELIBERATE_LANE_TERMS):
         return Lane.DELIBERATE
     if any(f" {term} " in haystack for term in FAST_LANE_TERMS):
+        return Lane.FAST
+    if any(haystack.startswith(f" {term} ") for term in FAST_LANE_QUESTION_PREFIXES):
         return Lane.FAST
     return Lane.DELIBERATE
