@@ -846,9 +846,23 @@ describe("the chat list's height", () => {
      *
      * A branch carrying a pseudo-*element* is dropped rather than stripped —
      * `::before` is a generated box beside the container, and a height on it
-     * bounds nothing here. Stripping `:not()` and `:is()` only widens what is
-     * looked at, which is the safe direction for a guard.
+     * bounds nothing here.
+     *
+     * `:is()` and its synonyms are **kept**, and that distinction is the whole
+     * correctness of this function. Removing a pseudo removes its argument
+     * with it, so treating them alike deletes the subject:
+     * `.panelLeft :is(.fui-AccordionPanel):focus-within` collapses to
+     * `.panelLeft`, which is not one of these containers, and the cap it
+     * declares is skipped — narrowing, where every other removal here widens.
+     * jsdom matches `:is()` natively, so it is left for the engine to resolve
+     * while the state beside it goes.
+     *
+     * Everything else — `:not()`, `:has()`, `:nth-child()`, the states — is
+     * removed, which only ever widens what is looked at, and that is the safe
+     * direction for a guard.
      */
+    const SELECTOR_LISTS = [':is', ':where', ':matches', ':-moz-any', ':-webkit-any'];
+
     const withoutStates = (selector: string): string | null => {
         try {
             const parsed = selectorParser().astSync(selector);
@@ -859,7 +873,27 @@ describe("the chat list's height", () => {
                 }
             });
             parsed.walkPseudos((pseudo) => {
-                if (!pseudo.value.startsWith('::')) pseudo.remove();
+                if (pseudo.value.startsWith('::')) return;
+                if (SELECTOR_LISTS.includes(pseudo.value.toLowerCase())) return;
+                pseudo.remove();
+            });
+
+            /*
+              And a kept list is tidied after that removal, because taking a
+              state out of one of its branches can empty the branch:
+              `.a:is(:not(.b), .c):hover` becomes `.a:is(, .c)`, which is not a
+              selector at all. An invalid selector here would be reported rather
+              than skipped — `matches` throws and the rule is loaded — so this
+              costs nothing but noise, and the noise would be a rule named in a
+              failure nobody could act on.
+            */
+            parsed.walkPseudos((pseudo) => {
+                if (!SELECTOR_LISTS.includes(pseudo.value.toLowerCase())) return;
+
+                pseudo.each((branch) => {
+                    if (String(branch).trim() === '') branch.remove();
+                });
+                if (pseudo.nodes.length === 0) pseudo.remove();
             });
 
             const stripped = String(parsed).trim();
