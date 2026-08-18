@@ -241,10 +241,21 @@ this request starts the approval chain."*
 
 **What lands:** a **Reviewable plan**, with the **Deliberate** lane badge and its approval control.
 It starts with the **Workforce Agent** checking the procedure, then reaches **Clara Workman**
-(**You**), **Marcus Bell** and **Dana Reyes** in that declared `waitsOn` order. Each person's step
-says, in the plan's own words, that they get a message and can say no — the plan is where the
-approval chain is declared, and nobody in it was discovered from a roster. Approve it to let the
-fourth specialist answer.
+(**You**), **Marcus Bell** and **Dana Reyes** in that declared `waitsOn` order. The plan quotes
+its authored actions — `Confirm you want the agreed Saturday swap to proceed`, `Ask Marcus Bell
+to confirm the agreed swap`, then `Ask Dana Reyes to approve the swap` — so the approval chain is
+declared by the pack, not discovered from a roster.
+
+**Approve it:** the **Progress narration** says it is waiting on Marcus Bell. Marcus's Verdict
+then lands as its own conversation record, in his generated words and with its Provenance line.
+The narration moves to Dana Reyes; her Verdict lands next, with the same record-borne disclosure.
+There is no progress bar, ratio, percentage or per-step checkmark: a person is plainly waiting
+until their record has landed.
+
+**Say:** *"Approving the ticket completes it; approving this plan starts the swap, so one creates a
+record immediately while the other brings the colleague and shift-lead Verdicts into the
+conversation."*
+
 On the right, the **Agent Team** panel still shows **four** specialists and the cost table bills the
 **Workforce Agent** for the turn — a different specialist from the one that answered beat 1.
 
@@ -256,10 +267,10 @@ visible."*
 this specialist follows the shift-swap process but never reads **what somebody is owed**. Beat 5 is
 the other half of that sentence, and this beat is what makes it a boundary rather than a limitation.
 
-**Do not say the colleagues were asked.** What is on screen is the plan naming who the swap has to
-reach and in what order. Read the steps out as the plan's own promise — *"this is what it would
-take"* — rather than as two people who have been messaged, because nothing on the screen reports
-that they were.
+**Do not say the colleagues were contacted.** What is on screen is the plan naming who the swap
+has to reach and the Verdict records it produced in that order. Their Provenance lines say that no
+workforce management system was consulted; read those records as the walkthrough's authored
+decisions, never as live messages to Marcus or Dana.
 
 **Do not claim an HR integration.** There is no employment system behind this. The procedure
 library is mocked and says so on every answer. If somebody asks, *"this is where Workday or UKG

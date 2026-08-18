@@ -14,6 +14,7 @@ import {
     setShowApprovalButtons,
     setReloadLeftList,
     selectPlanData,
+    selectPlanApprovalRequest,
     selectContinueWithWebsocketFlow,
     selectPlanApproved,
     selectShowProcessingPlanSpinner,
@@ -27,12 +28,17 @@ import {
     agentResponding,
     requestSettled,
     socketConnected,
+    waitingOnPerson,
 } from '@/store/slices/progressSlice';
+import { nextUnresolvedPerson } from '@/models/reviewablePlan';
+import { parseVerdict } from '@/models/verdict';
 import {
     setSubmittingChatDisableInput,
     setClarificationMessage,
     addAgentMessage,
 } from '@/store/slices/chatSlice';
+import { verdictLanded } from '@/store/slices/verdictSlice';
+import { selectVerdicts } from '@/store/slices/verdictSlice';
 import {
     appendToStreamedReply,
     clearStreamedReply,
@@ -109,6 +115,8 @@ export function usePlanWebSocket({
 }: UsePlanWebSocketProps) {
     const dispatch = useAppDispatch();
     const planData = useAppSelector(selectPlanData);
+    const planApprovalRequest = useAppSelector(selectPlanApprovalRequest);
+    const verdicts = useAppSelector(selectVerdicts);
     const planApproved = useAppSelector(selectPlanApproved);
     const showProcessingPlanSpinner = useAppSelector(selectShowProcessingPlanSpinner);
     const continueWithWebsocketFlow = useAppSelector(selectContinueWithWebsocketFlow);
@@ -226,6 +234,38 @@ export function usePlanWebSocket({
             }
         };
     }, [dispatch]);
+
+    // ── VERDICT_LANDED ─────────────────────────────────────────────
+    useEffect(() => {
+        const unsub = webSocketService.on(
+            WebsocketMessageType.VERDICT_LANDED,
+            (message: StreamMessage) => {
+                const verdict = parseVerdict(message.data);
+                if (!verdict) return;
+                dispatch(verdictLanded(message.data));
+                if (planApprovalRequest?.id !== verdict.planId) {
+                    scrollToBottom();
+                    return;
+                }
+                const next = nextUnresolvedPerson(
+                    planApprovalRequest?.steps ?? [],
+                    [
+                        ...verdicts
+                            .filter((landed) => landed.planId === verdict.planId)
+                            .map((landed) => landed.stepId),
+                        verdict.stepId,
+                    ],
+                );
+                if (next) {
+                    dispatch(waitingOnPerson(next.name));
+                } else {
+                    dispatch(requestSettled());
+                }
+                scrollToBottom();
+            },
+        );
+        return unsub;
+    }, [dispatch, planApprovalRequest?.steps, scrollToBottom, verdicts]);
 
     // ── USER_CLARIFICATION_REQUEST ────────────────────────────────
     useEffect(() => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     applyPlanVerdict,
     isPersonRelation,
+    nextUnresolvedPerson,
     pendingVerdictFor,
     revisionSuggestionsFor,
     reviewablePlanSteps,
@@ -79,6 +80,12 @@ describe('the Reviewable plan model', () => {
             3,
             4,
         ]);
+    });
+
+    it('names only the person the approved plan is actually waiting on', () => {
+        expect(nextUnresolvedPerson(STEPS, [])?.name).toBe('Marcus Bell');
+        expect(nextUnresolvedPerson(STEPS, [3])?.name).toBe('Dana Reyes');
+        expect(nextUnresolvedPerson(STEPS, [3, 4])).toBeNull();
     });
 
     it('rejects a person step whose relation is outside the contract', () => {

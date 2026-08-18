@@ -12,6 +12,7 @@ import teamReducer from './slices/teamSlice';
 import streamingReducer from './slices/streamingSlice';
 import transparencyReducer from './slices/transparencySlice';
 import ticketReducer from './slices/ticketSlice';
+import verdictReducer from './slices/verdictSlice';
 import progressReducer from './slices/progressSlice';
 import panelDrawerReducer from './slices/panelDrawerSlice';
 
@@ -24,6 +25,7 @@ export const store = configureStore({
         streaming: streamingReducer,
         transparency: transparencyReducer,
         ticket: ticketReducer,
+        verdict: verdictReducer,
         progress: progressReducer,
         panelDrawer: panelDrawerReducer,
     },

@@ -140,6 +140,21 @@ export const reviewablePlanSteps = (steps: readonly PlanApprovalStep[]): Reviewa
         };
     });
 
+/** The next non-associate Person step that has not yet landed as a Verdict. */
+export const nextUnresolvedPerson = (
+    steps: readonly PlanApprovalStep[],
+    landedStepIds: readonly number[],
+): Extract<Assignee, { kind: 'person' }> | null => {
+    const landed = new Set(landedStepIds);
+    const next = reviewablePlanSteps(steps).find(
+        (step) =>
+            step.assignee.kind === 'person'
+            && step.assignee.relation !== 'associate'
+            && !landed.has(step.id),
+    );
+    return next?.assignee.kind === 'person' ? next.assignee : null;
+};
+
 /**
  * The starters offered beside the free-text box when a plan is sent back.
  *

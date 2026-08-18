@@ -45,6 +45,7 @@ const TICKET_MODULE = join(
     'ticket.py',
 );
 const LANE_MODULE = join(REPO_ROOT, 'src', 'backend', 'lane', 'lane.py');
+const PROVENANCE_MODULE = join(REPO_ROOT, 'src', 'backend', 'provenance.py');
 
 export interface QuickTask {
     id: string;
@@ -59,6 +60,7 @@ export interface QuickTask {
 /** One authored Reviewable-plan step on a Quick Task. */
 export interface PlanStep {
     id: number;
+    waitsOn?: number;
     assignee?: PlanAssignee;
 }
 
@@ -79,12 +81,51 @@ export interface PlanAssignee {
 
 /** The people an authored Quick Task's plan reaches, in its declared order. */
 export function planPeople(task: QuickTask): PlanAssignee[] {
-    return task.planSteps
+    const unresolved = [...task.planSteps];
+    const stepIds = new Set(unresolved.map((step) => step.id));
+    const resolved = new Set<number>();
+    const ordered: PlanStep[] = [];
+
+    while (unresolved.length) {
+        const ready = unresolved.filter(
+            (step) =>
+                step.waitsOn === undefined
+                || !stepIds.has(step.waitsOn)
+                || resolved.has(step.waitsOn),
+        );
+        if (!ready.length) {
+            throw new Error('The Quick Task plan_steps contain a waitsOn cycle');
+        }
+        for (const step of ready) {
+            unresolved.splice(unresolved.indexOf(step), 1);
+            resolved.add(step.id);
+            ordered.push(step);
+        }
+    }
+
+    return ordered
         .map((step) => step.assignee)
         .filter(
             (assignee): assignee is PlanAssignee =>
                 assignee?.kind === 'person' && typeof assignee.name === 'string',
         );
+}
+
+/** The people whose Verdicts begin only after the associate approves the plan. */
+export function postApprovalPeople(task: QuickTask): PlanAssignee[] {
+    return planPeople(task).filter((person) => person.relation !== 'associate');
+}
+
+/** The Verdict record's own Provenance line, read from its backend author. */
+export function verdictProvenanceLine(): string {
+    const source = readFileSync(PROVENANCE_MODULE, 'utf-8');
+    const match = source.match(
+        /VERDICT_PROVENANCE\s*=\s*\(\s*"([^"]*)"\s*"([^"]*)"\s*\)/m,
+    );
+    if (!match) {
+        throw new Error('VERDICT_PROVENANCE is not declared as a two-part source string');
+    }
+    return `${match[1]}${match[2]}`;
 }
 
 /** One member of the **Store assistant roster**, as the pack authors it. */

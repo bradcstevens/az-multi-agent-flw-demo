@@ -33,6 +33,7 @@ export const REQUEST_PHASES = [
     'routed',
     'connected',
     'working',
+    'waiting',
     'done',
 ] as const;
 
@@ -56,6 +57,8 @@ export interface NarrationSubject {
     lane?: Lane | null;
     /** The executor named by `agent_message_streaming`, spelled as it arrived. */
     executor?: string | null;
+    /** The next Person step the approved plan reports as unresolved. */
+    waitingOn?: string | null;
 }
 
 /** What the surface says while the POST is in flight. */
@@ -122,12 +125,14 @@ export const respondingAgent = (executor: string | null | undefined): string | n
  * at all, so a `done` that did not silence the indicator would leave it running
  * for the rest of the conversation (#69).
  */
-export const narrate = ({ phase, lane, executor }: NarrationSubject): string | null => {
+export const narrate = ({ phase, lane, executor, waitingOn }: NarrationSubject): string | null => {
     if (phase === 'idle' || phase === 'done') return null;
 
     if (phase === 'working') {
         return `${respondingAgent(executor) ?? 'An agent'} is responding...`;
     }
+
+    if (phase === 'waiting' && waitingOn) return `Waiting on ${waitingOn}...`;
 
     // `connected` is plumbing and says nothing of its own, so it holds whatever
     // the last real signal reported — the lane, if the router has decided one.

@@ -21,6 +21,7 @@ export type { Agent as TaskAgent } from './taskDetails';
 
 // Export Team models (Agent interface takes precedence)
 export * from './Team';
+export * from './verdict';
 
 
 // Add other model exports as needed

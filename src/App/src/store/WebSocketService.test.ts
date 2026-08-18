@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import webSocketService from './WebSocketService';
 import { WebsocketMessageType } from '@/models';
 import { parseSourceUsed, parseTokenUsage, parsePresenterAlert } from '@/models/transparency';
+import { parseVerdict } from '@/models/verdict';
 import { FakeSocket, frame } from '@/testing/fakeSocket';
 
 /**
@@ -120,6 +121,39 @@ describe('a transparency signal arriving on the socket', () => {
         );
 
         expect(received[0].ticket_id).toBe('SIM-223-0041');
+    });
+
+    it('reaches the conversation as the Verdict record that landed', async () => {
+        const socket = await connectedSocket();
+        const received: unknown[] = [];
+        webSocketService.on(WebsocketMessageType.VERDICT_LANDED, (message) =>
+            received.push(message.data),
+        );
+
+        socket.deliver(
+            frame('verdict_landed', {
+                m_plan_id: 'plan-223',
+                step_id: 3,
+                assignee: {
+                    kind: 'person',
+                    name: 'Marcus Bell',
+                    relation: 'peer',
+                    simulated: true,
+                },
+                outcome: 'approved',
+                words: 'I can confirm the Saturday swap works for me.',
+                provenance_line: 'Record-provided test provenance.',
+            }),
+        );
+
+        const verdict = parseVerdict(received[0]);
+        expect(verdict).toMatchObject({
+            planId: 'plan-223',
+            stepId: 3,
+            assignee: { name: 'Marcus Bell' },
+            outcome: 'approved',
+        });
+        expect(verdict?.provenanceLine).toEqual(expect.any(String));
     });
 });
 

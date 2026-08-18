@@ -21,6 +21,7 @@ import teamReducer from '@/store/slices/teamSlice';
 import streamingReducer from '@/store/slices/streamingSlice';
 import transparencyReducer from '@/store/slices/transparencySlice';
 import ticketReducer from '@/store/slices/ticketSlice';
+import verdictReducer from '@/store/slices/verdictSlice';
 import { useAppSelector } from '@/store/hooks';
 import {
     selectSettledReply,
@@ -100,6 +101,7 @@ const makeStore = () =>
             streaming: streamingReducer,
             transparency: transparencyReducer,
             ticket: ticketReducer,
+            verdict: verdictReducer,
             progress: progressReducer,
         },
         middleware: (getDefault) => getDefault({ serializableCheck: false }),

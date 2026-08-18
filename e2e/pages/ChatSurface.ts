@@ -174,6 +174,11 @@ export class ChatSurface {
         return this.page.getByTestId('simulated-ticket');
     }
 
+    /** Verdict records pushed from the approved plan's post-approval seam. */
+    get verdictRecords(): Locator {
+        return this.page.getByTestId('verdict-record');
+    }
+
     /** The simulated identifier an associate can read from the ticket card. */
     get ticketNumber(): Locator {
         return this.page.getByTestId('simulated-ticket-id');

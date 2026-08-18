@@ -178,6 +178,9 @@ class WebsocketMessageType(str, Enum):
     # in ``escalation/payloads.py`` for the same reason the three above live in
     # ``transparency/``.
     TICKET_RAISED = "ticket_raised"
+    # A Person step's decision, pushed from the post-approval seam rather than
+    # presented as agent speech. Its payload is the Verdict record itself.
+    VERDICT_LANDED = "verdict_landed"
 
 
 @dataclass(slots=True)

@@ -29,6 +29,8 @@ export interface ProgressState {
     planId: string | null;
     lane: Lane | null;
     executor: string | null;
+    /** The next Person step the approved plan is waiting on. */
+    waitingOn: string | null;
     /** Executors that have spoken in the answer the surface is currently showing. */
     participatingExecutors: string[];
 }
@@ -38,6 +40,7 @@ const initialState: ProgressState = {
     planId: null,
     lane: null,
     executor: null,
+    waitingOn: null,
     participatingExecutors: [],
 };
 
@@ -56,6 +59,7 @@ const progressSlice = createSlice({
             state.planId = action.payload ?? null;
             state.lane = null;
             state.executor = null;
+            state.waitingOn = null;
             state.participatingExecutors = [];
         },
         /**
@@ -89,12 +93,20 @@ const progressSlice = createSlice({
             }
             state.phase = 'working';
         },
+        /** The approved Reviewable plan names the Person step still unresolved. */
+        waitingOnPerson(state, action: PayloadAction<string | null | undefined>) {
+            const person = action.payload?.trim() || null;
+            if (!person || state.phase === 'done') return;
+            state.waitingOn = person;
+            state.phase = 'waiting';
+        },
         /**
          * The plan, or the answer, or the error — the request is no longer in
          * flight and the surface stops saying that it is.
          */
         requestSettled(state) {
             state.phase = 'done';
+            state.waitingOn = null;
         },
         /**
          * The chat page opened a conversation.
@@ -122,6 +134,7 @@ const progressSlice = createSlice({
         builder.addCase(planApprovalAccepted, (state) => {
             state.phase = 'sent';
             state.executor = null;
+            state.waitingOn = null;
             state.participatingExecutors = [];
         });
     },
@@ -132,6 +145,7 @@ export const {
     requestRouted,
     socketConnected,
     agentResponding,
+    waitingOnPerson,
     requestSettled,
     planOpened,
 } = progressSlice.actions;
@@ -139,6 +153,7 @@ export const {
 export const selectRequestPhase = (s: RootState) => s.progress.phase;
 export const selectRoutedLane = (s: RootState) => s.progress.lane;
 export const selectRespondingExecutor = (s: RootState) => s.progress.executor;
+export const selectWaitingOnPerson = (s: RootState) => s.progress.waitingOn;
 export const selectParticipatingExecutors = (s: RootState) => s.progress.participatingExecutors;
 
 /** What the surface says right now, or `null` for say nothing. */
@@ -146,7 +161,8 @@ export const selectProgressNarration = createSelector(
     selectRequestPhase,
     selectRoutedLane,
     selectRespondingExecutor,
-    (phase, lane, executor) => narrate({ phase, lane, executor }),
+    selectWaitingOnPerson,
+    (phase, lane, executor, waitingOn) => narrate({ phase, lane, executor, waitingOn }),
 );
 
 /**

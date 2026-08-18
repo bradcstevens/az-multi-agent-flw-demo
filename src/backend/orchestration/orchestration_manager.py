@@ -1068,10 +1068,11 @@ class OrchestrationManager:
                 if person_steps:
                     resolved_verdicts = await self._resolve_person_steps(
                         person_steps,
+                        plan=mplan,
+                        user_id=user_id,
                         associate_name=associate_name,
                         manager_chat_client=manager_chat_client,
                     )
-                    mplan.verdicts = resolved_verdicts
                     verdicts.extend(resolved_verdicts)
                 continue
 
@@ -1170,6 +1171,8 @@ class OrchestrationManager:
         self,
         person_steps: list,
         *,
+        plan,
+        user_id: str,
         associate_name: str,
         manager_chat_client,
     ) -> list:
@@ -1243,13 +1246,23 @@ class OrchestrationManager:
                 raise ValueError(
                     f"Manager generated no words for Person step {getattr(step, 'id', '?')}"
                 )
-            verdicts.append(
-                Verdict(
-                    step_id=step.id,
-                    assignee=assignee,
-                    outcome=outcome,
-                    words=words,
-                )
+            verdict = Verdict(
+                step_id=step.id,
+                assignee=assignee,
+                outcome=outcome,
+                words=words,
+            )
+            verdicts.append(verdict)
+            # The plan owns the record before the conversation sees it. The
+            # awaited push preserves the declared waitsOn order on the wire.
+            plan.verdicts = list(verdicts)
+            await connection_config.send_status_update_async(
+                message={
+                    "m_plan_id": plan.id,
+                    **verdict.model_dump(mode="json"),
+                },
+                user_id=user_id,
+                message_type=WebsocketMessageType.VERDICT_LANDED,
             )
         return verdicts
 

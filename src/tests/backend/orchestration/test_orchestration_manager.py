@@ -309,6 +309,7 @@ class MockWebsocketMessageType:
     # pushing a message type the backend had renamed, and the card would go
     # dark on stage with every test green.
     TICKET_RAISED = _real_websocket_message_type("TICKET_RAISED")
+    VERDICT_LANDED = _real_websocket_message_type("VERDICT_LANDED")
 
 
 class MockAgentMessageStreaming:
@@ -2459,6 +2460,42 @@ class TestTheApprovalIsTheTicketConfirmation:
         assert len(second_run.requests) == 2
         orchestration_config.wait_for_clarification.assert_not_called()
         sleep.assert_not_awaited()
+
+        pushed = [
+            call
+            for call in connection_config.send_status_update_async.call_args_list
+            if call.kwargs.get("message_type") == "verdict_landed"
+        ]
+        assert [
+            (
+                call.kwargs["message"]["m_plan_id"],
+                call.kwargs["message"]["step_id"],
+                call.kwargs["message"]["assignee"]["name"],
+                call.kwargs["message"]["outcome"],
+                call.kwargs["message"]["words"],
+                call.kwargs["message"]["provenance_line"],
+            )
+            for call in pushed[:2]
+        ] == [
+            (
+                "test-plan-id",
+                3,
+                "Marcus Bell",
+                "approved",
+                "I can confirm the Saturday swap works for me.",
+                "No workforce management system was consulted — this verdict was "
+                "authored for this walkthrough.",
+            ),
+            (
+                "test-plan-id",
+                4,
+                "Dana Reyes",
+                "approved",
+                "I approve the Saturday swap.",
+                "No workforce management system was consulted — this verdict was "
+                "authored for this walkthrough.",
+            ),
+        ]
 
     @pytest.mark.asyncio
     async def test_associate_only_person_steps_never_invoke_the_postapproval_executor(self):

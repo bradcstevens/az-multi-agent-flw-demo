@@ -20,6 +20,7 @@ describe('the phases a request passes through', () => {
             'routed',
             'connected',
             'working',
+            'waiting',
             'done',
         ]);
     });
@@ -82,6 +83,12 @@ describe('what the surface says in each phase', () => {
     it('names the executor that is actually responding', () => {
         expect(narrate({ phase: 'working', executor: 'Troubleshooting Agent' })).toBe(
             'Troubleshooting Agent is responding...',
+        );
+    });
+
+    it('names the Person step the approved plan is actually waiting on', () => {
+        expect(narrate({ phase: 'waiting', waitingOn: 'Marcus Bell' })).toBe(
+            'Waiting on Marcus Bell...',
         );
     });
 

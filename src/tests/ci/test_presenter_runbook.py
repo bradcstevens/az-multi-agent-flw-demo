@@ -264,13 +264,23 @@ def test_the_shift_swap_beat_quotes_its_authored_people_and_order():
 
     assert "Deliberate" in beat
     person_steps = [
-        step["assignee"]
+        step
         for step in task["plan_steps"]
         if step["assignee"]["kind"] == "person"
     ]
-    for assignee in person_steps:
-        assert assignee["name"] in beat
+    for step in person_steps:
+        assert step["assignee"]["name"] in beat
+    for step in person_steps:
+        assert step["action"] in beat
     assert "waitsOn" in beat
+
+
+def test_the_runbook_says_approval_completes_a_ticket_and_starts_a_swap():
+    """The two workflows share an approval shape but have opposite next steps."""
+    assert (
+        "Approving the ticket completes it; approving this plan starts the swap"
+        in _rendered()
+    )
 
 
 def test_every_rehearsed_reply_chip_is_quoted_from_the_pack():

@@ -269,7 +269,9 @@ export enum WebsocketMessageType {
      * rather than by an agent — the approval **is** the confirmation, so the
      * card is emitted by the thing that submitted the ticket.
      */
-    TICKET_RAISED = "ticket_raised"
+    TICKET_RAISED = "ticket_raised",
+    /** A Person step's own record, pushed after it resolves. */
+    VERDICT_LANDED = "verdict_landed",
 }
 
 export enum AgentMessageType {

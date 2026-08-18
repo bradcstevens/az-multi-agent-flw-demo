@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-import { agentHoldingToolbox, agentKey, planPeople, quickTasks } from '../authored';
+import {
+    agentHoldingToolbox,
+    agentKey,
+    planPeople,
+    postApprovalPeople,
+    quickTasks,
+    verdictProvenanceLine,
+} from '../authored';
 import { ChatSurface } from '../pages/ChatSurface';
 import { StoreSurface } from '../pages/StoreSurface';
 
@@ -139,6 +146,23 @@ test.describe('the fourth specialist', () => {
         }
 
         await plan.approveButton.click();
+
+        /*
+         * A Verdict is a pushed record, not generated agent speech. Every
+         * expectation comes from the authored plan or the record's own backend
+         * provenance constant; the people's generated words remain unasserted.
+         */
+        const verdictPeople = postApprovalPeople(task!);
+        expect(verdictPeople).toHaveLength(standIns.length);
+        for (const [index, person] of verdictPeople.entries()) {
+            const record = plan.verdictRecords.nth(index);
+            await expect(record).toBeVisible({ timeout: 180_000 });
+            await expect(record).toContainText(person.name!);
+            await expect(record.getByTestId('verdict-provenance')).toHaveText(
+                verdictProvenanceLine(),
+            );
+        }
+        await expect(plan.verdictRecords).toHaveCount(verdictPeople.length);
 
         const turn = plan.latestAgentTurn;
         await expect(turn).toBeVisible({ timeout: 180_000 });

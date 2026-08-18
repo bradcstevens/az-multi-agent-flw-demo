@@ -19,6 +19,7 @@ import {
 import {
     PlanVerdictState,
     applyPlanVerdict,
+    nextUnresolvedPerson,
     pendingVerdictFor,
 } from '../models/reviewablePlan';
 
@@ -105,6 +106,7 @@ import {
     planOpened,
     requestSent,
     requestSettled,
+    waitingOnPerson,
     selectProgressNarration,
 } from '../store/slices/progressSlice';
 import { useInlineToaster } from '../components/toast/InlineToaster';
@@ -395,6 +397,8 @@ const ChatPage: React.FC = () => {
             setVerdict(next);
             /* P0: single compound action replaces 3 separate dispatches */
             dispatch(planApprovalAccepted());
+            const nextPerson = nextUnresolvedPerson(planApprovalRequest.steps ?? [], []);
+            if (nextPerson) dispatch(waitingOnPerson(nextPerson.name));
         } catch {
             dismissToast(id);
             showToast('Failed to submit approval', 'error');

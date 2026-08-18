@@ -344,7 +344,8 @@ class WebSocketService {
             case WebsocketMessageType.SOURCE_USED:
             case WebsocketMessageType.TOKEN_USAGE:
             case WebsocketMessageType.PRESENTER_ALERT:
-            case WebsocketMessageType.TICKET_RAISED: {
+            case WebsocketMessageType.TICKET_RAISED:
+            case WebsocketMessageType.VERDICT_LANDED: {
                 this.emit(message.type, message.data);
                 break;
             }

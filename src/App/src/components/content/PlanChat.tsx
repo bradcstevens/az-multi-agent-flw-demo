@@ -15,11 +15,13 @@ import TicketStatusReply from "./TicketStatusReply";
 import { useAppSelector } from "@/store/hooks";
 import { selectPresenterAlerts } from "@/store/slices/transparencySlice";
 import { selectProgressNarration } from "@/store/slices/progressSlice";
+import { selectVerdicts } from "@/store/slices/verdictSlice";
 import { StartingTask, TicketStatusReply as TicketStatusReplyModel } from "@/models/Team";
 import { PersonalAnswer } from "@/models/personalAnswer";
 import { PolicyBlock } from "@/api/policyBlock";
 import PersonalAnswerCard from "../identity/PersonalAnswerCard";
 import PolicyBlockNotice from "../identity/PolicyBlockNotice";
+import VerdictCard from "./VerdictCard";
 import "@/styles/planChatContinuation.css";
 
 interface SimplifiedPlanChatProps extends PlanChatProps {
@@ -105,6 +107,8 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 }) => {
   // Read before the early return: hooks may not sit behind a condition.
   const presenterAlerts = useAppSelector(selectPresenterAlerts);
+  const verdicts = useAppSelector(selectVerdicts);
+  const currentVerdicts = verdicts.filter((verdict) => verdict.planId === planApprovalRequest?.id);
   /*
     What the surface says while this request is in flight (#64, ADR-023). Read
     from the slice rather than passed in, because the narration is one claim
@@ -159,6 +163,9 @@ const PlanChat: React.FC<SimplifiedPlanChatProps> = ({
 
         {/* Plan response with all information */}
         {renderPlanResponse(planApprovalRequest, handleApprovePlan, handleRejectPlan, processingApproval, showApprovalButtons)}
+        {currentVerdicts.map((verdict) => (
+          <VerdictCard key={`${verdict.planId}-${verdict.stepId}`} verdict={verdict} />
+        ))}
         {renderAgentMessages(agentMessages, undefined, undefined, finalResultRef)}
         <div aria-live="off">
           {renderAgentMessages(streamedReplyMessage)}
