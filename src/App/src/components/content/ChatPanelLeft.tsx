@@ -207,13 +207,21 @@ const ChatPanelLeft: React.FC<ChatPanelLeftProps> = ({
         plan id the row carries to open with, which would take one turn and
         leave the rest of the chat in Cosmos.
 
+        The second argument is the door out of `in_progress` (#122, ADR-031
+        §5): the turn is ended first, through the same primitive **Leaving a
+        Chat** uses. Asked for exactly when the row could not call this chat
+        settled, which is exactly what the confirmation the associate just
+        agreed to said it would do — so the ask is theirs and no heuristic
+        about abandonment is anywhere in it. A settled row sends nothing, and a
+        turn that started after this list was read is left running.
+
         Rethrows on failure, and deliberately says nothing itself: a refused
-        delete (a running chat, or a sweep that could not finish) means the
-        conversation is still there, and `ChatList` keeps its confirmation
-        standing and reports the reason in the dialog the associate is already
-        looking at.
+        delete (a sweep that could not finish, or a chat the route still finds
+        running) means the conversation is still there, and `ChatList` keeps
+        its confirmation standing and reports the reason in the dialog the
+        associate is already looking at.
       */
-      await apiService.deleteChat(chat.id);
+      await apiService.deleteChat(chat.id, !canDeleteChat(chat.status));
 
       /*
         The row goes here rather than only on the next read. `loadPlansData`

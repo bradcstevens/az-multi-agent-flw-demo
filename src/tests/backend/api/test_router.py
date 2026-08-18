@@ -2482,6 +2482,179 @@ class TestDeleteChat:
 
 
 # ---------------------------------------------------------------------------
+# DELETE /chats/{session_id}?end_turn=true
+# ---------------------------------------------------------------------------
+class TestDeletingARunningChat:
+    """The door out of `in_progress` (#122, ADR-031 §5).
+
+    **Chat deletion** fails closed on anything that has not reached a **Settled
+    status**, and that stays. What was missing is the way *out*: a Chat whose
+    turn was destroyed by **Leaving a Chat**, or by a walk-away, sat at
+    `in_progress` for ever and was unclearable by any exposed route — a
+    rehearsal that ran the walkthrough twenty times left twenty rows nobody
+    could delete.
+
+    The way out is to **end the turn**, never to loosen the guard. The delete
+    route takes the associate's own ask, ends the turn through #120's primitive
+    — the same one **Leaving a Chat** uses — and then deletes on the guard's
+    unchanged terms.
+    """
+
+    def _plan(self, status="in_progress", session_id="session-1"):
+        return SimpleNamespace(
+            id="plan-1",
+            plan_id="plan-1",
+            session_id=session_id,
+            overall_status=status,
+        )
+
+    def _delete(self, rt, query="?end_turn=true", session_id="session-1"):
+        return rt.client.delete(f"/api/v4/chats/{session_id}{query}")
+
+    def test_the_turn_is_ended_and_then_the_chat_goes(self, rt):
+        # `canceled` onto the Plan record through #120's primitive, and only
+        # then the sweep — which is what makes the guard's own answer change
+        # rather than the guard.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        rt.store.delete_chat = AsyncMock(
+            return_value=ChatDeletion.swept(deleted=7, failed=0)
+        )
+
+        resp = self._delete(rt)
+
+        assert resp.status_code == 200
+        assert resp.json()["documents_deleted"] == 7
+        written = rt.store.update_plan.await_args.args[0]
+        assert written.overall_status == "canceled"
+        rt.store.delete_chat.assert_awaited_once_with(session_id="session-1")
+
+    def test_a_delete_that_did_not_ask_ends_nothing(self, rt):
+        # The associate's request is the whole of the trigger (ADR-031 §3): no
+        # heuristic about abandonment lives here, so a plain delete against a
+        # running Chat is still the refusal it has always been. Anything else
+        # would end a live turn on a stale row.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        rt.store.delete_chat = AsyncMock(
+            return_value=ChatDeletion(DeletionOutcome.still_running)
+        )
+
+        resp = self._delete(rt, query="")
+
+        assert resp.status_code == 409
+        assert resp.json()["detail"] == STILL_RUNNING_DETAIL
+        rt.store.update_plan.assert_not_awaited()
+
+    def test_a_chat_that_already_finished_keeps_the_status_it_earned(self, rt):
+        # ADR-043's ordering constraint, at the door it was written for. A turn
+        # that completed and lost its browser echo now settles server-side, so
+        # the door finds `completed` and leaves it: replacing a status that
+        # lied in one direction with one that lies in the other is not a fix
+        # (ADR-031 §6). The Chat is deleted all the same — the guard's answer
+        # was already yes.
+        rt.store.get_plan_by_session = AsyncMock(
+            return_value=self._plan(status="completed")
+        )
+        rt.store.delete_chat = AsyncMock(
+            return_value=ChatDeletion.swept(deleted=3, failed=0)
+        )
+
+        resp = self._delete(rt)
+
+        assert resp.status_code == 200
+        rt.store.update_plan.assert_not_awaited()
+        rt.store.delete_chat.assert_awaited_once_with(session_id="session-1")
+
+    def test_a_turn_that_could_not_be_ended_deletes_nothing(self, rt):
+        # The store answers "no such chat" and "I could not tell you" in the
+        # same breath. Sweeping a Chat whose turn this route failed to settle
+        # would destroy the conversation while its orchestration went on
+        # computing into the partition it had just emptied.
+        rt.store.get_plan_by_session = AsyncMock(side_effect=Exception("cosmos"))
+        rt.store.delete_chat = AsyncMock()
+
+        resp = self._delete(rt)
+
+        assert resp.status_code == 500
+        rt.store.delete_chat.assert_not_awaited()
+
+    def test_a_turn_running_for_another_chat_is_left_running(self, rt):
+        # ADR-031 §6, at the second caller of the primitive. The registry is
+        # keyed by `user_id` and `process_request` deliberately cancels across
+        # sessions on that key; deleting one Chat may not reach into another.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        rt.store.delete_chat = AsyncMock(
+            return_value=ChatDeletion.swept(deleted=2, failed=0)
+        )
+        task = MagicMock()
+        task.done.return_value = False
+        rt.orchestration_config.active_turn.return_value = SimpleNamespace(
+            session_id="session-2", task=task
+        )
+
+        resp = self._delete(rt)
+
+        assert resp.status_code == 200
+        task.cancel.assert_not_called()
+
+    def test_a_chat_whose_turn_was_destroyed_is_clearable(self, rt):
+        # The row this door exists for: **Leaving a Chat** or a walk-away
+        # destroyed the turn, so nothing is computing and the record sat at
+        # `in_progress` for ever. Ending it writes `canceled` with nothing to
+        # cancel, and the sweep then runs.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        rt.store.delete_chat = AsyncMock(
+            return_value=ChatDeletion.swept(deleted=5, failed=0)
+        )
+        rt.orchestration_config.active_turn.return_value = None
+
+        resp = self._delete(rt)
+
+        assert resp.status_code == 200
+        assert rt.store.update_plan.await_args.args[0].overall_status == "canceled"
+
+    def test_the_door_is_never_a_verdict_on_a_plan(self, rt):
+        # Ending is not rejecting (ADR-031 §2), and #108 made `approved: false`
+        # mean *"send it back"* — a delete that posted it would file a revision
+        # request nobody wrote. `delete_plan_by_plan_id` stays unreached for
+        # ADR-026's own reason: it takes one document and is not scoped by
+        # `user_id`.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        rt.store.delete_chat = AsyncMock(
+            return_value=ChatDeletion.swept(deleted=1, failed=0)
+        )
+        rt.store.delete_plan_by_plan_id = AsyncMock()
+
+        self._delete(rt)
+
+        rt.store.delete_plan_by_plan_id.assert_not_awaited()
+        rt.plan_service.handle_plan_approval.assert_not_awaited()
+
+    def test_the_store_is_reached_as_this_user(self, rt):
+        # One store, built for this user, for both halves of the door. Its
+        # `user_id` predicate is the whole of the authorization, so an end-turn
+        # made under anybody else's identity would settle a conversation this
+        # caller cannot see.
+        rt.store.get_plan_by_session = AsyncMock(return_value=self._plan())
+        rt.store.delete_chat = AsyncMock(
+            return_value=ChatDeletion.swept(deleted=1, failed=0)
+        )
+
+        self._delete(rt)
+
+        rt.database_factory.get_database.assert_awaited_with(user_id="user-1")
+
+    def test_no_user(self, rt):
+        _no_user(rt)
+        rt.store.delete_chat = AsyncMock()
+
+        resp = self._delete(rt)
+
+        assert resp.status_code == 400
+        rt.store.update_plan.assert_not_awaited()
+        rt.store.delete_chat.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
 # POST /chats/{session_id}/end_turn
 # ---------------------------------------------------------------------------
 class TestEndingATurn:

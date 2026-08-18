@@ -81,14 +81,31 @@ export const CONFIRM_DELETE_LABEL = 'Delete chat';
 export const CANCEL_DELETE_LABEL = 'Keep chat';
 
 /**
- * Why a running chat is kept.
+ * What the surface says about a chat whose turn is still in flight.
  *
- * ADR-026's own noted cost: the surface has to explain when it refuses, or the
- * control reads as broken. The same sentence the route answers a 409 with — see
- * `STILL_RUNNING_DETAIL` in `src/backend/chat/deletion.py`.
+ * ADR-026's own noted cost, answered rather than restated: a running Chat
+ * cannot be deleted *as it stands*, so the surface has to explain what it will
+ * do instead of reading as a control that refuses. #122 makes that a door —
+ * the turn is ended first, through the same primitive **Leaving a Chat** uses
+ * — so this sentence names the act rather than the wall.
+ *
+ * Said in three places and written once: beside the row's delete, in the
+ * confirmation that delete opens, and in the 409 the route answers a delete
+ * that carried no such ask. The same sentence the route uses — see
+ * `STILL_RUNNING_DETAIL` in `src/backend/chat/deletion.py`, held in agreement
+ * by `src/tests/ci/test_chat_deletion_contract.py`.
  */
 export const STILL_RUNNING_REASON =
-    'This chat is still running, so it cannot be deleted yet.';
+    'This chat is still running, so deleting it ends its turn first.';
+
+/**
+ * The button that ends the turn and then deletes — named for both acts.
+ *
+ * Distinct from `CONFIRM_DELETE_LABEL` because the act is distinct: an answer
+ * in progress is stopped, and a button reading only *"Delete chat"* would take
+ * that consent without asking for it.
+ */
+export const END_AND_DELETE_LABEL = 'End turn and delete';
 
 /** What a failed delete tells the associate. */
 export const DELETE_FAILED_TITLE = 'Could not delete this chat';

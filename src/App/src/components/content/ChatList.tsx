@@ -27,6 +27,7 @@ import {
   DELETE_CHAT_TITLE,
   DELETE_CHAT_WARNING,
   DELETE_FAILED_TITLE,
+  END_AND_DELETE_LABEL,
   STILL_RUNNING_REASON,
   canDeleteChat,
   chatMenuLabel,
@@ -84,7 +85,14 @@ const ChatList: React.FC<ChatListProps> = ({
   const renderChatRow = (chat: Chat) => {
     const isActive = chat.id === selectedChatId;
     const state = chatStateLabel(chat.status);
-    const deletable = canDeleteChat(chat.status);
+    /*
+      Whether this row's delete takes the Chat as it stands, or ends its turn
+      on the way (#122, ADR-031 §5). `canDeleteChat` is unchanged and still
+      fail-closed — what changes is what the surface does with its answer: a
+      chat it cannot call settled is one whose turn is ended first, rather than
+      one the control refuses for ever.
+    */
+    const settled = canDeleteChat(chat.status);
     const reasonId = `chat-delete-reason-${chat.id}`;
 
     return (
@@ -153,24 +161,22 @@ const ChatList: React.FC<ChatListProps> = ({
                 <MenuItem
                   icon={<Delete20Regular />}
                   /*
-                    `disabledFocusable` beside `disabled`, not instead of it:
-                    `disabled` is what puts `aria-disabled` on the item, and
-                    `disabledFocusable` is what keeps it in the tab order — a
-                    natively-disabled item leaves it, so a keyboard user would
-                    find the reason below missing rather than read it.
+                    Offered whatever the chat's state (#122). The row used to
+                    carry a `disabled`/`disabledFocusable` pair so a keyboard
+                    user could still reach the reason beside it; there is no
+                    refusal left to explain, so the item is simply a control
+                    and the caption below says what confirming will do.
                   */
-                  disabled={!deletable}
-                  disabledFocusable={!deletable}
-                  aria-describedby={deletable ? undefined : reasonId}
-                  onClick={() => deletable && setConfirming(chat)}
+                  aria-describedby={settled ? undefined : reasonId}
+                  onClick={() => setConfirming(chat)}
                 >
                   {DELETE_CHAT_LABEL}
                 </MenuItem>
-                {!deletable && (
+                {!settled && (
                   /*
-                    ADR-026's own noted cost: a running Chat cannot be deleted,
-                    so the surface has to explain when it keeps one rather than
-                    leave a control that reads as broken.
+                    ADR-026's noted cost, turned into a door: the associate is
+                    told the turn in flight ends first, before they open a
+                    confirmation that says it again.
                   */
                   <Caption1 id={reasonId} className="task-menu-reason">
                     {STILL_RUNNING_REASON}
@@ -247,6 +253,14 @@ const ChatList: React.FC<ChatListProps> = ({
                 is a confirmation nobody can check.
               */}
               <div className="task-delete-name">{confirming?.name}</div>
+              {confirming !== null && !canDeleteChat(confirming.status) && (
+                /*
+                  Said again here, and deliberately: the menu's caption is read
+                  in passing, and this is the moment the associate consents to
+                  an answer in progress being stopped (#122).
+                */
+                <div>{STILL_RUNNING_REASON}</div>
+              )}
               <div>{DELETE_CHAT_WARNING}</div>
               {failure !== null && (
                 /*
@@ -276,7 +290,9 @@ const ChatList: React.FC<ChatListProps> = ({
                 disabled={deleting}
                 onClick={confirmDelete}
               >
-                {CONFIRM_DELETE_LABEL}
+                {confirming !== null && !canDeleteChat(confirming.status)
+                  ? END_AND_DELETE_LABEL
+                  : CONFIRM_DELETE_LABEL}
               </Button>
             </DialogActions>
           </DialogBody>
