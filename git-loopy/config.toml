@@ -32,7 +32,7 @@ test = { model = "gpt-5.6-terra", effort = "high" }
 # The documentation here is enforced (the runbook string-for-string, the ADR
 # index by test_durable_record.py), but sonnet and opus both clear it — so the
 # tie-break applies, and the faster one wins.
-docs = { model = "claude-sonnet-5", effort = "medium" }
+docs = { model = "gpt-5.6-luna", effort = "luna" }
 
 # The roster's fastest model, kept on SPEED grounds — the only justification the
 # rule permits now that price is not one. `low` rather than `none` because
