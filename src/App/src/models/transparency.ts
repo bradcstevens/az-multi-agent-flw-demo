@@ -59,6 +59,7 @@ export interface PresenterAlert {
     title: string;
     content: string;
     timestamp: string;
+    provenance: string;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -174,5 +175,10 @@ export function parsePresenterAlert(data: unknown): PresenterAlert | null {
     const content = asText(raw.content);
     if (!title || !content) return null;
 
-    return { title, content, timestamp: asText(raw.timestamp) };
+    return {
+        title,
+        content,
+        timestamp: asText(raw.timestamp),
+        provenance: asText(raw.provenance),
+    };
 }

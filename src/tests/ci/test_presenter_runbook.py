@@ -13,6 +13,7 @@ copy of the words on screen survives a rebrand it never saw, and the presenter f
 out in front of the customer that the card is called something else now.
 """
 
+import ast
 import json
 import re
 import subprocess
@@ -30,7 +31,7 @@ STORE_PACK = (
 )
 CHORD_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "presenterChord.ts"
 SURFACE_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "storeSurface.ts"
-HOME_INPUT = REPO_ROOT / "src" / "App" / "src" / "components" / "content" / "HomeInput.tsx"
+PROVENANCE = REPO_ROOT / "src" / "backend" / "provenance.py"
 RESUME_MODULE = REPO_ROOT / "src" / "App" / "src" / "models" / "resume.ts"
 AGENT_AVAILABILITY = (
     REPO_ROOT / "src" / "App" / "src" / "models" / "agentAvailability.ts"
@@ -64,6 +65,39 @@ def _exported_string(module: Path, name: str) -> str:
     )
     assert match, f"{module.name} no longer exports {name}"
     return match.group(1)
+
+
+def _provenance_lines() -> list[str]:
+    """Every literal Provenance line the surface can send.
+
+    The source module is the enumeration point. A manually maintained list here
+    could agree with itself forever while a new invented record went unregistered.
+    """
+    tree = ast.parse(PROVENANCE.read_text(encoding="utf-8"), filename=str(PROVENANCE))
+    lines = []
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        names = [
+            target.id
+            for target in node.targets
+            if isinstance(target, ast.Name) and target.id.endswith("_PROVENANCE")
+        ]
+        if names:
+            value = ast.literal_eval(node.value)
+            assert isinstance(value, str), f"{names[0]} is not a string constant"
+            lines.append(value)
+    assert lines, "the Provenance line module defines no lines to register"
+    return lines
+
+
+def _simulation_register() -> str:
+    """The rendered register, excluding the rest of the presenter's script."""
+    source = _runbook()
+    start = source.index("## Simulation register")
+    rest = source[start:]
+    end = rest.index("\n---")
+    return re.sub(r"\s+", " ", rest[:end])
 
 
 def _corpus_section(name: str) -> str:
@@ -249,21 +283,11 @@ def test_the_anonymous_opening_is_explained_rather_than_merely_stated():
     )
 
 
-def test_the_simulated_sign_in_is_said_out_loud():
-    """What the button says beside itself, said in the runbook too.
-
-    A stakeholder who discovers afterwards that an identity provider was implied
-    has stopped believing the rest of the demonstration, so the presenter must
-    say it before they are asked.
-    """
-    note = re.search(
-        r"(Simulated sign-in — no identity provider is involved\.)",
-        HOME_INPUT.read_text(encoding="utf-8"),
-    )
-    assert note, "HomeInput no longer says the sign-in is simulated"
-    assert note.group(1) in _rendered(), (
-        "the runbook does not say out loud that the sign-in is mocked end to end"
-    )
+def test_every_provenance_line_is_said_out_loud_in_the_simulation_register():
+    """The register travels with every invented record's source constant."""
+    register = _simulation_register()
+    missing = [line for line in _provenance_lines() if line not in register]
+    assert not missing, f"the Simulation register omits Provenance lines: {missing}"
 
 
 def test_every_beat_has_a_failure_playbook_row():

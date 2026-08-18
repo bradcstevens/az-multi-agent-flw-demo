@@ -35,23 +35,13 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List
 
 from associate.records import AssociateRecord
+from provenance import ASSOCIATE_RECORD_PROVENANCE
 
 # The discriminator the browser switches on, beside ``POLICY_BLOCK_KIND``. The
 # two are the same beat's two outcomes and must never be mistaken for each
 # other: one says *we cannot tell who you are*, the other says *here is your
 # record*.
 PERSONAL_ANSWER_KIND = "personal_answer"
-
-# Said on every answer, identically, because it is true of every answer. It
-# names the data as authored rather than retrieved, and says plainly that no
-# identity provider and no payroll system were involved — which is the whole
-# licensing and governance conversation this beat exists to open.
-PERSONAL_ANSWER_NOTE = (
-    "Simulated associate record, authored for this walkthrough. No identity "
-    "provider signed you in and no payroll system was queried — the sign-in "
-    "and these figures are both mocked."
-)
-
 
 @dataclass(slots=True)
 class AnswerFact:
@@ -68,7 +58,7 @@ class PersonalAnswer:
     display_name: str
     role: str = ""
     facts: List[AnswerFact] = field(default_factory=list)
-    note: str = PERSONAL_ANSWER_NOTE
+    provenance: str = ASSOCIATE_RECORD_PROVENANCE
 
     @classmethod
     def from_record(cls, record: AssociateRecord) -> "PersonalAnswer":

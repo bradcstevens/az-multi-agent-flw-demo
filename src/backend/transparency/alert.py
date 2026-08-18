@@ -122,4 +122,5 @@ def presenter_alert(name: Optional[str] = None) -> PresenterAlert:
         title=alert.title,
         content=alert.content,
         timestamp=datetime.now(timezone.utc).isoformat(),
+        provenance=alert.provenance,
     )

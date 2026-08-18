@@ -62,7 +62,7 @@
     color: var(--colorNeutralForeground1);
 }
 
-.personal-answer__note {
+.personal-answer__provenance {
     margin-top: 4px;
     color: var(--colorNeutralForeground3);
 }

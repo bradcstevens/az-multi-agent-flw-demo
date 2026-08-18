@@ -4,10 +4,13 @@ import { render, screen } from '@testing-library/react';
 import PresenterAlertCard from './PresenterAlertCard';
 import { parsePresenterAlert } from '../../models/transparency';
 
+const provenance = 'A provenance line received from the backend.';
+
 const alert = parsePresenterAlert({
     title: 'Shift task due',
     content: 'The coffee station deep clean is due before the 15:00 handover at Store 223.',
     timestamp: '2026-08-13T09:00:00+00:00',
+    provenance,
 })!;
 
 describe('the Presenter alert', () => {
@@ -43,5 +46,17 @@ describe('the Presenter alert', () => {
         render(<PresenterAlertCard alert={alert} />);
 
         expect(screen.getByTestId('presenter-alert')).toHaveTextContent(/simulated/i);
+    });
+
+    it('renders the Provenance line delivered on the payload', () => {
+        render(<PresenterAlertCard alert={alert} />);
+
+        expect(screen.getByTestId('presenter-alert')).toHaveTextContent(provenance);
+    });
+
+    it('renders no Provenance line when the payload carried none', () => {
+        render(<PresenterAlertCard alert={{ ...alert, provenance: '' }} />);
+
+        expect(screen.queryByText(provenance)).not.toBeInTheDocument();
     });
 });

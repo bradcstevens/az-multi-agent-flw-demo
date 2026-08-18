@@ -5,6 +5,8 @@ import PersonalAnswerCard from './PersonalAnswerCard';
 import { parsePersonalAnswer, PERSONAL_ANSWER_KIND } from '../../models/personalAnswer';
 import { SIMULATED_LABEL } from '../../models/storeSurface';
 
+const provenance = 'A provenance line received from the backend.';
+
 const answer = parsePersonalAnswer({
     personal_answer: {
         kind: PERSONAL_ANSWER_KIND,
@@ -14,7 +16,7 @@ const answer = parsePersonalAnswer({
             { label: 'PTO balance', value: '34.5 hours' },
             { label: 'Hours scheduled this week', value: '32' },
         ],
-        note: 'Simulated associate record, authored for this walkthrough.',
+        provenance,
     },
 })!;
 
@@ -50,12 +52,10 @@ describe('the personal answer card', () => {
         );
     });
 
-    it('says plainly that no identity provider signed anybody in', () => {
+    it('renders the Provenance line the associate record provided', () => {
         render(<PersonalAnswerCard answer={answer} />);
 
-        expect(screen.getByTestId('personal-answer')).toHaveTextContent(
-            /Simulated associate record/i,
-        );
+        expect(screen.getByTestId('personal-answer')).toHaveTextContent(provenance);
     });
 
     it('renders a record that holds nothing but a name', () => {
@@ -63,7 +63,7 @@ describe('the personal answer card', () => {
         // nothing, which is true. An empty card is better than a claim.
         render(
             <PersonalAnswerCard
-                answer={{ displayName: 'Tanya Alvarez', role: '', facts: [], note: '' }}
+                answer={{ displayName: 'Tanya Alvarez', role: '', facts: [], provenance: '' }}
             />,
         );
 

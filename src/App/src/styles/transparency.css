@@ -406,3 +406,7 @@
     align-items: center;
     gap: 8px;
 }
+
+.presenter-alert__provenance {
+    color: var(--colorNeutralForeground3);
+}

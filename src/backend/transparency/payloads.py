@@ -13,6 +13,8 @@ nothing but ``dataclasses``, so they are testable as the pure things they are.
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
+from provenance import PRESENTER_ALERT_PROVENANCE
+
 
 @dataclass(slots=True)
 class TokenUsage:
@@ -62,6 +64,7 @@ class PresenterAlert:
     title: str
     content: str
     timestamp: str
+    provenance: str = PRESENTER_ALERT_PROVENANCE
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

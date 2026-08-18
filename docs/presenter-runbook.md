@@ -174,7 +174,8 @@ loud, unprompted. A stakeholder who works this out for themselves afterwards sto
 everything else you showed them.
 
 **What happens:** the header gains a name, and the *same question, unedited* is asked again — and
-answered, out of an authored associate record, marked *Simulated*.
+answered, out of an authored associate record. Its Provenance line says: *"No payroll system was
+queried — these figures were authored for this walkthrough."*
 
 **They should be looking at:** the header changing, and the same words getting a different
 outcome.
@@ -194,7 +195,8 @@ while you do it.
 
 **What lands:** an alert card arrives on its own, with the conversation already finished — visibly
 not an answer, with its own heading and a *Simulated* badge — about the coffee station deep clean
-due before the 15:00 handover, naming SOP-104.
+due before the 15:00 handover, naming SOP-104. Its Provenance line says: *"No shift-task system
+pushed this alert — it was authored for this walkthrough."*
 
 **Say:** *"Nobody asked it anything just then. It can act on a shift event and put the procedure
 one tap away."*
@@ -276,6 +278,23 @@ proof that a refused request costs nothing at all.
 
 ---
 
+## Simulation register
+
+This is the walkthrough's inventory of invented things. When adding a **Provenance line**, add its
+constant in `src/backend/provenance.py` and a row here; the CI guard reads that module rather than
+maintaining a second list. ADR-037's floor applies where a later spec can find it: an invented
+person's action is disclosed in the record that carries it, never only in this register.
+
+| Invented thing | Walkthrough appearance | Disclosure the presenter can address |
+| --- | --- | --- |
+| Associate record and sign-in | Beat 6, **Sign in to continue** | *"No payroll system was queried — these figures were authored for this walkthrough."* |
+| Presenter alert | Beat 7, the proactive coffee-station alert | *"No shift-task system pushed this alert — it was authored for this walkthrough."* |
+| Service ticket | Beat 4, after **Approve Task Plan** | The `SIM-223-0007` number travels with the card; no service desk receives it. |
+| Store procedure corpus | Beats 1 and 2, the Grounding panel | Every procedure is invented for this demonstration and reviewed by nobody at Circle K. |
+| Workforce procedure library | Beat 8, the shift-swap answer | The procedure library is simulated; it describes HR process and is not an employment-system integration. |
+
+---
+
 ## Questions you will be asked
 
 **"Are these our procedures?"** No. Every procedure in the library is **invented** for this
@@ -284,9 +303,10 @@ nobody at Circle K. The only thing here that is yours is the banner on the front
 would be uploaded to the same Copilot Studio agent by whoever owns them today, without an engineer
 in the loop; that is the point of putting them there rather than in code.
 
-**"Is that a real ticket?"** No — it is marked *Simulated* on the card. Nothing here writes to a
-service desk. Everything invented carries that badge, and nothing that is real does: the Copilot
-Studio hop, the token counts and the model assignments are not badged, because they are measured.
+**"Is that a real ticket?"** No — look at the ticket number, `SIM-223-0007`. Nothing here writes to
+a service desk. The Simulation register names every invented thing the walkthrough asks the
+presenter to address; the Copilot Studio hop, token counts and model assignments are evidenced by
+their own reported signals.
 
 **"Is that a real sign-in?"** No. There is no Entra, no MSAL, no identity provider anywhere in the
 flow — the name is written into the session and that is the whole of it. The point of the beat is

@@ -7,6 +7,7 @@ the sentence that was going to explain it.
 """
 
 import transparency.alert as alert_module
+from provenance import PRESENTER_ALERT_PROVENANCE
 from transparency.alert import (REHEARSED_ALERT, REHEARSED_ALERTS,
                                 presenter_alert)
 
@@ -19,6 +20,7 @@ class TestPresenterAlert:
 
         assert alert.title == REHEARSED_ALERT.title
         assert alert.content == REHEARSED_ALERT.content
+        assert alert.provenance == PRESENTER_ALERT_PROVENANCE
 
     def test_the_presenter_may_choose_another_rehearsed_line(self):
         assert presenter_alert("delivery").title == REHEARSED_ALERTS["delivery"].title

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge, Body1, Body1Strong } from '@fluentui/react-components';
+import { Badge, Body1, Body1Strong, Caption1 } from '@fluentui/react-components';
 import { Alert24Regular } from '@fluentui/react-icons';
 
 import { PresenterAlert } from '../../models/transparency';
@@ -43,6 +43,9 @@ const PresenterAlertCard: React.FC<PresenterAlertCardProps> = ({ alert }) => (
             <SimulatedBadge what="This shift task" />
         </div>
         <Body1 className="presenter-alert__content">{alert.content}</Body1>
+        {alert.provenance && (
+            <Caption1 className="presenter-alert__provenance">{alert.provenance}</Caption1>
+        )}
     </div>
 );
 

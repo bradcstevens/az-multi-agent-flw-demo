@@ -175,12 +175,14 @@ describe('parsePresenterAlert', () => {
             title: 'Shift task due',
             content: 'The coffee station deep clean is due before the 15:00 handover.',
             timestamp: '2026-08-13T09:00:00+00:00',
+            provenance: 'A provenance line received from the backend.',
         });
 
         expect(alert).not.toBeNull();
         expect(alert!.title).toBe('Shift task due');
         expect(alert!.content).toContain('coffee station');
         expect(alert!.timestamp).toBe('2026-08-13T09:00:00+00:00');
+        expect(alert!.provenance).toBe('A provenance line received from the backend.');
     });
 
     it('refuses an alert with nothing to say', () => {

@@ -96,6 +96,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from associate.answer import PERSONAL_ANSWER_KIND  # noqa: E402
 from associate.records import DEMO_ASSOCIATE  # noqa: E402
+from provenance import ASSOCIATE_RECORD_PROVENANCE  # noqa: E402
 from chat.deletion import (  # noqa: E402
     STILL_RUNNING_DETAIL,
     ChatDeletion,
@@ -744,13 +745,13 @@ class TestTheMockedUnlock:
             f.label for f in DEMO_ASSOCIATE.facts
         ]
 
-    def test_the_answer_says_it_is_simulated(self, rt):
+    def test_the_answer_carries_its_provenance_line(self, rt):
         """A claim about somebody's pay, made in their name, on a stage."""
         self._sign_in(rt)
 
         answer = self._post(rt, self.PERSONAL).json()["personal_answer"]
 
-        assert "simulated" in answer["note"].lower()
+        assert answer["provenance"] == ASSOCIATE_RECORD_PROVENANCE
 
     def test_the_answer_costs_no_agent_and_no_plan(self, rt):
         """The unlock costs exactly what the refusal costs: nothing.
