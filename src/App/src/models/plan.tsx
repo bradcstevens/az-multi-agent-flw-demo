@@ -3,6 +3,7 @@ import { PlanStatus, AgentMessageType } from './enums';
 import { StreamingPlanUpdate } from './messages';
 import { PlanApprovalStep } from './reviewablePlan';
 import { TeamConfig } from './Team';
+import type { Lane } from './lane';
 
 /**
  * Base interface with common fields
@@ -129,6 +130,8 @@ export interface Plan extends BaseModel {
     initial_goal: string;
     /** The Quick Task tapped to start this turn; absent for free-typed input. */
     starting_task_id?: string;
+    /** The Lane selected for this request, absent on records written before #102. */
+    lane?: Lane;
     /** Current status of the plan */
     overall_status: PlanStatus;
     /** Whether the plan is approved */
