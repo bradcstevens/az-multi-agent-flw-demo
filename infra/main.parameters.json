@@ -47,6 +47,9 @@
     "copilotStudioAgentName": {
       "value": "${COPILOT_STUDIO_AGENT_NAME=Store SOP Assistant}"
     },
+    "copilotStudioChatUrl": {
+      "value": "${COPILOT_STUDIO_CHAT_URL=}"
+    },
     "embeddingModelName": {
       "value": "${AZURE_ENV_EMBEDDING_MODEL_NAME=text-embedding-3-small}"
     },

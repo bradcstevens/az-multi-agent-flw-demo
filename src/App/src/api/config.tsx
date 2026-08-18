@@ -18,6 +18,7 @@ export let USER_INFO: UserInfo | null = null;
 export let config = {
     API_URL: "http://localhost:8000/api",
     ENABLE_AUTH: false,
+    COPILOT_STUDIO_CHAT_URL: "",
 };
 
 export function setApiUrl(url: string | null) {
@@ -35,6 +36,7 @@ export function setEnvData(configData: Record<string, any>) {
     if (configData) {
         config.API_URL = configData.API_URL || "";
         config.ENABLE_AUTH = configData.ENABLE_AUTH || false;
+        config.COPILOT_STUDIO_CHAT_URL = configData.COPILOT_STUDIO_CHAT_URL || "";
     }
 }
 

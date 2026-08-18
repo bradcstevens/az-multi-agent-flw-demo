@@ -10,6 +10,7 @@ import {
 import { Dismiss20Regular } from '@fluentui/react-icons';
 
 import { Agent } from '../../models/Team';
+import { getConfigData } from '../../api/config';
 import { AGENT_DOSSIER_COPY } from '../../models/agentDossier';
 import { mcpToolsForDomain } from '../../models/agentMcpTools';
 import { getAgentDisplayNameWithSuffix } from '../../utils/agentIconUtils';
@@ -46,6 +47,8 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, participation, onClo
      * it has to be true.
      */
     const mcpTools = agent.use_toolbox ? mcpToolsForDomain(agent.toolbox_filter) : [];
+    const copilotStudioChatUrl =
+        agent.name === 'ShiftTasksAgent' ? getConfigData().COPILOT_STUDIO_CHAT_URL : '';
     const hasConfiguredFacts =
         knowledgeBase !== null || followUpQuestions !== null || temperature !== null;
 
@@ -99,6 +102,18 @@ const AgentDossier: React.FC<AgentDossierProps> = ({ agent, participation, onClo
                                                 <li key={tool}>
                                                     <code>{tool}</code>
                                                     <span>{AGENT_DOSSIER_COPY.mcpToolGlosses[tool]}</span>
+                                                    {tool === 'search_store_procedures' &&
+                                                        copilotStudioChatUrl && (
+                                                            <a
+                                                                href={copilotStudioChatUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                            >
+                                                                {
+                                                                    AGENT_DOSSIER_COPY.copilotStudioLinkLabel
+                                                                }
+                                                            </a>
+                                                        )}
                                                 </li>
                                             ))}
                                         </ul>

@@ -62,6 +62,12 @@ describe('the Grounding panel', () => {
         expect(screen.getByTestId('grounding-platform')).toHaveTextContent('Copilot Studio');
     });
 
+    it('keeps the Copilot Studio destination out of the per-answer panel', () => {
+        render(<GroundingPanel source={cited} />);
+
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
     it('names every observed hop to the Dataverse source rather than SharePoint', () => {
         render(<GroundingPanel source={cited} />);
 

@@ -36,6 +36,7 @@ import { ASSISTANT_NAME, STORE_ASSISTANT_TEAM_ID } from '../models/storeSurface'
 import webSocketService from '@/store/WebSocketService';
 import { FakeSocket, frame } from '@/testing/fakeSocket';
 import { allRules, sourceFiles } from '@/testing/stylesheets';
+import { setEnvData } from '@/api/config';
 
 import planReducer from '@/store/slices/planSlice';
 import chatReducer from '@/store/slices/chatSlice';
@@ -150,6 +151,11 @@ const outline = () =>
 beforeEach(() => {
     window.sessionStorage.clear();
     window.localStorage.clear();
+    setEnvData({
+        API_URL: 'https://backend.example/api',
+        ENABLE_AUTH: false,
+        COPILOT_STUDIO_CHAT_URL: '',
+    });
     FakeSocket.instances = [];
     vi.stubGlobal('WebSocket', FakeSocket);
     window.appConfig = { API_URL: 'https://backend.example/api' } as never;
@@ -210,6 +216,46 @@ describe('the Agent dossier on the home surface', () => {
         expect(
             tools.compareDocumentPosition(configuration) & Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
+    });
+
+    it('omits the Copilot Studio destination when the optional URL is unset', async () => {
+        renderHomeSurface();
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Shift Tasks Agent' }));
+
+        const dossier = screen.getByRole('dialog', { name: 'Agent dossier' });
+        expect(
+            within(dossier).queryByRole('link', {
+                name: 'Open Store SOP Assistant in Copilot Studio',
+            }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('opens the Store SOP Assistant in a new context only from Shift Tasks Agent', async () => {
+        window.appConfig = {
+            API_URL: 'https://backend.example/api',
+            ENABLE_AUTH: false,
+            COPILOT_STUDIO_CHAT_URL: 'https://example.invalid',
+        } as never;
+        renderHomeSurface();
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Shift Tasks Agent' }));
+
+        const dossier = screen.getByRole('dialog', { name: 'Agent dossier' });
+        const destination = within(dossier).getByRole('link', {
+            name: 'Open Store SOP Assistant in Copilot Studio',
+        });
+        expect(destination).toHaveAttribute('href', 'https://example.invalid');
+        expect(destination).toHaveAttribute('target', '_blank');
+        expect(destination).toHaveAttribute('rel', 'noopener noreferrer');
+
+        await userEvent.keyboard('{Escape}');
+        await userEvent.click(await screen.findByRole('button', { name: 'Workforce Agent' }));
+        expect(
+            within(screen.getByRole('dialog', { name: 'Agent dossier' })).queryByRole('link', {
+                name: 'Open Store SOP Assistant in Copilot Studio',
+            }),
+        ).not.toBeInTheDocument();
     });
 
     it('states availability without making a participation claim', async () => {

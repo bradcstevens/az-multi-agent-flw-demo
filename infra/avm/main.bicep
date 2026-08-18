@@ -110,6 +110,9 @@ param copilotStudioDirectLineTokenEndpoint string = ''
 @description('Optional. Display name of the published Copilot Studio SOP agent.')
 param copilotStudioAgentName string = 'Store SOP Assistant'
 
+@description('Optional. Chat URL of the published Copilot Studio SOP agent. This credential is supplied outside the repository; empty leaves the Agent dossier link absent (ADR-041).')
+param copilotStudioChatUrl string = ''
+
 // ============================================================================
 // Parameters — Compute
 // ============================================================================
@@ -1369,6 +1372,7 @@ module webSite './modules/compute/app-service.bicep' = {
       WEBSITES_CONTAINER_START_TIME_LIMIT: '1800'
       BACKEND_API_URL: 'https://${containerApp.outputs.fqdn}'
       AUTH_ENABLED: 'false'
+      COPILOT_STUDIO_CHAT_URL: copilotStudioChatUrl
       PROXY_API_REQUESTS: enablePrivateNetworking ? 'true' : 'false'
     }
     virtualNetworkSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.webserverfarmSubnetResourceId : ''

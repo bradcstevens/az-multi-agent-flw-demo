@@ -44,6 +44,7 @@ async def serve_index():
 @app.get("/config")
 async def get_config():
     auth_enabled = os.getenv("AUTH_ENABLED", "false")
+    copilot_studio_chat_url = os.getenv("COPILOT_STUDIO_CHAT_URL", "")
 
     if PROXY_API_REQUESTS:
         # WAF mode: frontend proxies API calls, so tell browser to use same origin
@@ -56,6 +57,7 @@ async def get_config():
     config = {
         "API_URL": api_url,
         "ENABLE_AUTH": auth_enabled,
+        "COPILOT_STUDIO_CHAT_URL": copilot_studio_chat_url,
     }
     return config
 

@@ -248,6 +248,18 @@ def test_the_token_endpoint_is_a_secret_and_its_absence_stops_the_deploy():
     )
 
 
+def test_the_copilot_studio_chat_url_is_optional_and_not_a_provisioning_input():
+    parameters = json.loads(_text(PARAMETERS))["parameters"]
+
+    assert parameters["copilotStudioChatUrl"]["value"] == "${COPILOT_STUDIO_CHAT_URL=}", (
+        "the Copilot Studio chat URL has no empty default: a clean checkout "
+        "would need a credential it must never commit"
+    )
+    assert "COPILOT_STUDIO_CHAT_URL" not in _inputs_keys(), (
+        "the Copilot Studio chat URL is committed as a provisioning input"
+    )
+
+
 def test_the_deploy_proves_its_own_result():
     # `azd` exiting zero is not the deployment working. Both checks read the
     # running deployment, and both exist because a green repository sat on top

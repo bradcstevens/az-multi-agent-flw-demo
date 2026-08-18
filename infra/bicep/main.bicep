@@ -86,6 +86,9 @@ param copilotStudioDirectLineTokenEndpoint string = ''
 @description('Optional. Display name of the published Copilot Studio SOP agent.')
 param copilotStudioAgentName string = 'Store SOP Assistant'
 
+@description('Optional. Chat URL of the published Copilot Studio SOP agent. This credential is supplied outside the repository; empty leaves the Agent dossier link absent (ADR-041).')
+param copilotStudioChatUrl string = ''
+
 @description('Optional. Name of the embedding model deployed for guardrail similarity checks.')
 param embeddingModelName string = 'text-embedding-3-small'
 
@@ -831,6 +834,10 @@ module frontend_container_app './modules/compute/container-app.bicep' = {
           {
             name: 'AUTH_ENABLED'
             value: 'false'
+          }
+          {
+            name: 'COPILOT_STUDIO_CHAT_URL'
+            value: copilotStudioChatUrl
           }
           {
             name: 'PROXY_API_REQUESTS'

@@ -15,6 +15,7 @@ export const AGENT_DOSSIER_COPY = {
     availableHasNotSpoken: 'Available, has not spoken',
     systemMessagePreamble: 'System message, verbatim',
     mcpToolsLabel: 'MCP tools',
+    copilotStudioLinkLabel: 'Open Store SOP Assistant in Copilot Studio',
     mcpToolGlosses: {
         search_store_procedures: 'Searches store procedures',
         list_attempted_steps: 'Lists troubleshooting steps already tried',
