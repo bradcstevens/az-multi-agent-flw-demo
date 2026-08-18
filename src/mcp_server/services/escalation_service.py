@@ -71,17 +71,16 @@ def format_draft(payload: Optional[Dict[str, Any]]) -> str:
 
 
 def format_status(payload: Optional[Dict[str, Any]]) -> str:
-    """Render this conversation's stored ticket status, or say none exists."""
-    fields = (payload or {}).get("fields")
+    """Return this conversation's submitted ticket record, or say none exists."""
+    payload = payload or {}
+    fields = payload.get("fields")
     if not (payload or {}).get("drafted") or not isinstance(fields, dict):
         return TICKET_STATUS_UNAVAILABLE
     status = str(fields.get("status") or "").strip()
-    if status != "submitted":
+    rendered = payload.get("rendered")
+    if status != "submitted" or not isinstance(rendered, str) or not rendered.strip():
         return TICKET_STATUS_UNAVAILABLE
-    return (
-        f"The simulated ticket is {status}. No service desk receives it and no "
-        "engineer is dispatched."
-    )
+    return rendered.strip()
 
 
 class EscalationService(MCPToolBase):

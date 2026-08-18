@@ -2744,6 +2744,27 @@ class TestServiceTicket:
 
         assert self._read(rt).json()["drafted"] is False
 
+    def test_reading_back_a_submitted_ticket_returns_its_persisted_record(self, rt):
+        """The status tool reads this response, not a summary made after approval."""
+        self._in_flight()
+        self._tried(rt, "I fitted a fresh paper filter")
+        drafted = self._draft(rt, symptom="cold coffee").json()
+        expected = dict(drafted["fields"])
+        expected.update(ticket_id="SIM-223-0041", status="submitted")
+        document = next(
+            d for d in rt.session_documents.values()
+            if d["data_type"] == "service_ticket"
+        )
+        document["fields"].update(
+            ticket_id=expected["ticket_id"], status=expected["status"]
+        )
+
+        readback = self._read(rt).json()
+
+        assert readback["drafted"] is True
+        assert readback["fields"] == expected
+        assert readback["rendered"] == router_mod.render_ticket(expected)
+
     def test_a_reopened_chat_reads_its_submitted_ticket_without_a_number_lookup(self, rt):
         """A Chat rehydrates its own raised ticket; a draft does not count."""
         self._in_flight()

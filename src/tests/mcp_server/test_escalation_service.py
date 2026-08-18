@@ -233,13 +233,30 @@ class TestDraftServiceTicket:
 
 class TestTicketStatus:
     @pytest.mark.asyncio
-    async def test_it_reads_only_the_ticket_for_the_turn_in_flight(self, mock_mcp_server):
+    async def test_it_reads_back_the_persisted_ticket_for_the_turn_in_flight(
+        self, mock_mcp_server
+    ):
+        rendered = (
+            "ticket_id: SIM-223-0041\n"
+            "opened_at: 2026-08-17T14:12:00\n"
+            "status: submitted\n"
+            "steps_attempted: Fitted a fresh paper filter\n\n"
+            "This ticket is simulated. No service desk receives it, no engineer "
+            "is dispatched, and this ticket number means nothing outside this "
+            "demonstration."
+        )
         service = EscalationService(
-            client_with({"drafted": True, "fields": {"status": "submitted"}})
+            client_with(
+                {
+                    "drafted": True,
+                    "fields": {"status": "submitted"},
+                    "rendered": rendered,
+                }
+            )
         )
         tool = tool_named(service, mock_mcp_server, "get_ticket_status")
 
-        assert "submitted" in (await tool()).lower()
+        assert await tool() == rendered
         method, path = service.backend._request.await_args.args
         assert (method, path) == ("GET", TICKET_PATH)
         assert "json" not in service.backend._request.await_args.kwargs
@@ -249,3 +266,8 @@ class TestTicketStatus:
 
     def test_a_draft_is_not_presented_as_a_raised_ticket(self):
         assert format_status(drafted()) == TICKET_STATUS_UNAVAILABLE
+
+    def test_a_submitted_status_without_its_record_is_not_presented(self):
+        assert format_status(
+            {"drafted": True, "fields": {"status": "submitted"}}
+        ) == TICKET_STATUS_UNAVAILABLE

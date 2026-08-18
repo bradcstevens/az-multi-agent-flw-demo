@@ -146,6 +146,16 @@ raising the ticket."*
 anything that acts on the associate's behalf stops and asks. And context survives the handoff to
 the service desk.
 
+**Then tap:** `What's happening with my ticket?` above the message box.
+
+**What happens:** the Fast lane reads the same persisted Simulated ticket back: its
+`SIM-223-…` number, status `submitted`, every field and the attempted steps. There is no plan to
+approve and no further action to take.
+
+**Say:** *"This is the record it stored, not a new summary."* The ticket itself says: This ticket
+is simulated. No service desk receives it, no engineer is dispatched, and this ticket number means
+nothing outside this demonstration.
+
 ### 5. How much PTO do I have? — the boundary
 
 **Tap:** `How much PTO do I have?` — *"My name is Tanya, how much PTO do I have?"*

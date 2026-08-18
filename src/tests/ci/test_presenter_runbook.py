@@ -19,6 +19,7 @@ import subprocess
 from pathlib import Path
 
 import provenance
+from escalation.ticket import SIMULATED_NOTICE, TICKET_ID_PREFIX
 from sop.provenance import SOP_SOURCE
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -218,6 +219,25 @@ def test_every_rehearsed_reply_chip_is_quoted_from_the_pack():
 
     missing = [reply for reply in chips if reply not in runbook]
     assert not missing, f"the runbook misquotes the rehearsed replies: {missing}"
+
+
+def test_the_ticket_beat_quotes_the_persisted_ticket_read_back():
+    """Beat 4 proves persistence by rendering the submitted record again."""
+    task = next(task for task in _quick_tasks() if task.get("ticket_on_approval") is True)
+    prompt = task["ticket_status_reply"]["prompt"]
+    runbook = _rendered()
+    beat = runbook[runbook.index("### 4.") : runbook.index("### 5.")]
+
+    assert prompt in beat, (
+        "the ticket beat does not name the authored status inquiry that reads "
+        "the ticket back"
+    )
+    assert TICKET_ID_PREFIX in beat, (
+        "the ticket beat does not point out the record's ticket number"
+    )
+    assert SIMULATED_NOTICE in beat, (
+        "the ticket beat does not quote the Simulated ticket's own notice"
+    )
 
 
 def test_the_opening_beat_names_the_document_the_corpus_says_answers_it():
