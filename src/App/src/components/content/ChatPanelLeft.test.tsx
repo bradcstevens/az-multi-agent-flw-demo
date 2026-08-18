@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import selectorParser from 'postcss-selector-parser';
 
 vi.mock('@/api', () => ({
     apiService: {
@@ -740,5 +741,436 @@ describe('deleting every chat from the panel (#76)', () => {
         expect(
             screen.getByRole('button', { name: /^The coffee machine/ }),
         ).toBeInTheDocument();
+    });
+});
+
+/**
+ * How tall the chat list is allowed to be (#178).
+ *
+ * Asserted **here**, where the panel renders whole, rather than beside the list
+ * component. `.panelLeft .fui-AccordionPanel { max-height: 280px }` is a rule
+ * about this list written the way this repository writes rules — scoped under a
+ * class of ours — and a render with no panel around the list cannot see it: the
+ * selector matches nothing, so the rule is never loaded and never reported. The
+ * production ancestors are the point, so the production component is what gets
+ * rendered.
+ *
+ * jsdom has no layout engine, so a hidden row is not observable. What *is*
+ * observable is what the engine computed, and that is what this asks. Three
+ * earlier versions parsed the stylesheets by hand and each review found another
+ * hole in the parser rather than in the surface — `:is()`'s commas split into
+ * invalid fragments, `var()` read as a literal, an unparseable selector treated
+ * as no match, an inline `maxBlockSize` unrecognised beside `maxHeight`. All of
+ * that is the engine's job, so the engine does it.
+ *
+ * Media-query rules are flattened in deliberately: below the **Stacking
+ * breakpoint** this panel is not rendered at all, so a rule capping the list
+ * there is dead code claiming to be a layout.
+ */
+describe("the chat list's height", () => {
+    const A_MORNING_OF_CHATS = Array.from({ length: 12 }, (_, i) => ({
+        id: `plan-${i}`,
+        session_id: `session-${i}`,
+        timestamp: `2026-08-14T09:${String(i).padStart(2, '0')}:00Z`,
+        initial_goal: `Rehearsal question ${i}`,
+        overall_status: PlanStatus.COMPLETED,
+    })) as unknown as Plan[];
+
+    /**
+     * The elements between the panel's scroll region and a chat row, taken from
+     * the DOM the panel actually produces.
+     *
+     * Read rather than listed because the containers are not all ours: Fluent's
+     * `Accordion`, `AccordionItem` and `AccordionPanel` sit between our
+     * container and our rows, and it was `.fui-AccordionPanel` — a class no
+     * source file in this repository contains — that carried the cap.
+     *
+     * The walk stops **below** `.panelContent`, and that boundary is the whole
+     * claim rather than a detail: `.panelContent` is the panel's own scroll
+     * region, the thing this list is supposed to be bounded by and scroll
+     * inside. Walking through it reported the panel scrolling as though the
+     * list had opened a second scrollbar, which is the opposite of what this
+     * ticket is about.
+     */
+    const SCROLL_REGION = 'panelContent';
+
+    const listContainers = async (): Promise<HTMLElement[]> => {
+        vi.mocked(apiService.getPlans).mockResolvedValue(A_MORNING_OF_CHATS as never);
+        renderPanel();
+
+        const row = await screen.findByRole('button', { name: /^Rehearsal question 0/ });
+        const containers: HTMLElement[] = [];
+
+        for (
+            let node = row.parentElement;
+            node !== null && !node.classList.contains(SCROLL_REGION);
+            node = node.parentElement
+        ) {
+            containers.push(node);
+        }
+
+        return containers;
+    };
+
+    /** The panel's own scroll region, which is what the list is bounded by. */
+    const scrollRegion = (): HTMLElement =>
+        document.querySelector(`.${SCROLL_REGION}`) as HTMLElement;
+
+    /**
+     * The surface's own rules, in the document, for the containers they apply
+     * to — so the engine resolves them and this suite only reads the answer.
+     *
+     * One rule at a time rather than one sheet: jsdom rejects a *stylesheet*
+     * wholesale when any rule in it defeats its parser, and written as a single
+     * `<style>` the entire surface silently failed to load behind a green
+     * assertion. One at a time, a rule it cannot parse is one rule, and it is
+     * returned rather than swallowed.
+     */
+    /**
+     * The same selector with the **states this engine cannot try** taken out,
+     * parsed rather than pattern-matched.
+     *
+     * jsdom evaluates `:focus` and refuses `:focus-within` — measured, with a
+     * descendant actually focused — and it has no pointer, so `:hover` and
+     * `:active` never match. A stylesheet is not written about the DOM as it
+     * stands, and `.panelContent > *:focus-within { max-height: 280px }` bounds
+     * this list the moment an associate tabs into a row.
+     *
+     * Two hand-written attempts at this failed and are the reason a parser is a
+     * dependency now. A regex strip mangled `:is(:not(.a), .b)` into invalid
+     * nonsense; a lexical "does the selector name a container" gate missed the
+     * selector above, whose only class belongs to the panel's scroll region
+     * while its *subject* is a container. The grammar declines to be
+     * approximated, so it is parsed: `postcss-selector-parser` is what
+     * autoprefixer reads selectors with.
+     *
+     * A branch carrying a pseudo-*element* is dropped rather than stripped —
+     * `::before` is a generated box beside the container, and a height on it
+     * bounds nothing here.
+     *
+     * `:is()` and its synonyms are **kept**, and that distinction is the whole
+     * correctness of this function. Removing a pseudo removes its argument
+     * with it, so treating them alike deletes the subject:
+     * `.panelLeft :is(.fui-AccordionPanel):focus-within` collapses to
+     * `.panelLeft`, which is not one of these containers, and the cap it
+     * declares is skipped — narrowing, where every other removal here widens.
+     * jsdom matches `:is()` natively, so it is left for the engine to resolve
+     * while the state beside it goes.
+     *
+     * Everything else — `:not()`, `:has()`, `:nth-child()`, the states — is
+     * removed, which only ever widens what is looked at, and that is the safe
+     * direction for a guard.
+     */
+    const SELECTOR_LISTS = [':is', ':where', ':matches', ':-moz-any', ':-webkit-any'];
+
+    const withoutStates = (selector: string): string | null => {
+        try {
+            const parsed = selectorParser().astSync(selector);
+
+            parsed.each((branch) => {
+                if (branch.some((node) => node.type === 'pseudo' && node.value.startsWith('::'))) {
+                    branch.remove();
+                }
+            });
+            parsed.walkPseudos((pseudo) => {
+                if (pseudo.value.startsWith('::')) return;
+                if (SELECTOR_LISTS.includes(pseudo.value.toLowerCase())) return;
+                pseudo.remove();
+            });
+
+            /*
+              And a kept list is tidied after that removal, because taking a
+              state out of one of its branches can empty the branch:
+              `.a:is(:not(.b), .c):hover` becomes `.a:is(, .c)`, which is not a
+              selector at all. An invalid selector here would be reported rather
+              than skipped — `matches` throws and the rule is loaded — so this
+              costs nothing but noise, and the noise would be a rule named in a
+              failure nobody could act on.
+            */
+            parsed.walkPseudos((pseudo) => {
+                if (!SELECTOR_LISTS.includes(pseudo.value.toLowerCase())) return;
+
+                pseudo.each((branch) => {
+                    if (String(branch).trim() === '') branch.remove();
+                });
+                if (pseudo.nodes.length === 0) pseudo.remove();
+            });
+
+            const stripped = String(parsed).trim();
+            return stripped === '' ? null : stripped;
+        } catch {
+            return null;
+        }
+    };
+
+    const loadRulesFor = (
+        containers: HTMLElement[],
+    ): { unload: () => void; unreadable: string[]; declarations: CSSStyleDeclaration[] } => {
+        const applies = (selector: string): boolean => {
+            // Selector lists are handed over whole: `matches` understands
+            // `.a, .b`, and splitting on commas is what broke `:is(a, b)`.
+            const asked = [selector, withoutStates(selector)];
+
+            for (const candidate of asked) {
+                if (candidate === null) continue;
+                try {
+                    if (containers.some((container) => container.matches(candidate))) return true;
+                } catch {
+                    // A selector this engine cannot parse cannot be ruled out.
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        const injected: HTMLStyleElement[] = [];
+        const unreadable: string[] = [];
+        const declarations: CSSStyleDeclaration[] = [];
+
+        for (const rule of allRulesIncludingMediaQueries()) {
+            if (!SIZES_OR_SCROLLS.test(rule.body)) continue;
+            if (!applies(rule.selector)) continue;
+
+            const style = document.createElement('style');
+            style.textContent = `${rule.selector}{${rule.body}}`;
+            document.head.appendChild(style);
+            injected.push(style);
+
+            const parsed = style.sheet?.cssRules[0] as CSSStyleRule | undefined;
+            if (parsed === undefined) unreadable.push(`${rule.file}: ${rule.selector}`);
+            else declarations.push(parsed.style);
+        }
+
+        return {
+            unload: () => injected.forEach((style) => style.remove()),
+            unreadable,
+            declarations,
+        };
+    };
+
+    /*
+      What these containers may say about their own size, which is nothing.
+
+      The rule is deliberately stricter than "no `max-height: 280px`", because
+      two rounds of this ticket were spent discovering that the defect has more
+      than one spelling. `height: 100%` with `overflow-y: hidden` sizes the list
+      to the panel and then clips the rows that do not fit — every chat past the
+      fifth gone, with no scrollbar even to hint at them, which is worse than the
+      rule this ticket deleted. `max-height: 100%` is the same defect with a
+      percentage. And `overflow-y: var(--x)` cannot be read at all here, because
+      this engine does not resolve custom properties.
+
+      Between the panel's scroll region and a row there is nothing to decide: the
+      height belongs to the panel and the scrolling belongs to the panel. So any
+      height and any overflow on these containers is reported, and the only free
+      values are the ones that mean "I said nothing". A container that genuinely
+      needs to size itself can have this conversation in a review, which is
+      exactly where it belongs.
+
+      Physical and logical spellings both, because an element can be given
+      either and the engine reports what it was given.
+    */
+    const HEIGHTS = ['height', 'max-height', 'block-size', 'max-block-size'];
+    /*
+      Both axes, and both spellings of both. CSS computes a non-`visible` value
+      on one axis into `auto` on the other, so `overflow-x: hidden` on a list
+      container is a vertical scroll region declared sideways — and jsdom
+      reports it only under `overflow-x`, leaving `overflow` and `overflow-y`
+      empty.
+    */
+    const SCROLLERS = [
+        'overflow',
+        'overflow-x',
+        'overflow-y',
+        'overflow-inline',
+        'overflow-block',
+    ];
+
+    /**
+     * Which rules are worth loading, **derived from the properties above**
+     * rather than spelled a second time.
+     *
+     * They were two lists, and they drifted the moment one grew: `overflow-x`
+     * was added to what is checked and not to what is loaded, so the rule that
+     * declared it was skipped before anything could check it. One list cannot
+     * disagree with itself.
+     */
+    const SIZES_OR_SCROLLS = new RegExp(
+        `(?:^|[;{\\s])(?:${[...HEIGHTS, ...SCROLLERS].join('|')})\\s*:`,
+        'i',
+    );
+
+    const SAYS_NOTHING = ['', 'auto', 'none', 'initial', 'unset', 'revert'];
+    const NOT_A_SCROLL_REGION = ['', 'visible', 'initial', 'unset', 'revert'];
+
+    /*
+      Read with `getPropertyValue` and the CSS spelling of the property, which
+      is the one accessor that answers for both a rule's declarations and an
+      element's computed style. The camel-case properties are `undefined` on a
+      `CSSStyleRule`'s declarations for the logical spellings, and an
+      `undefined` compared against a list of allowed values reads as a finding —
+      seven of them, all invented.
+    */
+    const valueOf = (style: CSSStyleDeclaration, property: string): string =>
+        style.getPropertyValue(property).trim();
+
+    const boundsIn = (style: CSSStyleDeclaration): string[] =>
+        HEIGHTS.filter((property) => !SAYS_NOTHING.includes(valueOf(style, property))).map(
+            (property) => `${property}: ${valueOf(style, property)}`,
+        );
+
+    const scrollsIn = (style: CSSStyleDeclaration): string[] =>
+        SCROLLERS.filter(
+            (property) => !NOT_A_SCROLL_REGION.includes(valueOf(style, property)),
+        ).map((property) => `${property}: ${valueOf(style, property)}`);
+
+    const describeElement = (element: HTMLElement): string =>
+        `${element.tagName.toLowerCase()}.${Array.from(element.classList).join('.')}`;
+
+    it('is bounded by the panel it sits in, not by anything of its own', async () => {
+        /*
+          The defect: `max-height: 280px` with its own `overflow-y: auto` put
+          five rows on screen and the rest behind a scrollbar *inside* a panel
+          that is already the height of the surface and already scrolls — #60's
+          "content hidden behind a second scrollbar", in the column on the other
+          edge.
+        */
+        const containers = await listContainers();
+        const { unload, unreadable } = loadRulesFor(containers);
+
+        try {
+            expect(
+                unreadable,
+                `${unreadable.join(', ')} applies to the chat list and could not be read`,
+            ).toEqual([]);
+
+            for (const container of containers) {
+                expect(
+                    boundsIn(getComputedStyle(container)),
+                    `${describeElement(container)} bounds the chat list's height`,
+                ).toEqual([]);
+                expect(
+                    scrollsIn(getComputedStyle(container)),
+                    `${describeElement(container)} opens a scroll region inside the panel`,
+                ).toEqual([]);
+            }
+        } finally {
+            unload();
+        }
+    });
+
+    it('declares no such bound either, whatever the cascade settles on', async () => {
+        /*
+          The criterion is that the list *declares* no height of its own, and a
+          computed value is the winner of an argument rather than the argument.
+          A cap declared and then reset — or one whose reset lives in a query
+          that does not apply — leaves the forbidden declaration in the
+          stylesheet and this panel one edit from showing five chats again.
+
+          A stylesheet is not written about the DOM as it stands, so a rule
+          waiting on a state this engine cannot try is loaded anyway — see
+          `applies`. A cap behind `:focus-within` clips the list the moment an
+          associate tabs into a row.
+
+          Read off the CSSOM rather than parsed here, so it is still the engine
+          saying what the rule declares.
+        */
+        const containers = await listContainers();
+        const { unload, declarations } = loadRulesFor(containers);
+
+        try {
+            const declared = declarations.flatMap((style) => [
+                ...boundsIn(style),
+                ...scrollsIn(style),
+            ]);
+
+            expect(
+                declared,
+                `${declared.join(', ')} is declared for a container of the chat list`,
+            ).toEqual([]);
+        } finally {
+            unload();
+        }
+    });
+
+    it('would say so if the rule came back, however it were scoped', async () => {
+        /*
+          The guard, proved rather than trusted. The assertions above are "no
+          container is bounded", which is also what a guard that has stopped
+          looking says — and it *had* stopped looking once: loaded as one sheet,
+          jsdom rejected the surface's whole stylesheet over one nested rule in
+          `Chat.css` and everything passed against no styles at all.
+
+          Both shapes go back. The unscoped one is how the rule was actually
+          written; the panel-scoped one is how it would be written by someone
+          following this repository's own convention, and it is invisible to any
+          suite that renders the list without its panel.
+        */
+        const containers = await listContainers();
+        const { unload } = loadRulesFor(containers);
+
+        const unscoped = document.createElement('style');
+        unscoped.textContent =
+            '.fui-AccordionPanel { max-height: 280px !important; overflow-y: auto !important; }';
+        const scoped = document.createElement('style');
+        scoped.textContent = '.panelLeft .fui-AccordionPanel { max-block-size: 240px; }';
+
+        try {
+            const panel = containers.find((element) =>
+                element.classList.contains('fui-AccordionPanel'),
+            ) as HTMLElement;
+
+            expect(panel, 'the Fluent accordion panel no longer holds the rows').toBeDefined();
+
+            document.head.appendChild(unscoped);
+            expect(boundsIn(getComputedStyle(panel))).toContain('max-height: 280px');
+            expect(scrollsIn(getComputedStyle(panel))).toContain('overflow-y: auto');
+            unscoped.remove();
+
+            document.head.appendChild(scoped);
+            expect(boundsIn(getComputedStyle(panel))).toContain('max-block-size: 240px');
+        } finally {
+            unscoped.remove();
+            scoped.remove();
+            unload();
+        }
+    });
+
+    it('reads the surface it thinks it is reading', async () => {
+        /*
+          That this loader really pulls rules out of the repository's own
+          stylesheets and gets them applying, rather than quietly loading
+          nothing and reporting a clean list. `.panelLeft` declares `height:
+          100%` in `ChatPanelLeft.css` and is one of the containers walked, so
+          the proof needs nothing invented.
+        */
+        const containers = await listContainers();
+        const panel = document.querySelector('.panelLeft') as HTMLElement;
+        const { unload } = loadRulesFor([...containers, panel]);
+
+        try {
+            const classes = containers.flatMap((element) => Array.from(element.classList));
+
+            expect(classes).toContain('task-list-container');
+            expect(
+                classes.some((className) => /^fui-Accordion/.test(className)),
+                'the Fluent accordion is no longer between the list and its rows',
+            ).toBe(true);
+
+            // The boundary the walk stops at exists, and is the panel's own.
+            expect(scrollRegion(), 'the panel has no scroll region for the list to sit in').not.toBeNull();
+            expect(classes).not.toContain(SCROLL_REGION);
+            expect(scrollsIn(getComputedStyle(scrollRegion()))).toContain('overflow-y: auto');
+
+            // And the repository's own CSS is what is being read: `.panelLeft`
+            // takes its height from `ChatPanelLeft.css` and from nothing here.
+            expect(
+                valueOf(getComputedStyle(panel), 'height'),
+                "the surface's own stylesheets are not reaching the rendered panel",
+            ).toBe('100%');
+        } finally {
+            unload();
+        }
     });
 });

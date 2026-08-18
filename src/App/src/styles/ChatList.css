@@ -185,16 +185,30 @@
   gap: 12px;
 }
 
-.fui-AccordionPanel {
-  max-height: 280px !important;
-  overflow-y: auto !important;
-  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+/*
+  Nothing here declares how tall the list is (#178).
 
-.fui-AccordionPanel[aria-hidden="true"] {
-  max-height: 0;
-  overflow: hidden !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
+  What stood here was `max-height: 280px !important` with its own `overflow-y:
+  auto !important`, on `.fui-AccordionPanel` — a class Fluent generates. Five
+  rows fitted; every chat after the fifth sat behind a scrollbar *inside* a
+  panel that is already the height of the surface and already scrolls, under a
+  screen of empty space. That is #60's "content hidden behind a second
+  scrollbar", in the column on the other edge, and on a rehearsed surface the
+  rows it hid were the walkthrough's own earlier beats.
+
+  It was also #59's finding in a second place: a Fluent class reached for from
+  outside the component and held with `!important`, which capped every accordion
+  the application might ever render and would have stopped matching without a
+  word the day Fluent renamed it.
+
+  The collapsed rule went with it because it was answering a state that does not
+  exist: `AccordionPanel` mounts its content through a `Collapse` motion with
+  `unmountOnExit`, so a closed panel is not in the DOM to be styled, and the
+  `max-height`/`transition` pair was fighting that motion for the open one.
+
+  The list is bounded by the panel it sits in, which is bounded by the surface.
+  `ChatPanelLeft.test` is where that is asserted — the panel is rendered whole
+  there, so a rule scoped `.panelLeft .fui-AccordionPanel` is visible to it,
+  which it is not to any suite that renders the list on its own.
+*/
 

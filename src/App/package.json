@@ -69,6 +69,7 @@
     "eslint-plugin-react": "^7.37.5",
     "flatted": "^3.4.2",
     "jsdom": "^26.1.0",
+    "postcss-selector-parser": "^7.1.5",
     "rollup": "^4.59.0",
     "typescript": "^5.8.3",
     "vite": "7.3.2",

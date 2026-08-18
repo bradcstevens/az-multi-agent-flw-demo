@@ -416,3 +416,57 @@ describe('the list holds chats in every state', () => {
         expect(deleteItem()).not.toHaveAttribute('aria-disabled', 'true');
     });
 });
+
+/**
+ * What the list itself puts on screen (#178).
+ *
+ * The height it is allowed to be is asserted where the panel is rendered whole,
+ * in `ChatPanelLeft.test`: an ancestor-scoped rule such as `.panelLeft
+ * .fui-AccordionPanel` is a rule about this list, and it cannot be seen from a
+ * render that has no panel around it.
+ */
+describe('the chat list', () => {
+    it('renders every chat it has been given, not a windowful', () => {
+        /*
+          The claim the panel makes, asserted where it can be. The cap was a
+          stylesheet, so this passed while the surface hid nine of these — it
+          stands as the guard for the day someone answers a long history by
+          slicing the list in JavaScript instead.
+        */
+        const morning = Array.from({ length: 12 }, (_, i) =>
+            completed(`chat-${i}`, `Rehearsal question ${i}`),
+        );
+
+        renderList(morning);
+
+        for (const chat of morning) {
+            expect(screen.getByText(chat.name)).toBeInTheDocument();
+        }
+    });
+
+    it('still collapses when the heading is pressed', async () => {
+        /*
+          What the deleted rules were nominally for. `AccordionPanel` mounts
+          through a `Collapse` motion with `unmountOnExit`, so a closed panel is
+          not in the DOM at all and the `max-height: 0` pair was answering a
+          state that cannot occur — but "dead rule" is a claim about behaviour,
+          so it is asserted rather than reasoned about.
+        */
+        renderList(MORNING);
+
+        const heading = screen.getByRole('button', { name: /^Chats/ });
+        expect(heading).toHaveAttribute('aria-expanded', 'true');
+
+        fireEvent.click(heading);
+
+        expect(heading).toHaveAttribute('aria-expanded', 'false');
+        await waitFor(() =>
+            expect(screen.queryByText('How do I close the store?')).not.toBeInTheDocument(),
+        );
+
+        fireEvent.click(heading);
+
+        expect(heading).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByText('How do I close the store?')).toBeInTheDocument();
+    });
+});
