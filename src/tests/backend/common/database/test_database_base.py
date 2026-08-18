@@ -162,6 +162,12 @@ class TestDatabaseBaseImplementationRequirements:
             async def settle_turn(self, session_id: str, status) -> TurnSettled:
                 return TurnSettled(SettleOutcome.settled, status="completed")
 
+            # The Startup reconciliation's read (#159, ADR-047) — every Plan
+            # record's state, across every owner, which is what lets a starting
+            # process settle the turns it inherited.
+            async def plan_states(self):
+                return []
+
             # Chat deletion (#75, ADR-026) — the session-scoped operation the
             # surface's delete control means, distinct from the single-plan
             # primitive above.
@@ -270,6 +276,7 @@ class TestDatabaseBaseContextManager:
             async def update_current_team(self, current_team): pass
             async def delete_plan_by_plan_id(self, plan_id): return False
             async def settle_turn(self, session_id, status): return TurnSettled(SettleOutcome.settled)
+            async def plan_states(self): return []
             async def delete_chat(self, session_id): return ChatDeletion(DeletionOutcome.no_such_chat)
             async def delete_all_chats(self, team_id): return ChatsDeletion()
             async def add_mplan(self, mplan): pass
@@ -339,6 +346,7 @@ class TestDatabaseBaseContextManager:
             async def update_current_team(self, current_team): pass
             async def delete_plan_by_plan_id(self, plan_id): return False
             async def settle_turn(self, session_id, status): return TurnSettled(SettleOutcome.settled)
+            async def plan_states(self): return []
             async def delete_chat(self, session_id): return ChatDeletion(DeletionOutcome.no_such_chat)
             async def delete_all_chats(self, team_id): return ChatsDeletion()
             async def add_mplan(self, mplan): pass
@@ -443,7 +451,7 @@ class TestConcreteImplementation:
             'update_team', 'get_team', 'get_team_by_id', 'get_all_teams', 'delete_team',
             'get_data_by_type', 'get_all_items', 'get_steps_for_plan', 'get_current_team',
             'delete_current_team', 'set_current_team', 'update_current_team',
-            'delete_plan_by_plan_id', 'settle_turn', 'delete_chat', 'add_mplan', 'update_mplan', 'get_mplan',
+            'delete_plan_by_plan_id', 'settle_turn', 'plan_states', 'delete_chat', 'add_mplan', 'update_mplan', 'get_mplan',
             'add_agent_message', 'update_agent_message', 'get_agent_messages',
             'add_team_agent', 'delete_team_agent', 'get_team_agent'
         ]
@@ -515,6 +523,7 @@ class TestConcreteImplementation:
             async def update_current_team(self, current_team): pass
             async def delete_plan_by_plan_id(self, plan_id): return True
             async def settle_turn(self, session_id, status): return TurnSettled(SettleOutcome.settled)
+            async def plan_states(self): return []
             async def delete_chat(self, session_id): return ChatDeletion(DeletionOutcome.deleted)
             async def delete_all_chats(self, team_id): return ChatsDeletion()
             async def add_mplan(self, mplan): pass
@@ -588,6 +597,7 @@ class TestDatabaseBaseAbstractMethodCoverage:
             async def update_current_team(self, current_team): await super().update_current_team(current_team)
             async def delete_plan_by_plan_id(self, plan_id): return await super().delete_plan_by_plan_id(plan_id)
             async def settle_turn(self, session_id, status): return await super().settle_turn(session_id, status)
+            async def plan_states(self): return await super().plan_states()
             async def delete_chat(self, session_id): return await super().delete_chat(session_id)
             async def delete_all_chats(self, team_id): return await super().delete_all_chats(team_id)
             async def add_mplan(self, mplan): await super().add_mplan(mplan)

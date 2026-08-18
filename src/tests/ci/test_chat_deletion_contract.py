@@ -154,6 +154,38 @@ def test_the_single_plan_primitive_has_no_caller_left():
     assert callers == []
 
 
+def test_the_settled_status_set_still_has_exactly_three_members():
+    # ADR-026 §fail-closed, ADR-031 §5 and ADR-047 §5 all turn on this number.
+    # The way out of `in_progress` is to end the turn — including a turn a
+    # **Startup reconciliation** ends on the associate's behalf — and never to
+    # widen the set a delete will accept. A fourth member added here would make
+    # Chats deletable that no turn ever finished.
+    assert len(SETTLED_STATUSES) == 3
+
+
+def test_the_startup_reconciliation_writes_a_status_the_set_already_had():
+    # #159, ADR-047: the pass settles the turns a starting process inherited,
+    # and it does it by writing a status the guard already accepted rather than
+    # by teaching the guard a new one. Imported, not read as text: a constant
+    # that stopped being a member would still spell one.
+    from chat.reconcile import RECONCILED_STATUS
+
+    assert RECONCILED_STATUS.value in SETTLED_STATUSES
+
+
+def test_the_reconciliation_decides_by_the_deletion_rule_rather_than_its_own():
+    # Two predicates for "is this chat running" is the shape that drifts, and
+    # the drift here settles a live turn. `chat/reconcile.py` calls
+    # `is_running` — the same total, fail-closed rule the delete refuses on —
+    # so the pass and the guard cannot come to different conclusions about one
+    # record.
+    reconcile = REPO_ROOT / "src" / "backend" / "chat" / "reconcile.py"
+    source = reconcile.read_text(encoding="utf-8")
+
+    assert re.search(r"^from chat\.deletion import .*\bis_running\b", source, re.M)
+    assert re.search(r"\bis_running\(", source)
+
+
 def test_the_canceled_status_is_one_something_writes():
     # ADR-031: `canceled` sat in the settled-status set above, in its frontend
     # mirror and in `chatStateLabel` while **nothing in `src/backend` could

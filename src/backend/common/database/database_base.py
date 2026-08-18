@@ -237,6 +237,19 @@ class DatabaseBase(ABC):
         pass
 
     @abstractmethod
+    async def plan_states(self) -> List[Dict[str, Any]]:
+        """Every Plan record's state, across every owner (#159, ADR-047).
+
+        What a **Startup reconciliation** decides from, and the one read on this
+        interface that is *not* scoped to the client's ``user_id``: the pass runs
+        before any request has arrived, on behalf of no associate. The status is
+        deliberately not filtered — the fail-closed rule for which Plans still
+        claim to run lives whole in ``chat.reconcile``, because a store-side
+        predicate would omit the Plans that carry no status at all.
+        """
+        pass
+
+    @abstractmethod
     async def delete_chat(self, session_id: str) -> ChatDeletion:
         """Delete one Chat: every document in its session partition (ADR-026).
 

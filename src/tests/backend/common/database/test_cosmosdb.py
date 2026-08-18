@@ -1838,6 +1838,123 @@ class TestTheSettleWrite:
         assert client.container.patch_item.call_args.args[0] == "plan-7"
 
 
+class TestEveryPlansState:
+    """The cross-user read a **Startup reconciliation** decides from (#159).
+
+    Deliberately *not* the reads beside it. Everything else in this file is
+    scoped to one owner because it answers for one associate's conversation; this
+    one runs before any request has arrived, on behalf of no user at all, and it
+    is the only read here that is allowed to see every Chat.
+
+    Its other decision is what it does **not** ask Cosmos. The status filter is
+    left to ``chat.reconcile``, because a Plan carrying no ``overall_status`` is
+    exactly the record fail-closed calls running — and a ``WHERE`` clause over a
+    field the document does not have omits it. The rule is total in one place
+    rather than approximated in two.
+    """
+
+    @pytest.fixture
+    def client(self):
+        client = CosmosDBClient(
+            endpoint="https://test.documents.azure.com:443/",
+            credential="test_credential",
+            database_name="test_db",
+            container_name="test_container",
+            session_id="",
+            user_id="",
+        )
+        client._initialized = True
+        client.container = AsyncMock()
+        return client
+
+    @staticmethod
+    def _cosmos(client, rows=(), raises=None):
+        def query_items(**kwargs):
+            async def cursor():
+                if raises is not None:
+                    raise raises
+                for row in rows:
+                    yield row
+
+            return cursor()
+
+        client.container.query_items = Mock(side_effect=query_items)
+
+    @pytest.mark.asyncio
+    async def test_every_plan_comes_back_with_what_names_and_settles_it(
+        self, client
+    ):
+        self._cosmos(
+            client,
+            rows=[
+                {
+                    "id": "plan-1",
+                    "session_id": "session-1",
+                    "user_id": "user-1",
+                    "overall_status": PlanStatus.in_progress.value,
+                }
+            ],
+        )
+
+        assert await client.plan_states() == [
+            {
+                "id": "plan-1",
+                "session_id": "session-1",
+                "user_id": "user-1",
+                "overall_status": PlanStatus.in_progress.value,
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_the_read_is_of_plans_and_of_nobody_in_particular(self, client):
+        # No `user_id` predicate, and that is the difference between this read
+        # and every other one in this file: the pass runs on behalf of no user,
+        # and one scoped to an empty owner would answer for nobody's chats.
+        self._cosmos(client)
+
+        await client.plan_states()
+
+        asked = client.container.query_items.call_args.kwargs
+        where = asked["query"].split("WHERE")[1]
+        assert "c.data_type=@data_type" in where
+        assert "c.user_id" not in where
+        assert asked["parameters"] == [
+            {"name": "@data_type", "value": DataType.plan}
+        ]
+
+    @pytest.mark.asyncio
+    async def test_the_status_is_not_filtered_in_the_query(self, client):
+        # Cosmos omits from a predicate any document missing the field it
+        # names, so a `WHERE` clause on `overall_status` would drop precisely
+        # the Plans fail-closed treats as running — the silent failure #165
+        # documents for `ORDER BY`, in the one place it would settle nothing.
+        self._cosmos(client)
+
+        await client.plan_states()
+
+        assert "overall_status" not in (
+            client.container.query_items.call_args.kwargs["query"].split("WHERE")[1]
+        )
+
+    @pytest.mark.asyncio
+    async def test_the_rows_are_read_raw(self, client):
+        # `query_items` drops a document it cannot validate and turns an outage
+        # into an empty list, either of which reads here as "nothing is stuck".
+        self._cosmos(client, rows=[{"id": "plan-1"}])
+
+        assert await client.plan_states() == [{"id": "plan-1"}]
+
+    @pytest.mark.asyncio
+    async def test_a_store_that_cannot_answer_says_so(self, client):
+        # Raised rather than reported as an empty backlog: a pass that examined
+        # nothing because Cosmos was down must not print the line an operator
+        # reads as "nothing was stuck".
+        self._cosmos(client, raises=RuntimeError("cosmos is having a day"))
+
+        with pytest.raises(RuntimeError):
+            await client.plan_states()
+
+
 class TestDeleteAllChats:
     """The list-level control, at the store (#76, ADR-026).
 

@@ -865,6 +865,47 @@ class CosmosDBClient(DatabaseBase):
 
         return ChatDeletion.swept(deleted=deleted, failed=failed)
 
+    async def plan_states(self) -> List[Dict[str, Any]]:
+        """Every **Plan record**'s state, across every owner (#159, ADR-047).
+
+        The read a **Startup reconciliation** decides from, and the only one in
+        this class that is not scoped to ``self.user_id``. That is deliberate
+        rather than an omission: the pass runs before any request has arrived, on
+        behalf of no associate, and a read predicated on an empty owner would
+        answer for nobody's chats. Its authorization is the moment it runs — a
+        process reconciling what it inherited — not an identity it does not have.
+
+        **The status is not filtered here**, and that is the load-bearing part.
+        Cosmos omits from a predicate any document missing the field it names, so
+        a ``WHERE`` clause on ``overall_status`` would silently drop exactly the
+        Plans ``is_running`` calls running — the same trap #165 documents for
+        ``ORDER BY``, in the one place where the consequence is a backlog that
+        reports itself clear. The whole rule therefore lives in
+        ``chat.reconcile``, total and in one piece, and this method's only job is
+        to hand it the rows.
+
+        Read **raw**, for the reason ``delete_chat`` documents: the shared
+        ``query_items`` helper drops a document it cannot validate and turns a
+        store failure into an empty list, and both read here as *nothing is
+        stuck*. Four fields, because that is what names a Chat, decides whether
+        it is running, and identifies the row in a log.
+
+        Raises rather than reporting an empty backlog. A pass that examined
+        nothing because the store could not answer must not print the line an
+        operator reads as *nothing was stuck*.
+        """
+        await self._ensure_initialized()
+
+        rows = self.container.query_items(
+            query=(
+                "SELECT c.id, c.session_id, c.user_id, c.overall_status "
+                "FROM c WHERE c.data_type=@data_type"
+            ),
+            parameters=[{"name": "@data_type", "value": DataType.plan}],
+        )
+
+        return [row async for row in rows]
+
     async def _latest_plan(self, session_id: str):
         """The Chat's latest Plan, read raw: status, id, ``_etag``, found.
 

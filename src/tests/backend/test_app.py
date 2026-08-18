@@ -10,6 +10,7 @@ when running the full test suite due to test collection order. If v4 is mocked b
 this file is imported, the tests will be skipped.
 """
 
+import asyncio
 import pytest
 import sys
 import os
@@ -340,3 +341,180 @@ def test_health_check_middleware_configured():
 
 
 
+
+
+class TestStartupReconciliation:
+    """A turn nobody is running is settled at startup (#159, ADR-047).
+
+    The wiring, not the rule: which records get settled is decided in
+    ``chat/reconcile.py`` and asserted at that seam. What has to hold *here* is
+    that a starting process asks at all, that it asks across every owner, that
+    it says what it did, and that a pass which could not run leaves the
+    application serving.
+    """
+
+    @staticmethod
+    def _factory(plans, settled=None):
+        """``DatabaseFactory``, stood in for at the two calls startup makes."""
+        # Imported by the path the application itself uses: `backend.app`
+        # reaches the reconciliation as `chat.reconcile`, and a second copy of
+        # `SettleOutcome` under `backend.chat.settle` is a different enum whose
+        # members are identical to and not the same as these.
+        from chat.settle import SettleOutcome, TurnSettled
+
+        store = MagicMock()
+        store.plan_states = AsyncMock(return_value=plans)
+        store.settle_turn = AsyncMock(
+            return_value=settled or TurnSettled(SettleOutcome.settled, "canceled")
+        )
+        factory = MagicMock()
+        factory.get_database = AsyncMock(return_value=store)
+        return factory, store
+
+    @pytest.mark.asyncio
+    async def test_a_chat_left_claiming_to_run_is_settled_on_startup(self):
+        import backend.app as app_module
+        from backend.common.models.messages import PlanStatus
+
+        factory, store = self._factory(
+            [{
+                "id": "plan-1",
+                "session_id": "sess-1",
+                "user_id": "user-1",
+                "overall_status": PlanStatus.in_progress.value,
+            }]
+        )
+
+        with patch.object(app_module, "DatabaseFactory", factory):
+            reconciled = await app_module.settle_inherited_turns()
+
+        assert reconciled.settled == ("sess-1",)
+        store.settle_turn.assert_awaited_once_with("sess-1", PlanStatus.canceled)
+
+    @pytest.mark.asyncio
+    async def test_a_settled_chat_is_left_exactly_as_it_is(self):
+        import backend.app as app_module
+        from backend.common.models.messages import PlanStatus
+
+        factory, store = self._factory(
+            [{
+                "id": "plan-1",
+                "session_id": "sess-1",
+                "user_id": "user-1",
+                "overall_status": PlanStatus.completed.value,
+            }]
+        )
+
+        with patch.object(app_module, "DatabaseFactory", factory):
+            reconciled = await app_module.settle_inherited_turns()
+
+        assert reconciled.settled == ()
+        store.settle_turn.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_the_pass_says_what_it_settled(self, caplog):
+        # An operator has to be able to tell a cleared backlog from a
+        # reconciliation that never ran, and this line is where.
+        import logging
+
+        import backend.app as app_module
+        from backend.common.models.messages import PlanStatus
+
+        factory, _store = self._factory(
+            [{
+                "id": "plan-1",
+                "session_id": "sess-1",
+                "user_id": "user-1",
+                "overall_status": PlanStatus.in_progress.value,
+            }]
+        )
+
+        with patch.object(app_module, "DatabaseFactory", factory):
+            with caplog.at_level(logging.INFO):
+                await app_module.settle_inherited_turns()
+
+        assert any(
+            "Startup reconciliation" in record.message
+            and "settled 1 as canceled" in record.message
+            for record in caplog.records
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_pass_that_could_not_run_says_so_rather_than_nothing(
+        self, caplog
+    ):
+        import logging
+
+        import backend.app as app_module
+
+        factory = MagicMock()
+        factory.get_database = AsyncMock(side_effect=RuntimeError("no cosmos"))
+
+        with patch.object(app_module, "DatabaseFactory", factory):
+            with caplog.at_level(logging.ERROR):
+                reconciled = await app_module.settle_inherited_turns()
+
+        assert reconciled is None
+        assert any(
+            "Startup reconciliation did not run" in record.message
+            for record in caplog.records
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_reconciliation_that_fails_does_not_stop_the_app_starting(
+        self,
+    ):
+        # A store that cannot answer is a demonstration that boots without its
+        # backlog cleared — the state it is in today. Refusing to serve would
+        # turn a stale row into an outage.
+        import backend.app as app_module
+
+        factory = MagicMock()
+        factory.get_database = AsyncMock(side_effect=RuntimeError("no cosmos"))
+
+        with patch.object(app_module, "DatabaseFactory", factory):
+            async with lifespan(app):
+                pass
+
+    @pytest.mark.asyncio
+    async def test_startup_reconciles_before_the_application_serves(self):
+        # Inside the lifespan's startup half, so the backlog is cleared by the
+        # time the first request could arrive.
+        import backend.app as app_module
+        from backend.common.models.messages import PlanStatus
+
+        factory, store = self._factory(
+            [{
+                "id": "plan-1",
+                "session_id": "sess-1",
+                "user_id": "user-1",
+                "overall_status": PlanStatus.in_progress.value,
+            }]
+        )
+
+        with patch.object(app_module, "DatabaseFactory", factory):
+            async with lifespan(app):
+                store.settle_turn.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_store_that_hangs_does_not_hold_the_process_short_of_ready(
+        self,
+    ):
+        # Blocking and never finishing are different things. The pass must
+        # finish before the application serves — a pass still running while
+        # requests arrive could settle a turn that started after it read — but
+        # an unbounded wait turns the one operation explicitly allowed to fail
+        # into a restart loop.
+        import backend.app as app_module
+
+        async def _never(*_args, **_kwargs):
+            await asyncio.sleep(3600)
+
+        factory = MagicMock()
+        factory.get_database = _never
+
+        with patch.object(app_module, "DatabaseFactory", factory):
+            with patch.object(app_module, "RECONCILIATION_TIMEOUT_SECONDS", 0.01):
+                reconciled = await app_module.settle_inherited_turns()
+
+        assert reconciled is None

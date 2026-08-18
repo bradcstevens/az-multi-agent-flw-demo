@@ -1,6 +1,8 @@
 # app.py
+import asyncio
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from common.config.app_config import config
 
@@ -9,7 +11,9 @@ logging.basicConfig(level=getattr(logging, config.AZURE_BASIC_LOGGING_LEVEL.uppe
 
 from api.router import app_router
 from azure.monitor.opentelemetry import configure_azure_monitor
+from chat.reconcile import Reconciliation, reconcile_turns
 from common.config.app_config import config
+from common.database.database_factory import DatabaseFactory
 from common.models.messages import UserLanguage
 from config.agent_registry import agent_registry
 # FastAPI imports
@@ -27,7 +31,69 @@ from patches import magentic_duplicate_fc_id
 
 magentic_duplicate_fc_id.apply()
 
+# How long the **Startup reconciliation** may hold the process short of ready.
+# Bounded because a store that hangs would otherwise hold this process until the
+# platform restarted it, and then hold the next one — a restart loop caused by
+# the one operation that is explicitly allowed to fail.
+RECONCILIATION_TIMEOUT_SECONDS = 30
+
 # Azure monitoring
+
+
+async def settle_inherited_turns() -> Optional[Reconciliation]:
+    """**Startup reconciliation** — settle the turns this process inherited.
+
+    #159, ADR-047. A turn runs inside an ``asyncio.Task`` held in memory by the
+    process serving it, so a **Plan record** a *starting* process finds at an
+    unsettled status describes a turn that no longer exists anywhere. Settling it
+    reports what happened; it does not infer it. The backlog ADR-031 named —
+    rows no exposed route can clear — therefore clears itself on the next deploy.
+
+    Here rather than in a route because *starting* is the whole of the argument.
+    The rule reaches only what this process inherited, and it is safe only while
+    one process is all there is: ``infra/bicep/main.bicep`` pins every Container
+    App to one replica and the ``single-replica`` preflight check fails the moment
+    that stops being true. See ADR-047 before widening it.
+
+    **Awaited before the application serves, and bounded.** It must finish first —
+    a pass still running while requests arrive could settle a turn that started
+    after it read, which is the one direction of error ADR-043 exists to prevent.
+    But *blocking* and *never finishing* are different things: a store that hangs
+    would hold the process short of ready until the platform restarted it, and
+    then hold the next one, so the wait is bounded and a pass that overruns is
+    abandoned exactly like one that raised.
+
+    **A reconciliation that could not run does not stop the application
+    starting.** A store that cannot answer is a demonstration that boots without
+    its backlog cleared, which is the state it is in today; refusing to serve
+    would turn a stale row into an outage. It is logged as *did not run* rather
+    than as an empty backlog, because those are different facts and only one of
+    them means the rows are gone.
+    """
+    logger = logging.getLogger(__name__)
+
+    try:
+        reconciled = await asyncio.wait_for(
+            _reconcile_inherited_turns(), timeout=RECONCILIATION_TIMEOUT_SECONDS
+        )
+    except Exception:
+        logger.error(
+            "Startup reconciliation did not run to completion: chats left "
+            "claiming to run by an earlier process may still be undeletable",
+            exc_info=True,
+        )
+        return None
+
+    logger.info("Startup reconciliation: %s", reconciled.summary)
+    return reconciled
+
+
+async def _reconcile_inherited_turns() -> Reconciliation:
+    """The pass itself: read every Plan's state, settle the ones nobody is running."""
+    store = await DatabaseFactory.get_database()
+    return await reconcile_turns(
+        await store.plan_states(), DatabaseFactory.get_database
+    )
 
 
 @asynccontextmanager
@@ -37,6 +103,7 @@ async def lifespan(app: FastAPI):
 
     # Startup
     logger.info("Starting MACAE application...")
+    await settle_inherited_turns()
     yield
 
     # Shutdown

@@ -244,8 +244,39 @@ is the rest of it. The **Plan record** used to sit at `in_progress` for ever, wh
 would take, because the only writer of a **Settled status** was the browser that had gone; ADR-043
 has the server settle the turn it ended, so an abandoned turn's answer is still lost — but lost under
 an accurate label rather than under a claim to still be working. Not a turn that was lost, but one
-whose loss the surface went on denying.
+whose loss the surface went on denying. The rows abandoned *before* that decision are cleared by the
+**Startup reconciliation** below, which is what makes ADR-031's named gap recoverable rather than
+permanent: browser back and a closed tab still abandon a turn and are still not detected as they
+happen, but they no longer strand a row for ever.
 _Avoid_: orphaned plan, stuck plan, stale chat
+
+**Startup reconciliation** — a starting process settling the turns it inherited (#159,
+[ADR-047](docs/ADR/047-a-turn-nobody-is-running-is-settled-at-startup.md)). A turn runs inside an
+`asyncio.Task` held in memory by the process serving it, so a **Plan record** a *starting* process
+finds at an unsettled status describes a turn that no longer exists anywhere — and writing `canceled`
+onto it is reporting what happened, not inferring it from a clock. That is why it is not a sweeper
+and not a timeout: every other moment would have to decide *whether* a turn is still running, and
+this one knows. It runs in the FastAPI lifespan's startup half
+(`settle_inherited_turns`, `src/backend/app.py`), decides in
+`src/backend/chat/reconcile.py`, and writes through **the settle-write** — session-scoped, naming no
+Plan, inheriting every rule on that write including *never overwrite a Settled status*.
+
+The scope is the decision. It reaches only what **this process** inherited, and that is safe only
+while one process is all there is: a second replica may be mid-turn on a Chat this one knows nothing
+about, and settling it would stamp a terminal status onto a live answer's record. The deployed
+environment runs exactly one replica — `infra/bicep/main.bicep` pins every Container App to it and
+the `single-replica` check in `docs/preflight/deployed-environment.md` fails the moment that stops
+being true — so the answer was established rather than assumed, and the rule does not widen with it
+if it changes. One replica is **not** one process during a rollout: those settings are per revision,
+and a revision swap runs the new process to ready while the old one still serves, so a deploy is a
+window in which this pass can reach a turn another process is computing. The cost is bounded to a
+mislabelled status and is weighed in ADR-047; closing it needs durable turn ownership. A Plan naming
+no session or no owner is left alone and **counted**, because no
+settle-write can reach it and the conservative direction is the one that leaves a row stuck. A
+reconciliation that could not run does not stop the application starting, and says *did not run*
+rather than reporting an empty backlog: those are different facts and only one of them means the rows
+are gone.
+_Avoid_: sweeper, cleanup job, stale-plan reaper
 
 **Ending a turn** — the one primitive behind every end-of-turn behaviour, with one declaration in
 `src/backend/chat/turn.py` and one route, `POST /api/v4/chats/{session_id}/end_turn` (#120,
@@ -1442,7 +1473,12 @@ turn finishing inside that window settles nothing rather than stamping its succe
 and **neither when it is cancelled**, because a cancelled turn is `canceled` through **Leaving a
 Chat**'s writer rather than a failure through this one. `error`, the word the orchestration
 broadcasts, is not a status: it maps onto `failed` here and is refused by the settle-write before
-the store is touched, so no fourth member is coined by accident.
+the store is touched, so no fourth member is coined by accident. Its third caller is the
+**Startup reconciliation**, which settles the turns a starting process inherited and is the reason
+the backlog ADR-031 named clears itself on a deploy
+([ADR-047](docs/ADR/047-a-turn-nobody-is-running-is-settled-at-startup.md)). It writes `canceled`
+through the same operation and widens nothing: the set still has three members and `is_running` is
+still fail-closed, so more Chats become deletable only because more turns actually ended.
 _Avoid_: terminal state, final status, deletable status
 
 **Chat deletion** — an irreversible removal of a **Chat**. It deletes every document in that
