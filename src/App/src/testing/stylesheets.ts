@@ -140,51 +140,129 @@ export const isRendered = (className: string): boolean =>
     sourceFiles().some((path) => readFileSync(path, 'utf8').includes(className));
 
 /**
- * Every stylesheet the application **actually loads**, derived from the imports
- * that load them rather than from a directory listing.
+ * Every stylesheet the application **actually loads**, walked from the entry
+ * point the browser starts at rather than listed or globbed.
  *
- * The list used to be `index.css` plus `src/styles/*.css`, which is neither the
- * set the browser loads nor a superset of it. `App.tsx` imports `App.css` from
- * `src/`, so every rule in it was invisible to every assertion here — and what
- * it holds is a third copy of the chat list's row rules. Meanwhile three
- * stylesheets under `commonComponents/` are imported by nothing at all, so a
- * directory listing would have made dead files evidence.
+ * Three inventories have been wrong here in turn. `index.css` plus
+ * `src/styles/*.css` missed `App.css`, which `App.tsx` imports from `src/` and
+ * which holds a third copy of the chat list's row rules, so every rule in it
+ * was invisible to every assertion in this file. Scanning *every* source file's
+ * imports then over-corrected: `commonComponents/modules/Chat.tsx` and
+ * `ChatExample.tsx` are imported by nothing, and they are the only importers of
+ * the three stylesheets under `commonComponents/` — so dead files became
+ * evidence, which is worse than missing evidence because it looks like proof.
  *
- * Derived, for #58's reason one level up: a *list* of stylesheets in a helper
- * agrees with itself forever, while an import is what actually loads one. A
- * stylesheet added tomorrow is covered the moment something imports it, and a
- * stylesheet nobody imports never is.
+ * Reachability from `index.tsx` is the only definition that matches what the
+ * browser loads, and it is derived, for #58's reason one level up: a *list* of
+ * stylesheets agrees with itself forever, while an import graph keeps agreeing
+ * with the application. A stylesheet is covered the moment something the entry
+ * point can reach imports it, and never while nothing does.
  */
-export const loadedStylesheets = (): { file: string; path: string }[] => {
-    const imported = new Set<string>();
+export const ENTRY_POINT = join(SRC, 'index.tsx');
 
-    for (const source of sourceFiles()) {
-        const code = readFileSync(source, 'utf8');
-        for (const match of code.matchAll(/import\s+['"]([^'"]+\.css)['"]/g)) {
-            const specifier = match[1];
-            imported.add(
-                specifier.startsWith('@/')
-                    ? join(SRC, specifier.slice(2))
-                    : resolve(dirname(source), specifier),
-            );
+const withoutAnyComments = (code: string): string =>
+    code.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+
+/**
+ * One import specifier, resolved the way the bundler resolves it. A bare
+ * specifier is a package and stops the walk; `@/` is the alias `vite.config`
+ * and `tsconfig` both point at `src`.
+ */
+const resolveImport = (from: string, specifier: string): string | null => {
+    if (!specifier.startsWith('.') && !specifier.startsWith('@/')) return null;
+
+    const base = specifier.startsWith('@/')
+        ? join(SRC, specifier.slice(2))
+        : resolve(dirname(from), specifier);
+
+    const candidates = [
+        base,
+        `${base}.ts`,
+        `${base}.tsx`,
+        join(base, 'index.ts'),
+        join(base, 'index.tsx'),
+    ];
+
+    return candidates.find((path) => existsSync(path) && statSync(path).isFile()) ?? null;
+};
+
+/**
+ * The inventory, computed once per test process.
+ *
+ * Cached because it is read *per call*, and some suites call it per table cell:
+ * the walk reads every reachable module and every stylesheet, so an uncached
+ * inventory turned a cheap `readdir` into hundreds of file reads per suite. It
+ * measurably starved the rest of the run — `index.test.tsx`'s bootstrap test,
+ * which is already close to its 5s budget on this machine, went from failing
+ * one full-suite run in four to three in four. Nothing writes a stylesheet
+ * while a process is running, so the answer cannot go stale within one.
+ */
+let inventory: { file: string; path: string }[] | null = null;
+
+export const loadedStylesheets = (): { file: string; path: string }[] => {
+    if (inventory !== null) return inventory;
+
+    const stylesheets = new Set<string>();
+    const walked = new Set<string>();
+    const queue = [ENTRY_POINT];
+
+    while (queue.length > 0) {
+        const module = queue.pop() as string;
+        if (walked.has(module)) continue;
+        walked.add(module);
+
+        const code = withoutAnyComments(readFileSync(module, 'utf8'));
+        /*
+          Static, re-exported and dynamic alike: `import x from 'y'`, the
+          side-effect `import 'y'` that loads every stylesheet here, and
+          `await import('y')`.
+
+          `export … from` is not optional. Half this application's modules are
+          reached through a barrel — `pages/index.tsx`, `models/index.tsx`,
+          `store/index.ts`, `api/index.tsx` — and a barrel re-exports rather
+          than imports, so a walk that reads only `import` stops dead at the
+          first one and reports two stylesheets for the whole surface.
+        */
+        for (const match of code.matchAll(/\b(?:import|export)\b[^'"();]*\(?\s*['"]([^'"]+)['"]/g)) {
+            const resolved = resolveImport(module, match[1]);
+            if (resolved === null) continue;
+            if (resolved.endsWith('.css')) stylesheets.add(resolved);
+            else if (/\.tsx?$/.test(resolved)) queue.push(resolved);
         }
     }
 
-    return Array.from(imported)
-        .filter((path) => existsSync(path))
+    inventory = Array.from(stylesheets)
         .sort()
         .map((path) => ({ file: relative(SRC, path), path }));
+
+    return inventory;
 };
 
-/** Every top-level rule in every stylesheet the surface loads. */
+/**
+ * Every top-level rule in every stylesheet the surface loads.
+ *
+ * Reads the same inventory as `allRulesIncludingMediaQueries`, because two
+ * answers to "which stylesheets are there" is two answers to every question
+ * asked of them — the defect class this repository has already paid for with
+ * widths (#58) and breakpoints (#66). The difference between the two readers is
+ * what they read *inside* a stylesheet, and nothing else.
+ *
+ * Parsed once per process, for the reason the inventory is: these are called
+ * inside loops over cells and rules, and re-parsing every stylesheet each time
+ * is load the rest of the suite pays for in timeouts.
+ */
+let topLevelRules: Rule[] | null = null;
+
 export const allRules = (): Rule[] =>
-    readdirSync(STYLES)
-        .filter((entry) => entry.endsWith('.css'))
-        .flatMap((entry) => rulesIn(readFileSync(join(STYLES, entry), 'utf8'), entry));
+    (topLevelRules ??= loadedStylesheets().flatMap(({ file, path }) =>
+        rulesIn(readFileSync(path, 'utf8'), file),
+    ));
 
 /** Every rule the stylesheets declare, inside media queries as well as out. */
+let everyRule: Rule[] | null = null;
+
 export const allRulesIncludingMediaQueries = (): Rule[] =>
-    loadedStylesheets().flatMap(({ file, path }) => {
+    (everyRule ??= loadedStylesheets().flatMap(({ file, path }) => {
         const css = withoutComments(readFileSync(path, 'utf8'));
         // Media-query bodies are parsed as their own stylesheets, so a rule
         // inside one is read exactly like a rule outside one.
@@ -201,4 +279,4 @@ export const allRulesIncludingMediaQueries = (): Rule[] =>
             return [];
         });
         return [...rulesIn(css, file), ...inner];
-    });
+    }));
